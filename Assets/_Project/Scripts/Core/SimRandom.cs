@@ -5,6 +5,15 @@ namespace Nova.Core
     /// <summary>
     /// Fast, seedable, bit-exact XorShift128+ implementation for deterministic simulation.
     /// Provides identical random sequences across platforms (ARM / x86).
+    /// <para>
+    /// Implements <c>XorShift128PlusV1</c> per docs/tech/SimulationCore.md section 1:
+    /// two uint64 state words, canonical xorshift128+ transitions with the
+    /// (23, 17, 26) shift triple. The spec fixes neither seeding nor the 64-to-32
+    /// bit output reduction; both are implementation details pinned by the
+    /// golden-vector tests (SimRandomGoldenTests). Seeding uses a SplitMix64 mix
+    /// of the seed; <see cref="NextUInt"/> emits the high 32 bits of the
+    /// xorshift128+ sum output.
+    /// </para>
     /// </summary>
     public sealed class SimRandom : ISimRandom
     {
