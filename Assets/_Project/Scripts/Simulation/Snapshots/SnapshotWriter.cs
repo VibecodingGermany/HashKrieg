@@ -41,10 +41,19 @@ namespace Nova.Simulation.Snapshots
         /// Adds a named block. <paramref name="blockId"/> must be unique;
         /// a duplicate throws <see cref="ArgumentException"/> because a
         /// duplicate id is a structural error and must never be serialized.
+        /// Adding more than 65.535 blocks (u16 table width) throws
+        /// <see cref="InvalidOperationException"/> instead of silently
+        /// wrapping the serialized block count.
         /// The content is copied; later caller mutations cannot leak in.
         /// </summary>
         public void AddBlock(ushort blockId, ReadOnlySpan<byte> content)
         {
+            if (_ids.Count >= ushort.MaxValue)
+            {
+                throw new InvalidOperationException(
+                    "Snapshot exceeds the maximum block count of 65535 (u16 table); " +
+                    "this is a structural error.");
+            }
             for (int i = 0; i < _ids.Count; i++)
             {
                 if (_ids[i] == blockId)

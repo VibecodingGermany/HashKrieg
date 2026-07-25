@@ -111,6 +111,21 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void Writer_BlockCountBeyondUInt16_ThrowsStructuralError()
+        {
+            var writer = new SnapshotWriter();
+            for (int i = 0; i < ushort.MaxValue; i++)
+            {
+                writer.AddBlock(unchecked((ushort)(i + 1)), ReadOnlySpan<byte>.Empty);
+            }
+            // The 65.536th block would silently wrap the u16 block-count
+            // field; the writer must reject it instead.
+            Assert.That(
+                () => writer.AddBlock(0, ReadOnlySpan<byte>.Empty),
+                Throws.InvalidOperationException);
+        }
+
+        [Test]
         public void Reader_ZeroBlockCount_IsRejectedAsEmptyBlockTable()
         {
             byte[] file = SnapshotV1TestUtil.CreateSampleWriter().ToArray();
