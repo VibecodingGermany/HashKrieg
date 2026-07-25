@@ -1,6 +1,6 @@
 # Kanonischer Simulationskern
 
-**Version:** 1.1.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
+**Version:** 1.1.1 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
@@ -175,7 +175,9 @@ Unity und SimRunner dürfen keine nachgebauten Serializer oder Sim-Kopien besitz
 Unity und `Nova.SimRunner` kompilieren dieselben `Nova.Core`-,
 `Nova.Simulation`- und gegebenenfalls `Nova.AI`-Quellen mit denselben
 determinismusrelevanten Defines. Getrennte, versionierte Projekte sind zulässig;
-kopierte Logik ist es nicht.
+kopierte Logik ist es nicht. Der verbindliche Determinismus-Define heißt
+`NOVA_FIXED_POINT`; das Unity-Projekt und
+`tools/Nova.SimRunner/Nova.SimRunner.csproj` setzen ihn identisch.
 
 G1 verlangt auf Windows x64 und macOS arm64:
 
@@ -223,3 +225,4 @@ Tie-Break.
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Kanonischen Fixed-Point-, State-, Hash-, Snapshot- und Replay-Vertrag gemäß D-057/D-058 festgelegt | Lead Technical Director |
 | 1.1.0 | 2026-07-24 | Zahlenbereich, ID-Bitlayout, Nullterminierung der Hashdomänen und Command-Kappen bytegenau geschlossen | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | `NOVA_FIXED_POINT` als verbindlichen Determinismus-Define-Namen für Unity und SimRunner in §9 festgelegt | Lead Technical Director |

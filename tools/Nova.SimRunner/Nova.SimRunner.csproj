@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Nova.SimRunner</RootNamespace>
+    <!-- Determinism define shared with the Unity host (docs/tech/SimulationCore.md
+         section 9). No canonical name existed in the tech contracts, so
+         NOVA_FIXED_POINT is introduced here and ratified in SimulationCore.md. -->
+    <DefineConstants>$(DefineConstants);NOVA_FIXED_POINT</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Assets\_Project\Scripts\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\_Project\Scripts\Simulation\**\*.cs" Link="Simulation\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
