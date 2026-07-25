@@ -195,6 +195,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   eindeutige Run-IDs — PR-Event-Runs, reine Integrity-Runs und
   Run-Wiederverwendung werden abgelehnt; neue Generator-Kontrollen mit
   gemockter GitHub-API (kein Netzwerk im Self-Test).
+- **G1-Command-Pfad, Review-Nachzügler:** `CommandDedupeState.TryDeserialize`
+  wirft bei manipuliertem Snapshot mit doppeltem Pending-Schlüssel nicht mehr
+  (`ArgumentException`), sondern liefert `false` ohne Teilmutation; jeder
+  deserialisierte Pending-Record wird zusätzlich inhaltlich gegen die
+  §4-Grundregeln revalidiert (Slot-/Block-Konsistenz, Stream-Kind statt
+  Session-Aktion, Sequenz ≠ 0, kanonischer Payload) und der Ingress lehnt
+  Snapshots mit Pending-Records auf für die Session inaktiven Slots ganz ab.
+  `CommandIngress.TryAcceptRecordBytes` erzwingt jetzt
+  `consumed == bytes.Length` — Trailing-Bytes hinter einem validen Record sind
+  ein struktureller Framing-Fehler (neuer Grund `TrailingBytes`), auf dem
+  Live- wie auf dem Replay-Import-Pfad. Tests für alle Fälle in beiden Lanes.
 
 ### Entschieden
 - **D-065 (Authorize-Run-Bindung der Evidence-Kette):** Replay-/Reuse-
@@ -284,6 +295,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - [ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) dokumentiert Testfehler, Integrationslücken, fehlende Akzeptanznachweise und Planungswidersprüche am eingefrorenen Stand `460290e`.
 - [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) ersetzt pauschale Modul-Fertigmeldungen durch sequenzielle Gates G0–G5.
 - Sprint-6-Abschluss, Sprint-7-GO, 445-PT-Verbindlichkeit sowie die ungültigen Schließungen Q-018/Q-019 wurden durch D-055 zurückgezogen; R-16 wurde reaktiviert und R-17 ergänzt.
+- [docs/tech/Commands.md](docs/tech/Commands.md) 1.1.1 (Review-Klarstellungen
+  ohne Vertragsänderung): Reflection-Restrisiko der kompilierseitig
+  erzwungenen Vertrauensgrenze dokumentiert, Vertrauensannahme des
+  öffentlichen Byte-Intake samt caller-seitiger Fingerprint-Prüfung beim
+  Replay-Import festgehalten und die Zustellungsannahme der Watermark-Dedupe
+  (zuverlässig geordnet je Spieler; Lücken-Fehlermodell als
+  Post-MVP-Netzwerk-Anforderung) präzisiert.
 
 ### Entfernt
 - Getrackte Build-Outputs unter `tools/Nova.SimRunner/bin/` sind aus dem
