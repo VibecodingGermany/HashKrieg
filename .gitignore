@@ -43,8 +43,10 @@ crashlytics-build.properties
 ExportedObj/
 sysinfo.txt
 
-# Unity generierte Solution-/Projektdateien
-*.csproj
+# Unity generierte Solution-/Projektdateien (nur Repo-Root; handgeschriebene
+# Tool-Projektdateien wie tools/Nova.SimRunner/Nova.SimRunner.csproj bleiben
+# versionierbar)
+/*.csproj
 *.unityproj
 *.sln
 *.slnx
@@ -67,6 +69,10 @@ tools/Nova.SimRunner/out/
 # Unity Asset Meta-Daten von ignorierten Ordnern
 /[Aa]ssets/[Aa]ssetStoreTools*
 /[Aa]ssets/[Pp]lugins/[Ee]ditor/JetBrains*
+
+# Unity-generiertes Purchasing-Artefakt (wird lokal vom Editor erzeugt)
+/[Aa]ssets/Resources/BillingMode.json
+/[Aa]ssets/Resources/BillingMode.json.meta
 
 # ── Node / Tooling (falls Build-Skripte hinzukommen) ───────────────────────
 node_modules/
