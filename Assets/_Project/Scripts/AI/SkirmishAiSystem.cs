@@ -90,7 +90,7 @@ namespace Nova.AI
                 _production.EnqueueUnitProduction(
                     playerId: _aiPlayerId,
                     def: in riflemanDef,
-                    spawnTransform: new Transform2D(45f, 45f),
+                    spawnTransform: new Transform2D(SimFixed.FromInt(45), SimFixed.FromInt(45)),
                     buildTimeTicks: 20
                 );
             }

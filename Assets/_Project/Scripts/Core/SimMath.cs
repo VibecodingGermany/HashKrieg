@@ -7,6 +7,16 @@ namespace Nova.Core
     /// Encapsulates all mathematical operations (Sqrt, Atan2, Sin, Cos, Floor, Clamp) in a single place.
     /// Per D-033 & CodingGuidelines §2.3, this wrapper uses IEEE-754 floats for the MVP phase,
     /// providing the single point of conversion for the Beta Fixed-Point (q31.32) transition.
+    /// <para>
+    /// Status after the Q-040(i) SimFixed migration: nothing authoritative
+    /// uses the float paths anymore — the canonical movement path computes
+    /// in <see cref="SimFixed"/>/<see cref="SimAngle"/> via the purely
+    /// integer <see cref="SimTrig"/>. Only the integer <see cref="Clamp(int, int, int)"/>
+    /// overload still has callers (prototype scaffolding and the command
+    /// adapter); the float transcendentals, the float Clamp overload, Floor
+    /// helpers and the float bit converters are caller-less and stay until
+    /// the remaining domain slices migrate.
+    /// </para>
     /// </summary>
     public static class SimMath
     {

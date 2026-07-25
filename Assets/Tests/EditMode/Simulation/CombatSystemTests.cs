@@ -19,8 +19,8 @@ namespace Nova.Simulation.Tests
             kernel.Start();
 
             // Attacker at (10, 10), Target at (12, 10) - distance 2.0 <= range 8.0
-            EntityId attackerId = entities.SpawnUnit(1, new Transform2D(10f, 10f), 5f);
-            EntityId targetId = entities.SpawnUnit(2, new Transform2D(12f, 10f), 5f, maxHealth: 20);
+            EntityId attackerId = entities.SpawnUnit(1, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId targetId = entities.SpawnUnit(2, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(10)), SimFixed.FromInt(5), maxHealth: 20);
 
             ref UnitState attacker = ref entities.GetUnitRef(attackerId);
             attacker.AttackTarget = targetId;

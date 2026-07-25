@@ -98,12 +98,16 @@ namespace Nova.Simulation.Production
 
                 if (item.IsComplete)
                 {
-                    // Spawn unit into EntityManager upon queue completion
+                    // Spawn unit into EntityManager upon queue completion.
+                    // Boundary conversion: content definitions stay float
+                    // until the production domain slice (Q-040(i) migrated
+                    // movement only); FromFloat never feeds the tick path here
+                    // beyond this spawn handoff.
                     _entityManager.SpawnUnit(
                         playerId: item.PlayerId,
                         initialTransform: item.SpawnTransform,
-                        moveSpeed: item.Definition.MoveSpeed,
-                        radius: item.Definition.Radius,
+                        moveSpeed: SimFixed.FromFloat(item.Definition.MoveSpeed),
+                        radius: SimFixed.FromFloat(item.Definition.Radius),
                         maxHealth: item.Definition.MaxHealth
                     );
 

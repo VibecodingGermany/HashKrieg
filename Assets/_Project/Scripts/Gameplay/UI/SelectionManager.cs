@@ -52,8 +52,9 @@ namespace Nova.Gameplay
                 ref readonly UnitState u = ref rawUnits[i];
                 if (!u.IsActive || u.PlayerId != playerId) continue;
 
-                float px = u.Transform.PositionX;
-                float py = u.Transform.PositionY;
+                // Presentation-side boundary conversion (selection is UI, not sim).
+                float px = u.Transform.PositionX.ToFloat();
+                float py = u.Transform.PositionY.ToFloat();
 
                 if (px >= minX && px <= maxX && py >= minY && py <= maxY)
                 {

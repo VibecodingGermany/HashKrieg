@@ -43,7 +43,9 @@ namespace Nova.Simulation.Factions
                 ref UnitState u = ref units[i];
                 if (!u.IsActive || u.CurrentHealth >= u.MaxHealth) continue;
 
-                if (_biomassGrid.IsOnBiomass(u.Transform.PositionX, u.Transform.PositionY))
+                // Boundary conversion: the biomass grid stays prototype float
+                // scaffolding until its own domain slice.
+                if (_biomassGrid.IsOnBiomass(u.Transform.PositionX.ToFloat(), u.Transform.PositionY.ToFloat()))
                 {
                     u.CurrentHealth = SimMath.Clamp(u.CurrentHealth + BiomassHealAmount, 0, u.MaxHealth);
                 }

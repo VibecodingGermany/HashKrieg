@@ -12,8 +12,8 @@ namespace Nova.Simulation.State
         public EntityId Id;
         public byte PlayerId;
         public Transform2D Transform;
-        public float MoveSpeed;
-        public float Radius;
+        public SimFixed MoveSpeed;
+        public SimFixed Radius;
         public GridPos2D TargetGridPos;
         public int CurrentHealth;
         public int MaxHealth;
@@ -26,15 +26,15 @@ namespace Nova.Simulation.State
             EntityId id,
             byte playerId,
             Transform2D transform,
-            float moveSpeed,
-            float radius = 0.5f,
+            SimFixed moveSpeed,
+            SimFixed? radius = null,
             int maxHealth = 100)
         {
             Id = id;
             PlayerId = playerId;
             Transform = transform;
             MoveSpeed = moveSpeed;
-            Radius = radius;
+            Radius = radius ?? SimFixed.FromRaw(SimFixed.OneRaw / 2); // default 0.5 m
             CurrentHealth = maxHealth;
             MaxHealth = maxHealth;
             AttackTarget = EntityId.Invalid;

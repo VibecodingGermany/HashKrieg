@@ -52,10 +52,11 @@ namespace Nova.Gameplay.Match
                         SpawnViewInstance(i, in unit);
                     }
 
-                    // Interpolate render position and rotation
+                    // Interpolate render position and rotation (presentation
+                    // boundary: SimFixed/SimAngle -> float; the sim stays authoritative)
                     GameObject viewObj = _viewInstances[i];
-                    Vector3 targetPos = new Vector3(unit.Transform.PositionX, 0.5f, unit.Transform.PositionY);
-                    Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation * Mathf.Rad2Deg, 0f);
+                    Vector3 targetPos = new Vector3(unit.Transform.PositionX.ToFloat(), 0.5f, unit.Transform.PositionY.ToFloat());
+                    Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
 
                     viewObj.transform.position = Vector3.Lerp(viewObj.transform.position, targetPos, Time.deltaTime * _interpolationSpeed);
                     viewObj.transform.rotation = Quaternion.Slerp(viewObj.transform.rotation, targetRot, Time.deltaTime * _interpolationSpeed);
@@ -87,12 +88,12 @@ namespace Nova.Gameplay.Match
                 // Fallback procedural capsule visualization
                 instance = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 instance.transform.SetParent(transform, false);
-                instance.transform.localScale = new Vector3(unit.Radius * 2f, 1f, unit.Radius * 2f);
+                instance.transform.localScale = new Vector3(unit.Radius.ToFloat() * 2f, 1f, unit.Radius.ToFloat() * 2f);
             }
 
             instance.name = $"UnitView_{unit.Id.Index}_{unit.Id.Version}";
-            instance.transform.position = new Vector3(unit.Transform.PositionX, 0.5f, unit.Transform.PositionY);
-            instance.transform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation * Mathf.Rad2Deg, 0f);
+            instance.transform.position = new Vector3(unit.Transform.PositionX.ToFloat(), 0.5f, unit.Transform.PositionY.ToFloat());
+            instance.transform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
 
             _viewInstances[index] = instance;
             _boundIds[index] = unit.Id;

@@ -20,7 +20,7 @@ namespace Nova.Simulation.Tests
             kernel.Start();
 
             // Spawn enemy unit for Player 1 at (20, 20) with 100 HP
-            EntityId enemyId = entities.SpawnUnit(playerId: 1, new Transform2D(20f, 20f), moveSpeed: 5f, radius: 0.5f, maxHealth: 100);
+            EntityId enemyId = entities.SpawnUnit(playerId: 1, new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)), moveSpeed: SimFixed.FromInt(5), radius: SimFixed.FromRaw(SimFixed.OneRaw / 2), maxHealth: 100);
 
             var orbitalStrikeDef = new CommanderAbilityDefinition(
                 abilityId: 1,

@@ -31,9 +31,9 @@ namespace Nova.Simulation.Tests
             // Spawn 1,000 active units distributed across grid
             for (int i = 0; i < unitCount; i++)
             {
-                float startX = 10f + (i % 30);
-                float startY = 10f + (i / 30);
-                EntityId id = entities.SpawnUnit(1, new Transform2D(startX, startY), 4.5f, 0.4f);
+                int startX = 10 + (i % 30);
+                int startY = 10 + (i / 30);
+                EntityId id = entities.SpawnUnit(1, new Transform2D(SimFixed.FromInt(startX), SimFixed.FromInt(startY)), SimFixed.FromFloat(4.5f), SimFixed.FromFloat(0.4f));
                 ref UnitState unit = ref entities.GetUnitRef(id);
                 unit.SetTarget(target);
             }

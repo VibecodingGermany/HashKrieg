@@ -15,8 +15,8 @@ namespace Nova.Simulation.Tests
             var manager = new EntityManager(10);
             Assert.AreEqual(0, manager.ActiveCount);
 
-            EntityId id1 = manager.SpawnUnit(1, new Transform2D(10f, 10f), 5f);
-            EntityId id2 = manager.SpawnUnit(1, new Transform2D(20f, 20f), 5f);
+            EntityId id1 = manager.SpawnUnit(1, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId id2 = manager.SpawnUnit(1, new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)), SimFixed.FromInt(5));
 
             Assert.AreEqual(2, manager.ActiveCount);
             Assert.IsTrue(manager.IsValid(id1));
@@ -28,7 +28,7 @@ namespace Nova.Simulation.Tests
             Assert.AreEqual(1, manager.ActiveCount);
 
             // Re-spawning should recycle slot 0 with incremented version
-            EntityId id3 = manager.SpawnUnit(1, new Transform2D(30f, 30f), 5f);
+            EntityId id3 = manager.SpawnUnit(1, new Transform2D(SimFixed.FromInt(30), SimFixed.FromInt(30)), SimFixed.FromInt(5));
             Assert.AreEqual(id1.Index, id3.Index);
             Assert.AreNotEqual(id1.Version, id3.Version);
         }
@@ -46,14 +46,14 @@ namespace Nova.Simulation.Tests
             kernel.Start();
 
             // Spawn unit at (10.5, 10.5)
-            EntityId unitId = entities.SpawnUnit(1, new Transform2D(10.5f, 10.5f), 5f);
+            EntityId unitId = entities.SpawnUnit(1, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             ref UnitState unit = ref entities.GetUnitRef(unitId);
 
             var target = new GridPos2D(20, 10);
             pathfinding.RequestFlowField(target);
             unit.SetTarget(target);
 
-            float initialX = unit.Transform.PositionX;
+            SimFixed initialX = unit.Transform.PositionX;
 
             // Step 10 ticks (0.5 seconds of movement)
             for (int i = 0; i < 10; i++)
@@ -62,7 +62,7 @@ namespace Nova.Simulation.Tests
             }
 
             ref UnitState updatedUnit = ref entities.GetUnitRef(unitId);
-            Assert.Greater(updatedUnit.Transform.PositionX, initialX);
+            Assert.IsTrue(updatedUnit.Transform.PositionX > initialX);
         }
     }
 }

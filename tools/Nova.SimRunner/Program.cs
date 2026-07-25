@@ -83,9 +83,13 @@ namespace Nova.SimRunner
             var rawIds = new uint[UnitCount];
             for (int i = 0; i < UnitCount; i++)
             {
-                float startX = 10f + (i % 30);
-                float startY = 10f + (i / 30);
-                EntityId id = entities.SpawnUnit(0, new Transform2D(startX, startY), 4.5f, 0.4f);
+                int startX = 10 + (i % 30);
+                int startY = 10 + (i / 30);
+                EntityId id = entities.SpawnUnit(
+                    0,
+                    new Transform2D(SimFixed.FromInt(startX), SimFixed.FromInt(startY)),
+                    SimFixed.FromRaw(294912), // 4.5 m/s
+                    SimFixed.FromRaw(26214)); // ~0.4 m
                 rawIds[i] = UnitCommandStateView.ToRawEntityId(id);
             }
 

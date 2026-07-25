@@ -53,7 +53,7 @@ namespace Nova.Gameplay.Match
                 float spawnX = 10f + (i % 25) * 1.2f;
                 float spawnY = 10f + (i / 25) * 1.2f;
 
-                EntityId id = _matchRunner.Entities.SpawnUnit(1, new Transform2D(spawnX, spawnY), moveSpeed: 6.0f, radius: 0.4f);
+                EntityId id = _matchRunner.Entities.SpawnUnit(1, new Transform2D(SimFixed.FromFloat(spawnX), SimFixed.FromFloat(spawnY)), moveSpeed: SimFixed.FromFloat(6.0f), radius: SimFixed.FromFloat(0.4f));
                 ref UnitState unit = ref _matchRunner.Entities.GetUnitRef(id);
                 unit.SetTarget(targetPos);
             }

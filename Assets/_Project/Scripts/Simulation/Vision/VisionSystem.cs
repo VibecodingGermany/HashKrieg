@@ -50,8 +50,9 @@ namespace Nova.Simulation.Vision
                 ref readonly UnitState u = ref units[i];
                 if (!u.IsActive) continue;
 
-                ushort cx = (ushort)SimMath.Clamp((int)Math.Floor(u.Transform.PositionX), 0, _visionGrid.Width - 1);
-                ushort cy = (ushort)SimMath.Clamp((int)Math.Floor(u.Transform.PositionY), 0, _visionGrid.Height - 1);
+                // Canonical world-to-grid mapping: floor (Q-040(i) SimFixed migration).
+                ushort cx = (ushort)SimMath.Clamp(SimFixed.WorldToGrid(u.Transform.PositionX), 0, _visionGrid.Width - 1);
+                ushort cy = (ushort)SimMath.Clamp(SimFixed.WorldToGrid(u.Transform.PositionY), 0, _visionGrid.Height - 1);
 
                 _visionGrid.RevealCircle(u.PlayerId, cx, cy, DefaultSightRadius);
             }

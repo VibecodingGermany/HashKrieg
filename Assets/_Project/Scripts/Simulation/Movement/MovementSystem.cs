@@ -8,16 +8,23 @@ namespace Nova.Simulation.Movement
     /// <summary>
     /// Deterministic simulation system for unit movement and steering.
     /// Combines Flow-Field direction vectors with O(N) spatial grid separation steering.
-    /// Runs on the canonical fixed tick delta (<see cref="SimClock.TickDeltaSeconds"/> = 0.1 s, 10 Hz).
+    /// Runs on the canonical fixed tick rate (<see cref="SimClock.TicksPerSecond"/> = 10 Hz).
     /// <para>
-    /// Numerics caveat (Q-040(i)): movement still computes with IEEE-754
-    /// floats and <see cref="SimMath"/> transcendentals (Atan2/Sqrt) — the
-    /// serialized state is bit-stable per runtime, but these functions are
-    /// not guaranteed bit-identical across Mono/IL2CPP/.NET, a latent
-    /// cross-runtime desync risk under docs/tech/SimulationCore.md sections
-    /// 1 and 9. Declared as Q-040(i) with the provisional that the prototype
-    /// floats stay until the movement domain slice; to be decided by D-ID
-    /// before the G1 schema freeze.
+    /// Q-040(i) resolution (implemented, ratification pending): the whole
+    /// tick path computes in canonical fixed-point — <see cref="SimFixed"/>
+    /// positions/speeds, <see cref="SimAngle"/> headings and the purely
+    /// integer <see cref="SimTrig"/> transcendentals. No float or double
+    /// remains in the hash-relevant movement path, so the results are
+    /// bit-identical across Mono/IL2CPP/.NET by construction
+    /// (docs/tech/SimulationCore.md sections 1 and 9).
+    /// </para>
+    /// <para>
+    /// Tick delta encoding: 0.1 s is not exactly representable in Q16.16
+    /// (6553.6 raw). Instead of rounding the delta itself, the per-tick step
+    /// is computed as speed / <see cref="SimClock.TicksPerSecond"/> — the
+    /// factor 1/10 is exact and the single division rounds once, ties-to-even
+    /// (max 0.5 raw units per tick step), which is the most exact encoding of
+    /// the 10 Hz contract available in Q16.16.
     /// </para>
     /// <para>
     /// Stateful (<see cref="IStatefulSimSystem"/>): the movement system owns
@@ -30,8 +37,20 @@ namespace Nova.Simulation.Movement
     /// </summary>
     public sealed class MovementSystem : IStatefulSimSystem
     {
-        /// <summary>Canonical tick delta in seconds (10 Hz, docs/tech/SimulationCore.md section 2).</summary>
-        public const float TickDeltaSeconds = SimClock.TickDeltaSeconds;
+        /// <summary>Exact per-tick divisor of the canonical 10 Hz clock (see class remarks).</summary>
+        private static readonly SimFixed TicksPerSecond = SimFixed.FromInt(SimClock.TicksPerSecond);
+
+        /// <summary>Half a grid cell, exact in Q16.16 (target cell centers).</summary>
+        private static readonly SimFixed HalfCell = SimFixed.FromRaw(SimFixed.OneRaw / 2);
+
+        /// <summary>Separation steering weight (0.5, exact in Q16.16).</summary>
+        private static readonly SimFixed SeparationWeight = SimFixed.FromRaw(SimFixed.OneRaw / 2);
+
+        /// <summary>
+        /// Dead-zone for the combined steering vector, squared (~1.07e-4,
+        /// the Q16.16 rounding of the prototype's 1e-4 float threshold).
+        /// </summary>
+        private static readonly SimFixed MinSteeringLengthSquared = SimFixed.FromRaw(7);
 
         private readonly EntityManager _entityManager;
         private readonly PathfindingSystem _pathfindingSystem;
@@ -73,8 +92,9 @@ namespace Nova.Simulation.Movement
                 ref readonly UnitState u = ref units[i];
                 if (!u.IsActive) continue;
 
-                ushort gx = (ushort)Math.Max(0, Math.Min(_gridWidth - 1, (int)Math.Floor(u.Transform.PositionX)));
-                ushort gy = (ushort)Math.Max(0, Math.Min(_gridHeight - 1, (int)Math.Floor(u.Transform.PositionY)));
+                // Canonical world-to-grid mapping: floor, also for negative values.
+                ushort gx = (ushort)Math.Max(0, Math.Min(_gridWidth - 1, SimFixed.WorldToGrid(u.Transform.PositionX)));
+                ushort gy = (ushort)Math.Max(0, Math.Min(_gridHeight - 1, SimFixed.WorldToGrid(u.Transform.PositionY)));
                 int cellIndex = gy * _gridWidth + gx;
 
                 _unitNexts[i] = _gridHeads[cellIndex];
@@ -87,11 +107,11 @@ namespace Nova.Simulation.Movement
                 ref UnitState unit = ref units[i];
                 if (!unit.IsActive || !unit.IsMoving) continue;
 
-                float curX = unit.Transform.PositionX;
-                float curY = unit.Transform.PositionY;
+                SimFixed curX = unit.Transform.PositionX;
+                SimFixed curY = unit.Transform.PositionY;
 
-                ushort gridX = (ushort)Math.Max(0, Math.Min(_gridWidth - 1, (int)Math.Floor(curX)));
-                ushort gridY = (ushort)Math.Max(0, Math.Min(_gridHeight - 1, (int)Math.Floor(curY)));
+                ushort gridX = (ushort)Math.Max(0, Math.Min(_gridWidth - 1, SimFixed.WorldToGrid(curX)));
+                ushort gridY = (ushort)Math.Max(0, Math.Min(_gridHeight - 1, SimFixed.WorldToGrid(curY)));
 
                 // Arrival check
                 if (gridX == unit.TargetGridPos.X && gridY == unit.TargetGridPos.Y)
@@ -104,19 +124,19 @@ namespace Nova.Simulation.Movement
                 Direction2D flowDir = _pathfindingSystem.FlowField.GetDirection(gridX, gridY);
                 var (flowDx, flowDy) = Direction2DUtility.GetOffset(flowDir);
 
-                float moveDx = flowDx;
-                float moveDy = flowDy;
+                SimFixed moveDx = SimFixed.FromInt(flowDx);
+                SimFixed moveDy = SimFixed.FromInt(flowDy);
 
                 // If at flow end or blocked, move directly towards target cell center
                 if (flowDir == Direction2D.None)
                 {
-                    moveDx = (unit.TargetGridPos.X + 0.5f) - curX;
-                    moveDy = (unit.TargetGridPos.Y + 0.5f) - curY;
+                    moveDx = (SimFixed.FromInt(unit.TargetGridPos.X) + HalfCell) - curX;
+                    moveDy = (SimFixed.FromInt(unit.TargetGridPos.Y) + HalfCell) - curY;
                 }
 
                 // O(1) Local 3x3 Spatial Grid Neighborhood Separation
-                float sepDx = 0f;
-                float sepDy = 0f;
+                SimFixed sepDx = SimFixed.Zero;
+                SimFixed sepDy = SimFixed.Zero;
 
                 int minGx = Math.Max(0, gridX - 1);
                 int maxGx = Math.Min(_gridWidth - 1, gridX + 1);
@@ -133,13 +153,13 @@ namespace Nova.Simulation.Movement
                             if (otherIndex != i)
                             {
                                 ref readonly UnitState other = ref units[otherIndex];
-                                float distSq = unit.Transform.DistanceToSquared(in other.Transform);
-                                float minDist = unit.Radius + other.Radius;
+                                SimFixed distSq = unit.Transform.DistanceToSquared(in other.Transform);
+                                SimFixed minDist = unit.Radius + other.Radius;
 
-                                if (distSq > 0f && distSq < minDist * minDist)
+                                if (distSq > SimFixed.Zero && distSq < minDist * minDist)
                                 {
-                                    float dist = SimMath.Sqrt(distSq);
-                                    float pushFactor = (minDist - dist) / dist;
+                                    SimFixed dist = SimTrig.Sqrt(distSq);
+                                    SimFixed pushFactor = (minDist - dist) / dist;
                                     sepDx += (curX - other.Transform.PositionX) * pushFactor;
                                     sepDy += (curY - other.Transform.PositionY) * pushFactor;
                                 }
@@ -151,20 +171,23 @@ namespace Nova.Simulation.Movement
                 }
 
                 // Combine flow vector and separation
-                float finalDx = moveDx + sepDx * 0.5f;
-                float finalDy = moveDy + sepDy * 0.5f;
+                SimFixed finalDx = moveDx + sepDx * SeparationWeight;
+                SimFixed finalDy = moveDy + sepDy * SeparationWeight;
 
-                float lenSq = finalDx * finalDx + finalDy * finalDy;
-                if (lenSq > 0.0001f)
+                SimFixed lenSq = finalDx * finalDx + finalDy * finalDy;
+                if (lenSq > MinSteeringLengthSquared)
                 {
-                    float len = SimMath.Sqrt(lenSq);
+                    SimFixed len = SimTrig.Sqrt(lenSq);
                     finalDx /= len;
                     finalDy /= len;
 
-                    float step = unit.MoveSpeed * TickDeltaSeconds;
-                    float nextX = curX + finalDx * step;
-                    float nextY = curY + finalDy * step;
-                    float rotation = SimMath.Atan2(finalDy, finalDx);
+                    // Exact 1/10 s per tick: divide by the tick rate once
+                    // (ties-to-even) instead of multiplying by a rounded
+                    // 0.1 s constant (see class remarks).
+                    SimFixed step = unit.MoveSpeed / TicksPerSecond;
+                    SimFixed nextX = curX + finalDx * step;
+                    SimFixed nextY = curY + finalDy * step;
+                    SimAngle rotation = SimTrig.Atan2(finalDy, finalDx);
 
                     unit.Transform = new Transform2D(nextX, nextY, rotation);
                 }

@@ -54,6 +54,28 @@ namespace Nova.Core
         public int ToInt() => RawValue / OneRaw;
 
         /// <summary>
+        /// Boundary conversion from an IEEE-754 host value (content
+        /// definitions, test fixtures, editor input): nearest Q16.16,
+        /// ties-to-even; out-of-range inputs throw <see cref="OverflowException"/>.
+        /// Not part of the canonical numeric model — deterministic given
+        /// identical input bits, but host floats are not guaranteed identical
+        /// across runtimes, so the authoritative tick path never calls this.
+        /// </summary>
+        public static SimFixed FromFloat(float value)
+        {
+            // double intermediate: value * 2^16 of a float is exact in double,
+            // so the ties-to-even rounding sees the true product.
+            return new SimFixed(CheckedRaw((long)Math.Round((double)value * OneRaw, MidpointRounding.ToEven)));
+        }
+
+        /// <summary>
+        /// Boundary conversion to float for presentation only (rendering,
+        /// selection UI, prototype scaffolding). The simulation is
+        /// authoritative; this conversion is never fed back into sim state.
+        /// </summary>
+        public float ToFloat() => RawValue / (float)OneRaw;
+
+        /// <summary>
         /// Largest whole number not greater than this value. Uses an arithmetic
         /// shift, so negative values floor away from zero (e.g. -0.5 to -1).
         /// </summary>

@@ -14,9 +14,9 @@ namespace Nova.Gameplay.Tests
             var entities = new EntityManager(10);
             var selection = new SelectionManager();
 
-            EntityId u1 = entities.SpawnUnit(0, new Transform2D(10f, 10f), 5f);
-            EntityId u2 = entities.SpawnUnit(0, new Transform2D(15f, 15f), 5f);
-            EntityId u3 = entities.SpawnUnit(0, new Transform2D(50f, 50f), 5f); // Outside bounds
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(15), SimFixed.FromInt(15)), SimFixed.FromInt(5));
+            EntityId u3 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(50), SimFixed.FromInt(50)), SimFixed.FromInt(5)); // Outside bounds
 
             int count = selection.SelectBox(entities, playerId: 0, minX: 5f, minY: 5f, maxX: 20f, maxY: 20f);
             Assert.AreEqual(2, count);

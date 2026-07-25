@@ -55,7 +55,9 @@ namespace Nova.Simulation.Combat
                 }
 
                 ref UnitState target = ref _entityManager.GetUnitRef(attacker.AttackTarget);
-                float distSq = attacker.Transform.DistanceToSquared(in target.Transform);
+                // Boundary conversion: combat stays prototype float scaffolding
+                // until its own domain slice (Q-040(i) migrated movement only).
+                float distSq = attacker.Transform.DistanceToSquared(in target.Transform).ToFloat();
 
                 // Range check and firing trigger
                 if (distSq <= DefaultWeaponRange * DefaultWeaponRange && attacker.WeaponCooldownTicks == 0)

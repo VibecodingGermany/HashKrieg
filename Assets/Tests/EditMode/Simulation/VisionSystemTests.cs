@@ -34,7 +34,7 @@ namespace Nova.Simulation.Tests
             kernel.Start();
 
             // Spawn unit for Player 0 at (30.5, 30.5)
-            EntityId id = entities.SpawnUnit(0, new Transform2D(30.5f, 30.5f), 5f);
+            EntityId id = entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(30.5f), SimFixed.FromFloat(30.5f)), SimFixed.FromInt(5));
 
             Assert.AreEqual(VisionState.Unexplored, grid.GetVisionState(0, 30, 30));
 

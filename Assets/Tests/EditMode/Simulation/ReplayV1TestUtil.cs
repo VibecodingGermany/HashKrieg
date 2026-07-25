@@ -106,7 +106,7 @@ namespace Nova.Simulation.Tests
                 var ids = new uint[count];
                 for (int i = 0; i < count; i++)
                 {
-                    EntityId id = Entities.SpawnUnit(owner, new Transform2D(startX + i, y), 5f);
+                    EntityId id = Entities.SpawnUnit(owner, new Transform2D(SimFixed.FromFloat(startX + i), SimFixed.FromFloat(y)), SimFixed.FromInt(5));
                     ids[i] = UnitCommandStateView.ToRawEntityId(id);
                 }
                 Array.Sort(ids);

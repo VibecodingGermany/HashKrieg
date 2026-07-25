@@ -72,8 +72,10 @@ namespace Nova.Simulation.Commanders
                     ref UnitState u = ref rawUnits[i];
                     if (!u.IsActive || u.PlayerId == playerId) continue;
 
-                    float dx = u.Transform.PositionX - targetX;
-                    float dy = u.Transform.PositionY - targetY;
+                    // Boundary conversion: commander abilities stay prototype
+                    // float scaffolding until their own domain slice.
+                    float dx = u.Transform.PositionX.ToFloat() - targetX;
+                    float dy = u.Transform.PositionY.ToFloat() - targetY;
 
                     if (dx * dx + dy * dy <= rSq)
                     {

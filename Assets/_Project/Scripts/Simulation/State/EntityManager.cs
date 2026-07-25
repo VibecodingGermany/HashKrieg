@@ -45,7 +45,7 @@ namespace Nova.Simulation.State
             return _versions[id.Index] == id.Version && _units[id.Index].IsActive;
         }
 
-        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, float moveSpeed, float radius = 0.5f, int maxHealth = 100)
+        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, SimFixed moveSpeed, SimFixed? radius = null, int maxHealth = 100)
         {
             if (_freeSlots.Count == 0)
             {
@@ -115,8 +115,12 @@ namespace Nova.Simulation.State
 
         /// <summary>
         /// Serialization version of the entity store snapshot block.
+        /// v2 (Q-040(i) SimFixed migration): positions, speeds and radii are
+        /// SimFixed raw int32, rotation is a SimAngle uint16 — replacing the
+        /// v1 IEEE-754 float bit patterns. v1 blocks are rejected (the
+        /// pre-G1 reset allows the hard cut; no migration path).
         /// </summary>
-        public const byte StateVersion = 1;
+        public const byte StateVersion = 2;
 
         /// <summary>
         /// Writes the complete authoritative entity store state as canonical
@@ -126,10 +130,10 @@ namespace Nova.Simulation.State
         /// enumeration order (top first) so a restore reproduces the exact
         /// same future id assignment sequence.
         /// <para>
-        /// Positions, speeds and radii are still IEEE-754 floats of the
-        /// prototype movement scaffolding; they serialize as their exact
-        /// little-endian bit patterns so hash and snapshot stay bit-exact
-        /// until the fixed-point migration replaces the storage type.
+        /// Since block version 2 the numeric fields are the canonical
+        /// fixed-point raw values (<see cref="SimFixed"/> int32,
+        /// <see cref="SimAngle"/> uint16), so hash and snapshot are
+        /// bit-identical across runtimes by construction.
         /// </para>
         /// </summary>
         public void WriteState(Snapshots.SnapshotBlockWriter writer)
@@ -157,11 +161,11 @@ namespace Nova.Simulation.State
 
                 writer.WriteEntityId(u.Id);
                 writer.WriteUInt8(u.PlayerId);
-                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.PositionX));
-                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.PositionY));
-                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.Rotation));
-                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.MoveSpeed));
-                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Radius));
+                writer.WriteSimFixed(u.Transform.PositionX);
+                writer.WriteSimFixed(u.Transform.PositionY);
+                writer.WriteSimAngle(u.Transform.Rotation);
+                writer.WriteSimFixed(u.MoveSpeed);
+                writer.WriteSimFixed(u.Radius);
                 writer.WriteUInt16(u.TargetGridPos.X);
                 writer.WriteUInt16(u.TargetGridPos.Y);
                 writer.WriteInt32(u.CurrentHealth);
@@ -264,11 +268,11 @@ namespace Nova.Simulation.State
 
                 if (!reader.TryReadEntityId(out EntityId id)) return false;
                 if (!reader.TryReadUInt8(out byte playerId)) return false;
-                if (!reader.TryReadUInt32(out uint posX)) return false;
-                if (!reader.TryReadUInt32(out uint posY)) return false;
-                if (!reader.TryReadUInt32(out uint rotation)) return false;
-                if (!reader.TryReadUInt32(out uint moveSpeed)) return false;
-                if (!reader.TryReadUInt32(out uint radius)) return false;
+                if (!reader.TryReadInt32(out int posX)) return false;
+                if (!reader.TryReadInt32(out int posY)) return false;
+                if (!reader.TryReadUInt16(out ushort rotation)) return false;
+                if (!reader.TryReadInt32(out int moveSpeed)) return false;
+                if (!reader.TryReadInt32(out int radius)) return false;
                 if (!reader.TryReadUInt16(out ushort targetX)) return false;
                 if (!reader.TryReadUInt16(out ushort targetY)) return false;
                 if (!reader.TryReadInt32(out int currentHealth)) return false;
@@ -285,11 +289,11 @@ namespace Nova.Simulation.State
                     Id = id,
                     PlayerId = playerId,
                     Transform = new Transform2D(
-                        SimMath.UInt32BitsToSingle(posX),
-                        SimMath.UInt32BitsToSingle(posY),
-                        SimMath.UInt32BitsToSingle(rotation)),
-                    MoveSpeed = SimMath.UInt32BitsToSingle(moveSpeed),
-                    Radius = SimMath.UInt32BitsToSingle(radius),
+                        SimFixed.FromRaw(posX),
+                        SimFixed.FromRaw(posY),
+                        SimAngle.FromRaw(rotation)),
+                    MoveSpeed = SimFixed.FromRaw(moveSpeed),
+                    Radius = SimFixed.FromRaw(radius),
                     TargetGridPos = new Pathfinding.GridPos2D(targetX, targetY),
                     CurrentHealth = currentHealth,
                     MaxHealth = maxHealth,

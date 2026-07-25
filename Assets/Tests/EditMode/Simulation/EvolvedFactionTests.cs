@@ -35,7 +35,7 @@ namespace Nova.Simulation.Tests
             // Spread biomass around (20, 20)
             grid.SetBiomassCircle(20, 20, 5);
 
-            EntityId id = entities.SpawnUnit(0, new Transform2D(20f, 20f), moveSpeed: 5f, radius: 0.5f, maxHealth: 100);
+            EntityId id = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)), moveSpeed: SimFixed.FromInt(5), radius: SimFixed.FromRaw(SimFixed.OneRaw / 2), maxHealth: 100);
             ref UnitState u = ref entities.GetUnitRef(id);
             u.CurrentHealth -= 20; // Reduce health to 80
 

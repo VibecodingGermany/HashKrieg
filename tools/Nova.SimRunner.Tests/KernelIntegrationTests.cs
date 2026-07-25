@@ -115,12 +115,12 @@ namespace Nova.SimRunner.Tests
             // target tick. The prototype kernel accepted commands into a
             // buffer that was never handed to any system.
             var host = TestHost.Create(Seed);
-            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             uint rawUnit = UnitCommandStateView.ToRawEntityId(unit);
 
             // Control host: same seed, same spawn, no command.
             var control = TestHost.Create(Seed);
-            control.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            control.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
 
             ulong hashBefore = host.Kernel.CalculateStateHash();
 
@@ -140,7 +140,7 @@ namespace Nova.SimRunner.Tests
             Assert.That(hashAfter, Is.Not.EqualTo(control.Kernel.CalculateStateHash()),
                 "identical ticks with and without the command must differ");
 
-            float xBefore = host.Entities.GetUnitRef(unit).Transform.PositionX;
+            SimFixed xBefore = host.Entities.GetUnitRef(unit).Transform.PositionX;
             for (int i = 0; i < 5; i++)
             {
                 host.StepTick();
@@ -156,7 +156,7 @@ namespace Nova.SimRunner.Tests
             // full authoritative state — every mutation changes it, repeating
             // the hash never does and never consumes PRNG state.
             var host = TestHost.Create(Seed);
-            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
 
             ulong h0 = host.Kernel.CalculateStateHash();
             Assert.That(host.Kernel.CalculateStateHash(), Is.EqualTo(h0), "hash repetition must be stable");
@@ -182,7 +182,7 @@ namespace Nova.SimRunner.Tests
             // The live hash is the canonical container state hash of exactly
             // the bytes SaveSnapshot emits — the two can never drift apart.
             var host = TestHost.Create(Seed);
-            host.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             host.StepTick();
 
             byte[] snapshot = host.Kernel.SaveSnapshot();
@@ -197,14 +197,13 @@ namespace Nova.SimRunner.Tests
             // clock constant, the host and the movement system.
             Assert.That(SimClock.TicksPerSecond, Is.EqualTo(10));
             Assert.That(SimClock.TickDeltaSeconds, Is.EqualTo(0.1f).Within(1e-7f));
-            Assert.That(MovementSystem.TickDeltaSeconds, Is.EqualTo(SimClock.TickDeltaSeconds));
 
             // A unit with speed 5 units/s covers exactly one second of
             // simulation time (5 units) in 10 ticks. No flow field is
             // requested, so the direct-target fallback drives it straight at
             // the target cell center (pure +x).
             var host = TestHost.Create(Seed);
-            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             host.Entities.GetUnitRef(unit).SetTarget(new GridPos2D(20, 10));
 
             for (int i = 0; i < 10; i++)
@@ -212,8 +211,88 @@ namespace Nova.SimRunner.Tests
                 host.StepTick();
             }
 
-            float moved = host.Entities.GetUnitRef(unit).Transform.PositionX - 10.5f;
-            Assert.That(moved, Is.EqualTo(5f).Within(1e-3f), "10 ticks at 10 Hz must equal 1 second of movement");
+            SimFixed moved = host.Entities.GetUnitRef(unit).Transform.PositionX - SimFixed.FromFloat(10.5f);
+            Assert.That(moved, Is.EqualTo(SimFixed.FromInt(5)),
+                "10 ticks at 10 Hz must equal 1 second of movement, exactly in Q16.16");
+        }
+
+        [Test]
+        public void DiagonalMovement_IsNormalized_NoDiagonalSpeedup()
+        {
+            // The combined steering vector is normalized before the speed
+            // step is applied: diagonal movement covers the same per-tick
+            // distance as straight movement (no sqrt(2) speed-up). No flow
+            // field is requested, so the direct-target fallback drives the
+            // unit diagonally at the target cell center.
+            var host = TestHost.Create(Seed);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+            host.Entities.GetUnitRef(unit).SetTarget(new GridPos2D(20, 20));
+
+            for (int i = 0; i < 10; i++)
+            {
+                host.StepTick();
+            }
+
+            ref readonly UnitState moved = ref host.Entities.GetUnitRef(unit);
+            SimFixed dx = moved.Transform.PositionX - SimFixed.FromFloat(10.5f);
+            SimFixed dy = moved.Transform.PositionY - SimFixed.FromFloat(10.5f);
+            Assert.That(dx, Is.EqualTo(dy), "diagonal movement must advance both axes equally");
+
+            SimFixed distance = SimTrig.Sqrt(dx * dx + dy * dy);
+            SimFixed tolerance = SimFixed.FromRaw(1000); // ~0.015, integer-normalization rounding
+            Assert.That(distance, Is.GreaterThan(SimFixed.FromInt(5) - tolerance));
+            Assert.That(distance, Is.LessThan(SimFixed.FromInt(5) + tolerance),
+                "10 diagonal ticks must cover the same 5 units as straight movement");
+        }
+
+        [Test]
+        public void Rotation_FollowsMovementDirection_ViaSimTrigAtan2()
+        {
+            // The heading is SimTrig.Atan2 of the normalized steering vector:
+            // a pure diagonal move faces exactly 45 degrees (8192 angle units).
+            var host = TestHost.Create(Seed);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+            host.Entities.GetUnitRef(unit).SetTarget(new GridPos2D(20, 20));
+
+            host.StepTick();
+
+            Assert.That(host.Entities.GetUnitRef(unit).Transform.Rotation.RawValue, Is.EqualTo(8192));
+        }
+
+        [Test]
+        public void TwoKernels_RandomMoveCommands_500Ticks_ProduceIdenticalHashes()
+        {
+            // Long-horizon determinism: two identically seeded hosts receive
+            // the same SimRandom-driven Move commands through the sealed
+            // intake and must stay bit-identical for 500 ticks.
+            var hostA = TestHost.Create(Seed);
+            var hostB = TestHost.Create(Seed);
+
+            var ids = new uint[16];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                EntityId a = hostA.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f + i), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+                EntityId b = hostB.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f + i), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+                ids[i] = UnitCommandStateView.ToRawEntityId(a);
+            }
+
+            var rng = new SimRandom(777UL);
+            for (int tick = 0; tick < 500; tick++)
+            {
+                if (tick % 10 == 0)
+                {
+                    int targetX = rng.NextInt(5, 60);
+                    int targetY = rng.NextInt(5, 60);
+                    hostA.SubmitMove(ids, targetX, targetY);
+                    hostB.SubmitMove(ids, targetX, targetY);
+                }
+                hostA.StepTick();
+                hostB.StepTick();
+                Assert.That(
+                    hostB.Kernel.CalculateStateHash(),
+                    Is.EqualTo(hostA.Kernel.CalculateStateHash()),
+                    $"hash mismatch at tick {tick + 1}");
+            }
         }
 
         [Test]
@@ -227,8 +306,8 @@ namespace Nova.SimRunner.Tests
             var ids = new uint[8];
             for (int i = 0; i < ids.Length; i++)
             {
-                EntityId a = hostA.Entities.SpawnUnit(0, new Transform2D(10.5f + i, 10.5f), 5f);
-                EntityId b = hostB.Entities.SpawnUnit(0, new Transform2D(10.5f + i, 10.5f), 5f);
+                EntityId a = hostA.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f + i), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+                EntityId b = hostB.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f + i), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
                 Assert.That(UnitCommandStateView.ToRawEntityId(a), Is.EqualTo(UnitCommandStateView.ToRawEntityId(b)));
                 ids[i] = UnitCommandStateView.ToRawEntityId(a);
             }
@@ -259,7 +338,7 @@ namespace Nova.SimRunner.Tests
             for (int i = 0; i < ids.Length; i++)
             {
                 EntityId id = hostA.Entities.SpawnUnit(
-                    0, new Transform2D(10.5f + (i % 8), 10.5f + (i / 8)), 4.5f);
+                    0, new Transform2D(SimFixed.FromFloat(10.5f + (i % 8)), SimFixed.FromFloat(10.5f + (i / 8))), SimFixed.FromFloat(4.5f));
                 ids[i] = UnitCommandStateView.ToRawEntityId(id);
             }
 
@@ -313,7 +392,7 @@ namespace Nova.SimRunner.Tests
         public void Restore_RejectsTamperedTruncatedAndForeignSnapshots()
         {
             var hostA = TestHost.Create(Seed);
-            hostA.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            hostA.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             hostA.StepTick();
             byte[] snapshotBytes = hostA.Kernel.SaveSnapshot();
 
@@ -342,7 +421,7 @@ namespace Nova.SimRunner.Tests
         public void SubmitBatch_EnforcesSingleBatchPerTick_AndRequiresBoundPipeline()
         {
             var host = TestHost.Create(Seed);
-            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             host.SubmitMove(new[] { UnitCommandStateView.ToRawEntityId(unit) }, 30, 30);
 
             CommandBatch batch = host.Ingress.SealTickBatch(1);
@@ -363,7 +442,7 @@ namespace Nova.SimRunner.Tests
             // fails validation, the running host must stay bit-identical —
             // no franken-state from already committed earlier blocks.
             var source = TestHost.Create(Seed);
-            source.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            source.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             source.StepTick();
             byte[] snapshotBytes = source.Kernel.SaveSnapshot();
 
@@ -386,7 +465,7 @@ namespace Nova.SimRunner.Tests
             byte[] forged = writer.ToArray();
 
             var host = TestHost.Create(Seed);
-            host.Entities.SpawnUnit(0, new Transform2D(20.5f, 20.5f), 5f);
+            host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(20.5f), SimFixed.FromFloat(20.5f)), SimFixed.FromInt(5));
             host.StepTick();
             ulong hashBefore = host.Kernel.CalculateStateHash();
             byte[] stateBefore = host.Kernel.SaveSnapshot();
@@ -420,7 +499,7 @@ namespace Nova.SimRunner.Tests
             var ids = new uint[4];
             for (int i = 0; i < ids.Length; i++)
             {
-                EntityId id = source.Entities.SpawnUnit(0, new Transform2D(10.5f + i, 10.5f), 5f);
+                EntityId id = source.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f + i), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
                 ids[i] = UnitCommandStateView.ToRawEntityId(id);
             }
             source.SubmitMove(ids, 40, 40);

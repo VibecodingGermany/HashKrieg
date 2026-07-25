@@ -48,7 +48,7 @@ namespace Nova.Simulation.Tests
 
             Assert.AreEqual(0, entities.ActiveCount);
 
-            bool enqueued = production.EnqueueUnitProduction(0, in riflemanDef, new Transform2D(20f, 20f), buildTimeTicks: 5);
+            bool enqueued = production.EnqueueUnitProduction(0, in riflemanDef, new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)), buildTimeTicks: 5);
             Assert.IsTrue(enqueued);
             Assert.AreEqual(1, production.ActiveQueueCount);
 
