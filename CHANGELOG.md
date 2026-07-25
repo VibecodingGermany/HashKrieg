@@ -18,6 +18,34 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Kernel-Integration — kanonische Kernel-Bausteine (ohne Gate-Status,
+  ohne Evidence):** Der umgebaute `SimulationKernel` akzeptiert als einzigen
+  Command-Intake versiegelte `CommandBatch`-Objekte (`SubmitBatch`,
+  [docs/tech/Commands.md](docs/tech/Commands.md) §1) und wendet fällige
+  Batches in Tickphase 1 selbst über `CommandExecutor` an
+  (`LastTickResults`); `BindCommands` bindet den `ICommandStateView`-Adapter
+  und optional den Ingress, dessen Dedupe-/Sequenzstate Teil des
+  Kernel-Blocks ist ([docs/tech/SimulationCore.md](docs/tech/SimulationCore.md)
+  §3). Neuer kanonischer State-Hash: `CalculateStateHash()` ist der
+  NOVA_STATE_V1-Container-State-Hash über exakt die Bytes, die
+  `SaveSnapshot()` emittiert — Kernel-Block (Tick, PRNG-Wörter,
+  Ingress-State, ausstehende Batches als kanonische Record-Bytes) plus ein
+  Block pro `IStatefulSimSystem` — und berührt den PRNG nicht.
+  Kernel-Snapshots über den Container v1 (`SaveSnapshot()`/
+  `TryRestoreSnapshot()`) mit BlockId-Registry `SnapshotBlockIds`
+  (Kernel = 1, Systeme ab 100; die finale Registry bleibt Q-040-Thema). Neu:
+  `IStatefulSimSystem` (`WriteState`/`TryRestoreState`),
+  `UnitCommandStateView` (Executor-Adapter auf EntityManager/Pathfinding,
+  übersetzt gepackte Wire-Ids, vgl. Q-040(e)), `SimClock` (zentrale
+  10-Hz-Konstante) und `SimRandom.GetState()/SetState()` (PRNG-Wörter
+  snapshotfähig, `ISimRandom` unverändert). `MovementSystem`
+  (Entity-Store-Block: Units, Generationen, Free-List) und
+  `PathfindingSystem` (Flow-Field-Ziel; das Feld selbst wird beim Restore
+  deterministisch neu berechnet — abgeleiteter Cache gemäß SimulationCore
+  §3) sind stateful. Neue Regressionssuite `KernelIntegrationTests` in
+  beiden Lanes (F-001/F-005/F-006, Zwei-Host-Determinismus,
+  Snapshot-Nachweis §7.2 über 1.000 Ticks mit vor dem Snapshot gequeueten
+  Commands und byteidentischem Roundtrip) sowie `SimRandom`-State-Tests.
 - **Review-Folgearbeit Snapshot-Blockformat v1 (ohne Gate-Status, ohne
   Evidence):** zwei bewusste v1-Abweichungen von
   [docs/tech/Serialization.md](docs/tech/Serialization.md) offen deklariert
@@ -206,6 +234,31 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **F-001 — Kanonischer Command-Pfad verwirft Commands**
+  ([ImplementationAudit](docs/production/ImplementationAudit_2026-07-24.md)):
+  Der Prototyp-Kernel pufferte angenommene Commands, ohne sie je an ein
+  System zu übergeben. Jetzt ist `SubmitBatch` der einzige Intake und der
+  Kernel wendet fällige Batches in Tickphase 1 selbst an; der
+  Regressionstest `SealedMoveCommand_ChangesUnitStateAtTargetTick` (beide
+  Lanes) weist die Unit-State-Änderung am TargetTick samt
+  `Applied`-`CommandResult` nach (Vorher/Nachher, Kontroll-Host ohne
+  Command).
+- **F-005 — State-Hash und Replay nicht kanonisch:** Der alte
+  `CalculateStateHash()` hashte nur den Tick und mutierte per
+  `Random.NextUInt()` den PRNG; `StateHashUtility` nutzte FNV-1a statt
+  XXH64. Jetzt kanonischer XXH64/NOVA_STATE_V1-Hash über den vollständigen
+  autoritativen Block-State, strikt read-only. Regressionstests
+  `StateHash_ReflectsStateMutation_AndStaysStableOnRepeat` und
+  `StateHash_MatchesSnapshotHeaderHash` (beide Lanes) sowie
+  `SimulationKernel_RepeatedStateHash_IsStable_AndDoesNotConsumePrng`
+  (EditMode); zwei aufeinanderfolgende Hashes sind identisch, jede
+  State-Mutation (Bewegung, Command-Anwendung) ändert den Hash.
+- **F-006 — Verbindliche Tickrate verletzt:** `MatchRunner` (0,05 s) und
+  `MovementSystem` (0,05 s) rechneten mit 20 Hz. Jetzt gilt die zentrale
+  Konstante `SimClock` (10 Hz / 0,1 s) für Host und Systeme.
+  Regressionstests `TickRate_IsCanonical10Hz_MovementCoversOneSecondInTenTicks`
+  (beide Lanes: 10 Ticks legen exakt 1 Sekunde Sim-Zeit zurück) und
+  `MatchRunner_TickRate_IsCanonical10Hz` (EditMode).
 - **EditMode-Suite wieder grün (G0-B):**
   `LockstepRelayBufferTests.CommandEnvelopeNetPacket_Serialization_PreservesValues`
   erwartete ein veraltetes 41-Byte-Paket und der `Deserialize`-Guard
@@ -264,6 +317,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **API-Bruch `SimulationKernel` (intendiert; D-055 erklärt Prototypen zu
+  Input, D-057 macht Prototyp-Formate unsupported):** Der Konstruktor nimmt
+  jetzt die Konkretklasse `SimRandom` (statt `ISimRandom`, das Interface
+  selbst bleibt unverändert); `SubmitCommand(CommandEnvelope)` und die
+  `ICommandSink`-Implementierung entfallen ersatzlos — Command-Intake
+  ausschließlich über `SubmitBatch`. `MatchRunner` fährt den kanonischen
+  10-Hz-Lockstep (pro Tick: Batch versiegeln → submitten → Kernel steppen →
+  Session-Tick) und bindet Session/Ingress/Loopback/State-View;
+  `tools/Nova.SimRunner` nutzt denselben Host-Pfad, reicht die
+  1.000-Unit-Last als echte versiegelte Move-Batches ein und belegt zwei
+  identische Runs mit bitgleichem State-Hash.
+  `MovementSystem.TickDeltaSeconds` und `MatchRunner.TickDeltaTime` sind
+  Aliase der `SimClock`-Konstante. Die drei historischen Modul-Specs
+  `CommandSystem_Spec.md`, `LockstepRelay_Spec.md` und
+  `LockstepReplay_Spec.md` verweisen nach dem Entfernen der Prototyp-Tests
+  auf die neue Suite (je Version 1.1.1).
 - **G1-Vorarbeit, Review-Auflagen (P2-1 bis P2-5):** `SimRandom.SetSeed`
   nutzt jetzt kanonisches SplitMix64 mit einem einzigen laufenden Zustand
   (pro Wort um `0x9E3779B97F4A7C15` weitergeschaltet), sodass die beiden
@@ -353,6 +422,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Post-MVP-Netzwerk-Anforderung) präzisiert.
 
 ### Entfernt
+- **Prototyp-Command-/Hash-/Replay-/Relay-Pfade (Pre-G1-Reset, D-057;
+  ersetzt durch den kanonischen Pfad):** `CommandEnvelope`,
+  `CommandType`/`CommandIssuer`, `ICommandSink` und `CommandProcessorSystem`
+  (separater Buffer, der nie beliefert wurde — F-001), `StateHashUtility`
+  (FNV-1a — F-005), `ReplayBuffer` (rein aufzeichnend, ohne
+  Playback-Nachweis — F-005) sowie `CommandEnvelopeNetPacket` und
+  `LockstepRelayBuffer` (34-Byte-Prototypformat) samt zugehöriger
+  Prototyp-Tests (`CommandSystemTests`, `LockstepReplayTests`,
+  `LockstepRelayBufferTests`). Der alte
+  `DeterministicSimTests`-CommandEnvelope-Test ist entfallen und durch die
+  neue Kernel-Integration-Suite ehrlich ersetzt (dokumentiert im Commit).
 - Getrackte Build-Outputs unter `tools/Nova.SimRunner/bin/` sind aus dem
   Git-Index entfernt (die Dateien bleiben lokal erhalten; der Ordner ist
   ignoriert). Damit erfüllt das Repo die G0-B-Regel „keine getrackten
