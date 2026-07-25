@@ -219,15 +219,15 @@ namespace Nova.Simulation.Tests
 
             var visible = new List<EntityId>();
             host.Fog.GetVisibleEntities(0, visible);
-            Assert.That(visible, Does.Contain(observer), "own units are always visible");
-            Assert.That(visible, Does.Contain(nearEnemy), "a foreign unit in a Visible cell is listed");
-            Assert.That(visible, Does.Not.Contain(farEnemy), "a foreign unit outside sight is hidden");
+            Assert.That(visible.Contains(observer), Is.True, "own units are always visible");
+            Assert.That(visible.Contains(nearEnemy), Is.True, "a foreign unit in a Visible cell is listed");
+            Assert.That(visible.Contains(farEnemy), Is.False, "a foreign unit outside sight is hidden");
 
             // Team 1's units have sight 2: neither reaches the observer at
             // (10,10), so team 1 sees exactly its own two units.
             var enemyView = new List<EntityId>();
             host.Fog.GetVisibleEntities(1, enemyView);
-            Assert.That(enemyView, Does.Not.Contain(observer), "team 1 does not see team 0's unit");
+            Assert.That(enemyView.Contains(observer), Is.False, "team 1 does not see team 0's unit");
             Assert.That(enemyView.Count, Is.EqualTo(2), "team 1 sees exactly its own two units");
         }
 
@@ -320,7 +320,7 @@ namespace Nova.Simulation.Tests
             host.Step(2); // commit with the enemy hidden
             Assert.That(view.GetCellState(17, 10), Is.EqualTo(VisionState.Unexplored));
             host.Fog.GetVisibleEntities(0, visible);
-            Assert.That(visible, Does.Not.Contain(enemy));
+            Assert.That(visible.Contains(enemy), Is.False);
 
             Teleport(host, observer, 13, 10); // enemy now 4 cells inside the circle
             host.Step(); // odd tick: no recompute, the committed mask governs
@@ -328,13 +328,13 @@ namespace Nova.Simulation.Tests
                 "no fresh sight before the commit tick");
             visible.Clear();
             host.Fog.GetVisibleEntities(0, visible);
-            Assert.That(visible, Does.Not.Contain(enemy), "no targeting before the commit tick");
+            Assert.That(visible.Contains(enemy), Is.False, "no targeting before the commit tick");
 
             host.Step(); // even tick: the change takes effect exactly at the commit
             Assert.That(view.IsVisible(17, 10), Is.True);
             visible.Clear();
             host.Fog.GetVisibleEntities(0, visible);
-            Assert.That(visible, Does.Contain(enemy));
+            Assert.That(visible.Contains(enemy), Is.True);
         }
 
         [Test]
