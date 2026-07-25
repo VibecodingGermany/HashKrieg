@@ -1,6 +1,6 @@
 # Asset-Budget
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 3
+**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 3
 
 ## Zweck
 
@@ -8,12 +8,23 @@ Dieses Dokument definiert die verbindlichen Asset-Budgets pro Asset-Klasse (Poly
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (URP), D-033/D-035 (Performance-Disziplin), D-015 (Elite-Limits), D-023 (Superwaffen)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-058 (Lastkorridore), D-060 (Unity-Pin), D-061 (Abnahme)
 - RTS_Technisches_Planungsdokument.md §7.3 (Kauf-Prüf-Liste), §15 (Qualitätsziele)
 - [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) – 3-stufiges Animations-/Mesh-LOD, Audio-Abstraktion (Unity Audio MVP, FMOD ab Alpha)
 - [../research/AssetStore_Landschaft.md](../research/AssetStore_Landschaft.md) – Kauf-Asset-Landschaft
 - [./PerformanceBudget.md](PerformanceBudget.md) – GPU ≤8 ms, Rendering-CPU ≤4 ms
 - [./MemoryBudget.md](MemoryBudget.md) – Asset-RAM-Deckel 1,8 GB
+
+## MS-1-Override (D-056/D-058/D-060/D-061)
+
+Für MS-1 gilt ausschließlich der Produktionsumfang aus
+[MVPContentManifest.md](../production/MVPContentManifest.md) beziehungsweise
+[`quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json): zwei Fraktionen,
+eine Karte, 100 Einheiten im produktiven Abnahmeszenario. Der 500-Objekt-Korridor
+ist nur ein synthetischer V2-/V3-Lasttest und darf Dummy- oder Scale-Fixtures
+verwenden; er verlangt weder 500 produktive Einheiten noch den früheren
+FFA-/Vollroster-Umfang. Asset-Import und Messungen verwenden Unity
+`6000.5.4f1`, Revision `d550df8bd089`, URP.
 
 ## 1. Polycount-Budgets (Dreiecke, LOD0)
 
@@ -43,7 +54,7 @@ Zielkorridor: schräge Top-Down-Kamera (D-019), typische Sichtweite mittel bis f
 | Terrain (pro Karte/Biom) | 2–4 Layer à 2048² + Splat-Map 1024² | BC7 | Biome als Themen (D-017/D-028) |
 | VFX/Partikel | gemeinsame Atlanten, ≤ 4 Atlanten à 1024² global | BC7/BC3 | Flipbook-Frames im Atlas |
 | UI | Atlanten, ≤ 2048² gesamt | BC7 | UI Toolkit |
-| FoW-Textur | 256² R8/RG8 | unkomprimiert | research/FogOfWar.md |
+| FoW-Textur | 128² RG8 | unkomprimiert | verbindlicher MS-1-Vertrag aus tech/FogOfWar.md |
 
 Regeln: (1) **Atlanten-Pflicht** pro Einheitentyp – kein Typ darf mehr als 1 Material/1 Textur-Set benötigen (Draw-Call-Disziplin, SRP-Batcher-Kompatibilität). (2) Mipmaps Pflicht (Speicherfaktor 1,33 bereits in den Memory-Budgets eingerechnet). (3) Textur-RAM-Deckel gesamt: ≤ 1,0 GB geladen (Teil des 1,8-GB-Asset-Deckels, MemoryBudget.md §1).
 
@@ -85,7 +96,7 @@ Jedes Asset-Store-Paket wird gegen diese Richtwerte geprüft; **drei oder mehr �
 
 | §7.3-Punkt | Messbarer Richtwert |
 |---|---|
-| Unity-Kompatibilität | Unity 6.3 LTS (6000.3.x) vom Publisher gelistet oder im Test lauffähig |
+| Unity-Kompatibilität | Unity `6000.5.4f1`, Revision `d550df8bd089`, URP, im Testprojekt nachgewiesen |
 | Renderpipeline | URP-nativ oder mit ≤ 1 PT-Tag konvertierbar (Built-in-Shader = Warnung) |
 | Lizenz | kommerzielle Nutzung, keine Umsatzbeteiligung, keine Quellangaben-Pflicht im Spiel |
 | Polygonzahl | innerhalb §1-Budgets der Klasse (LOD0), sonst Retopologie-Aufwand schätzen |
@@ -150,7 +161,9 @@ namespace Nova.Assets
 - **Terrain-Polycount/Verfahren** (Unity Terrain vs. Custom Mesh, Biome-Shader) ist noch keinem TDD zugeordnet; das Dreieck-Budget für Terrain (vorläufig ≤ 300 k sichtbar) muss mit dem Rendersequenzen-TDD (Sprint 6, OpenQuestions) bestätigt werden.
 - **Trümmer-Persistenz:** Wie lange bleiben Gebäude-Trümmer (D-012) als gerenderte Meshes stehen? Unbegrenzte Persistenz würde das Worst-Case-Dreieck-Budget sprengen – Design-Entscheidung (Despawn-Timer vs. Deckel) mit Game Design klären.
 - **Visual Effect Graph vs. Shuriken** ab Alpha: VFX-Graph verändert die Partikel-Kostenstruktur (GPU statt CPU); Entscheidung mit dem Rendersequenzen-TDD fällen.
-- **~90 Einheitentypen total** (GDD) vs. ≤ 40 pro Match geladen: Die Annahme „max. 3 Fraktionen + Neutrale pro Match" muss gegen die Match-/Modi-TDDs (FFA ab Alpha, D-025) verifiziert werden – FFA mit 8 Spielern lädt potenziell alle 3 Fraktionen vollständig (ist in den Deckeln bereits berücksichtigt, aber nicht gemessen).
+- **Post-MVP-Vollroster:** Die früheren Annahmen zu drei Fraktionen, Neutralen und
+  FFA sind kein MS-1-Abnahmekriterium; eine spätere Last- und Speicherfreigabe
+  benötigt eine eigene Scope-Entscheidung.
 - **Textur-Kompressionsformat für macOS** (BC vs. ASTC auf Apple Silicon): BC7 wird von Apple-GPUs nativ unterstützt, aber die tatsächlichen VRAM-Werte sind im Phase-0-Spike zu vermessen.
 
 ## Nächste Schritte
@@ -165,3 +178,5 @@ namespace Nova.Assets
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Performance Engineer |
+| 0.2.0 | 2026-07-24 | MS-1-Content, 100-/500-Korridore und exakten Unity-Pin gemäß D-056/D-058/D-060/D-061 abgegrenzt | Lead Performance Engineer |
+| 0.2.1 | 2026-07-24 | FoW-Texturbudget auf verbindliches 128²-RG8-MS-1-Grid korrigiert | Lead Performance Engineer |

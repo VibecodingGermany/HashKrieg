@@ -1,6 +1,6 @@
 # Animation System
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
@@ -8,13 +8,26 @@ Technisches Design des Animations-Systems von Project Nova: Hybrid-Modell aus Me
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-006 (Unity 6.3 + URP), D-011 (Evolvierte-Wachstumsbauweise), D-012 (gezielte Zerstörbarkeit), D-033 (Sim/View-Trennung, Commands), D-034 (Pathfinding, Trümmer-Dirty-Flagging), D-035 (MonoBehaviour/SO-Gerüst, kein DOTS)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-056 (MS-1-Umfang), D-057 (Sim/View-Trennung), D-058 (Lastkorridore), D-060 (Unity-Pin), D-061 (Abnahme)
 - [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) – Optionsvergleich Animation (Hybrid-Empfehlung, LOD-Pflicht, Animator-vs.-Playables-Prototyp)
 - [../vision/CoreGameplay.md](../vision/CoreGameplay.md) – Feel-Bausteine (Wrack-Liegezeit 20–30 s, Treffer-Feedback ohne Zahlen)
 - [../gamedesign/Buildings.md](../gamedesign/Buildings.md) – Baufortschritt, Keim/Reifung (D-011), Modul-Upgrades der Verteidigungsplattform
 - [../gamedesign/Infantry.md](../gamedesign/Infantry.md), [../gamedesign/Vehicles.md](../gamedesign/Vehicles.md), [../gamedesign/Aircraft.md](../gamedesign/Aircraft.md) – Einheitentypen und Bewegungsformen
 - [./GameState.md](./GameState.md) – Sim-Event-Katalog und Zustandsdaten, aus denen die View liest (Schwestervorgabe D-033)
 - [./Pathfinding.md](./Pathfinding.md) – Bewegungsdaten (Geschwindigkeit, Richtung, Steering-Status) als Animations-Input
+
+## MS-1-Override (D-056/D-058/D-060/D-061)
+
+MS-1 animiert nur die in
+[MVPContentManifest.md](../production/MVPContentManifest.md) freigegebenen
+Allianz-/Legion-Einheiten und neun Gebäuderollen. Luft, Evolvierte,
+Flak-Module, aktive Einheitenfähigkeiten und der Vollroster sind Post-MVP.
+Die MG- und Rocket-Module der Verteidigungsplattform samt sichtbarem
+Sub-Mesh-Wechsel gehören dagegen zum MS-1-Produktionspfad.
+Die produktive Abnahme umfasst 100 Einheiten; 500 Animationsobjekte sind ein
+synthetischer V3-Lasttest. Der Animationsanteil wird dort mit
+CPU-P95 ≤1,5 ms abgenommen. Referenzeditor ist Unity `6000.5.4f1`, Revision
+`d550df8bd089`, URP.
 
 ## Architektur-Grundsätze
 
@@ -38,7 +51,7 @@ Fahrzeuge, Mechs ohne Humanoid-Rig, Gebäude und Lufteinheiten erhalten **kein S
 
 - **Fahrwerks-Simulation:** Räder/Ketten rotieren proportional zur Sim-Geschwindigkeit; Hover-/Bein-Imitation über Sinus-Offsets; Aufhängungs-Nicken bei Beschleunigung/Bremsen aus Geschwindigkeits-Delta der letzten Ticks abgeleitet (View-seitig, nicht-deterministisch erlaubt).
 - **Turm-/Waffen-Rotation:** Turm-Transform folgt dem aktuellen Ziel-Vektor aus der Sim mit begrenzter Drehrate (Rate kommt aus dem Unit-SO, identisch zum Sim-Wert, damit View und Sim deckungsgleich wirken).
-- **Gebäude:** Baufortschritt als Stufen-/Shader-Blend (Fundament → Gerüst → fertig), Modul-Upgrades der Verteidigungsplattform (MG/Flak/Rakete, D-008) als austauschbare Turm-Sub-Meshes.
+- **Gebäude:** Baufortschritt als Stufen-/Shader-Blend (Fundament → Gerüst → fertig); in MS-1 sind MG und Rocket der Verteidigungsplattform als austauschbare Turm-Sub-Meshes aktiv, Flak bleibt Post-MVP.
 - **Luft:** Banking/Pitch aus Steuerkurve der Luft-Steering-Schicht (D-034), Schwebetrudeln im Idle; kein Rig.
 - **Evolvierte-Gebäude (D-011):** Keim → Reifung über Wachstums-Shader (Vertex-Displacement/Blend-Shapes, Wachstumsgrad 0–1 aus Sim-Reifestufe) statt Konstruktions-Stufen; Regenerations-Visualisierung als Pulsieren statt Reparatur-Funken.
 
@@ -106,7 +119,8 @@ Der `RenderSnapshot` wird vom View-Adapter aus dem serialisierbaren Sim-State (D
 
 ## Performance-Budget
 
-- Ziel: 60 FPS bei 500 Einheiten; Animations-CPU-Anteil ≤ 2 ms im typischen Gefecht (LOD 1 dominant).
+- Ziel im synthetischen V3-Lasttest: 60 FPS bei 500 Animationsobjekten;
+  Animations-CPU-P95 ≤ 1,5 ms (LOD 1 dominant).
 - Maßnahmen: GPU Skinning, `CullCompletely`, LOD-Ratenbegrenzung, rig-lose Masse-Fraktionen (Legion) ohne Skinning-Kosten, Fahrwerks-Updates als Burst-Job über `NativeArray`-Posen, sobald Profiler es erfordert (D-035-Hotspot-Regel).
 - Validierung: Phase-0-Spike „Animator vs. Playables bei 500 Einheiten" (DecisionLog, Offene Punkte) liefert die Messbasis für Controller-Design und LOD-Schwellen.
 
@@ -131,3 +145,5 @@ Der `RenderSnapshot` wird vom View-Adapter aus dem serialisierbaren Sim-State (D
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Graphics Engineer |
+| 0.2.0 | 2026-07-24 | MS-1-Animationsumfang, synthetischen 500er-Lasttest, CPU-P95-Budget und Unity-Pin gemäß D-056/D-058/D-060/D-061 festgelegt | Lead Graphics Engineer |
+| 0.2.1 | 2026-07-24 | MG/Rocket-Module als MS-1-Pflicht klargestellt und nur Flak zurückgestellt | Lead Graphics Engineer |

@@ -1,134 +1,114 @@
 # Memory-Budget
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 4
+**Version:** 1.0.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 7
 
 ## Zweck
 
-Dieses Dokument legt das verbindliche RAM-Budget für Project Nova (Desktop-Release ≤ 4 GB) fest, zerlegt es in Speicherbereiche (Assets, Sim-State, Grid-Layer, FoW-Bitmasken, Engine-Overhead) und definiert die GC-Politik (0 B pro Sim-Tick) inklusive Pool-Strategien sowie die Bewertung von Streaming/Addressables. Es operationalisiert die TPD-§15-Ziele „kontrollierter Speicherverbrauch" und „geringe Garbage-Collection-Spitzen" und ist Eingabe für die Sprint-7-Implementierung und die Asset-Prüfung in [AssetBudget.md](AssetBudget.md).
+Definiert feste MS-1-Kapazitäten, Snapshot-/Parsergrenzen und
+Flow-Cache-Eviction. Es macht keine unbelegte Gesamt-RAM-Zusage.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-033 (vollständig serialisierbarer State), D-034 (Integer-Grid 1-m-Tiles, 3 Clearance-Radien, Flow Fields), D-035 (kein GC im Tick, UnityEngine.Pool), D-036 (SimRunner)
-- [../research/Pathfinding.md](../research/Pathfinding.md) – Grid-Layer-Modell, Flow-Field-Speicherabschätzung
-- [../research/FogOfWar.md](../research/FogOfWar.md) – Bitmask-Datenstruktur (`values`/`visited` pro Team)
-- [./PerformanceBudget.md](PerformanceBudget.md) – Frame-/Tick-Budgets, Mess-Methodik
-- [./AssetBudget.md](AssetBudget.md) – Asset-seitige Speicherbudgets (Texturen, Meshes, Audio)
-- [./Pathfinding.md](Pathfinding.md), [./Architecture.md](Architecture.md) – Schwester-TDDs aus Sprint 3 (FoW als Subsystem von `Nova.Simulation`)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-058/D-061
+- [GameState.md](GameState.md) und [Serialization.md](Serialization.md)
+- [Pathfinding.md](Pathfinding.md) und [FogOfWar.md](FogOfWar.md)
+- [PerformanceBudget.md](PerformanceBudget.md)
 
-## 1. Gesamtbudget
+## 1. Feste Kapazitäten
 
-| Kennzahl | Budget | Bemerkung |
-|---|---|---|
-| RAM gesamt (Desktop-Release, Match auf L-Karte, 500 Einheiten) | ≤ 4 GB | P95 während 35-min-Match (längstes Szenario laut GDD: 20–35 min) |
-| Managed Heap (C# Objekte, View + Services) | ≤ 512 MB | ohne native Unity-Engine-Objekte |
-| Native/Engine (Unity-Runtime, URP, RenderTargets, Physik) | ≤ 1,0 GB | Messbasis Phase-0-Spike |
-| Assets im Speicher (Texturen, Meshes, Audio, Animation) | ≤ 1,8 GB | Detailbudget: [AssetBudget.md](AssetBudget.md) |
-| Sim-State + Grid-Infrastruktur + FoW | ≤ 100 MB | §2–§4 |
-| Reserve (Fragmentierung, OS-Seitiges, Wachstum Beta-MP) | ≥ 0,6 GB | Lockstep-Ringpuffer, Replay-Aufzeichnung |
+| Ressource | MS-1-Hardcap/Ziel |
+|---|---:|
+| reservierte Slots | 8 |
+| aktive Slots | exakt 2 |
+| Grid | 128×128 × 1 m |
+| Produktionseinheiten | 100 gesamt |
+| synthetisches Scale-Fixture | 500 Agenten |
+| Entity Store | 1.024 |
+| unkomprimierter Snapshot | Ziel ≤4 MiB |
+| Parser | Hardcap 64 MiB vor Payload-Parse |
+| Flow-Cache | ≤32 Einträge und ≤8 MiB |
 
-## 2. Sim-State (Nova.Simulation, D-033/D-035)
+500 Agenten sind ein Testfixture. Sie erhöhen nicht Produktionseinheitenlimit,
+aktive Slots oder Contentumfang.
 
-Vollständig serialisierbarer State, Unity-frei, Array-of-Structs-Layout:
+## 2. Autoritativer Speicher
 
-| Bestandteil | Abschätzung | Rechnung |
-|---|---|---|
-| Einheiten (500 aktiv) | ≤ 1 MB | 500 × ~1–2 KB (Position, Bewegung, Kampf, Orders, Statusflags, Fixed-Point-Felder ab Beta) |
-| Gebäude (12 Typen × ≤ 8 Spieler, inkl. Module/Trümmer-Zustand) | ≤ 0,5 MB | ≤ 500 Instanzen × ~1 KB |
-| Projektile, Effekte, Aetherium-Feldzustand, Commander/Elite-Metadaten | ≤ 1 MB | gepoolte feste Kapazitäten |
-| Command-Ringpuffer + Replay-Aufzeichnung (35 min × 10 Hz) | ≤ 20 MB | 21.000 Ticks × ≤ 1 KB Commands/Tick (Obergrenze, typisch weit darunter) |
-| **Summe Sim-State** | **≤ 25 MB** | inkl. Sicherheitszuschlag |
+Folgende Bereiche sind vorallokiert oder besitzen eine fingerprinted feste
+Kapazität:
 
-Savegame-/Serialisierungs-Puffer (Snapshot des Gesamt-State) doppelt vorhalten: ≤ 50 MB transient, nur während Save/Load.
+- Entity-Slots, Generationen und Free-List;
+- Player-/Team-State für acht reservierte Slots;
+- Command-/Result-/Dedupe-Puffer;
+- Projectile- und Deferred-Queues;
+- Grid-Layer für Movement, Aetherium und FoW;
+- Production-/Construction-Queues und
+- Snapshot-Writebuffer.
 
-## 3. Grid-Layer (D-034, Abschätzung bis zur Finalisierung von tech/Pathfinding.md)
+Eine Überschreitung vergrößert keinen Container dynamisch, sondern erzeugt
+einen deterministischen, getesteten Fehler.
 
-Basis: uniformes Integer-Grid, 1-m-Tiles. Worst Case = L-Karte 256 × 256 m = 65.536 Zellen (M: 192² = 36.864; S: 128² = 16.384).
+## 3. Flow-Field-Cache
 
-| Layer | Datentyp/Zelle | L-Karte | Anmerkung |
-|---|---|---|---|
-| Statische Begehbarkeit/Terrainkosten | u8 | 64 KB | einmal geladen |
-| Höhenlevel (für Höhen-LoS-FoW ab Phase 2) | u8 | 64 KB | |
-| Clearance (3 Radienklassen, D-034) | 3 × u8 | 192 KB | max. passierbarer Radius pro Zelle |
-| Dynamische Belegung (Einheiten, Dirty-Flags) | u8 + Dirty-Bitset | 72 KB | pro Tick aktualisiert |
-| Aetherium-Feld (Typ, Wachstumsstufe, Überernte) | u8 | 64 KB | |
-| Aktive Flow Fields (Kosten + Richtung) | 3 Byte/Zelle (2 Byte Kosten `int16` + 1 Byte Richtung) | ~192 KB **pro Feld** (L-Karte) | Begrenzung über Feld-Cache nötig |
-| **Flow-Field-Cache, gedeckelt ≤ 96 aktive Felder (Korrekturlauf Sprint 4, D-045, tech/Pathfinding.md §1.1/§2)** | | **≈ 19 MB** (L: 3 B × 65.536 Zellen × 96 = 18.874.368 B ≈ 19 MB; M: ~10,6 MB; S: ~4,7 MB) | **RefCount-Eviction** (kein LRU – referenzierte Felder werden nie verworfen, Freigabe nur bei RefCount 0, älteste zuerst); Überlauf über Deckel hinaus fällt auf A*-Einzelsuche zurück (≤ 4 Fills/Tick, Rest `Deferred`) |
-| **Summe Grid** | | **≤ 20 MB** | statische Layer (~0,45 MB) + Flow-Field-Cache (≈19 MB), gerundet mit Sicherheitszuschlag |
+Zwei Grenzen gelten gleichzeitig: 32 Einträge und 8 MiB. Ein Insert ist nur
+zulässig, wenn beide eingehalten werden.
 
-Deckel- und Policy-Herkunft: tech/Pathfinding.md §1.1 (96-Felder-Begründung: 6 Parteien × 2–4 aktive Kontrollgruppen × bis zu 3 Clearance-Klassen = 36–72 Angriffsfelder, plus 24–36 Wirtschafts-Flow-Sharing-Felder §2, Deckel 32 im 6-Spieler-Fall nachweislich unterschritten) und §2 (RefCount- statt LRU-Eviction, da ein referenziertes Feld Einheiten mitten im Pfad ohne Richtungsfeld zurückließe). Vormalige Annahme (32 Felder / ≤ 6,5 MB / LRU) ist damit ersetzt.
+Eviction:
 
-**Gegenrechnung 100-MB-Sim-Kappe (§1):** Sim-State ≤ 25 MB (§2) + Grid ≤ 20 MB (§3, inkl. ≈19-MB-Flow-Field-Cache) + FoW ≤ 0,5 MB (§4) = **≤ 45,5 MB** – die 100-MB-Gesamtkappe für Sim-State + Grid-Infrastruktur + FoW (§1) hält mit ≥ 54 MB Reserve, auch im 96-Felder-Worst-Case.
+1. Einträge mit `RefCount > 0` sind geschützt.
+2. Kandidaten sind ausschließlich `RefCount == 0`.
+3. Kandidat ist deterministisch ältester LRU-Eintrag.
+4. Gleichstand entscheidet der kanonische Cache-Key.
+5. Request-, RefCount-, LRU- und Eviction-Metadaten werden gespeichert, soweit
+   sie zukünftige Auswahl beeinflussen.
 
-Falls tech/Pathfinding.md eine höhere Zellauflösung oder zusätzliche Layer (z. B. Dichtefelder, Einflusskarten für den KI-Director) festlegt, wird diese Tabelle aktualisiert – die 100-MB-Gesamtkappe bleibt verbindlich.
+Ist kein Kandidat vorhanden, liefert die Request-Queue deterministische
+Backpressure statt eines stillen Speicherwachstums.
 
-## 4. FoW-Bitmasken (research/FogOfWar.md §B)
+## 4. Snapshot und Parser
 
-Grid-Auflösung 1 m (D-034-Doppelnutzung), 3 Zustände über zwei Bitmasken-Arrays (`values` = aktuell sichtbar, `visited` = erforscht) als Team-Bitmask (bis 8 Spieler = 1 Byte/Zelle/Array):
+Das 4-MiB-Ziel gilt unkomprimiert für `SimState` plus notwendige
+Fortsetzungsdaten. Der 64-MiB-Hardcap schützt Parser und Migration vor
+feindlichen Längen. Längen/Counts werden vor Allokation geprüft.
 
-| Bestandteil | L-Karte (256²) | Anmerkung |
-|---|---|---|
-| `values` + `visited` | 2 × 64 KB = 128 KB | 8-Spieler-Bitmask |
-| Radar-/Stealth-Zusatzplanes | ≤ 128 KB | GDD-Radar-Mechanik |
-| GPU-Sicht-Textur (R8/RG8, upsampled) | ≤ 0,5 MB VRAM | Upload ~65 KB/Sicht-Tick, vernachlässigbar |
-| **Summe FoW (CPU-Seite)** | **≤ 0,5 MB** | |
+G1 berichtet pro Block:
 
-## 5. GC-Politik (D-035)
+- Nutzbytes,
+- Capacity/High-Water-Mark,
+- serialisierte Bytes und
+- Hash-/Roundtrip-Ergebnis.
 
-**Verbindliche Regeln:**
+Ein Zielbruch >4 MiB ist ein Gatebefund, aber noch kein Parserfehler. >64 MiB
+ist immer harter Parsefehler.
 
-1. **0 B Managed-Allokation pro Sim-Tick** in `Nova.Simulation` und allen Hotspots – enforced über CI-Messung (SimRunner meldet `GC.GetAllocatedBytesForCurrentThread()`-Delta pro Tick; >0 = Build-Fehler) und Code-Review.
-2. **Kein UnityEngine im Sim-Pfad** (D-033) ⇒ Sim-Allokationen sind rein managed; native Unity-Allokationen entstehen nur in der View-Schicht.
-3. **Pools statt new:** Commands, Projektile, Schadensereignisse, Pfad-Anfragen und Flow-Field-Puffer kommen aus festkapazitisierten Pools (`UnityEngine.Pool.ObjectPool<T>` in der View, eigene ringbasierende Pools in der Sim). Pool-Kapazitäten sind Budget-Zahlen (z. B. Projektile ≤ 2.000, Pfad-Anfragen ≤ 256 in Flight).
-4. **Structs & Arrays in Hotpaths:** keine LINQ-Queries, keine Closures/Lambdas mit Capture, keine `foreach` über `IEnumerable`-Interfaces, keine String-Erzeugung im Tick (Logging im Sim-Pfad nur ringgepuffert als Enum-/ID-Einträge).
-5. **Event-Bus/Puffer:** Sim→View-Kommunikation über vorgepufferte Struct-Listen (double-buffered), keine Delegates mit Allokation pro Event.
-6. **View-Schicht:** GC freundlich, aber diszipliniert – Ziel ≤ 1 KB/Frame transient, damit Gen-0-Collections selten und <0,5 ms bleiben (Deckel im Frame-Budget, siehe PerformanceBudget.md).
-7. **GC-Modus:** Incremental GC aktiv (Unity-Standard), damit Sammlungen über Frames amortisiert werden; `GC.Collect()`-Aufrufe außerhalb von Ladebildschirmen sind verboten.
+## 5. Laufzeitallokationen
 
-## 6. Streaming & Addressables – Bewertung
+Im autoritativen Tick gilt 0 B Managed-GC. Pools und persistente Buffer werden
+vor dem Messfenster dimensioniert. Presentation-/UI-Allokationen werden separat
+gemessen und dürfen keine Sim-GC-Zahl kaschieren.
 
-- **Match-Loading statt Streaming:** RTS-Matches laden ihr gesamtes Asset-Set im Ladebildschirm (3 Fraktionen komplett, Karte, VFX, Audio). Echtes Runtime-Streaming (wie in Open-World-Titeln) ist nicht erforderlich und würde die View-Schicht unnötig komplizieren – **kein Runtime-Streaming im MVP/Alpha**.
-- **Addressables: empfohlen, aber zurückgestuft.** Vorteile (Fraktions-/Karten-Bundles, saubere Lade/Entlade-Grenzen zwischen Matches, Grundlage für spätere DLCs/Biome-Roadmap 1/4/8/12) sprechen dafür; der Overhead (Build-Pipeline, Lernkurve) spricht für Einführung **ab Phase 2 (Alpha)**, nicht im MVP. MVP lädt klassisch per Szenen-/Ressourcenstruktur, die Referenzierung erfolgt aber bereits über die GameDatabase-Registry (Vier-Säulen-Prämisse), sodass der Addressables-Umstieg keine API-Änderung erzwingt.
-- **Texture Streaming (Unity Texture Mipmap Streaming):** nur bei Überschreitung des VRAM-Budgets evaluieren; auf Desktop mit ≤1,8 GB Asset-Budget voraussichtlich unnötig.
-- **Audio:** Musik gestreamt (Streaming-LoadType), SFX dekomprimiert im Speicher oder komprimiert-in-memory nach Größenklasse (Details: [AssetBudget.md](AssetBudget.md) §Audio).
-- **Entladen zwischen Matches:** Match-Ende ⇒ vollständiges Unload aller Match-Assets + `Resources.UnloadUnusedAssets()` im Menü-Übergang (einzige erlaubte Stelle für teure Cleanup-Calls); verhindert RAM-Kriech über Match-Folgen.
+## 6. Wachstumstests
 
-## 7. Schnittstellen-Skizze (API-Design, keine Implementierung)
+V4/V5a/V5b beobachten mindestens:
 
-```csharp
-namespace Nova.Performance
-{
-    // Kapazitäten & Speicherbudgets, datengetrieben (GameDatabase).
-    public sealed class MemoryBudgetSO : ScriptableObject
-    {
-        public PoolCapacity[] Pools;      // z. B. { "Projectile", 2000 }, { "PathRequest", 256 }
-        public int MaxActiveFlowFields;   // 96 (Deckel §3, Korrekturlauf Sprint 4, D-045)
-        public long ManagedHeapBudgetBytes;
-    }
+- Entity-/Projectile-/Command-/Deferred-High-Water-Marks,
+- Flow-Cache Bytes, Hits, Fills und Evictions,
+- Snapshotgröße,
+- Managed Heap/GC im Sim-Tick und
+- monotones Wachstum über Warmup +120 s.
 
-    public struct PoolCapacity { public string PoolId; public int Capacity; }
-
-    // CI-/Laufzeit-Prüfung: Allokationsdelta pro Tick (SimRunner, D-036).
-    public interface IAllocationProbe
-    {
-        long BytesAllocatedLastTick { get; }   // Muss 0 sein (Regel 1, §5)
-    }
-}
-```
+„Kein unbeschränktes Wachstum“ verlangt ein Plateau innerhalb fester
+Kapazitäten, nicht nur einen ausbleibenden Out-of-Memory-Crash.
 
 ## Offene Punkte
 
-- **Grid-Layer-Finalliste** (Dichtefelder, KI-Einflusskarten, Bauplatzierungs-Maske) hängt von tech/Pathfinding.md und dem KI-TDD ab; obige Abschätzung ist der Deckel, nicht die Finalliste.
-- **Flow-Field-Cache-Größe (96 Felder, Korrekturlauf Sprint 4)** ist die aktuelle Budgetannahme (tech/Pathfinding.md §1.1); der Phase-0-Spike (V4, Szenario „6 Parteien Vollwirtschaft + 3 Angriffe", siehe PerformanceBudget.md) muss die Eviction-Thrash-Metrik (Fills/Tick) messen und zeigen, ob 96 Felder auch bei 8 Spielern × mehreren Angriffsgruppen mit Reserve ausreichen.
-- **Fixed-Point-Umstellung (D-033, Beta)** kann Struct-Größen im Sim-State ändern; Abschätzung §2 muss dann neu vermessen werden.
-- **Replay/Spectator-Vollaufzeichnung** (research/FogOfWar.md empfiehlt serverseitige Vollaufzeichnung) würde den FoW-Verlauf zusätzlich puffern (~128 KB/Sicht-Tick × 21.000 Ticks ≈ 2,7 GB unkomprimiert) – nur mit Kompression/Delta-Kodierung machbar; Umfang der Replay-Funktion ist noch nicht entschieden (kein D-Eintrag).
-- **macOS-RAM-Verhalten** (Unified Memory, Swap-Aggressivität) auf 8-GB-Macs ist ungemessen; Mindest-RAM-Anforderung des Spiels (8 vs. 16 GB) muss nach Phase-0-Messung festgelegt werden.
+- Ein Gesamt-RAM-Budget wird erst aus realen G0/G1-Buildmessungen abgeleitet;
+  es ist kein MS-1-Gate in diesem Rebaseline.
 
 ## Nächste Schritte
 
-1. Phase 0: Native/Engine-Baselines messen (leere Szene, dann Massenschlacht-Szenario) → Tabelle §1 mit Ist-Werten versehen.
-2. Sprint 7: Pool-Kapazitäten und `MemoryBudgetSO`-Einträge beim ersten vertikalen System-Durchstich anlegen; CI-Allokationsprobe (Regel 1) aktivieren.
-3. Alpha (Phase 2): Addressables-Einführung mit Fraktions-Bundles; Entscheidung zu tech/Pathfinding.md-Layerliste hier nachziehen.
-4. Beta: Fixed-Point-Umstellung und Lockstep-Ringpuffer neu vermessen; Replay-Kompressionskonzept (falls Replay-Feature beschlossen).
+1. Store-/Queue-Kapazitäten in G1 testbar machen.
+2. Per-Block-Snapshotgrößen und Parsergrenzen messen.
+3. Cache-/Wachstumsmetriken in V4/V5a/V5b aufnehmen.
 
 ## Änderungsverlauf
 
@@ -136,3 +116,4 @@ namespace Nova.Performance
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Performance Engineer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4: Flow-Field-Deckel/Speicher/Eviction an tech/Pathfinding.md §1.1/§2 angeglichen (32→96 Felder, ≤6,5 MB→≈19 MB, LRU→RefCount), 100-MB-Sim-Kappe nachgerechnet | Lead Performance Engineer |
+| 1.0.0 | 2026-07-24 | D-058-Kapazitäten, 4-/64-MiB-Grenzen und deterministische 32-/8-MiB-Cache-Eviction festgelegt | Lead Performance Engineer |

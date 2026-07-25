@@ -1,10 +1,16 @@
 # Architecture Review – Multiplayer & Netcode
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Multiplayer & Netcode) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Multiplayer & Netcode) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Prüfung der Multiplayer-/Netcode-Architektur (Lockstep über Command-Relay, D-033/D-038) auf Protokoll-Löcher, Desync-Forensik-Lücken, Reconnect-/Vertrauensschwachstellen, Maphack-Haltung, Fixed-Point-Migrationsrisiko, Server-Kosten-/Validierungsmodell und Quantum-Fallback-Kriterien. Jeder Befund ist mit Beleg und eigener Begründung versehen; Bestätigen ohne Befund war nicht das Ziel.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -80,8 +86,14 @@ Adversariale Prüfung der Multiplayer-/Netcode-Architektur (Lockstep über Comma
 - Alle Befunde sind Entwurfsbefunde auf Dokumentebene; keine Implementierung existiert, daher keine Laufzeit-Verifikation möglich.
 - **Index-Pflicht:** Dieses Dokument legt das Verzeichnis `docs/tech/review/` neu an – `docs/README.md` (Wiki-Index) muss gemäß Dokumentationsstandard nachgezogen werden (durch den Orchestrator; dieser Reviewer ändert nur dieses eine Dokument).
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung (18 Befunde: 1 KRITISCH, 6 HOCH, 7 MITTEL, 4 NIEDRIG) | Reviewer |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |

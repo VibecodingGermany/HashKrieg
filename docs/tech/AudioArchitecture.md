@@ -1,18 +1,31 @@
 # Audio-Architektur
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Audio Designer | **Sprint:** 3
+**Version:** 0.2.2 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Audio Designer | **Sprint:** 3
 
 ## Zweck
 
-Technisches Design der Audio-Architektur von Project Nova: `AudioService`-Abstraktion mit Unity-Audio-Backend im MVP und FMOD als committed Middleware ab Alpha, Bus-/Kategoriestruktur, Voice-Management bei 500 Einheiten, adaptive Musik aus Sim-Daten, 3D-Sound-Setup für die isometrische Kamera, datengetriebene Sound-Zuweisung via ScriptableObjects sowie Lokalisierung und Performance-Budgets. Umsetzungsreif für Sprint 7 (MVP-Implementierung), ohne Implementierungslogik.
+Technisches Design der Audio-Architektur von Project Nova: `AudioService`-Abstraktion mit Unity-Audio-Backend, Bus-/Kategoriestruktur, Voice-Management, adaptive Musik aus Sim-Daten, 3D-Sound-Setup für die isometrische Kamera, datengetriebene Sound-Zuweisung via ScriptableObjects sowie Lokalisierung und Performance-Budgets. Die FMOD-Zielarchitektur ist Post-MVP und keine MS-1-Verpflichtung.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (Unity 6.3 LTS + URP), D-009 (Commander als Identitäts-Layer), D-010 (Matchdauer 20–35 Min.), D-017 (Biome/Wetter-Hazards), D-019 (Kamera/Lesbarkeit), D-033 (Sim/View-Trennung, Presentation nicht deterministisch), D-035 (MonoBehaviour + SO-Gerüst, `Nova.Simulation` Unity-frei)
-- [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) §2 – verbindliche Audio-Einschätzung (Unity Audio MVP, FMOD ab Alpha, Wwise verworfen)
-- [../gamedesign/CommanderSystem.md](../gamedesign/CommanderSystem.md) – Voice-Line-Kategorien, Spam-Regel, Lokalisierungs-Staffelung
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-039 (historisches Audio-Zielbild), D-056 (MS-1-Umfang), D-057 (Sim/View-Trennung), D-058 (Lastkorridore), D-060 (Unity-Pin), D-061 (Abnahme)
+- [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) §2 – historische Audio-Einschätzung (Unity Audio, spätere FMOD-Evaluierung, Wwise verworfen)
+- [../gamedesign/CommanderSystem.md](../gamedesign/CommanderSystem.md) – ausschließliches Post-MVP-Zielbild für Voice-Line-Kategorien, Spam-Regel und Lokalisierungs-Staffelung
 - [../gamedesign/Biomes.md](../gamedesign/Biomes.md) – Wetter-/Hazard-Events als Ambience- und Bark-Auslöser
 - [../gamedesign/Weapons.md](../gamedesign/Weapons.md), [../gamedesign/Units](../gamedesign/Factions.md) – Träger der Sound-Referenzen
+
+## MS-1-Override (D-056/D-058/D-060/D-061)
+
+MS-1 verlangt funktionales Audiofeedback für den geschlossenen
+Allianz-/Legion-Core-Loop, aber keine finale Musik, Vertonung, Sprecheraufnahmen,
+Wetter-Ambience oder FMOD-Migration. Das produktive Szenario umfasst 100
+Einheiten; 500 Audioemitter sind nur ein synthetischer Lasttest. Editor und
+Backend-Validierung verwenden Unity `6000.5.4f1`, Revision `d550df8bd089`, URP.
+
+Die Abschnitte 2–8 bewahren das frühere Vollspiel-/Alpha-Zielbild als
+Designreserve. Sie autorisieren weder Commander-/Voice-Code noch FMOD, adaptive
+Musik, Wetter-Ambience oder 500 produktive Audioemitter in G0–G5. Für MS-1 sind
+ausschließlich dieser Override, D-056 und die G4-/G5-Akzeptanzprofile führend.
 
 ## 1. Grundprinzipien
 
@@ -102,16 +115,17 @@ Stealing-Reihenfolge bei erschöpftem Voice-Budget: Low → Normal → …; Crit
 - **Bark-Budgets:** max. 1 Acknowledge-Bark pro Auswahl-Aktion (Gruppenbefehl an 40 Einheiten = 1 Stimme); globaler Bark-Cooldown ~1,5 s; Cooldown pro Einheiten**gruppe** statt pro Einheit (Research: „ein Nachmittag Arbeit" im MVP).
 - **Concurrency-Deckel:** gleiche `SoundEventId` max. 3–4× gleichzeitig (Schuss-Variationen), danach Stealing des ältesten. MVP manuell im Service, Alpha nativ über FMOD Max-Instances/Cooldowns.
 
-### 4.3 Commander-Event-Voiceovers
+### 4.3 Commander-Event-Voiceovers (Post-MVP)
 
-Verbindliche Spam-Regel aus [../gamedesign/CommanderSystem.md](../gamedesign/CommanderSystem.md) §3: **max. 1 Event-Ansage alle ~8–12 s** (Richtwert); kritische Events (Superwaffe, HQ unter Beschuss) **dürfen unterbrechen**. Der Service führt eine priorisierte Warteschlange: Normal-Priorität wird bei vollem Cooldown verworfen (nicht gestaut), Critical preempted die laufende Ansage. Kategorien und Mengen (~42–55 Lines/Commander im MVP) folgen CommanderSystem §4; Auslöser kommen als abstrahierte `CommanderEvent`-Enum aus dem Presentation-Layer, der Sim-Events darauf mappt.
+Post-MVP-Zielregel aus [../gamedesign/CommanderSystem.md](../gamedesign/CommanderSystem.md) §3: **max. 1 Event-Ansage alle ~8–12 s** (Richtwert); kritische Events (Superwaffe, HQ unter Beschuss) **dürfen unterbrechen**. Der Service führt dann eine priorisierte Warteschlange: Normal-Priorität wird bei vollem Cooldown verworfen (nicht gestaut), Critical preempted die laufende Ansage. Kategorien und Mengen (~42–55 Lines/Commander im historischen Vollspielentwurf) folgen CommanderSystem §4. Dieser Absatz ist keine MS-1-Anforderung.
 
 ## 5. Adaptive Musik
 
 - **Intensitätsquelle ist die Simulation, gelesen nicht gekoppelt:** Ein `MusicIntensityProvider` (Presentation-Layer) aggregiert pro Sekunde aus Sim-Snapshots: aktive Kampf-Ereignisse nahe eigener Einheiten, eigene Verluste/min, Basis-Beschuss, Superwaffen-Countdown. Ergebnis: `intensity01` geglättet (Anstieg schnell ~2 s, Abfall langsam ~15–20 s) → `SetMusicIntensity`.
-- **MVP (Unity Audio):** 2–3 Musik-Stems (Ruhe / Spannung / Gefecht) per Crossfade über Mixer-Snapshots; Sieg/Niederlage als harte State-Übergänge.
+- **Post-MVP-Zielbild (Unity Audio):** 2–3 Musik-Stems (Ruhe / Spannung / Gefecht) per Crossfade über Mixer-Snapshots; Sieg/Niederlage als harte State-Übergänge.
 - **Alpha (FMOD):** Parameter-gesteuertes vertikales Layering, gleiche `intensity01`-Semantik – Aufrufer-Code ändert sich nicht.
-- Musik ist fraktionsgebunden (Theme-Auswahl über `CommanderDefinitionSO.FactionID`), Battle-Layer fraktionsneutral im MVP.
+- Musik ist im Post-MVP-Zielbild fraktionsgebunden; MS-1 fordert keine
+  Commander-Definition und keine adaptive Stem-Implementierung.
 
 ## 6. 3D-Sound-Setup (isometrische Kamera)
 
@@ -150,7 +164,7 @@ public class AudioBudgetSO : ScriptableObject    // ein Asset, global
 
 public class CommanderVoiceSetSO : ScriptableObject  // aus CommanderDefinitionSO.VoiceProfileID
 {
-    public string Locale;              // "en" MVP; "de" ab Release
+    public string Locale;              // Post-MVP-Lokalisierung
     public CommanderLineEntry[] Lines; // Event -> Clips/Keys + Priorität (Katalog = CommanderSystem §4)
 }
 ```
@@ -159,10 +173,13 @@ Zuweisungsweg: `UnitDefinitionSO → UnitSoundSetSO → SoundEventSO`. Einheiten
 
 ## 8. Lokalisierung der Commander-Voice
 
-Verbindlich laut CommanderSystem (Korrekturlauf Sprint 2): **MVP Englisch vertont + deutsche Untertitel; Release Deutsch + Englisch voll vertont.** Architektonisch heißt das:
+Historisches Post-MVP-Zielbild aus CommanderSystem: Englisch vertont und
+deutsche Untertitel zuerst, Deutsch und Englisch später vollständig vertont.
+Für MS-1 ist Commander-/Voice-Content gemäß D-056 deaktiviert.
 
 - `SoundEventId` ist locale-neutral; die Locale-Auflösung passiert im Backend über `CommanderVoiceSetSO.Locale` (Asset-Ordner/Bank pro Sprache). Aufrufer-Code ist sprachagnostisch.
-- MVP-Budget: 1 Sprecher × 3 Fraktionen (EN). DE-Aufnahmen erst nach MVP – die Ordner-/Bank-Struktur muss das von Anfang an vorsehen, damit Release-DE ein Content-Drop ist, kein Umbau.
+- Post-MVP-Budget: zunächst 1 Sprecher × 3 Fraktionen (EN). Diese
+  Asset-Struktur ist keine MS-1-Implementierungspflicht.
 - Rest-Abhängigkeit Q-018 (Preis-/Budget-Rahmen) betrifft nur den Umfang der Alternativtakes, nicht die Staffelung.
 
 ## 9. Performance-Budget
@@ -175,12 +192,18 @@ Verbindlich laut CommanderSystem (Korrekturlauf Sprint 2): **MVP Englisch verton
 | CPU-Budget Audio-Thread | ≤ 1 ms/Frame (Update im Service, kein per-Einheit-Polling) | ≤ 1,5 ms inkl. FMOD-Update |
 | Musik-Stems geladen | 3 | Bank-basiert, Streaming |
 
-Begründung MVP-Deckel: 1 Fraktion, 1 Karte, Sound-Dichte weit unter Zielvision – native Grenzen reichen (Research §2). Alle Werte stehen im `AudioBudgetSO` und werden im Optionen-Menü nicht unter die Lesbarkeits-Minima (Commander-Voice, Alerts) absenkbar gemacht.
+Begründung MVP-Deckel: zwei Fraktionen, eine Karte, Sound-Dichte weit unter
+der Vollspielvision – native Grenzen reichen (Research §2). Alle Werte stehen
+im `AudioBudgetSO`; spielkritische Alerts bleiben hörbar und untertitelt.
+Commander-Voice gehört nicht zu MS-1.
 
 ## Offene Punkte
 
-- **DecisionLog-Anker fehlt:** Die Audio-Entscheidung (Unity Audio MVP + FMOD ab Alpha) ist Stand Sprint 3 nur als Research-Empfehlung (Animation_Audio_UI §„Empfehlung") dokumentiert und hat noch **keine D-ID**. Vergabe im DecisionLog anstoßen; bis dahin referenziert dieses Dokument die Research-Quelle direkt.
-- **FMOD-Budgetschwelle:** Indie-Lizenz-Grenzen ($200k Umsatz / $600k Budget) gegen Studio-Finanzplanung spiegeln (aus Research übernommen, Q-018-Abhängigkeit).
+- **D-039 ist vorhanden, aber für MS-1 begrenzt:** Unity Audio bleibt das
+  zulässige Backend; FMOD besitzt ohne neue Post-MVP-Entscheidung keinen
+  Implementierungstermin.
+- **FMOD-Budgetschwelle:** Erst bei einer Post-MVP-Reaktivierung gegen dann
+  aktuelle Lizenz- und Finanzdaten prüfen.
 - **Listener-Modell:** Fokuspunkt-Listener mit Zoom-Lautstärke-Kopplung ist eine Design-Annahme; Alternative (Listener starr an Kamera, manuelle Ducking-Kurve) im MVP-Prototyp per Gehör entscheiden.
 - **Wetter-Vorwarn-Cues:** Biomes.md definiert 15/20-s-Vorwarnung „Audio" ohne konkrete Cue-Liste – Cue-Design (global vs. räumlich) mit Level Design abstimmen.
 - **KI-Barks:** Ob KI-gesteuerte Einheiten (Command-only, 3-Schichten-KI) im Singleplayer hörbar acknolwedgen (Feedback für KI-Aktionen) oder stumm bleiben, ist gamedesign-seitig nicht festgelegt.
@@ -189,12 +212,18 @@ Begründung MVP-Deckel: 1 Fraktion, 1 Karte, Sound-Dichte weit unter Zielvision 
 
 - Sprint 4: DecisionLog-Eintrag (D-ID) für die Audio-Entscheidung beantragen; dieses Dokument danach auf die D-ID umhängen.
 - Sprint 5–6: `SoundEventSO`/`UnitSoundSetSO`-Schema mit Lead Programmer gegen die GameDatabase-Konventionen (Definitions-only, Registry) prüfen.
-- Sprint 7: `IAudioService` + `UnityAudioService` (Source-Pool, Mixer-Topologie §3, Mini-Voice-Limit §4.2) implementieren; Commander-Spam-Queue §4.3.
-- Sprint 7: Musik-Stem-Spezifikation (3 Intensitätsstufen, Übergangslängen §5) an Composer/Extern; Commander-Casting EN starten (Signature-Asset-Prozess, TPD §7.2).
-- Alpha-Planung: FMOD-Studio-Projekt-Struktur (Busse gespiegelt aus §3, Events aus `SoundEventSO`-Keys generierbar) als Migrationspaket vorbereiten.
+- Nach G0/G1 in G4 ausschließlich `IAudioService` +
+  `UnityAudioService`, Source-Pool, Mixer, Alerts, Untertitel und die
+  minimalen Allianz-/Legion-/Aetherium-Events integrieren.
+- G4/G5-Audio gegen UI-only-Matches und Accessibility-Anforderungen prüfen.
+- Commander-Casting, Commander-Spam-Queue, externe Musikproduktion und FMOD
+  bis zu einer Post-MVP-D-ID sperren.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Audio Designer |
+| 0.2.0 | 2026-07-24 | MS-1-Audioumfang, synthetischen 500er-Lasttest, Post-MVP-FMOD und Unity-Pin gemäß D-056/D-058/D-060/D-061 abgegrenzt | Lead Audio Designer |
+| 0.2.1 | 2026-07-24 | MS-1 auf zwei Fraktionen korrigiert und Commander-/FMOD-Arbeit aus Sprint 7 entfernt | Lead Audio Designer |
+| 0.2.2 | 2026-07-24 | D-039-Anker korrigiert und Vollspiel-Audio, Commander-Voice sowie adaptive Musik ausdrücklich aus G0–G5 entfernt | Lead Audio Designer |

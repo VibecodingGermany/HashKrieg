@@ -1,19 +1,27 @@
 # Lighting & Post-Processing
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
-Technisches Design des Beleuchtungs- und Post-Processing-Konzepts von *Project Nova* (Unity 6.3 LTS + URP, D-006). Festgelegt werden: Lichtkonzept pro Biom-Typ, die Realtime-vs.-Baked-Strategie, Schatten-Budget, Aetherium-Glow (Emissive + Bloom), VFX-Beleuchtung (Explosionen) und der URP-Post-Processing-Stack. Verbindlich für Sprint 7 (Vertical Slice) und die Environment-Art-Vorgaben an Sprint 5. API-Skizzen sind Entwürfe; keine Implementierungslogik. Pipeline-Setup, FoW und Overlays siehe [./Rendering.md](./Rendering.md).
+Technisches Design des Beleuchtungs- und Post-Processing-Konzepts von *Project Nova* für Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Festgelegt werden: Lichtkonzept pro Biom-Typ, die Realtime-vs.-Baked-Strategie, Schatten-Budget, Aetherium-Glow (Emissive + Bloom), VFX-Beleuchtung (Explosionen) und der URP-Post-Processing-Stack. API-Skizzen sind Entwürfe; keine Implementierungslogik. Pipeline-Setup, FoW und Overlays siehe [./Rendering.md](./Rendering.md).
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (URP, Desktop Win/macOS), D-010 (Aetherium-Felder verändern Terrain), D-012 (gezielte Zerstörbarkeit → keine statische Umgebung), D-017/D-028 (Wetter/Hazards pro Biom), D-019 (Lesbarkeit, RTS-Kamera)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-060 (Unity-Pin), D-061 (Abnahme), D-019 (Lesbarkeit)
 - [../gamedesign/Biomes.md](../gamedesign/Biomes.md) – 10 Biom-Profile mit Farbpalette/Stimmung und Wetter-/Hazard-Zeitfenstern (verbindliche Stimmungsvorgabe)
 - [../gamedesign/Resources.md](../gamedesign/Resources.md) – Überernte-Stufen, Feldzustände (Glow-Träger)
 - [../research/FogOfWar.md](../research/FogOfWar.md) – Lesbarkeits-Leitplanken, RenderGraph-Pflicht
 - [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md) – URP-Performance-Leitplanken
 - [./Rendering.md](./Rendering.md) – Qualitätsstufen, HDR/MSAA, Team-Color-Shader, FoW-Pass-Reihenfolge
+
+## MS-1-Override (D-056/D-060/D-061)
+
+Für MS-1 ist ausschließlich das klare Glutrinne-Lichtprofil verbindlich.
+Weitere Biome, Wetterphasen, Hazards, dynamische Tageszeiten und
+Evolvierten-spezifische Effekte sind Post-MVP. Abgenommen werden Lesbarkeit,
+Teamfarben und funktionales Aetherium-Feedback im freigegebenen Szenario;
+finale Art-Qualität ist kein G0–G5-Kriterium.
 
 ## Grundprinzipien
 
@@ -127,20 +135,25 @@ Ein globaler `Volume` mit Basis-Profil; `LightingProfile.PostVolume` legt Biom-O
 
 - **Realtime-only-Verzicht auf jegliches Baking:** Empfehlung dieses Dokuments, aber formale DecisionLog-Entscheidung steht aus (Lighting war keiner der D-033–D-036-Blöcke). Risiko: Kampagne (Phase 3, D-020) mit Nah-Kamera-Momenten könnte APV/Baked-GI-Bedarf erzeugen – Status: offen, Entscheidungsvorlage für Sprint-3-Review.
 - **Adaptive/Performance-gesteuerte VfxLight-Caps:** Konkrete Kosten der Punktlichter auf schwachen Metal-GPUs unvermessen – Cap 8 ist Einschätzung, keine Messung. Status: offen, Phase-0/Vertical-Slice-Profiling.
-- **Mond-Strahlungsfront als Licht-Sweep:** Design-Regel „Krater-Schatten schützen" (Biomes.md) verlangt, dass Echtzeit-Schatten die Schutzzonen korrekt zeigen; Zusammenspiel mit Shadow-Distance 120 m und 2 Cascades auf L-Karten ungeprüft – evtl. kartenweite Schatten nötig (Kosten). Status: offen, Sprint-7-Prototyp.
+- **Mond-Strahlungsfront als Licht-Sweep:** Post-MVP; keine Sprint-7- oder
+  MS-1-Aufgabe.
 - **Adaptive Tageszeit:** Kein Tag/Nacht-Zyklus im GDD definiert; `LightingProfile`-Modell ist dafür ausgelegt, aber ob Tageszeit überhaupt ein Feature ist (Hazard-Events nutzen das System bereits), ist eine Design-Frage – Status: offen, nicht selbst entschieden.
 - **APV (Adaptive Probe Volumes) ab Alpha:** Re-Eval für Kampagnen-Qualität; Unity-6.3-Reife auf Metal zu prüfen. Status: offen, vorgemerkt.
 
 ## Nächste Schritte
 
 1. Sprint-3-Review: Realtime-only-Empfehlung als DecisionLog-Entwurf einreichen (mit geprüften Alternativen: Misch-Baking, APV-sofort).
-2. Sprint 7: `LightingProfile`-SOs für MVP-Biom (Wüste) + eine Wetter-Variante anlegen; `ILightingDirector`-Crossfade mit der 15-s-Vorwarnung koppeln.
-3. Sprint 7: Schatten-Budget (2 Cascades, 120 m, 2048) gegen die Referenzszene profilieren; VfxLightPool-Cap vermessen.
-4. Bloom-Threshold mit dem Kristall-Emissive-Parameter abstimmen (nur Emissive blüht – Art-Test mit Alien-Welt-Palette).
-5. Mond-Strahlungsfront-Sweep prototypen und Schatten-Lesbarkeit der Schutzzonen verifizieren.
+2. Nach G0 für V2 ausschließlich ein klares Glutrinne-Wüstenprofil anlegen;
+   keine Wettervariante.
+3. In V2 Schatten-Budget und VfxLightPool-Cap gegen das
+   `SCALE_500_RENDERING`-Fixture vermessen.
+4. In G4 Bloom-Threshold mit dem Aetherium-Emissive-Parameter abstimmen.
+5. Wetter-, Mond-, Mars- und APV-Arbeit bis zu einer Post-MVP-D-ID sperren.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Graphics Engineer |
+| 0.2.0 | 2026-07-24 | Glutrinne als einzigen MS-1-Lichtumfang und exakten Unity-Pin gemäß D-056/D-060/D-061 festgelegt | Lead Graphics Engineer |
+| 0.2.1 | 2026-07-24 | Nächste Schritte auf klares Glutrinne/V2 begrenzt und Wetter-/Mond-Arbeit aus Sprint 7 entfernt | Lead Graphics Engineer |

@@ -1,6 +1,6 @@
 # Module und Phasen – tatsächlicher Implementierungsstand
 
-**Version:** 1.0.0 | **Status:** Recovery-Baseline | **Verantwortungsbereich:** Lead Technical Director / Producer | **Sprint:** 7
+**Version:** 1.4.0 | **Status:** Recovery-Baseline – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director / Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -12,7 +12,7 @@ nicht auf vorhandenen Dateien oder APIs.
 
 - [production/ImplementationAudit_2026-07-24.md](production/ImplementationAudit_2026-07-24.md)
 - [production/MVPRecoveryPlan.md](production/MVPRecoveryPlan.md)
-- [production/DecisionLog.md](production/DecisionLog.md) – D-055
+- [production/DecisionLog.md](production/DecisionLog.md) – D-055 bis D-064
 - [production/Milestones.md](production/Milestones.md)
 
 ## Aktueller Gesamtstatus
@@ -48,24 +48,35 @@ nicht auf vorhandenen Dateien oder APIs.
 ## Recovery-Status
 
 Aktiver Scope ist ausschließlich
-[MVPRecoveryPlan G0](production/MVPRecoveryPlan.md): reproduzierbare grüne
-Baseline. Feature- und Alpha-Expansion sind bis zum bestandenen MVP-Gate G5
-gestoppt.
+[MVPRecoveryPlan G0-A](production/MVPRecoveryPlan.md): der
+subject-unabhängige, nicht selbstautorisierende Trusted-Gate-Bootstrap. Schema
+1.2 prüft nur Integrität und jeder Pass-Versuch bleibt mit
+`E_AUTHORIZATION_BOOTSTRAP` gesperrt. Erst nach G0-A folgt G0-B; Feature- und
+Alpha-Expansion sind bis zum bestandenen MVP-Gate G5 gestoppt.
 
 ## Offene Punkte
 
-- Q-038: reduzierten MVP-Content-Scope ratifizieren.
-- Q-039: Fixed-Point-/Cross-Plattform-Gate entscheiden.
+- Q-038 ist durch D-056 geschlossen; der reduzierte, abhängige MS-1-Umfang
+  steht im [MVPContentManifest](production/MVPContentManifest.md).
+- Q-039 ist durch D-057 und D-061 geschlossen; kanonischer Fixed-Point-State
+  und ARM64↔x86_64-Nachweis sind verbindliche Gate-Anforderungen.
 - Uncommitteten Shader-Stand separat reviewen.
 
 ## Nächste Schritte
 
-1. Roten Netzwerkpaket-Test und Build-Reproduzierbarkeit in G0 beheben.
-2. Code-CI als Merge-Gate aktivieren.
-3. Danach G1 für Command/State/Hash/Replay öffnen.
+1. G0-A einschließlich Gate-Runner ohne Gate-Fortschritt geschützt mergen.
+2. Am nachfolgenden sauberen Subject in G0-B roten Netzwerkpaket-Test und
+   Build-Reproduzierbarkeit beheben und erst danach dort Schema 1.3,
+   vollständige `authorizedEvidence`-Kette und `environmentId`-Bindung
+   autorisieren.
+3. G1 erst nach bestandenem G0 öffnen.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Halluzinierte MS-0-/MVP-/Alpha-Fertigmeldungen durch evidenzbasierten Iststand ersetzt | Lead Technical Director / Producer |
+| 1.1.0 | 2026-07-24 | Q-038/Q-039 gemäß D-056/D-057/D-061 geschlossen und Status auf G0 aktiv synchronisiert | Lead Technical Director / Producer |
+| 1.2.0 | 2026-07-24 | D-062-Same-Subject-Gate-Kette als Statusvoraussetzung ergänzt | Lead Technical Director / Producer |
+| 1.3.0 | 2026-07-24 | D-063-autorisierte Schema-1.2-Evidence als Statusvoraussetzung ergänzt | Lead Technical Director / Producer |
+| 1.4.0 | 2026-07-24 | D-064: Schema 1.2 als Integritätsvorstufe und G0-A vor G0-B als aktive Recovery-Reihenfolge verankert | Lead Technical Director / Producer |

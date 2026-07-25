@@ -1,14 +1,19 @@
 # Naming Convention – Benennungsregeln für Project Nova
 
-**Version:** 0.2.1 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
+**Version:** 0.4.0 | **Status:** Entwurf – MS-1 rebaselined | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
 
 ## Zweck
 
-Dieses Dokument legt die verbindlichen Benennungsregeln für Code (Namespaces, Typen, Member), SO-Assets, Ordner, Tests, Events und Datei-Header fest. Ziel: Navigierbarkeit einer Codebasis, die auf ~90 Einheitentypen, 12 Gebäudetypen und mehrere hundert Definitions-Assets wächst, sowie unmissverständliche Zuordnung jedes Typs zu seiner Architektur-Schicht (D-033/D-035). Verbindlich ab Sprint 7; Ergänzungen (neue Präfixe, neue Feature-Namespaces) erfolgen nur über Änderung dieses Dokuments.
+Dieses Dokument legt die verbindlichen Benennungsregeln für Code (Namespaces,
+Typen, Member), Definitions-Assets, Ordner, Tests, Events und Datei-Header
+fest. MS-1 aktiviert nur das Manifest aus
+[MVPContentManifest.md](../production/MVPContentManifest.md); Namen für den
+größeren Vollspielentwurf sind reserviert, aber keine Implementierungspflicht.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-033 (Sim/View-Trennung), D-035 (OOP+SO-Gerüst), D-036 (SimRunner), D-043 (kanonische Assembly-Topologie inkl. `Nova.AI`/`Nova.AI.Data`), D-049 (Registry-Sharding)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-057 (kanonischer State/Commands), D-061 (Abnahme)
+- [./Commands.md](./Commands.md) – führendes Command-Schema
 - [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md) – §3 (Registry-Pattern, stabile IDs)
 - [./FolderStructure.md](./FolderStructure.md) – Ordner-/Assembly-Struktur, der die Namespaces folgen
 - [./CodingGuidelines.md](./CodingGuidelines.md) – Regeln, deren Rollen hier benannt werden
@@ -18,7 +23,7 @@ Dieses Dokument legt die verbindlichen Benennungsregeln für Code (Namespaces, T
 | Element | Konvention | Beispiel |
 |---|---|---|
 | Typen, Methoden, Properties, Events | `PascalCase` | `MoveCommand`, `Execute`, `CurrentTick` |
-| Interfaces | `I` + `PascalCase`, Rollenname | `ICommand`, `ISimSystem`, `ISimRandom` |
+| Interfaces | `I` + `PascalCase`, Rollenname | `ISimSystem`, `ISimRandom` |
 | Parameter, lokale Variablen | `camelCase` | `targetTile`, `elapsedTicks` |
 | Private/protected Felder | `_camelCase` | `_unitStates`, `_logger` |
 | `const` und `static readonly` | `PascalCase` | `TicksPerSecond`, `MaxEntities` |
@@ -36,12 +41,12 @@ Namespaces spiegeln exakt die Ordnerstruktur ([./FolderStructure.md](./FolderStr
 | Namespace | Schicht | Inhalt (Beispiele) |
 |---|---|---|
 | `Nova.Core` | Core | `EntityId`, `Tick`, `INovaLogger`, `SimMath` |
-| `Nova.Simulation` | Sim (Unity-frei) | `Simulation`, `SimulationConfig`, `CommandEnvelope`, `CommandType` |
-| `Nova.Simulation.Commands` | Sim | `MoveCommand`, `AttackCommand`, `BuildCommand` |
+| `Nova.Simulation` | Sim (Unity-frei) | `SimulationHost`, `SimulationConfig`, `CommandRecord`, `CommandKind` |
+| `Nova.Simulation.Commands` | Sim | `CommandIntent`, `CommandIngress`, `CommandBatch` |
 | `Nova.Simulation.State` | Sim | `UnitState`, `MatchState`, `PlayerState` |
 | `Nova.Simulation.Definitions` | Sim | `UnitDefinition`, `WeaponDefinition` (Unity-freie Snapshots) |
 | `Nova.Simulation.Economy` / `.Combat` / `.Movement` / `.Pathfinding` / `.FogOfWar` | Sim | je ein `ISimSystem` + zugehörige Typen |
-| `Nova.Simulation.Burst` | Burst/Jobs | Burst-Varianten der Hotspot-Jobs (D-034, nur hinter Feature-Flag, D-045) |
+| `Nova.Simulation.Burst` | Post-MVP reserviert | erst nach bewiesener exakter Feld-/Hash-/Byteparität aktivierbar (D-057) |
 | `Nova.AI` / `Nova.AI.Strategy` / `.Tactics` / `.Squads` | KI (Unity-frei, D-043) | `AiPlayer`, `StrategicDirector`, `SquadBehavior` |
 | `Nova.AI.Data` | Data (SO) | `DifficultyProfileSO`, `StrategyOptionSO`, `AiRegistrySO` |
 | `Nova.Data` | Data (SO) | `UnitDefinitionSO`, `UnitRegistrySO`, `GameDatabaseMasterSO` |
@@ -56,8 +61,8 @@ Suffixe sind verbindlich – sie machen die Schichtzugehörigkeit am Namen erken
 
 | Rolle | Muster | Beispiel |
 |---|---|---|
-| Command (Sim, Struct) | `<Aktion>Command` | `MoveCommand`, `SetRallyPointCommand` |
-| Command-Transport (Sim, Struct) | `CommandEnvelope` + `CommandType`-Enum + fixed-size Payload (boxfrei, Review F-5; `ICommand` nur als Marker über generische Constraints) | – |
+| Command-Intent | `<Action>CommandIntent` | `MoveCommandIntent` |
+| Kanonischer Command-Record | `CommandRecord` + `CommandKind` + versionierter Payload | `MoveCommandPayloadV1` |
 | Sim-System | `<Domäne>System : ISimSystem` | `EconomySystem`, `FogOfWarSystem` |
 | State-Struct (Sim) | `<Entität>State` | `UnitState`, `BuildingState` |
 | Sim-Definition (Unity-frei) | `<Entität>Definition` | `UnitDefinition`, `TechDefinition` |
@@ -113,16 +118,26 @@ Ablage: `Assets/_Project/Data/<Typ>/<Fraktion>/` (vgl. FolderStructure §4).
 - **Sim-Event-Puffer-Records** heißen `<Ereignis>Event` (§3) und sind keine C#-Events; die Namensnähe ist gewollt (DamageEvent = Datensatz, OnDamageReceived = mögliches View-Event daraus).
 - **Commands** werden nie `On…` benannt – Commands sind Absichten (Imperativ), Events sind Fakten (Vergangenheit).
 
-## 8. Stabile Definitions-IDs
+## 8. Authoring-Keys und kanonische Definitions-IDs
 
-String-IDs für SO-Definitionen (Registry-Key, Savegames, SimRunner-Auswertung), Format dot-lower:
+SO-Definitionen besitzen außerhalb der Simulation einen stabilen
+`DefinitionKey` im Format dot-lower:
 
 ```text
 unit.allianz.rifleman      bldg.legion.war_factory      tech.evolvierte.spore_cloud
 ```
 
-- Muster: `<typ>.<fraktion>.<name_snake_case>`; Fraktions-Token wie §4 in lower-case.
-- IDs sind nach Vergabe **unveränderlich** (Savegame-/Replay-Kompatibilität); Umbenennung eines Assets ändert die ID nicht.
+- Muster: `<typ>.<fraktion>.<name_snake_case>`; Fraktions-Token wie §4 in
+  lower-case.
+- Keys sind nach Vergabe unveränderlich; Asset-Umbenennung ändert den Key
+  nicht.
+- Der G1-Definitions-Build sortiert gültige Keys byteweise nach UTF-8,
+  weist daraus `DefinitionId uint16` von 1 aufwärts zu und schreibt die
+  Zuordnung in den kanonischen `DefinitionSnapshot`. 0 ist ungültig.
+- Sim-State, Commands, Snapshots und Replays enthalten ausschließlich
+  `DefinitionId`, niemals Strings.
+- Jede geänderte Zuordnung ändert `DefinitionsHash64`. Replays werden dann
+  abgelehnt; Savegames benötigen eine explizite Migration.
 
 ## 9. Datei-Header-Konvention
 
@@ -131,8 +146,8 @@ Jede handgeschriebene `.cs`-Datei beginnt mit:
 ```csharp
 // -----------------------------------------------------------------------------
 // Project Nova – <eine Zeile Zweck>
-// Assembly: Nova.Simulation | Layer: Simulation (keine UnityEngine-Referenzen, D-033)
-// Entscheidungen: D-033, D-035
+// Assembly: Nova.Simulation | Layer: Simulation (keine UnityEngine-Referenzen, D-057)
+// Entscheidungen: D-057, D-061
 // -----------------------------------------------------------------------------
 ```
 
@@ -142,15 +157,22 @@ Jede handgeschriebene `.cs`-Datei beginnt mit:
 
 ## Offene Punkte
 
-- **Präfix-Vollständigkeit:** Die SO-Präfix-Tabelle (§4) deckt den MVP-Scope; Superwaffen-, Commander-Identitäts- und Hazard-Definitionen bekommen ihre Präfixe mit der Sprint-5-Asset-Korrektur bzw. wenn die zugehörigen Tech-Docs entstehen.
+- **Präfix-Vollständigkeit:** Die Tabelle deckt den MS-1-Scope; Präfixe für
+  Superwaffen, Commander und Hazards werden erst mit einem Post-MVP-Scope
+  verbindlich.
 - **Fraktions-Token:** `Allianz`/`Legion`/`Evolvierte` folgen den GDD-Namen; falls das GDD lokalisierte interne Namen ändert, ist §4 nachzuziehen (IDs nach §8 bleiben stabil).
 - **AIDIFF_-Präfix:** Längeres Token wegen Eindeutigkeit gegenüber einem späteren `AI_`-Sammelpräfix gewählt; bei Einführung weiterer KI-Asset-Typen (Behavior-Trees etc.) Namespace/Präfix gemeinsam final festlegen.
 
 ## Nächste Schritte
 
 1. Konsistenzreview gegen Architecture.md und die AI-/Data-Tech-Docs (Namespace-Liste §2 mit den dort geplanten Systemen abgleichen).
-2. Sprint 7: Referenzdateien mit Header und korrekten Suffixen anlegen (`MoveCommand` + `CommandEnvelope`, `EconomySystem`, `UnitDefinitionSO`, `UnitRegistrySO`).
-3. **Sprint 7 (Tooling-Aufgabe, D-049):** ID-Codegen umsetzen – Generator in `Nova.Editor` erzeugt aus den Sub-Registry-Assets ein Enum pro Kategorie (`UnitId`, `BuildingId`, `WeaponId`, …) plus Lookup-Tabelle als generierte Datei unter `Nova.Data/Generated/` (generierter Code – `#region` hier ausnahmsweise erlaubt, CodingGuidelines §7); die CI prüft die Aktualität der generierten Datei (Rebuild + Diff). Die String-IDs nach §8 bleiben die serialisierbare Quelle der Wahrheit (Savegames/Replays); die Enums sind nur der Compile-Zeit-Zugriff.
+2. G1: Referenzdateien mit korrekten Suffixen anlegen
+   (`MoveCommandIntent`, `CommandRecord`, `MoveCommandPayloadV1`).
+3. In G1 den Definitions-Generator umsetzen: Er validiert und sortiert
+   `DefinitionKey`, erzeugt den kanonischen `DefinitionSnapshot` samt
+   `DefinitionId uint16` und optional typisierte Compile-Zeit-Konstanten. CI
+   prüft Rebuild + Diff; nur Mapping und Hash, nicht Strings, erreichen
+   Commands/State/Persistence.
 4. Präfix-Tabelle nach Sprint-5-Asset-Audit vervollständigen und Version erhöhen.
 
 ## Änderungsverlauf
@@ -160,3 +182,5 @@ Jede handgeschriebene `.cs`-Datei beginnt mit:
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Technical Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Nova.AI-Namespaces (D-043), Sub-Registry-/Master-Index-Benennung (D-049), Command-/CommandEnvelope-Benennung boxfrei (Review F-5), ID-Codegen als Sprint-7-Tooling-Aufgabe konkretisiert | Lead Technical Director |
 | 0.2.1 | 2026-07-21 | Restfehler behoben: Altrest `Nova.Simulation.Ai` als Sim-Namespace entfernt (D-043 – KI ist eigene Assembly `Nova.AI`/`.Strategy`/`.Tactics`/`.Squads`, kein zweiter Namespace mehr in `Nova.Simulation`) | Lead Technical Director |
+| 0.3.0 | 2026-07-24 | Benennungsumfang und Command-Typen auf D-056/D-057/D-061 rebaselined | Lead Technical Director |
+| 0.4.0 | 2026-07-24 | Authoring-String-Keys sauber von kanonischem `DefinitionId uint16` und Persistence getrennt | Lead Technical Director |

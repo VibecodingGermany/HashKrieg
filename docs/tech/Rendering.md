@@ -1,14 +1,15 @@
 # Rendering
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
-Technisches Design der Render-Pipeline von *Project Nova* auf Unity 6.3 LTS + URP (D-006). Das Dokument legt die URP-Asset-Konfiguration, die Draw-Call-Strategie für 500 Einheiten bei 60 FPS, das FoW-Rendering, Minimap, Zerstörungs-/Trümmer-Darstellung (D-012), Brand-/Verseuchungs-Overlays, LOD- und Qualitätsstufen sowie die Art-Direction-Anbindung (Stylized Military Sci-Fi, Team-Farben) fest. Verbindlich für Sprint 7 (Vertical Slice) und alle Grafik-nahen Implementierungen. API-Skizzen sind Entwürfe; keine Implementierungslogik. Beleuchtung und Post-Processing sind ausgelagert nach [./Lighting.md](./Lighting.md).
+Technisches Design der Render-Pipeline von *Project Nova* auf Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Das Dokument legt URP-Konfiguration, Draw-Call-Strategie, FoW-Rendering, Minimap, LOD- und Qualitätsstufen fest. API-Skizzen sind Entwürfe; keine Implementierungslogik. Beleuchtung und Post-Processing sind ausgelagert nach [./Lighting.md](./Lighting.md).
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (Unity 6.3 LTS + URP), D-012 (gezielte Zerstörbarkeit), D-019 (schräge Top-Down-Kamera), D-033 (Sim/View-Trennung, Regel 2), D-035 (MonoBehaviour-OOP + Burst/Jobs, kein DOTS)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-057 (Sim/View-Trennung), D-058 (Lastkorridore), D-060 (Unity-Pin), D-061 (Abnahme)
+- [./FogOfWar.md](./FogOfWar.md) – verbindlicher technischer MS-1-FoW-Vertrag
 - [../research/FogOfWar.md](../research/FogOfWar.md) – Ansatz B (Grid/Bitmask-CPU-Modell + Textur-Ausgabe), Full Screen Pass Renderer Feature, RenderGraph-Pflicht, RTHandle-Persistenz
 - [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) – Healthbars als gebatchtes Mesh/Shader-Overlay, Minimap via RenderTexture, 3-stufiges LOD
 - [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md) – SRP Batcher, GPU Resident Drawer, Profiler-Disziplin
@@ -16,10 +17,19 @@ Technisches Design der Render-Pipeline von *Project Nova* auf Unity 6.3 LTS + UR
 - [../gamedesign/Biomes.md](../gamedesign/Biomes.md) – Farbpaletten, Wetter-/Hazard-VFX-Bedarf
 - [./Lighting.md](./Lighting.md) – Post-Processing-Stack, Emissive/Bloom, Licht-Budgets
 
+## MS-1-Override (D-056/D-058/D-060/D-061)
+
+MS-1 rendert exakt zwei aktive Spielerfraktionen auf Glutrinne; acht
+Spieler-Slots bleiben nur reserviert. Das produktive Abnahmeszenario umfasst
+100 Einheiten. 500 Renderobjekte sind ausschließlich der synthetische
+V2-Lasttest und dürfen Dummy-/Scale-Fixtures sein. Verbindlich ist der
+FoW-Vertrag aus [FogOfWar.md](FogOfWar.md); Wetter, Hazards, Luft,
+Evolvierte, finale Zerstörungsart und weitere Biome sind Post-MVP.
+
 ## Grundprinzipien
 
 1. **View ist strikt von der Simulation getrennt (D-033, Regel 2):** Das Rendering liest ausschließlich aus einem präsentationsseitigen Snapshot des Sim-States; es mutiert nichts und wird niemals vom Sim-Tick aufgerufen. Render-Code darf Unity-APIs voll nutzen (D-035).
-2. **RenderGraph-konform von Tag 1 (D-006-Konsequenz):** Alle Custom Passes werden als `ScriptableRendererFeature` mit RenderGraph-API gebaut; keine `CommandBuffer.Blit`-Basismuster (Migrationsschuld-Verbot).
+2. **RenderGraph-konform von Tag 1 (D-060-Konsequenz):** Alle Custom Passes werden als `ScriptableRendererFeature` mit RenderGraph-API gebaut; keine `CommandBuffer.Blit`-Basismuster (Migrationsschuld-Verbot).
 3. **Desktop-first, Metal und DX gleichberechtigt:** Kein plattformspezifischer Code-Pfad ohne dokumentierten Grund; alle Texturen/Passes auf R8/RG8/RGBA32 und Standard-URP-Features beschränkt, wo möglich (Metal-Risiko laut FoW-Research niedrig halten).
 4. **Datengetrieben:** Render-relevante Parameter (Qualitätsstufen, LOD-Distanzen, Team-Farben, FoW-Darstellung) liegen in ScriptableObjects (`RenderQualityProfile`, `TeamColorProfile`), nicht in Code-Konstanten.
 
@@ -35,13 +45,15 @@ Ein zentrales **URP Asset** `Nova-URP-Asset` mit drei Qualitäts-Varianten (s. Q
 | Dynamic Batching | **aus** | wirkungslos bei SRP Batcher + GPU Resident Drawer, erzeugt nur CPU-Kosten |
 | HDR | **an** | Voraussetzung für Bloom (Aetherium-Glow, Explosionen, Lighting.md) |
 | MSAA | 2× (Stufe Hoch: 4×) | RTS-Kamera glättet vor allem Kanten; STP übernimmt Rest |
-| RenderGraph-Compatibility Mode | **aus** | erzwingt RenderGraph-konforme Custom Passes von Anfang an (D-006-Konsequenz, kein Migrationsschuld) |
+| RenderGraph-Compatibility Mode | **aus** | erzwingt RenderGraph-konforme Custom Passes von Anfang an (D-060-Konsequenz, keine Migrationsschuld) |
 | Depth/Opaque Texture | Depth **an**, Opaque **aus** | Depth für FoW-Höhenfading und Selektionsringe; Opaque-Textur nicht benötigt (kein Refraktions-/Distortion-Effekt im Scope) |
 | Schatten | siehe [./Lighting.md](./Lighting.md) (Schatten-Budget) | – |
 
-## Draw-Call-Strategie für 500 Einheiten
+## Draw-Call-Strategie für den synthetischen 500-Objekt-Test
 
-Ziel: ≤ 300 Draw Calls Sicht-Set bei 500 Einheiten + Basis + Umgebung auf dem Referenz-PC, 60 FPS.
+Ziel: ≤ 300 Draw Calls im Sicht-Set bei 500 synthetischen Renderobjekten +
+Basis + Umgebung auf dem Referenz-PC, 60 FPS. Dies ist V2 und keine
+Produktiv-Content-Anforderung.
 
 - **Einheiten (bewegt):** Pro Einheitentyp genau **ein Mesh + ein Material** (SRP-Batcher-fähig). Team-Farbe, Beschädigungsstufe und Tarnzustand werden über `MaterialPropertyBlock`-freie, instancing-kompatible Wege gesetzt (per-Instanz über `GraphicsBuffer`/Custom-Data im Shader oder GPU Resident Drawer Batch-Group). Infanterie mit Skinning bleibt kleinster Typen-Teilmenge (Animations-Strategie: Mecanim nur Infanterie, Research-Vorgabe).
 - **Gebäude (statisch):** **Kombinierte Meshes pro Basis-Cluster** – beim Bau-Abschluss wird die unbewegliche Basis-Geometrie (Fundament + Rumpf) in Clustern statisch kombiniert; bewegliche Teile (Türme, Radar-Schüssel, Bau-Kran) bleiben eigene Renderer. Begründung: Gebäude ändern sich selten; Kombinieren senkt Draw Calls drastisch bei großen Basen. Re-Kombinierung ereignisgesteuert (Bau/Zerstörung), nie pro Frame.
@@ -77,7 +89,12 @@ namespace Nova.Presentation.Rendering
 
 Umsetzung exakt nach FoW-Research (Ansatz B) und gamedesign/FogOfWar.md:
 
-- **Datenquelle:** Das CPU-Sichtgrid (`values`/`visited`-Bitmasken, 1-m-Raster, Sicht-Tick 5–10 Hz) liegt in `Nova.Simulation`-nahen Strukturen; der View-Layer erhält pro Sicht-Tick eine **Textur-Kopie** (`RG8`: R = sichtbar, G = erforscht) für das lokale Team. Upload ~2,6 MB/s bei 10 Hz auf L-Karte (256 m → 256×256 Texel) – vernachlässigbar (Research-Werte).
+- **Datenquelle:** Das committed CPU-Sichtgrid aus
+  [FogOfWar.md](FogOfWar.md) besitzt für Glutrinne exakt 128×128 Zellen bei
+  1 m und wird mit 5 Hz aktualisiert. Der View-Layer erhält aus dem
+  gefilterten Snapshot je Commit eine **Textur-Kopie** (`RG8`: R = sichtbar,
+  G = erforscht); das sind 163.840 Byte/s ohne Protokoll-Overhead. Er liest
+  weder mutable Sim-Strukturen noch den 256²-/5–10-Hz-Vollspielentwurf.
 - **Darstellung Hauptkamera:** **Full Screen Pass Renderer Feature** (`NovaFogOfWarFeature`, RenderGraph-konform), injiziert nach `AfterRenderingOpaques`/vor Post-Processing. Das FoW-Material sampelt die FoW-Textur in Welt-XZ-Koordinaten (rekonstruiert aus Depth), upsampled bilinear mit optionalem 3×3-Blur und mappt die drei Zustände: unerforscht → schwarz; erforscht → entsättigt/~40 % Helligkeit (gamedesign-Festlegung); sichtbar → unverändert. Übergang per zeitlichem **Easing (~0,3 s)** im Shader gegen die Vorgänger-Textur (Ping-Pong via `RTHandle`, persistent über Frames – etablierte URP-Praxis), damit der Sicht-Tick nicht poppt.
 - **Einheiten-Culling:** Sichtbarkeit einzelner Einheiten kommt nicht aus dem Fullscreen-Pass, sondern aus `IsVisible(position, teamMask)` (Grid-Lookup im View-Layer); versteckte Einheiten werden per Renderer-Deaktivierung/Layer-Swap ausgeblendet (Gemserk-Muster, Research). Damit korreliert Angriffs-/Auswahl-Logik nie mit der Darstellung – beide lesen dieselbe Grid-Wahrheit.
 - **Ghost-Gebäude:** Beim Verlust der Sicht auf eine Zelle mit Gebäude wird ein gedämpftes Ghost-Rendering (separater, billiger Shader-Pfad des Gebäude-Materials, `ghostTint`) aktiviert und beim Wiedersehen aktualisiert/entfernt. Ghosts sind View-only, gespeist aus dem FoW-Snapshot.
@@ -110,7 +127,7 @@ Unity-`LODGroup` für statische Objekte; für instanziierte Einheiten LOD-Auswah
 
 ## Qualitätsstufen (Desktop-Profile)
 
-Drei Profile als `RenderQualityProfile`-SOs, umschaltbar zur Laufzeit; Ziel-Hardware Desktop Win/macOS (D-006):
+Drei Profile als `RenderQualityProfile`-SOs, umschaltbar zur Laufzeit; Ziel-Hardware Desktop Win/macOS (D-060):
 
 | Stufe | RenderScale | Schatten | LOD-Bias | Post | Besonderheiten |
 |---|---|---|---|---|---|
@@ -130,7 +147,7 @@ Auto-Detect beim ersten Start (GPU-Tier), manuell übersteuerbar; kein dynamisch
 
 - **GPU Resident Drawer mit dynamischen Einheiten:** Verhalten bei per-Frame-Layer-Swaps (FoW-Culling), Code-animierten Transforms und Skinned Renderern ist unklar – **Pflicht-Validierung am Phase-0-Spike** (DecisionLog, Offene Punkte). Fallback (eigener `UnitRenderBatcher` mit `RenderMeshInstanced`) ist hier vorgedacht, aber nicht entschieden.
 - **STP-Qualität auf Metal:** STP-Verhalten/Bildqualität auf Apple Silicon vs. Windows-GPU nicht verifiziert; falls Metal-Artefakte: Stufenplan „STP nur Windows" wäre nötig – Status: offen, Phase-0-Spike.
-- **Minimap in UI Toolkit:** RenderTexture-Einbindung in UI Toolkit in Unity 6.3 hands-on validieren (Research vermerkt gemischte Community-Berichte); uGUI-`RawImage` als dokumentierter Fallback – Status: offen.
+- **Minimap in UI Toolkit:** RenderTexture-Einbindung im gepinnten Editor hands-on validieren; uGUI-`RawImage` als dokumentierter Fallback – Status: offen, kein G0-Blocker.
 - **Ghost-Gebäude & kombinierte Meshes:** Gebäude-Cluster-Kombinierung vs. pro-Gebäude-Ghost-Zustände können kollidieren (Ghost braucht eigenen Materialzustand innerhalb eines kombinierten Meshs); Auflösung (Sub-Mesh-Split vs. Ghost als separates Overlay-Mesh) – Status: offen, Sprint 7.
 - **Trümmer-Persistenz-Menge:** Kein Limit für Trümmer-Overlays definiert (Speicher-/Draw-Budget bei langen Matches 35 min); Limit-Politik (Fade-out vs. Cap) ist Design-nahe und hier nicht entschieden – Status: offen, Abstimmung mit Game Design.
 - **VFX-Dichte-Budget:** Konkrete Partikel-/Overdraw-Budgets für Gefechte fehlen (VFX-Dokument nicht Gegenstand dieses Auftrags) – Status: offen, Input an Sprint-5-Asset-Pipeline.
@@ -148,3 +165,5 @@ Auto-Detect beim ersten Start (GPU-Tier), manuell übersteuerbar; kein dynamisch
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Graphics Engineer |
+| 0.2.0 | 2026-07-24 | MS-1-Renderumfang, synthetischen V2-Lasttest, verbindlichen FoW-Vertrag und Unity-Pin gemäß D-056/D-058/D-060/D-061 festgelegt | Lead Graphics Engineer |
+| 0.2.1 | 2026-07-24 | FoW-Upload auf verbindliches 128²-Teamgrid bei exakt 5 Hz korrigiert | Lead Graphics Engineer |

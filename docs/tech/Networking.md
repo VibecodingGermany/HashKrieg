@@ -1,21 +1,32 @@
 # Networking – Zielarchitektur Lockstep über autoritativem Command-Relay
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Multiplayer Engineer | **Sprint:** 4
+**Version:** 0.3.1 | **Status:** Post-MVP-Zielbild | **Verantwortungsbereich:** Lead Multiplayer Engineer | **Sprint:** 4
 
 ## Zweck
 
 Definiert die Netzwerk-Zielarchitektur von Project Nova gemäß **D-033**: deterministisches Lockstep über einem autoritativen Command-Relay-Server (Eigenbau-UDP; Fallback = reduzierter MP-Scope, D-051). Festgelegt werden Server-Rollen inkl. Trust-Anchor (Post-Match-Re-Simulation, D-046), Protokoll-Design, Lobby-/Match-Flow, Disconnect-Regel (final), Host-Migration-Bewertung, NAT/Traversal, Regions-/Ping-Anforderungen und die Maphack-Lage. Was konkret über die Leitung wandert (Commands, Hashes, Snapshots), spezifiziert [./Replication.md](./Replication.md); das Simulationsmodell selbst liegt in [./GameState.md](./GameState.md) (geplant, D-033/D-035).
 
-Geltungsbereich: **MVP = Singleplayer als "lokaler Server"** (kein Netzwerk, aber identische Command-Pipeline); **Beta = online PvP/Koop über Relay** (D-018, D-025). Dieses Dokument beschreibt die Beta-Zielarchitektur so, dass der MVP-Codepfad strukturell identisch bleibt – MP wird ein Transport-Thema, kein Rewrite (D-033, Begründung).
+Geltungsbereich: **MS-1 = `LocalLoopbackTransport` ohne Netzwerk** über die
+kanonische Command-Pipeline; das nachfolgende Relay-Modell ist ein
+unverbindliches Post-MVP-Zielbild.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-033 (Sim-/MP-Modell), D-006 (Unity 6.3), D-018/D-025 (Modus-Phasen), D-029 (kein Voice-Chat), D-035 (Nova.Simulation-Assembly), D-038 (Disconnect-Regel), D-046 (MP-Trust-Anchor), D-051 (Quantum-Fallback gestrichen)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-057 (kanonische Simulation und `LocalLoopback`), D-060 (Unity-Pin), D-061 (Abnahme), D-018/D-025 (spätere Modus-Phasen)
 - [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Modellvergleich, Bandbreitenrechnung, Determinismus-Fallstricke, §6 Umsetzungsoptionen
 - [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerModes.md) – Lobby-/Teamregeln (§4), Beobachter/Replays (§6), MatchSettings
 - [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) – Match-Ergebnis-Regeln, technischer Abbruch (§ Konflikt, siehe Offene Punkte)
 - [./Replication.md](./Replication.md) – Replikationsumfang, Desync-Detektion, Reconnect, Replays
 - [./GameState.md](./GameState.md) – geplant: Command-Modell, Tick-Loop, Serialisierung (D-033-Regeln 1–5)
+
+## MS-1-Override (D-056/D-057/D-061)
+
+Die nachfolgende Relay-, Lobby-, NAT-, Regionen- und Online-Architektur ist
+vollständig Post-MVP. MS-1 verwendet ausschließlich den in
+[Replication.md](Replication.md) definierten `LocalLoopback` über dieselbe
+Command-Pipeline; es gibt keinen Netzwerktransport und keine Relay-Abnahme in
+G0–G5. Der kanonische State, Hash, Replay und Save/Load werden dennoch so
+implementiert, dass ein späterer Transport sie konsumieren kann.
 
 ## 1. Zielarchitektur (ab Beta)
 
@@ -49,7 +60,10 @@ Der Server simuliert **nicht** selbst (kein Gameplay-State) – das hält Hostin
 
 ### 1.2 MVP-Ausprägung: lokaler Server
 
-Im Singleplayer läuft dieselbe Pipeline gegen einen in-prozess `LocalRelay` (Loopback-Implementierung von `IRelayClient`/`IRelayServer`): Commands werden in eine Queue gestellt, 2 Ticks später ausgeführt. Damit sind Input-Delay-Verhalten, Command-Serialisierung und Hash-Logging ab MVP produktiv – die Online-Infrastruktur ersetzt später nur den Transport.
+Im MS-1-Singleplayer führt `LocalLoopbackTransport` Records an denselben
+Ingress zurück. Der fingerprinted lokale `InputDelayTicks`-Wert ist 1; Schema,
+Sortierung, Dedupe und Fehlermodell stehen verbindlich in
+[Commands.md](Commands.md).
 
 ## 2. Eigenbau-UDP-Relay (Primärpfad)
 
@@ -171,15 +185,20 @@ Gemäß D-033 **akzeptiert bis Ranked-Re-Evaluierung**: Jeder Client besitzt den
 - **KI-Slot-Ausführungsort regulärer KI-Slots** (§4.3): feste Zuordnung pro Slot (Command-erzeugend) vs. deterministische KI auf allen Clients wie bei der Übernahme-KI. Die **Übernahme-KI nach Disconnect ist entschieden** (deterministisches Sim-Ereignis, kein Server-Prozess, kein SPOF – D-046, §5). Rest zu entscheiden mit Beta-Infrastrukturplanung.
 - **Server-Ausfall mid-match:** Fortsetzungs-Szenario bewusst nicht verplant; Restrisiko für lange Matches (20–35 min) dokumentieren.
 - **Relay-Backend-Technologie:** Implementierungssprache/-Hosting des Relay-Servers (z. B. .NET auf Basis von `Nova.Simulation`-nahen Serializern) ist Sprint-6-/Beta-Thema; Research nennt Backend-Dienst explizit orthogonal.
-- **Tick-Rate 10 Hz unter Last:** Endbestätigung hängt am Phase-0-Spike (Sim-Kosten bei 500 Einheiten); bei Überschreitung ist 8 Hz mit Input-Delay 2 zu prüfen – Abhängigkeit zu [./GameState.md](./GameState.md).
+- **Post-MVP-Netzprofil:** MS-1 bleibt unveränderlich bei 10 Hz und
+  `InputDelayTicks = 1`. Ein späteres Onlineprofil darf davon nur mit neuer
+  D-ID und eigener Replay-/Kompatibilitätsbewertung abweichen; es verändert
+  keinen Vertrag in G0–G5.
 - **Verschlüsselung/Integrität des UDP-Stroms** (DTLS vs. eigenes HMAC-Tagging): vor Beta-Extern-Tests festzulegen.
 
 ## Nächste Schritte
 
 1. ~~Angleichung von [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) (technischer Abbruch) und [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerModes.md) §3.2~~ – **erledigt (D-038, 2026-07-21)**; die Host-Migration-Frage aus MultiplayerModes.md §4 ist oben (§6) beantwortet.
-2. Phase-0-Spike: Fixed-Point-Determinismus ARM↔x86 validieren – Scope erweitert (Review F-04, DecisionLog Offene Punkte): ORCA-/Flow-Field-Steering im Fixed-Point-Pfad evaluieren, Bibliothekswahl treffen, float-Direktfelder im GameState verbieten (nur SimVec/SimFixed-Typen im State; Details [./Replication.md](./Replication.md) §6).
-3. [./GameState.md](./GameState.md): Command-Schema und Tick-Loop so definieren, dass `TickBatch`/Input-Delay direkt darauf aufsetzen.
-4. Sprint 6 (Produktionsplanung): Relay-Server-Hosting, Regionen und Kostenrahmen für Beta schätzen.
+2. Erst nach bestandenem G5 eine eigene Online-Architekturentscheidung mit
+   Relay-Hosting, Regionen, Sicherheitsprofil und abweichendem Input-Delay
+   vorbereiten.
+3. Bis dahin das Zielbild nicht implementieren und keine G0–G5-Gates daran
+   koppeln.
 
 ## Änderungsverlauf
 
@@ -188,3 +207,5 @@ Gemäß D-033 **akzeptiert bis Ranked-Re-Evaluierung**: Jeder Client besitzt den
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Multiplayer Engineer |
 | 0.1.1 | 2026-07-21 | Konflikt-Verweise auf VictoryConditions.md/MultiplayerModes.md als aufgelöst markiert (D-038-Angleichung erfolgt) | Lead Technical Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Multiplayer Engineer |
+| 0.3.0 | 2026-07-24 | Online-Architektur als Post-MVP abgegrenzt und MS-1 auf `LocalLoopback` gemäß D-056/D-057/D-061 festgelegt | Lead Multiplayer Engineer |
+| 0.3.1 | 2026-07-24 | Veralteten Phase-0-/8-Hz-Pfad entfernt und Online-Arbeit strikt hinter G5 verschoben | Lead Multiplayer Engineer |

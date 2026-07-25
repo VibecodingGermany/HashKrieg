@@ -1,10 +1,16 @@
 # Architecture Review – Wartbarkeit & Prozess
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Wartbarkeit & Prozess) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Wartbarkeit & Prozess) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Prüfung der Prozess- und Wartbarkeitsarchitektur von Project Nova: Tragfähigkeit der Coding-/Naming-/Struktur-Regeln unter realen Bedingungen (parallele Agenten, jahrelange Pflege), Realismus der Test- und Deployment-Strategie, Synchronhaltung des 72-Dokumente-Wikis und Startbarkeit von Sprint 7. Der Review ändert keine Bestandsdateien; alle Befunde sind mit Beleg (Datei:Zeile/Abschnitt) und empfohlener Maßnahme versehen.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -51,8 +57,14 @@ Explizit geprüft und für tragfähig befunden:
 - Dieser Review ändert bewusst keine Bestandsdateien (Auftragslage); die nötigen Folge-Updates (CHANGELOG.md `[Unreleased]`, ggf. DecisionLog, Angleichungen F-08/F-09) obliegen dem Studio-Prozess. Der Wiki-Index führt `tech/review/` bereits ([../../README.md](../../README.md) Z. 27).
 - Abgleich mit den Parallel-Reviews der anderen Bereiche (Sim-Kern, Rendering, Daten): Überschneidungen bei F-03/F-10 (Testinfrastruktur) und F-05 (Datenmodell) sind zu erwarten und vor Maßnahmen-Umsetzung zu deduplizieren.
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung | Reviewer |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |

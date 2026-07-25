@@ -1,10 +1,16 @@
 # Architecture Review – Performance
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Performance) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Performance) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Prüfung der Performance-Architektur von Project Nova: Erreichbarkeit der Frame-/Tick-Budgets bei 500 Einheiten @ 60 FPS, versteckte O(n²)-Stellen, GC-/Allokations-Fallen trotz 0-B/Tick-Regel, URP-Fallstricke, Kosten der Burst/Managed-Doppelstruktur (D-037) und Speicher-Unterschätzungen. Jedes Budget wird als **begründet / optimistisch / unrealistisch** eingestuft, mit eigener Gegenrechnung. Dieses Dokument ändert keine Bestandsdokumente; Maßnahmen sind Empfehlungen an die jeweiligen Verantwortungsbereiche.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -81,8 +87,14 @@ Adversariale Prüfung der Performance-Architektur von Project Nova: Erreichbarke
 - **Native-Baseline-Messung** (leere URP-Szene, Ziel-Setup, Referenz-PC + 8-GB-Mac) sollte aus Phase 0 vorgezogen werden (s. F-12).
 - Dieses Review prüft nicht: Networking-Tick-/Relay-Kosten (D-033 Command-Relay), Terrain-Renderverfahren (offen in AssetBudget), UI-Toolkit-Detailkosten der Minimap-Einbindung – eigene Review-Bereiche.
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung (Sprint 4, Architecture Review) | Reviewer |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |

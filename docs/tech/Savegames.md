@@ -1,108 +1,121 @@
-# Savegames & Replays
+# Savegames
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 3
+**Version:** 1.0.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director / Lead UI Engineer | **Sprint:** 7
 
 ## Zweck
 
-Definiert Umfang, Dateistruktur, Ablage und Lebenszyklus von Speicherständen und Replay-Dateien: Slot-Struktur, Autosave-Regeln, Versions-Header mit Migrationspfad (TPD §Wartung: Savegame-Versionierung), Korruptions-Schutz (TPD: Schutz vor beschädigten Spieldaten), Replay-Format/-Ablage und die Kompatibilitäts-Policy über Patches. Verbindlich für Sprint 7 (Sim-Kern) und die UI-/Service-Schicht.
+Definiert MS-1-Speicherplätze, konsistente Capture-Punkte, atomisches Schreiben,
+Backup-Recovery und getestete Fortsetzung. Savegames verwenden den kanonischen
+Snapshot und den getrennten KI-Sidecar.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-033 (serialisierbarer State, SP = lokaler Server), D-035 (Unity-freie Assembly), D-036 (SimRunner)
-- [RTS_Technisches_Planungsdokument.md](../../RTS_Technisches_Planungsdokument.md) – Pflichtmodule Savegames/Replay-Grundlagen; Wartung: Savegame-Versionierung, Schutz vor beschädigten Spieldaten
-- [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Replay = Seed + Befehlsstrom; Replays als Savegame-Grundlage
-- [./GameState.md](./GameState.md) – snapshot-fähiger `WorldState`
-- [./Serialization.md](./Serialization.md) – Binärformat, `SchemaVersion`, `ReplayHeader`, Checksummen-Basis
-- [./Architecture.md](./Architecture.md) – Sim-Tick-Loop, Speicher-/Lade-Hooks (parallel, Sprint 3)
+- [Serialization.md](Serialization.md) – Snapshotbytes, Fingerprint und Limits
+- [GameState.md](GameState.md) – Sim-State und KI-Sidecar-Grenze
+- [../production/MVPContentManifest.md](../production/MVPContentManifest.md)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056/D-057
 
-## Savegame-Umfang
+## 1. Slotmodell
 
-Ein Savegame = **vollständiger Sim-Snapshot** (serialisierter `WorldState` gemäß GameState.md, Format gemäß Serialization.md) **+ Meta-Block**:
+| Typ | Anzahl | Rotation |
+|---|---:|---|
+| manuell | 10 | keine; expliziter Slot |
+| Quicksave | 2 | A ↔ B |
+| Autosave | 3 | ältester gültiger Slot wird ersetzt |
 
-```csharp
-public struct SaveGameMeta
-{
-    public SchemaVersion Version;        // Header, s. Serialization.md
-    public string   GameVersion;         // Build-Nummer
-    public uint     DefinitionsHash;     // GameDatabase-Version (Balance-Stand!)
-    public string   SaveName;            // Spieler-vergeben oder "Autosave"
-    public SaveKind Kind;                // Manual / Quick / Auto
-    public DateTime SavedUtc;
-    public string   MapId;               // für Slot-Vorschau
-    public float    MatchElapsedSeconds; // für Slot-Vorschau
-    public PlayerSummary[] Players;      // Fraktion/Team/Commander (Vorschau)
-    public uint     Tick;                // Lade- = Weiterspiel-Tick
-    // Optional (View-Komfort, NICHT sim-relevant, kein Hash-Bestandteil):
-    public float    CameraX, CameraY, CameraZoom;
-}
-```
+Autosaves werden alle fünf Minuten Matchzeit angefordert. Pause stoppt
+Sim-Ticks und damit den Matchzeit-Timer. Ein manueller Save ist aus dem
+Pause-/Matchmenü verfügbar.
 
-Bewusst **nicht** im Savegame: View-/UI-State (Selektion, UI-Fenster), Audio-State, abgeleitete Caches (Flow Fields, Clearance, Sicht-Raster) – diese werden nach dem Laden via `RebuildDerivedState()` (GameState.md) neu aufgebaut. Lade-Ablauf: Header prüfen → migrieren falls nötig → `WorldState` deserialisieren → Checksumme verifizieren → Derived State neu aufbauen → FoW/Sicht für das lokale Team einmalig neu rastern.
+## 2. Konsistenter Capture
 
-## Slot-Struktur
+Save-Anforderungen sind Session-Aktionen, keine frei serialisierten
+Simulations-Commands. Der Host:
 
-- Ablage: `Application.persistentDataPath/Saves/` (Win: `%userprofile%/AppData/LocalLow/<Studio>/Nova/Saves`, macOS: `~/Library/Application Support/<Studio>/Nova/Saves`), eine Datei pro Speicherstand (`*.novasave`), dazu `slots.json` als Index (Slot-Liste, Vorschau-Meta, Zeitstempel) – die Index-Datei ist rekonstruierbar aus den Savegame-Headern (Selbstheilung bei Index-Korruption).
-- Slots: **N manuelle Slots** (Vorschlag 20, UI-Entscheidung Sprint 4), **1 Quicksave** (rotierend auf 2 Dateien `quicksave_a/b`, s. Korruptions-Schutz), **3 Autosaves** (rolling `autosave_1..3`).
-- Profil-Trennung: Saves sind profilgebunden (`Saves/<ProfileId>/`), sobald das Profilsystem (Kampagne/Metafortschritt) spezifiziert ist – bis dahin ein Default-Profil.
+1. wartet auf eine abgeschlossene Tickgrenze,
+2. friert den kanonischen `SimState`,
+3. friert den zum selben committed View-Tick gehörenden `AiSidecar`,
+4. serialisiert beide mit gemeinsamen Fingerprint- und Tickmetadaten und
+5. setzt die Simulation erst nach sicherem Buffer-Capture fort.
 
-## Autosave-Regeln
+UI, Renderer und Kamera werden nicht gespeichert. Pending Commands,
+Sequence/Dedupe, Allocator und Deferred Queues sind Teil des Sim-Snapshots.
 
-- **Intervall:** alle 5 min Matchzeit (300 s = 3.000 Ticks), konfigurierbar (Einstellungen, 1–15 min), rolling über 3 Slots.
-- **Ereignis-Trigger (Skirmish/Kampagne):** nach Missionsziel-Abschluss, vor Boss-/Superwaffen-Ereignissen (soweit vom Missions-Skript markiert).
-- **Nie** während eines laufenden Ticks: Autosave wird am Tick-Ende eingeplant und zwischen zwei Ticks ausgeführt (D-033-Disziplin; Speichern darf die Sim nicht mutieren).
-- **Kostenrahmen:** Snapshot-Serialisierung ist synchron auf dem Main-Thread zwischen Ticks; Ziel < 50 ms bei L-Karte/500 Einheiten – Messung in Sprint 7, sonst Serialisierung in Worker-Thread auslagern (State ist flach/kopierbar).
-- Kein Autosave in Multiplayer-Matches (Beta); Replays übernehmen dort die Absicherung.
+## 3. Dateiinhalte
 
-## Versions-Header und Migrationspfad
+Eine Save-Datei enthält:
 
-- Header gemäß Serialization.md: Magic, `SchemaVersion`, `GameVersion`, `DefinitionsHash`, `ContentKind`.
-- **Ladeentscheidung (in dieser Reihenfolge):**
-  1. Magic unbekannt / Checksumme ungültig → Datei korrupt (s. u.).
-  2. `SchemaVersion.Major` < aktuell → lineare Migration `v(n)→…→Current` (Migratoren-Kette, Serialization.md); Erfolg → laden, Fehlschlag → Savegame als inkompatibel melden.
-  3. `DefinitionsHash` ≠ aktuell → Balance-Patch seit Speicherung → **nicht ladbar** (Policy s. u.), dem Spieler mit Hinweistext anzeigen ("Match-Stand basiert auf älterer Balance-Version").
-- Migrationen werden pro Schema-Major als Fixture im SimRunner getestet (alte Referenz-Savegames im Repo, Roundtrip auf `Current`, D-036).
+- Formatversion 1.0 und Slottyp/-index,
+- Fingerprint und Save-Tick,
+- kanonischen Sim-Snapshot,
+- versionierten AI-Sidecar,
+- Block-/State-/File-Hashes und
+- nicht autoritative Anzeige-Metadaten außerhalb des Sim-State.
 
-## Korruptions-Schutz
+Die unkomprimierte Zielgröße ist ≤4 MiB; Dateien über 64 MiB werden vor
+Payload-Parse abgelehnt.
 
-- **Checksumme:** xxHash32 über den gesamten Datei-Payload (Meta + State), im Header gespeichert; Verifikation vor jeder Deserialisierung.
-- **Atomares Schreiben:** Schreiben in `*.tmp` im selben Verzeichnis, dann `fsync` + atomares Umbenennen – ein Absturz während des Speicherns hinterlässt nie eine halbe Zieldatei.
-- **Rotierende Sicherung:** Quicksave/Autosave schreiben immer auf den älteren von zwei Slots; vor dem Überschreiben eines manuellen Slots wird die Vorgängerdatei als `*.bak` behalten (1 Generation).
-- **Fallback beim Laden:** Slot korrupt → automatischer Versuch mit `*.bak` bzw. dem jüngsten Autosave; dem Spieler wird die Wiederherstellung transparent gemeldet. Dauerhaft korrupte Dateien werden nach `Saves/quarantine/` verschoben statt gelöscht (Support-/Debug-Zugriff).
+## 4. Atomisches Schreiben
 
-## Replay-Datei-Format und -Ablage
+Für jeden Slot existieren Primary und Backup:
 
-- Format gemäß Serialization.md: `ReplayHeader` + `CommandRecord`-Strom + `HashCheckpoint`s, Dateiendung `*.novareplay`, Ablage `Application.persistentDataPath/Replays/`.
-- **Aufzeichnung:** automatisch für jedes Match (SP und Beta-MP), Dateiname `yyyyMMdd_HHmmss_<MapId>_<MatchType>.novareplay`; Aufzeichnungspflicht aus D-033 (Lockstep liefert Replays gratis) und Research (Test-Fixtures/Desync-Tooling).
-- **Aufbewahrung:** Vorschlag – die letzten 25 Replays automatisch behalten, ältere löschen; "Favorit"-Markierung verhindert Löschung (UI-Detail Sprint 4+).
-- **SimRunner-Nutzung (D-036):** KI-vs-KI-Nachtläufe schreiben Replays + Match-Result in CI-Artefakte; Desync-Fälle hinterlegen Replay + divergierenden HashCheckpoint als Fixture.
-- **Observer (Beta):** Replay-Datei ist zugleich das Observer-Format (verzögertes Einspielen des Command-Stroms) – kein separates Format.
+1. neue Bytes vollständig in eine temporäre Datei desselben Verzeichnisses
+   schreiben und flushen;
+2. vorhandenes gültiges Primary als Backup erhalten;
+3. temporäre Datei atomisch als Primary ersetzen;
+4. temporäre Reste nach erfolgreichem Start bereinigen.
 
-## Kompatibilitäts-Policy
+Ein Schreibfehler darf weder das letzte gültige Primary noch Backup zerstören.
+Quicksave-/Autosave-Rotation wechselt erst nach erfolgreichem atomischem
+Commit.
 
-| Patch-Art | Beispiel | Savegames | Replays |
-|---|---|---|---|
-| **Balance-Patch** (GameDatabase-Werte: Kosten, HP, Schaden) | Harvester-Tuning | **inkompatibel** – kein Ladeversuch, `DefinitionsHash`-Mismatch mit Hinweisdialog | **inkompatibel** zur Wiedergabe (Command-Strom würde bei neuen Werten divergieren); Datei bleibt archivierbar |
-| **Tech-Patch mit Schema-Änderung** (State-Struktur) | neues Feld in `UnitState` | ladbar **nach Migration** (Migratoren-Kette, Major-Bump) | ladbar nach Migration, HashCheckpoints alter Versionen werden übersprungen |
-| **Tech-Patch ohne Schema-Änderung** (Bugfix, `Minor`-Bump) | Pfadfindungs-Fix ohne State-Änderung | voll kompatibel | voll kompatibel (außer der Bugfix ändert Sim-Ergebnisse → dann wie Balance-Patch behandeln und im Changelog kennzeichnen) |
+## 5. Laden und Recovery
 
-Begründung: Savegames über Balance-Patches hinweg weiterzutragen würde Matches mit gemischtem Regelstand erzeugen (inkonsistente Wirtschaft/HP-Verhältnisse, KI-Fehlverhalten) – der Hash-Vergleich ist billig und eindeutig. Tech-Migrationen sind dagegen reine Struktur-Übersetzungen und regelneutral.
+Laden prüft in dieser Reihenfolge:
+
+1. Hardcap und Envelope,
+2. File-/Blockhashes,
+3. Fingerprint beziehungsweise registrierte Save-Migration,
+4. Sim-Snapshot und AI-Sidecar vollständig in temporären Objekten,
+5. Roundtrip-/Invarianten.
+
+Ist Primary beschädigt oder unvollständig, versucht der Host das Backup und
+meldet den Recovery-Fall sichtbar. Sind beide ungültig, bleibt die aktuelle
+Session unverändert und der Slot wird nicht als erfolgreich geladen
+ausgegeben.
+
+## 6. Kompatibilität
+
+Pre-G1-Prototyp-Saves sind unsupported. Nach G1 darf nur eine explizite,
+getestete Migration einen älteren Save-Fingerprint akzeptieren. Replays werden
+nicht über Save-Migrationen geladen.
+
+## 7. Pflichtprüfungen
+
+- alle zehn manuellen Slots;
+- Quicksave-Reihenfolge A/B über mindestens vier Saves;
+- drei Autosaves über mindestens fünf Intervalle;
+- Strom-/Prozessabbruch vor und während atomischem Replace;
+- beschädigtes Primary mit erfolgreichem Backup-Recovery;
+- beide Kopien beschädigt ohne Sessionmutation;
+- Save/Load unmittelbar vor und nach FoW-Recompute;
+- AI-Fortsetzung und gequeute Commands über mindestens 1.000 Ticks;
+- Autosave-Punkte 5–45 Minuten in G5.
 
 ## Offene Punkte
 
-- **Kampagnen-/Metafortschritt:** Kampagne.md sieht persistenten Fortschritt außerhalb einzelner Matches vor; Ablage (separates Profil-Savegame vs. Meta-Block) ist nicht Gegenstand dieses Dokuments und beim Profilsystem (Sprint 4+) zu entscheiden.
-- **Cloud-Saves (Steam Cloud o. ä.):** nicht entschieden; Größenbudget und Sync-Konflikte mit `slots.json` erst nach Plattform-Entscheidung bewertbar.
-- **Replay-Kompatibilität über Balance-Patches:** Alternativmodell "Replay speichert Definitions-Snapshot" (alte Balance-Werte in der Replay-Datei) würde alte Replays abspielbar halten, erhöht aber Größe/Komplexität – nicht entschieden, Abwägung nach erster Größenmessung.
-- **Autosave-Threading:** Auslagerung in Worker-Thread nur falls das 50-ms-Budget reißt; Thread-Snapshot erfordert Copy-on-Save des `WorldState` – Design folgt mit Messung.
-- **Slot-Anzahl/Obergrenzen:** 20 manuelle Slots + Replay-Aufbewahrung 25 sind Vorschläge; finale Werte mit UI/UX (Sprint 4).
+- Cloud-Saves und Steam sind Post-MVP.
+- Kompression wird erst nach G1-Größenmessung entschieden.
 
 ## Nächste Schritte
 
-- Sprint 7: Save/Load-Pfad (atomares Schreiben, Checksumme, `RebuildDerivedState`) zusammen mit dem Serializer implementieren; Messung Snapshot-Größe/-Dauer (L-Karte, 500 Einheiten) und Dokumentation in v0.2.
-- SimRunner-Fixture-Set: Referenz-Savegames je Schema-Version + KI-Match-Replays als CI-Artefakte etablieren (D-036).
-- Offene Punkte Cloud-Saves/Replay-Definitions-Snapshot als Eingabe für OpenQuestions.md übergeben.
+1. Slot-/Recovery-Tests vor UI-Anbindung implementieren.
+2. G3 AI-Sidecar-Fortsetzung nachweisen.
+3. G4 UI-only Save/Load/Recovery integrieren.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Technical Director |
+| 1.0.0 | 2026-07-24 | Zehn manuelle Slots, Quicksave A/B, drei Autosaves, kanonischen Snapshot, AI-Sidecar und Backup-Recovery festgelegt | Lead Technical Director / Lead UI Engineer |

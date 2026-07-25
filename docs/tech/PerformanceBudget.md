@@ -1,144 +1,180 @@
-# Performance-Budget (Frame & Tick)
+# Performance-Budget
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 4
+**Version:** 1.2.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Performance Engineer | **Sprint:** 7
 
 ## Zweck
 
-Dieses Dokument operationalisiert die Qualitätsziele aus TPD §15 („stabile 60 FPS auf typischer Gaming-Hardware, mindestens 30 FPS auf schwächerer Hardware, mehrere hundert aktive Einheiten, geringe GC-Spitzen") in ein verbindliches, messbares Frame- und Tick-Budget. Es definiert die Aufteilung des 16,6-ms-Frames auf Simulation, Rendering (CPU/GPU), UI und Reserve, die Skalierungsziele je Meilenstein (100 / 300 / 500 Einheiten), die Mess-Methodik inklusive Windows-Referenzhardware (festgelegt in D-052) und die fünf Pflicht-Validierungen am Phase-0-Spike (V1–V4 aus den OpenQuestions, V5 aus D-044). Verbindlich für alle Engineering-Rollen; Eingabe für [MemoryBudget.md](MemoryBudget.md), [AssetBudget.md](AssetBudget.md) und die Sprint-7-Implementierungsplanung.
+Definiert Messmethode und harte MS-1-Schwellen. Es trennt den vollständigen
+100-Einheiten-Produktfall von der synthetischen 500-Agenten-
+Architekturreserve.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (Unity 6.3 LTS + URP), D-033 (fester Sim-Tick 10 Hz, Rendering entkoppelt), D-034 (Pathfinding-CPU-Budget ≤2–4 ms), D-035 (Burst/Jobs-Hotspots, keine GC-Allokationen im Tick), D-036 (Nova.SimRunner für Headless-Messungen), D-042.1 (Sim-Tick-Gesamtbudget ≤8 ms mit Unterbudgets PF ≤4 ms / FoW ≤1,0 ms / Rest-Sim ≤3 ms, führend Architecture.md), D-044 (Sim-Tick-Ausführungsmodell + Pflicht-Gate V5), D-045 (Managed als einziger Auslieferungspfad bis Fixed-Point-Beta), D-048 (globales Einheiten-Deckel 600/Match), D-052 (Windows-Referenzhardware)
-- [../production/OpenQuestions.md](../production/OpenQuestions.md) – Pflicht-Validierungen V1–V4 am Phase-0-Spike (§ Offene Punkte)
-- [../research/Pathfinding.md](../research/Pathfinding.md) – CPU-Budget-Arbeitsannahme §4.1
-- [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) – Animator-vs.-Playables-Frage, Animations-LOD
-- [../research/FogOfWar.md](../research/FogOfWar.md) – Sicht-Tick-Kostenmodell
-- [./MemoryBudget.md](MemoryBudget.md), [./AssetBudget.md](AssetBudget.md) – Schwesterdokumente
-- [./Pathfinding.md](Pathfinding.md), [./Architecture.md](Architecture.md) – Schwester-TDDs aus Sprint 3
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-052,
+  D-058, D-061, D-063 und D-064
+- [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
+- [MemoryBudget.md](MemoryBudget.md), [Pathfinding.md](Pathfinding.md) und
+  [FogOfWar.md](FogOfWar.md)
+- [`../../quality/scenarios/mvp-v1.json`](../../quality/scenarios/mvp-v1.json)
 
-## 1. Zielwerte
+## 1. Workload-Grenze
 
-| Kennzahl | Ziel | Minimum | Quelle |
-|---|---|---|---|
-| Framerate | 60 FPS (16,6 ms/Frame) | 30 FPS (33,3 ms/Frame) | TPD §15 |
-| Sim-Tick-Frequenz | 10 Hz (D-033) | – | D-033 |
-| FoW-Sicht-Tick | 5–10 Hz | 5 Hz | GDD FoW |
-| Aktive Einheiten | 500 (Release) | 100 (MVP) | GDD/TPD |
-| GC-Allokation im Sim-Tick | 0 B | 0 B | D-035 |
-| RAM (Desktop-Release) | ≤ 4 GB | – | [MemoryBudget.md](MemoryBudget.md) |
+| Workload | Bedeutung |
+|---|---|
+| `MVP_FULL_100` | vollständiger MS-1-Inhalt; Produkt-/G5-Akzeptanz |
+| `SCALE_500_RENDERING` | synthetischer V2-URP-Renderingpfad |
+| `SCALE_500_ANIMATION` | synthetischer V3-Animationspfad |
+| `SCALE_500_PRECOMBAT` | synthetischer V4/V5a-Architekturspike |
+| `SCALE_500_FULL_DIAGNOSTIC` | realer Combat/AI in G3; Diagnose |
 
-Das 30-FPS-Minimum ist ein Degradationsziel für schwächere Hardware (TPD §15: „skalierbare Grafikqualität"): Es wird primär über GPU-Qualitätsstufen und View-seitige Reduktion (Animations-LOD, Partikel-LOD, FoW-Tick auf 5 Hz) erreicht – **das Sim-Tick-Budget gilt unverändert**, da die Simulation aus Determinismus-Gründen (D-033) nicht qualitätsskalierbar ist.
+100 Produktionseinheiten sind der MS-1-Deckel. 500 Agenten versprechen weder
+spielbaren Content noch einen späteren Spieler-Slot-Scope.
 
-## 2. Frame-Budget-Aufteilung (60 FPS, 16,6 ms)
+## 2. Windows-x64-Referenzmethode
 
-Ein Sim-Tick fällt bei 10 Hz auf jeden 6. Frame. Der Tick muss an dem Frame, auf dem er läuft, vollständig in sein Zeitfenster passen (kein implizites Spreading über Folge-Frames; Time-Slicing ist *innerhalb* des Ticks erlaubt, z. B. Pfad-Anfragen über mehrere Ticks verteilt, vgl. research/Pathfinding.md §4.1).
+D-052-Referenz: Ryzen 5 5600, RTX 3060, 16 GB, NVMe.
 
-**Ausführungsmodell (D-044, gestuft):** Im **MVP läuft der Sim-Tick synchron im Main-Thread** (einfachste Variante; bei 100-ms-Tick-Fenster und MVP-Last von 100 Einheiten unkritisch). **Ab Alpha erfolgt der Wechsel auf Worker-Tick** (Sim auf Worker-Thread, die View rendert Snapshot n−1; D-033 bereitet die Snapshot-Trennung vor), **falls die P95-Messung des Sim-Ticks > 6 ms zeigt**. Der Wechsel ist ein Architektur-Gate mit Messbeleg, kein stilles Refactoring.
+Jede `MVP_FULL_100`-Messung verwendet:
 
-| Posten | Tick-Frame (jeder 6.) | Normal-Frame | 30-FPS-Modus | Bemerkung |
-|---|---|---|---|---|
-| Sim-Tick gesamt | ≤ 8,0 ms | 0 ms | ≤ 8,0 ms | Unterbudgets (D-042.1, führend [Architecture.md](Architecture.md)): Pathfinding ≤4 ms (D-034), FoW ≤1,0 ms (an FoW-Tick-Frames), Rest-Sim (Kampf, Wirtschaft, Produktion, KI-Command-Verarbeitung) ≤3 ms – **unbelegt bis Pflicht-Gate V5** (D-044, §6) |
-| Rendering CPU (Main Thread) | ≤ 4,0 ms | ≤ 4,0 ms | ≤ 8,0 ms | Draw-Call-Aufbereitung, Culling, BatchRendererGroup/Resident Drawer, Animation-Update |
-| GPU | ≤ 8,0 ms | ≤ 8,0 ms | ≤ 20,0 ms | URP inkl. Full Screen Pass (FoW-Overlay), Shadow-Update reduziert; bewertet gegen die **1440p-Referenzauflösung** (D-052); 4K ist **nicht falsifiziert** |
-| UI (UI Toolkit) | ≤ 1,0 ms | ≤ 1,0 ms | ≤ 2,0 ms | HUD, Minimap, Healthbar-Overlay (gebatchtes Mesh) |
-| Audio | ≤ 0,5 ms | ≤ 0,5 ms | ≤ 1,0 ms | AudioService-Abstraktion, Stimmen-Limit |
-| Reserve / Engine-Overhead | ≥ 3,1 ms | ≥ 11,1 ms | ≥ 2,3 ms | Puffer für Spitzen (Zerstörungsevents, Superwaffen), OS-Jitter |
+- Windows x64 Standalone;
+- IL2CPP Development Build;
+- Managed-Pfad, Burst aus;
+- 2560×1440 und Profil `NovaReference`;
+- VSync aus und Deep Profiling aus;
+- festes Replay und identischen Fingerprint;
+- 30 Sekunden Warmup;
+- drei getrennte Messläufe zu je 120 Sekunden;
+- mindestens eine nichtnegative Rohprobe pro Sekunde und exakte Einheit aus
+  dem Szenariovertrag;
+- keine Ausreißerentfernung und
+- alle Rohsamples als gehashtes Artefakt.
 
-Messregel: Budgets gelten als **P95 über 60 s repräsentatives Match-Szenario** auf der Referenzhardware (§4). Einzelne Ausreißer (P99) dürfen das 1,5-Fache des Postenbudgets nicht überschreiten.
+P95/P99 sowie Minimum, Maximum und Gleichheit werden je Wiederholung und über
+die unveränderte Konkatenation geprüft. Ein einzelner Schwellenbruch ist
+Fail; Läufe werden nicht selektiv entfernt oder vorab gepoolt.
 
-## 3. Einheiten-Skalierungsziele
+Schema 1.3 führt diese Konfiguration als eigenes Windows-x64-Methodenprofil.
+Der Start-Command und jede zugehörige Performance-Messung referenzieren
+dieselbe `environmentId`.
 
-Die Budgets gelten jeweils am oberen Ende der Einheiten-Skala des betreffenden Meilensteins:
+## 3. MVP_FULL_100-Schwellen
 
-| Meilenstein | Aktive Einheiten | Kartengröße | Besondere Last |
-|---|---|---|---|
-| MVP (Phase 1) | 100 | S (128 m) | 1 Fraktion, 1 Karte, einfache Separation |
-| Alpha (Phase 2) | 300 | M (192 m) | 3 Fraktionen, ORCA, Superwaffen-VFX |
-| Release (Phase 3) | 500 | L (256 m) | 500 Einheiten + Gebäude + neutrale Einheiten, volle Zerstörbarkeit |
+| Metrik | P95 | P99 |
+|---|---:|---:|
+| Sim gesamt | ≤8,0 ms | ≤12,0 ms |
+| Pathfinding | ≤4,0 ms | ≤6,0 ms |
+| Fog of War | ≤1,0 ms | ≤1,5 ms |
+| Rest-Sim | ≤3,0 ms | ≤4,5 ms |
+| CPU-Frame | ≤16,6 ms | ≤24,9 ms |
+| GPU-Frame | ≤16,6 ms | ≤24,9 ms |
 
-Wachstumsannahme (im Spike zu verifizieren): Pathfinding/Separation skaliert überlinear (O(n log n) Spatial Hashing), Rest-Sim linear, FoW nahezu konstant (quellenbasiert, ≤ ca. 600 Sichtquellen). Sollte der 300-Einheiten-Alpha-Messwert das Budget übersteigen, wird **vor** dem Release-Ausbau nachoptimiert oder das Release-Ziel neu verhandelt (Eskalation an Technical Director, kein stilles Budget-Stretching).
+Zusätzliche P95-Deckel:
 
-**Erzwungene Obergrenze (D-048):** Das globale Einheiten-Deckel von **600 Einheiten/Match** (Produktionsstopp mit UI-Hinweis bei Erreichen; Survival-Endlos mit Stärke-Abflachung ab Welle 25 und Despawn älterer Wellenreste; `AetheriumDensity` ≤1,5 bei 5–6 Spielern) macht die 500er-Kalibrierung erzwungen statt angenommen. Die Budgets oben bleiben führend; das Deckel ist die harte Kappung darüber.
+- Rendering CPU ≤4,0 ms,
+- Animation ≤1,5 ms,
+- GPU Render ≤8,0 ms,
+- UI ≤1,0 ms.
 
-## 4. Mess-Methodik
+Simulations-GC ist 0 B pro Tick. „Rest-Sim“ umfasst insbesondere Combat,
+Projectiles, Economy, Aetherium, Construction, Production, Technology und
+Command-Verarbeitung, aber nicht Path/FoW.
 
-- **Referenzhardware (verbindlich festgelegt, D-052):** Alle Budget-Aussagen beziehen sich auf die **60-FPS-Referenz: Ryzen 5 5600 / RTX 3060 / 16 GB RAM / NVMe-SSD** (Mittelklasse der H1-Zielgruppe). Das **30-FPS-Minimum** wird auf **Ryzen 3 3100 / GTX 1050 Ti / 8 GB RAM** verifiziert; **Mac-Baseline: Apple M2** (Entwicklungs- und Qualitätsplattform, D-006 – ersetzt keine Windows-Messung). Beschaffung in der Sprint-6-Planung; Messungen ausschließlich auf Standalone-Builds, nie im Editor. GPU-Budgets werden gegen die **1440p-Referenzauflösung** bewertet; **4K ist nicht falsifiziert** und kein Budget-Versprechen.
-- **Messpfad = Auslieferungspfad (D-045):** **Managed ist bis zur Fixed-Point-Beta der einzige Auslieferungspfad** – CI und SimRunner messen damit denselben Pfad, der ausgeliefert wird (keine Messblindheit). Burst/Jobs laufen ausschließlich hinter **Feature-Flag** als Beschleunigungsoption; die Parität zum Managed-Pfad wird als **Toleranz-Parität** überwacht: relative Abweichung **≤ 1e-4** im Hash-Vergleich löst **Alarm** aus, **blockiert aber nicht**. Bit-Parität wird erst mit Fixed-Point (Beta) relevant und dann neu bewertet (D-037 bleibt gültig, durch D-045 präzisiert).
-- **Standalone statt Editor:** Messungen ausschließlich in Standalone-Development-Builds (IL2CPP-Release-Kandidat für finale Zahlen; Mono-Development-Build für Iteration). Editor-Messungen sind nicht budget-relevant (Overhead verfälscht Sim- und Render-Posten).
-- **Messkette:** Unity Profiler (Timeline-View) + `ProfilerRecorder` auf definierte Marker (pro Sim-Subsystem eigener `ProfilerMarker`: `Sim.Pathfinding`, `Sim.FoW`, `Sim.Combat`, `Sim.Economy`, `Sim.AI`), Frame Timing Manager für CPU-/GPU-Gesamtzeiten, RenderDoc/PIX für GPU-Posten-Aufschlüsselung.
-- **Reproduzierbare Szenarien:** Dank D-033 (Commands als einzige Mutation, seedbarer PRNG) werden Benchmarks als aufgezeichnete Command-Streams/Replays definiert – identischer Verlauf auf jeder Maschine. Pflicht-Szenarien: (a) Baseline-Basebuilding 10 min, (b) Massenschlacht mit Einheiten-Obergrenze des Meilensteins, (c) Superwaffen-Einschlag + Gebäudezerstörung (Spitzenlast), (d) FoW-Stress (max. Sichtquellen).
-- **Sim-only-Messung:** `Nova.SimRunner` (D-036) misst Tick-Zeiten headless in CI; daraus entsteht die Trend-Historie pro Commit (Regression >10 % auf einem Budget-Posten = Build-Warnung).
-- **Budget-Überwachung im Build:** Laufzeit-Budget-Monitor (Debug-Overlay) zeigt Ist vs. Budget pro Posten; Überschreitungen werden geloggt.
+## 4. 500-Agenten-Vertrag
 
-## 5. Schnittstellen-Skizze (API-Design, keine Implementierung)
+### Pre-Combat V4/V5a
 
-```csharp
-namespace Nova.Performance
-{
-    // Budget-Definition, datengetrieben via SO in der GameDatabase (Vier-Säulen-Prämisse).
-    public sealed class PerformanceBudgetSO : ScriptableObject
-    {
-        public Milestone Milestone;                 // MVP | Alpha | Release
-        public BudgetEntry[] Entries;               // siehe unten
-        public int TargetUnitCount;                 // 100 / 300 / 500
-    }
+- Pathfinding P95 ≤4,0 ms,
+- Pre-Combat-Rest-Sim P95 ≤3,0 ms,
+- kein Crash,
+- kein unbeschränktes Speicher-/Queue-Wachstum.
 
-    public struct BudgetEntry
-    {
-        public string MarkerName;                   // z. B. "Sim.Pathfinding"
-        public BudgetScope Scope;                   // SimTick | FrameCpu | Gpu | Ui | Audio
-        public float BudgetMs;
-        public float P99LimitMs;                    // i. d. R. 1.5f * BudgetMs
-    }
+Der Lauf enthält repräsentative SpatialHash-, committed FoW-Filter- und
+Command-Verarbeitung. V5a ist G2-Eintrittsvoraussetzung.
 
-    // Laufzeit-Abfrage (View-/Tool-Schicht, Unity-abhängig erlaubt).
-    public interface IBudgetMonitor
-    {
-        BudgetSample GetSample(string markerName);  // letztes P50/P95/P99
-        bool IsOverBudget(string markerName);
-        event Action<BudgetViolation> ViolationLogged;
-    }
+### Full Diagnostic V5b
 
-    // Headless-Pendant im SimRunner (D-036): rein .NET, kein Unity.
-    public interface ITickProfiler
-    {
-        void BeginSection(string name);
-        void EndSection(string name);
-        TickProfileResult Flush(int tickIndex);
-    }
-}
-```
+Realer Combat und reale KI werden in G3 mit 500 Agenten wiederholt. Pflicht
+sind kein Crash, kein unbeschränktes Wachstum und vollständige Rohwerte.
+Full-Content-500 besitzt **keine** Produkt-FPS-/Full-Sim-Akzeptanzschwelle.
 
-## 6. Phase-0-Spike: Pflicht-Validierungen (aus OpenQuestions übernommen)
+## 5. MS-0-Spikes
 
-Fünf Messungen sind Gate-Kriterien für den Phase-0-Abschluss (V1–V4 aus den OpenQuestions, V5 aus D-044); jede hat ein binäres Erfolgskriterium auf der Windows-Referenzhardware (Standalone-Build, Managed-Pfad D-045):
+| ID | Schwelle |
+|---|---|
+| V1 | 10.000 Ticks, exakte Win-x64-/Mac-arm64-Hashes und finale Bytes |
+| V2 | Rendering-CPU P95 ≤4 ms |
+| V3 | Animation P95 ≤1,5 ms |
+| V4 | Path P95 ≤4 ms |
+| V5a | Pre-Combat-Rest P95 ≤3 ms |
 
-| # | Validierung | Erfolgskriterium | Bei Scheitern |
-|---|---|---|---|
-| V1 | **Fixed-Point-Determinismus ARM ↔ x86:** identische Command-Streams erzeugen bit-identische State-Hashes auf Apple Silicon und Windows-x86 | 10.000 Ticks ohne Divergenz | Beta-MP-Plan (D-033) anpassen; ggf. Software-Fixed-Point-Bibliothek oder plattformspezifische Builds evaluieren |
-| V2 | **URP GPU Resident Drawer für bewegte Einheiten:** Nutzen bei 500 dynamisch bewegten Skinned/Static-Meshes vs. klassisches Batching | Rendering-CPU-Posten ≤ 4 ms im Massenschlacht-Szenario; sonst Fallback | Fallback: manuelle BatchRendererGroup-Nutzung oder Draw-Reduktion über LOD/Impostor |
-| V3 | **Animator vs. Playables bei 500 Einheiten** (vgl. research/Animation_Audio_UI.md) | Animations-Anteil am Rendering-CPU-Posten ≤ 1,5 ms inkl. Animations-LOD | Wechsel auf Playables-API/Animancer für Massen-Infanterie; Mecanim nur für Helden/Nahaufnahmen |
-| V4 | **Pathfinding-CPU-Budget ≤ 2–4 ms** (D-034): Flow-Field-Fill + Separation bei 500 Agenten auf L-Karte (256 m) | P95 `Sim.Pathfinding` ≤ 4 ms | Dokumentierter Fallback greift: A* Pathfinding Project (Granberg) evaluieren (D-034) |
-| V5 | **Combat-/KI-Kostenmodell** (D-044): belegt das bis dahin unbelegte Rest-Sim-Unterbudget ≤ 3 ms – Targeting mit **Spatial-Hash** (Pflichtbestand des Kampfmoduls, kein O(n²)-Scan), **FoW-Filter** bei der Zielsuche, **KI-Command-Verarbeitung** (Utility-Director + HTN + Squad-BTs); Messung auf dem Managed-Pfad (D-045) | P95 Rest-Sim ≤ 3 ms im Massenschlacht-Szenario der Meilenstein-Obergrenze | **Kein Sprint-7-Start des Kampfmoduls**; Kostenmodell nachschärfen, ggf. Budget-Neuverhandlung mit D-ID-Referenz |
+V1 ist ein exakter Vergleich. Numerische Toleranzwerte gelten nur für
+nichtautoritative Diagnostik und dürfen keinen Hash-/Bytevergleich ersetzen.
 
-Zusätzlich dient die Sim-Tick-P95 aus V5 als **Trigger-Messung für das Ausführungsmodell (D-044):** liegt sie > 6 ms, wird ab Alpha auf Worker-Tick gewechselt (§2).
+## 6. Mac-M2-Funktionsmethode
 
-Die Spike-Ergebnisse fließen als Version 0.3.0 in dieses Dokument (Budget-Nachjustierung nur mit Begründung und D-ID-Referenz).
+Apple M2, 1920×1080, Medium:
+
+| Metrik | P95 | P99 |
+|---|---:|---:|
+| Frame | ≤33,3 ms | ≤50,0 ms |
+
+Dies ist eine funktionale Baseline, kein Ersatz für den Windows-
+Referenzbenchmark oder den Cross-Plattform-Determinismuslauf.
+
+Das separate Mac-M2-Methodenprofil bindet und vergleicht exakt: macOS-Version,
+arm64-Architektur, Apple-M2-Hardwarekonfiguration, Standalone-Build,
+Managed-Pfad bei deaktiviertem Burst, 1920×1080, Quality-Profil `Medium`,
+VSync, Deep Profiling und festes Replay. Command und Messung verwenden auch
+hier dieselbe `environmentId`. Windows- und Mac-Messungen dürfen nicht auf ein
+gemeinsames Methodenprofil verweisen.
+
+## 7. Messintegrität
+
+Evidence bindet:
+
+- Subject- und Tree-SHA, `dirty=false`,
+- Engine/Revision, .NET, Packages und Hardware,
+- Content-/Scenario-/Evidence-Schema-/Validator-Hashes aus Subject-Blobs,
+- kanonische kriterienspezifische Build-/Startchecks,
+- Rohsamples und Profilerartefakte mit Hashes,
+- Checkanzahl und Urteil.
+
+In der Schema-1.2-Integritätsvorstufe bindet jede Performance-Metrik
+`methodRef=performanceMethod`, einen 30-s-Warmup und exakt drei
+120-s-Runs. Flache Einzelproben, falsche Units, negative Werte oder nur
+kombiniert grüne Perzentile sind ungültig.
+
+Unter dem Schema-1.3-Ziel bindet die Messung zusätzlich `environmentId` und
+verwendet den plattformspezifischen `methodRef`. Schema 1.2 kann diese
+Umgebungsautorität nicht erzeugen und autorisiert keinen Pass.
+
+Fehlender, abgebrochener oder übersprungener Messlauf ist Fail. Nach relevanter
+Code-, Definition-, Szenario- oder Toolchainänderung ist die Messung stale.
+
+## 8. Skalierungsdiagnostik
+
+Jeder 500-Agenten-Lauf berichtet zusätzlich:
+
+- Entity-/Projectile-/Queue-Hochwasserstände,
+- Flow-Cache-Hits/Fills/Evictions und RefCounts,
+- Path-/FoW-/Rest-Verteilung,
+- Allocations/GC und
+- Speichertrend über Warmup und Messfenster.
+
+Diese Diagnostik darf harte V4/V5a-Schwellen nicht relativieren.
 
 ## Offene Punkte
 
-- **Budget-Spannung Sim-Tick:** entschieden (D-042.1) – das Sim-Tick-Gesamtbudget beträgt **≤ 8 ms** (führend: [Architecture.md](Architecture.md)); Unterbudgets Pathfinding ≤4 ms (D-034), FoW ≤1,0 ms, Rest-Sim ≤3 ms. Die Spannung „D-034 ≤2–4 ms PF bei nur 4 ms Gesamt-Sim" ist damit aufgelöst; §2 ist entsprechend angeglichen.
-- ~~**Exakte Spezifikation der Windows-Referenzhardware**~~: **entschieden (D-052)** – 60-FPS-Referenz Ryzen 5 5600 / RTX 3060 / 16 GB / NVMe, 30-FPS-Minimum Ryzen 3 3100 / GTX 1050 Ti / 8 GB, Mac-Baseline Apple M2 (§4); offen bleibt nur die Beschaffung (Sprint-6-Planung).
-- **GPU-Budget-Aufteilung** (Shadows vs. Full Screen Pass vs. Partikel) kann erst nach dem Rendersequenzen-TDD (terminiert Sprint 6, OpenQuestions) final beziffert werden; die 8 ms sind bis dahin Obergrenze ohne Unterposten. Bewertungsbasis ist die 1440p-Referenzauflösung (D-052); 4K ist nicht falsifiziert.
-- **Rest-Sim-Unterbudget ≤ 3 ms (Kampf, Wirtschaft, KI-Command-Verarbeitung):** fachlich **unbelegt bis Pflicht-Gate V5** (D-044, §6) – kein eigenes Unterbudget für die KI vor V5; ohne bestandenes V5 kein Sprint-7-Start des Kampfmoduls.
-- **30-FPS-Modus:** Ob die Sim bei 30 FPS weiterhin mit 10 Hz tickt (längere Frames, gleicher Tick) oder ob zusätzliche View-Degradationen definiert werden, ist mit Game Design abzustimmen (Eingabelatenz-Gefühl).
+- Keine Schwellenkalibrierung vor realen Messungen. Eine Änderung der hier
+  definierten Gates braucht eine neue D-ID.
 
 ## Nächste Schritte
 
-1. Sprint 6: Referenzhardware beschaffen (Spezifikation verbindlich festgelegt, D-052); Messkette (ProfilerMarker-Namenskonvention, Szenario-Replays) mit Simulation-Architektur-TDD abstimmen.
-2. Phase 0 (Spike): V1–V5 durchführen, Ergebnisse als v0.3.0 hier und in research/Pathfinding.md dokumentieren; ohne bestandenes V5 (Combat-/KI-Kostenmodell, D-044) kein Sprint-7-Start des Kampfmoduls.
-3. Sprint 5–6: CI-Integration der SimRunner-Tick-Messung (Regressionsschwelle 10 %); Debug-Budget-Overlay im Development-Build.
-4. Sprint 6: GPU-Unterbudgets nach Rendersequenzen-TDD nachziehen.
+1. Zuerst G0-A Trusted-Gate-Bootstrap ohne Gate-Fortschritt herstellen.
+2. Instrumentierung, Raw-Sample-Export und getrennte Umgebungsprofile in
+   G0-B/G1 schaffen.
+3. V4/V5a vor G2 und `MVP_FULL_100` in G4/G5 am jeweils geforderten
+   eingefrorenen SHA ausführen.
 
 ## Änderungsverlauf
 
@@ -147,3 +183,7 @@ Die Spike-Ergebnisse fließen als Version 0.3.0 in dieses Dokument (Budget-Nachj
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Performance Engineer |
 | 0.1.1 | 2026-07-21 | Sim-Tick-Gesamtbudget auf ≤8 ms angehoben mit Unterbudgets (D-042.1, führend Architecture.md); offener Punkt „Budget-Spannung Sim-Tick" als entschieden markiert | Lead Technical Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Performance Engineer |
+| 1.0.0 | 2026-07-24 | D-061-Messmethode, P95/P99-Schwellen und klare 100-/500-Workload-Trennung festgelegt | Lead Performance Engineer |
+| 1.0.1 | 2026-07-24 | Fehlende kanonische V2-/V3-Szenario-IDs in die Workload-Matrix aufgenommen | Lead Performance Engineer |
+| 1.1.0 | 2026-07-24 | D-063-Drei-Lauf-Methode, exakte Units, nichtnegative Samples und Per-Run-Schwellenprüfung ergänzt | Lead Performance Engineer |
+| 1.2.0 | 2026-07-24 | D-064-`environmentId`-Bindung sowie getrennte Windows-x64-Referenz- und Mac-M2-Funktionsmethoden als Schema-1.3-Ziel ergänzt | Lead Performance Engineer |

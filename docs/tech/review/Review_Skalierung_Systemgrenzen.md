@@ -1,10 +1,16 @@
 # Architecture Review – Skalierung & Systemgrenzen
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Skalierung & Systemgrenzen) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Skalierung & Systemgrenzen) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Prüfung der Sprint-3-Architektur an den Skalierungsrändern: L-Karten (65.536 Tiles × Layer), 6 Spieler + Neutrale + KI-Clients, 500+ Einheiten inkl. Elite/Drohnen/Superwaffen, Aetherium-Ausbreitung über lange Matches (Grid-Mutationen als Desync-/Performance-Quelle), Flow-Field-Anzahl bei 6 Spielern × Zielen × Radienklassen, FoW-Bitmasken pro Team, Snapshot-/Savegame-Größen und Ladezeiten, SimRunner-CI-Laufzeiten, Replay-Längen, 3v3-Lockstep mit 6 Clients (Takt-Stall-Kaskaden) und Survival-Endlos. Jeder Befund ist mit Beleg (Datei:Zeile/Abschnitt) und eigener Gegenrechnung versehen.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -53,8 +59,14 @@ Explizit geprüft und für tragfähig befunden:
 - **F-8/F-10:** Stall-Schwellen, Delay-Wechsel-Protokoll und Observer-Join-Regel sind vor Beta-MP-Planung (Sprint 6) zu spezifizieren; Übergabe an OpenQuestions.md empfohlen.
 - **F-11:** Hash-Breiten-Festlegung hängt am Phase-0-Spike (Determinismus-Validierung); bis dahin Dokumenten-Widerspruch (64 vs. 32 bit) als bekannt markieren.
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung (Skalierung & Systemgrenzen, Sprint 4) | Unabhängiger Reviewer |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |

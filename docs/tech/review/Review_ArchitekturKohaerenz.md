@@ -1,10 +1,16 @@
 # Architecture Review – Architektur-Kohärenz & Korrektheit
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Architektur-Kohärenz & Korrektheit) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (Architektur-Kohärenz & Korrektheit) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Querschnittsprüfung der Kern-Architektur-Dokumente von Sprint 3 auf logische Widersprüche, Zyklen/Grauzonen im Abhängigkeitsgraph, Löcher im Zustandsmodell (gegen das GDD), Verletzungen der fünf D-033-Regeln durch die eigenen API-Skizzen, ID-/Hash-Fallstricke, Migrations-/Versionierungs-Lücken und Command-Pipeline-Randfälle. Dieses Dokument ändert nichts an den geprüften Dokumenten; es liefert priorisierte, umsetzbare Befunde für den Sprint-4-Korrekturlauf.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -62,8 +68,14 @@ Explizit geprüft und für tragfähig befunden:
 - F-2: Die Vollständigkeitsprüfung „GDD-Mechanik ↔ State-Feld" sollte nach dem Korrekturlauf von einem zweiten Reviewer gegen alle GDD-Dokumente wiederholt werden (Stichprobe hier: Resources, Buildings, NeutralUnits, ResearchTree, FogOfWar).
 - Dokumentationsdisziplin: Dieser Review ist bewusst als einzelnes neues Dokument angelegt; CHANGELOG-/Index-Pflichten (AGENTS.md §8) obliegen dem Orchestrator-Korrekturlauf.
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung | Reviewer (Architektur-Kohärenz & Korrektheit) |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |

@@ -1,182 +1,146 @@
 # Gesamtarchitektur
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
+**Version:** 1.3.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
-Verbindliche Gesamtarchitektur für Project Nova: Schichtenmodell, Command-Pipeline, Tick-Modell und der Erweiterungspfad von lokalem Singleplayer zu Online-Multiplayer. Grundlage für alle weiteren TDD-Dokumente in `docs/tech/` und für die Implementierung ab Sprint 7. Verbindlich für alle Engineering-Rollen.
+Definiert Schichten, Assembly-Grenzen, Hostfluss und Autorität für MS-1. Details
+werden in fokussierten TDDs gepflegt; bei Abweichung führen D-056–D-064 und
+[SimulationCore.md](SimulationCore.md).
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-006 (Unity 6.3 LTS + URP), D-033 (Sim-/MP-Modell), D-034 (Pathfinding), D-035 (OOP+SO+Burst, kein DOTS), D-036 (SimRunner), D-037 (Burst-Trennung), D-039 (Sim-Budgets), D-043 (kanonische Assembly-Topologie), D-044 (Tick-Ausführungsmodell), D-045 (Managed-first), D-046 (MP-Trust-Anchor), D-051 (Quantum-Fallback gestrichen)
-- [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md)
-- [../research/Unity_ECS_DOTS.md](../research/Unity_ECS_DOTS.md)
-- [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md)
-- [../vision/CoreGameplay.md](../vision/CoreGameplay.md) (Zielwerte: 500 Einheiten, 60 FPS, 20–35 min Matches)
-- [./ModuleOverview.md](./ModuleOverview.md), [./DependencyGraph.md](./DependencyGraph.md)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-043,
+  D-056 bis D-064
+- [SimulationCore.md](SimulationCore.md), [Commands.md](Commands.md) und
+  [FogOfWar.md](FogOfWar.md)
+- [DependencyGraph.md](DependencyGraph.md) und
+  [ModuleOverview.md](ModuleOverview.md)
+- [../production/MVPContentManifest.md](../production/MVPContentManifest.md)
 
-## 1. Architektur-Leitplanken (Vier Säulen + 5 Sim-Regeln)
+## 1. Architekturregeln
 
-Die Architektur steht auf vier Säulen (Research-Konsens, D-033/D-035):
+1. `Nova.Simulation` ist autoritativ, Unity-frei und Q16.16-basiert.
+2. Nur versiegelte `CommandBatch`-Objekte und feste Modulticks mutieren State.
+3. UI und KI erzeugen ausschließlich `CommandIntent`.
+4. Präsentation liest gefilterte Snapshots und besitzt keinen Schreibzugriff.
+5. Statische Definitionen werden vor Matchstart in kanonische, Unity-freie
+   Records überführt und durch `DefinitionsHash64` gebunden.
+6. Singleplayer nutzt mit `LocalLoopbackTransport` denselben Ingress wie jeder
+   spätere Transport.
+7. Snapshot, Savegame und Replay verwenden denselben State-, Fingerprint- und
+   Hashvertrag.
+8. Plan, Dateianwesenheit und isolierte Tests sind keine Gate-Evidence.
+9. Schema 1.2 prüft nur Evidence-Integrität. Gate-Autorität entsteht erst
+   zweistufig aus einem subject-unabhängigen Trusted-Tool-Bundle nach G0-A;
+   die Bundle-Änderung kann sich nicht selbst autorisieren.
 
-1. **Strikte Simulation/View-Trennung.** Der gesamte Spielzustand lebt in der Unity-freien Assembly `Nova.Simulation`. Im Sim-Pfad sind **keine UnityEngine-APIs** erlaubt (D-033 Regel 2, D-035). Die Präsentation liest Zustand nur über Snapshots/Events, schreibt nie.
-2. **Commands als einzige State-Mutation.** Jede Änderung am Spielzustand (Bewegen, Bauen, Forschen, Feuern-Entscheidungen von Spielern und KI) geht als Command durch die Command-Pipeline (D-033 Regel 1). Direkte Zugriffe auf den Sim-State von außerhalb sind verboten.
-3. **Fester Sim-Tick, entkoppeltes Rendering.** Die Simulation läuft mit festen 10 Hz (100 ms/Tick, D-033 Regel 3). Das Rendering läuft mit Display-Framerate (Ziel 60 FPS) und interpoliert zwischen Tick-Snapshots. Framezeit hat keinen Einfluss auf Sim-Ergebnisse.
-4. **Vollständig datengetrieben.** Alle statischen Definitionen (Einheiten, Gebäude, Waffen, Tech, Karten) kommen aus der SO-Registry `GameDatabase` (Sub-Registries pro Kategorie + generierter Master-Index, D-049; Definitions-only-SOs, **kein Runtime-State in SOs**). Beim Matchstart wird ein reiner Daten-Snapshot (`DefinitionSnapshot`) erzeugt, den die Simulation ohne Unity-Referenzen nutzt.
+## 2. Assembly-Topologie
 
-Zusätzlich gelten aus D-033: **(4)** eigener seedbarer PRNG im Sim-Kern (kein `System.Random`, kein `UnityEngine.Random`), **(5)** vollständig serialisierbarer State (Savegame, Replay, Desync-Debugging, später Lockstep-Checksums). **Singleplayer ist ein "lokaler Server"**: SP und (später) MP benutzen denselben Codepfad, nur der Transport unterscheidet sich.
-
-Float-Arithmetik ist im MVP erlaubt; die Umstellung auf Fixed-Point ist fester Bestandteil der Beta-MP-Arbeiten (D-033).
-
-## 2. Schichtenmodell
-
-Kanonische Assembly-Topologie gemäß D-043 (FolderStructure-Lager führend, ergänzt um `Nova.AI`/`Nova.AI.Data`):
-
-| Schicht | Assembly | Unity-Bezug | Inhalt |
+| Ebene | Assembly | Abhängigkeiten | Verantwortung |
 |---|---|---|---|
-| Basis | `Nova.Core` | **keine** (`noEngineReferences`) | Basistypen (`EntityId`, `Tick`), Logging, Result-Typen, Pools/Puffer – von allen Assemblies referenziert |
-| Simulation | `Nova.Simulation` | **keine** (`noEngineReferences`, reines .NET) | Spielregeln, State, Commands, Grid, Pathfinding, FoW, Economy, Combat, Production, Research, NeutralUnits, Superweapons, Match/Session, Replay, Savegame |
-| Sim-Beschleunigung | `Nova.Simulation.Burst` | Unity.Collections/Burst/Jobs, **kein UnityEngine** | Burst-Varianten der Hotspots (Flow Fields, FoW-Scan, Separation) hinter identischen Interfaces auf NativeArray-Spiegeln (D-037). **Managed-first (D-045):** Auslieferungspfad ist Managed; Burst nur hinter Feature-Flag mit Toleranz-Parität |
-| KI | `Nova.AI` | **keine** (reines .NET) | KI-Entscheidungslogik (Utility-Director, HTN-light, Squad-BT) als Client der Simulation über `IAiWorldView`/`ICommandSink`; SimRunner-tauglich ([./AIArchitecture.md](./AIArchitecture.md)) |
-| KI-Daten | `Nova.AI.Data` | UnityEngine (ScriptableObjects) | `DifficultyProfileSO`/`StrategyOptionSO`/`TaskPlanSO`/`SquadBehaviorSO`; Übersetzung in Unity-freie Records beim Match-Start |
-| Daten | `Nova.Data` | UnityEngine (ScriptableObjects) | Definitions-only-SOs, `GameDatabase` als Sub-Registries pro Kategorie + generierter Master-Index (D-049), Validierung |
-| Bridge | `Nova.Gameplay` | UnityEngine | Session-/Match-Orchestrierung, SO→`DefinitionSnapshot`-Überführung, Input→Command, lokaler Server (Loopback-Transport), Event-Dispatch an View |
-| Präsentation | `Nova.Presentation` | UnityEngine + URP | Kamera, Selektion, Units-/Buildings-View, Interpolation, VFX, FoW-Rendering (Full Screen Pass), Healthbars, Audio-Service |
-| UI | `Nova.UI` | UnityEngine (UI Toolkit) | HUD, Menüs, Minimap; uGUI nur World-Space; Minimap-Navigation über `UINavigationEvent` (dokumentierte Ausnahme, [./DependencyGraph.md](./DependencyGraph.md) §1) |
-| Editor | `Nova.Editor` | Unity Editor only | Karten-/Daten-Validierung, Custom Inspectors, Bake-Tools |
-| Build | `Nova.BuildTools` | Unity Editor only | Build-Pipeline-/CI-Werkzeuge (BuildPipeline-API, Skripte unter `ci/`) |
-| Headless | `Nova.SimRunner` | **keine** (reines .NET, außerhalb von `Assets/` unter `tools/`) | Konsolen-Runner auf `Nova.Core` + `Nova.Simulation` + `Nova.AI` für CI-Balancing-Läufe (D-036) |
+| Basis | `Nova.Core` | keine Engine | `SimFixed`, `Tick`, `EntityId`, stabile Result-/Buffer-Typen |
+| Simulation | `Nova.Simulation` | `Nova.Core`, keine Engine | Kernel, Commands, State, Systeme, Snapshot, Replay |
+| optionaler Fast Path | `Nova.Simulation.Burst` | Core/Simulation + Burst-Pakete | deaktiviert für MS-1; keine Autorität |
+| KI | `Nova.AI` | Core + öffentliche Read-/Intent-Verträge | versionierter Session-Sidecar |
+| Definitionen | `Nova.Data` / `Nova.AI.Data` | Core, Unity für SOs | authoring-only Definitionen |
+| Host/Bridge | `Nova.Gameplay` | Core/Simulation/AI/Data | MatchSession, Ingress, Loopback, Composition Root |
+| View | `Nova.Presentation` | Unity/URP | Kamera, Weltansicht, Interpolation, VFX/Audio |
+| UI | `Nova.UI` | Unity UI | HUD, Settings, Pause, Save/Load, Intents |
+| Runner | `Nova.SimRunner` | Core/Simulation/AI | headless Fixtures und Plattformnachweis |
 
-Regeln: Abhängigkeiten zeigen nur nach unten in dieser Tabelle (Details und Verbotsliste: [./DependencyGraph.md](./DependencyGraph.md); Referenzmatrix verbindlich in [./FolderStructure.md](./FolderStructure.md) §3). `Nova.Simulation` kennt keine der anderen Schichten. Die Präsentation darf Unity-APIs voll nutzen (D-035), aber niemals Sim-Interna.
+`Nova.Simulation` referenziert weder KI, Gameplay, Data, Presentation, UI noch
+Unity. Unity und SimRunner kompilieren dieselben Core-/Simulation-Quellen und
+determinismusrelevanten Defines.
 
-## 3. Command-Pipeline
+## 3. Laufzeitfluss
 
-Fluss: **Eingabe → Command → Tick-Ausführung → State-Mutation → View-Events → Präsentation.**
-
-1. **Eingabe (Bridge):** UI/Selektion/Hotkeys erzeugen Intent-Aufrufe auf `ICommandSink`. Auch die KI (Unity-freie Assembly `Nova.AI`, Client der Sim) und später Netzwerk-Peers speisen ausschließlich über Commands ein.
-2. **Pufferung:** Commands werden dem nächsten Tick zugeordnet (`TargetTick = CurrentTick + InputDelay`, MVP: 2 Ticks = 200 ms, Lockstep-kompatibel). Pro Tick entsteht ein deterministisch sortierter `CommandBatch` (Sortierschlüssel: `PlayerId`, dann `Sequence`).
-3. **Tick-Ausführung:** Der `SimulationKernel` führt pro Tick nacheinander aus: Command-Anwendung → Modul-Ticks in fester Reihenfolge (Economy → Production → Research → Combat → Movement/Pathfinding → FoW → AI-Strategie → Match/Victory) → View-Event-Sammlung.
-4. **State-Mutation:** Nur Commands und die daraus folgenden Modul-Ticks ändern State (Regel 1/2). Der PRNG wird ausschließlich aus dem Sim-Pfad bedient, pro Tick deterministisch weitergeschaltet.
-5. **View-Events:** Die Simulation emittiert pro Tick eine Liste von View-Events (Spawn, Move, Damage, Death, ResourceChanged, FoWDelta, …). Die Bridge verteilt sie an die Präsentation; Bewegung wird zusätzlich über Positions-Snapshots interpoliert.
-
-Schnittstellen-Skizze (API-Design, keine Implementierung):
-
-```csharp
-namespace Nova.Simulation.Core
-{
-    public interface ICommand { int PlayerId { get; } }
-
-    public readonly record struct CommandEnvelope(int TargetTick, int PlayerId, int Sequence, ICommand Command);
-
-    public interface ICommandSink
-    {
-        void Submit(ICommand command);        // Bridge/UI/KI-Einstieg
-    }
-
-    public sealed class SimulationClock
-    {
-        public const int TicksPerSecond = 10; // D-033, fester Tick
-        public int CurrentTick { get; }
-    }
-
-    public sealed class DeterministicRandom  // D-033 Regel 4 (z. B. XorShift)
-    {
-        public DeterministicRandom(ulong seed);
-        public int NextInt(int minInclusive, int maxExclusive);
-        public float NextFloat01();
-    }
-
-    public interface ISimulationModule
-    {
-        void Tick(SimContext ctx);            // feste Aufrufreihenfolge, siehe §3.3
-    }
-
-    public interface IStateSerializer         // D-033 Regel 5
-    {
-        byte[] Serialize(in SimState state);
-        SimState Deserialize(ReadOnlySpan<byte> data);
-        int ComputeChecksum(in SimState state); // Desync-Erkennung / Lockstep
-    }
-}
-
-namespace Nova.Simulation.Events
-{
-    public interface IViewEvent { }           // marker; konkrete Records je Modul
-    public interface IViewEventCollector
-    {
-        void Emit(IViewEvent e);
-        IReadOnlyList<IViewEvent> DrainTick(int tick); // Bridge holt pro Tick ab
-    }
-}
+```text
+Device/UI ─┐
+           ├─> CommandIntent ─> MatchSession/CommandIngress
+Nova.AI ───┘                         │
+                          LocalLoopbackTransport
+                                    │
+                            sealed CommandBatch
+                                    │
+                           SimulationKernel 10 Hz
+                                    │
+             TeamWorldView / PlayerSnapshot / ViewEvents
+                         ┌──────────┴──────────┐
+                    Nova.UI             Nova.Presentation
 ```
 
-## 4. Singleplayer als lokaler Server (D-033)
+`MatchSession` bindet aktive Slots, Seed, Map-/Definitionen und
+`InputDelayTicks=1` in den Fingerprint. Der Ingress vergibt Sequenzen und
+Zielticks. Client-Feedback darf sofort erscheinen, bezeichnet aber noch keinen
+Sim-Erfolg.
 
-Die Bridge kapselt den Transport hinter `IMatchTransport`. Im MVP existiert genau eine Implementierung: `LocalLoopbackTransport`, die Command-Batches verzögert (Input-Delay) an den eigenen Kernel zurückliefert. Session-Aufbau, Slot-Verwaltung (Mensch + KI), Start-Seed und Match-Konfiguration laufen über `MatchSession` in der Bridge – identisch zum späteren Online-Pfad.
+## 4. Tickordnung
 
-```csharp
-namespace Nova.Gameplay.Session
-{
-    public interface IMatchTransport
-    {
-        void SendCommands(in CommandEnvelope[] batch);   // eigene Befehle "zum Server"
-        event Action<CommandEnvelope[]> OnTickCommands;  // autoritative Batches "vom Server"
-    }
+1. CommandBatch validieren/anwenden,
+2. Economy/Energy,
+3. Aetherium,
+4. Construction/Production/T2,
+5. Pathfinding/Movement,
+6. FoW auf jedem zweiten Tick committen,
+7. Combat/Projectiles,
+8. Match-/Victory-State,
+9. CommandResults und gefilterte Snapshots.
 
-    public sealed class LocalLoopbackTransport : IMatchTransport { /* MVP: lokaler Server */ }
-    // Beta: LockstepRelayTransport (Eigenbau-UDP; Fallback = reduzierter MP-Scope, D-051) – D-033
+Combat, KI und Rendering verwenden dieselbe committed Team-Sicht. KI wird
+außerhalb des Kernel-Ticks gegen den zuletzt freigegebenen Sidecar-Snapshot
+ausgeführt und speist Intents wieder über den Session-Ingress ein.
 
-    public sealed class MatchSession
-    {
-        // Orchestriert: GameDatabase → DefinitionSnapshot, Map-Load, Slot-Belegung,
-        // Start-Seed, Kernel-Start, Transport-Bindung, Match-Ende (MatchResult)
-    }
-}
-```
+## 5. Zustand und Persistence
 
-Konsequenz: Es gibt keinen separaten "Singleplayer-Code". Alle Modi (Skirmish vs. KI, Koop lokal, später PvP) laufen über `MatchSession` + Transport-Abstraktion.
+Der autoritative Zustand ist vollständig in [GameState.md](GameState.md)
+inventarisiert. [Serialization.md](Serialization.md) definiert kanonische Bytes;
+[Savegames.md](Savegames.md) Benutzer-Slots/Recovery; [Replication.md](Replication.md)
+den Command-/Replay-Strom.
 
-## 5. Erweiterungspfad: deterministisches Lockstep-Relay ab Beta (D-033)
+Ein Replay wendet aufgezeichnete KI-Commands an und instanziiert KI nicht erneut.
+Ein Save enthält den für identische Fortsetzung erforderlichen KI-Sidecar.
 
-Zielarchitektur ab Beta: deterministisches Lockstep über einem **autoritativen Command-Relay-Server** (Eigenbau-UDP; der früher erwähnte Photon-Quantum-3-Fallback ist gestrichen – Ersatz-Fallback bei Scheitern des Eigenbau-Relay ist ein reduzierter MP-Scope, D-051). Der Relay validiert und sortiert Command-Batches pro Tick und verteilt sie an alle Clients; das Match-Ergebnis validiert der Server per Post-Match-Re-Simulation des Command-Logs (SimRunner-basiert, on-demand, D-046). Clients simulieren identisch.
+## 6. Kapazität
 
-Vorbereitung in der MVP-Architektur (keine Beta-Funktionalität, aber keine Sackgassen):
+MS-1 reserviert acht Slots, aktiviert zwei, nutzt 128×128 Zellen, höchstens
+100 Produktionseinheiten, 1.024 Entities und einen Flow-Cache von höchstens
+32 Einträgen/8 MiB. 500 Agenten sind ausschließlich synthetische
+Architekturreserve. Details:
+[MemoryBudget.md](MemoryBudget.md), [Pathfinding.md](Pathfinding.md) und
+[PerformanceBudget.md](PerformanceBudget.md).
 
-- Input-Delay und deterministische Batch-Sortierung (§3) sind von Anfang an aktiv.
-- `IMatchTransport` ist die einzige Stelle, an der Netzcode eingehängt wird.
-- `ComputeChecksum` pro Tick wird im MVP bereits für Replay-Verifikation und Desync-Jagd genutzt; im Lockstep derselbe Mechanismus für Sync-Vergleich.
-- Fixed-Point-Umstellung (MVP: float) ist Beta-Pflichtarbeit; Phase-0-Spike validiert ARM↔x86-Determinismus (DecisionLog, Offene Punkte).
-- Replays (Command-Stream + Seed + DefinitionSnapshot-Version) und Beobachter fallen aus dem Modell gratis (D-033).
-- Maphack-Risiko (voller State auf jedem Client) bis Ranked-Re-Evaluierung akzeptiert (D-033); serverseitiges Sichtgrid ist dann eigene Entscheidung.
+## 7. Plattform
 
-## 6. Serialisierung, Savegame, Replay
+Unity ist exakt auf `6000.5.4f1`, Revision `d550df8bd089`, URP gepinnt.
+Automatische Upgrades sind verboten. Der Managed-Pfad ist der einzige MS-1-
+Auslieferungspfad; Burst bleibt aus, bis eine spätere D-ID exakte Feld-, Hash-
+und Byteparität belegt.
 
-- **Savegame:** vollständige `SimState`-Serialisierung (Regel 5) über `IStateSerializer`, binär, versioniert (Format-Version im Header). Speichern erzeugt einen konsistenten Tick-Schnappschuss; Laden setzt Kernel in exakt diesen Tick.
-- **Replay:** Start-State-Referenz (Map, Slots, DefinitionSnapshot-Version) + Start-Seed + vollständiger Command-Stream; Verifikation über periodische State-Checksums. Replay-Abspielung = Kernel im Replay-Modus (Commands aus Datei statt Transport).
-- Beides liegt in `Nova.Simulation` und ist damit auch im `Nova.SimRunner` nutzbar (D-036).
+## 8. Gate-Zuordnung
 
-## 7. Performance- und Ressourcen-Budgets (Zielvorgaben)
-
-- Sim-Tick gesamt: ≤ 8 ms auf Zielhardware (10 Hz → ausreichend Reserve für View); Pathfinding-Anteil ≤ 2–4 ms (D-034, Phase-0-Messung).
-- Rendering: 60 FPS bei 500 Einheiten (URP, GPU Resident Drawer, SRP Batcher – Phase-0-Validierung laut DecisionLog).
-- Kein GC-Allokation im Tick (D-035-Konsequenz; Details in `CodingGuidelines.md`, Sprint 7).
-- FoW-Sicht-Tick 5–10 Hz (GDD) gekoppelt an Sim-Tick-Raster (Standard: jeder 2. Tick = 5 Hz; Feinjustage offen, siehe Offene Punkte).
+| Gate | Architektur-Exit |
+|---|---|
+| G0-A | Trusted-Tool-Checkout, Schema 1.3, vollständige `authorizedEvidence`-Kette und Umgebungsbindung zweistufig etabliert |
+| G0-B / G0 | Projekte/asmdefs/Builds/Tests an einem nachfolgenden sauberen Subject reproduzierbar, Negative Controls grün |
+| G1 | kanonischer Kern, Persistence und Plattformparität |
+| G2 | Player-Kernloop ausschließlich über Session/Commands |
+| G3 | gefilterte KI, Save/Replay-Fortsetzung |
+| G4 | produktiver MS-1-Host/UI/Content |
+| G5 | gleicher SHA vollständig abgenommen |
 
 ## Offene Punkte
 
-1. **Burst/Jobs vs. SimRunner-Portabilität (gelöst):** D-035 fordert Burst/Jobs auf Sim-Hotspots, D-033/D-036 fordern eine Unity-freie `Nova.Simulation`, die im reinen .NET-SimRunner läuft. Gelöst durch D-043 (eigene Assembly `Nova.Simulation.Burst`, nicht `.Jobs`) und D-045 (Managed-first: Auslieferungspfad ist Managed, Burst nur hinter Feature-Flag mit Toleranz-Parität ≤1e-4 statt Bit-Identität; Pflicht-Paritätstests Managed↔Burst sind CI-Pflicht, D-037). Kein offener Klärungsbedarf mehr vor Sprint 7.
-2. **Sim-Threading:** MVP-Vorschlag: Sim läuft synchron auf dem Main-Thread (10 Hz, Budget §7). Auslagerung auf Worker-Thread erst nach Messung; Auswirkung auf Event-Dispatch klären (Sprint 7).
-3. **FoW-Sicht-Tick-Frequenz:** GDD-Spanne 5–10 Hz; exakte Kopplung (jeder Tick vs. jeder 2. Tick) und Interaktion mit Sicht-basiertem Targeting offen → `FogOfWar.md` (tech).
-4. **Savegame-Format-Versionierung und Kompatibilitätsstrategie** über Patches hinweg → `GameState.md`/`Savegame`-Spezifikation.
-5. **Disconnect-Regel (KI-Übernahme) und Host-Migration:** laut D-033 in `Networking.md` final zu definieren (Beta-Scope, hier nur Schnittstellen-Vorkehrung).
-6. **Input-Delay-Wert:** 2 Ticks als MVP-Startwert; Feinjustage nach Spielgefühl/Lockstep-Anforderungen.
+- Online-Transport, Burst-Aktivierung und Worker-Tick sind Post-MVP und
+  benötigen neue Entscheidungen.
 
 ## Nächste Schritte
 
-- Modul-Detail-TDDs auf dieser Basis: `GameState.md`, `Networking.md`, `Replication.md`, `Pathfinding.md`, `FogOfWar.md`, `Testing.md` (D-033/D-036-Konsequenzen).
-- `CodingGuidelines.md` (Hotspot-Regeln, Assembly-Regeln) vorbereiten (Sprint 7).
-- Phase-0-Spike: vier Pflicht-Validierungen lt. DecisionLog (Fixed-Point ARM↔x86, GPU Resident Drawer, Animator vs. Playables, Pathfinding-Budget).
-- TDD-Konsistenzreview, danach formale Schließung von Q-013/Q-014/Q-015/Q-020.
+1. G0-A ohne Gate-Fortschritt mergen.
+2. Assembly- und Quellenparität in G0-B am nachfolgenden sauberen Subject
+   herstellen und dieses danach mit Schema 1.3 beweisen.
+3. G1-Verträge test-first implementieren und direkte Mutations-/
+   Engine-Kanten als Negative Controls absichern.
 
 ## Änderungsverlauf
 
@@ -184,3 +148,7 @@ Vorbereitung in der MVP-Architektur (keine Beta-Funktionalität, aber keine Sack
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Technical Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043-Topologie): kanonische Assembly-Topologie (§2) inkl. `Nova.AI`/`Nova.AI.Data`; Offene Punkte bereinigt (Burst/Jobs-Frage via D-043/D-045/D-037 gelöst, `GameDatabase`-Sharding nach D-049 nachgetragen) | Lead Technical Director |
+| 1.0.0 | 2026-07-24 | Architektur auf D-056–D-061, kanonischen G1-Kern und G0-offene Gate-Grenzen rebaselined | Lead Technical Director |
+| 1.1.0 | 2026-07-24 | D-062-Evidence-Semantik als führenden Architektur-Nachweis ergänzt | Lead Technical Director |
+| 1.2.0 | 2026-07-24 | D-063-Schema-1.2-/Check-/Trust-Vertrag als verbindliche Gate-Autorität ergänzt | Lead Technical Director |
+| 1.3.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt und G0-A-Trust-Bootstrap vor G0-B als Architektur-Exit ergänzt | Lead Technical Director |

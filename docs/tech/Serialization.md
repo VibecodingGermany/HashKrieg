@@ -1,128 +1,145 @@
-# Serialization – Sim-State- und Replay-Serialisierung
+# Serialisierung
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 3
+**Version:** 1.1.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
-Legt das Serialisierungsformat für den `WorldState` ([./GameState.md](./GameState.md)), das Schema-Versionierungsmodell und das Command-Log-Format (Replays) fest. Verbindlich für `Nova.Simulation` (Unity-frei, D-035), `Nova.SimRunner` (D-036) und [./Savegames.md](./Savegames.md). Erfüllt D-033 Regel 5 und liefert die Hash-Grundlage für Desync-Erkennung.
+Definiert kanonische Bytes für State, Snapshots, Savegames und Replay-
+Fingerprints. Derselbe Serializer läuft in Unity und SimRunner.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-033 (serialisierbarer State, Lockstep-Ziel), D-035 (Unity-freie Assembly), D-036 (SimRunner/CI)
-- [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Replay = Seed + Befehlsstrom, State-Hash-Vergleich, Desync-Tooling
-- [./GameState.md](./GameState.md) – zu serialisierendes Zustandsmodell
-- [./Savegames.md](./Savegames.md) – Dateiformat-Verbraucher (Slots, Header, Checksummen)
-- [./Networking.md](./Networking.md) – Hash-Austausch im Lockstep (parallel, Sprint 3)
+- [SimulationCore.md](SimulationCore.md) – Zahlen, Hashdomänen, Fingerprint
+- [GameState.md](GameState.md) – Block-/Feldinventar
+- [Commands.md](Commands.md) – Command-Records
+- [Savegames.md](Savegames.md) und [Replication.md](Replication.md)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-057/D-058
 
-## Format-Vergleich
+## 1. Kanonische Kodierung
 
-Kriterien: Dateigröße, Schema-Versionierung, Determinismus (bit-exakter Roundtrip, plattformstabil), Menschenlesbarkeit/Debuggbarkeit, Unity-Freiheit des Kerns, Wartungsaufwand.
+- Byteordnung: Little Endian.
+- Integerbreiten sind explizit; kein nativer `int` im Dateivertrag.
+- `SimFixed` schreibt seine signed `int32`-Rohbits.
+- `SimAngle` schreibt `uint16`.
+- Flags sind `u8` und nur 0/1 gültig.
+- Enums besitzen festgeschriebene Integerbreite und definierte Werte.
+- Jede Schema-Version schreibt `Major u16`, danach `Minor u16`.
+- Arrays schreiben `Count u32`, dann Elemente in definierter Reihenfolge.
+- Inaktive Kapazitätsslots werden nach Schema kanonisch nullgeschrieben.
+- Keine Reflection-, Dictionary-, GUID-, String- oder Runtime-Layout-
+  Serialisierung im autoritativen Payload.
 
-| Kriterium | Eigener BinaryWriter | MessagePack-C# | Unity JsonUtility |
-|---|---|---|---|
-| Größe (Snapshot ~500 Entities) | sehr klein (~50–150 kB, flache Structs) | klein (~1,2–2× Binär) | groß (~5–10× Binär, Text) |
-| Versionierung | explizit, voll kontrolliert (Feldreihenfolge = Kontrakt) | gut (Key-/Index-Schema), aber Magie im Attribut-Layer | schwach (still fehlende Felder, keine Migration) |
-| Determinismus | voll kontrollierbar (Endianness, Feldreihenfolge, Float-Rohbits) | grundsätzlich stabil, aber Map-/Enum-Verhalten versionssensitiv | Float-Text-Rundung, keine Bit-Stabilität garantiert |
-| Menschenlesbarkeit (Debug) | nein (Hexdump) → separater JSON-Debug-Export nötig | nein (msgpack-Tools vorhanden) | ja |
-| Unity-Freiheit `Nova.Simulation` | ja (reines .NET) | ja (NuGet, AOT-fähig) | **nein** (UnityEngine-API → verletzt D-033/D-035) |
-| Wartung / Tooling | Handarbeit pro Typ, dafür explizit und codegen-fähig | gering, Attribut-getrieben | gering, aber funktional zu schwach |
+Parser lesen Längen und Counts erst nach Bereichsprüfung und allokieren niemals
+aus ungeprüften Werten.
 
-**Empfehlung: Eigener BinaryWriter (handgeschriebene, explizite `Write`/`Read` pro State-Struct), ergänzt um einen optionalen JSON-Debug-Export.**
+## 2. Snapshot-Envelope
 
-Begründung:
-1. **Determinismus ist das harte Kriterium.** Replays, State-Hashes und Lockstep (D-033) verlangen bit-exakte, plattformstabile Bytes (feste Endianness Little-Endian, Floats als Rohbits). Nur ein eigenes Format macht das zum expliziten, testbaren Kontrakt statt zur Framework-Annahme.
-2. **D-035-Ausschluss:** JsonUtility ist eine UnityEngine-API und darf im Sim-Kern nicht verwendet werden – es scheidet strukturell aus, nicht nur qualitativ.
-3. **Abhängigkeitsdisziplin:** MessagePack-C# wäre technisch tragfähig (reines .NET), zieht aber eine Third-Party-Abhängigkeit in den Determinismus-kritischen Kern; der Wartungsvorteil ist bei flachen Structs (kein Objektgraph, GameState.md) klein. Als dokumentierter Fallback festgehalten (Analogie D-034-Fallback).
-4. **Debuggbarkeit** wird über einen separaten, nicht determinismuskritischen JSON-Export (System.Text.Json, nur Tooling/SimRunner, nie im Tick) gelöst – nicht über das Primärformat.
+Ein Snapshot enthält:
 
-## Serialisierungs-Skizze
+1. Datei-/Schema-Kennung 1.0,
+2. Payload-Länge,
+3. vollständigen Match-Fingerprint,
+4. geordnete State-Blöcke aus [GameState.md](GameState.md),
+5. Blocklängen und Blockhashes,
+6. Gesamt-State-Hash und
+7. Datei-Hash.
 
-```csharp
-namespace Nova.Simulation.Serialization
-{
-    // Binärer Kontrakt: Little-Endian, Feldreihenfolge = Schema, keine Selbstbeschreibung.
-    public interface ISimSerializable
-    {
-        void Write(SimBinaryWriter w, SchemaVersion v);
-        void Read (SimBinaryReader r, SchemaVersion v);   // v steuert Migrations-Lesen
-    }
+State-/Definitions-/File-/Replay-Chain verwenden XXH64 Seed 0 mit den
+ASCII-Präfixen `NOVA_STATE_V1`, `NOVA_DEFINITIONS_V1`, `NOVA_FILE_V1` und
+`NOVA_REPLAY_CHAIN_V1`, jeweils unmittelbar gefolgt von einem Nullbyte
+`0x00`. Hashbreite ist ausnahmslos `uint64`.
 
-    public static class WorldStateSerializer
-    {
-        public static byte[] Serialize(WorldState state);          // → identischer Hash bei Roundtrip
-        public static WorldState Deserialize(ReadOnlySpan<byte> data);
-        public static uint ComputeStateHash(WorldState state);     // xxHash32 über kanonische Bytes
-    }
+## 3. Fingerprint
 
-    // Debug-Export (außerhalb des Determinismus-Pfads, SimRunner/Editor-Tooling)
-    public static class WorldStateDebugDump { public static string ToJson(WorldState state); }
-}
-```
+Vor dem Payload-Parse werden verglichen:
 
-Regeln:
-- Floats werden als Rohbits (`BitConverter.SingleToInt32Bits`) geschrieben – kein Text, kein Runden.
-- Längen-Präfixe als `ushort`/`int` explizit; `BitArray` als gepackte `uint`-Blöcke mit Längenfeld.
-- Der Serializer ist die **einzige** Stelle, die Feldreihenfolge kennt – er ist damit automatisch die Migrations-Stelle.
+- alle State-/Command-/Payload-/Snapshot-/AI-Sidecar-Schemata,
+- `NumericModelId=Q16_16_V1`,
+- 10 Hz und `XorShift128PlusV1`,
+- `RulesHash64`, `DefinitionsHash64`, `MapHash64`,
+- MatchConfig, acht Slots mit zwei aktiven Belegungen, Seed und
+- Initial-State-Hash.
 
-## Schema-Versionierung
+Replay verlangt nach G1 exakte Gleichheit. Ein Save darf nur über eine explizit
+registrierte und getestete Migration abweichen.
 
-```csharp
-public readonly struct SchemaVersion { public readonly ushort Major; public readonly ushort Minor; }
-```
+## 4. Blockreihenfolge
 
-- Jede Datei (Savegame, Replay, Netzwerk-Snapshot) beginnt mit einem Header: Magic `"NOVA"`, `SchemaVersion`, `ContentKind` (Savegame/Replay/Snapshot), Erstell-Tick, `GameVersion` (Build), `DefinitionsHash` (Hash der GameDatabase-Version).
-- **Major** = brechende Strukturänderung des State (Feld hinzugefügt/entfernt/umtypisiert). **Minor** = rückwärtskompatible Ergänzung (neuer optionaler Block am Ende).
-- **Migrations-Strategie:** lineare Migratoren-Kette `v(n) → v(n+1)`; der Reader lädt in das älteste passende Schema und migriert schrittweise auf `Current`. Keine Sprung-Migrationen, keine Schema-Verzweigungen. Migratoren leben im Sim-Kern und sind durch Roundtrip-Tests je Version abgesichert (SimRunner-Fixtures, D-036).
-- **Definitions-Änderungen (Balance-Patches) sind keine Schema-Migration:** geänderte GameDatabase-Werte werden nicht migriert, sondern über `DefinitionsHash`-Vergleich als inkompatibel erkannt (Policy in [./Savegames.md](./Savegames.md)).
+Die Reihenfolge folgt exakt dem Root-Inventar:
 
-## Command-Log-Format (Replay = Seed + Command-Strom)
+1. Header/Fingerprint,
+2. PRNG,
+3. Allocator,
+4. Match/Teams/Players,
+5. Entities,
+6. Orders/Movement/Path,
+7. Combat/Projectiles,
+8. Economy/Energy/Aetherium,
+9. Construction/Production/Technology,
+10. FoW/Environment/Victory,
+11. pending Commands/Sequence/Dedupe/Results,
+12. Deferred Queues/Cachemetadaten.
 
-Grundlage: Research – bei befehlsgetriebener Simulation ist ein Replay = Map-Setup + Seed + zeitgestempelter Befehlsstrom (Kilobyte-klein, deterministisch abspielbar).
+Unbekannte Pflichtblöcke sind Fehler. Optionale Blöcke sind in Schema 1.0
+nicht vorgesehen.
 
-```csharp
-public struct ReplayHeader
-{
-    public SchemaVersion Version;
-    public string   GameVersion;      // Build-Nummer
-    public string   MapId;            // Map + Layout-Seed
-    public int      RandomSeed;       // WorldState.RandomSeed
-    public ReplayPlayer[] Players;    // Slot → Faction/Team/Commander (Meta, nicht im Hash)
-    public uint     DefinitionsHash;
-    public DateTime RecordedUtc;      // Meta
-}
+## 5. Größen- und Fehlergrenzen
 
-public struct CommandRecord              // 12–32 Byte je nach Payload
-{
-    public uint     Tick;              // Ziel-Tick (10 Hz, D-033)
-    public PlayerId Issuer;
-    public CommandType Type;           // Move, Attack, Build, Research, Harvest, …
-    public ushort   PayloadLength;
-    // Payload: typabhängige, ISimSerializable-Daten (IDs, Tiles, DefIds)
-}
+| Grenze | Wert |
+|---|---:|
+| unkomprimiertes MS-1-Ziel | ≤4 MiB |
+| Parser-Hardcap | 64 MiB |
+| Entity Count | ≤1.024 |
+| reservierte Slots | 8 |
+| aktive Slots | exakt 2 |
 
-public struct HashCheckpoint { public uint Tick; public uint StateHash; }
-```
+Falsche Länge, Hashfehler, Overflow, ungültiger Count, unbekanntes Schema oder
+Fingerprint-Mismatch werden vor State-Mutation abgelehnt. Deserialisierung
+erfolgt in einen temporären State; erst vollständiger Erfolg ersetzt den
+laufenden Host.
 
-- Datei = `ReplayHeader` + sequentieller `CommandRecord`-Strom + periodische `HashCheckpoint`s (Vorschlag: alle 100 Ticks = 10 s) für Desync-Lokalisierung und Schnellvorlauf.
-- Wiedergabe = Setup aus Header + Commands tickgenau einspielen; bei Checkpoint-Abweichung: Desync-Report (erster divergierender Tick/Entity, Pflicht-Tooling laut Research §3.6).
-- Das Format dient dreifach: Replays/Observer (Beta), Savegame-Grundlage, KI-Test-Fixtures und Desync-Debugging im SimRunner (D-036).
+## 6. Roundtrip und Fortsetzung
+
+G1-Pflichten:
+
+- `Serialize(Deserialize(bytes)) == bytes`;
+- jede Blockfeldmutation ändert Block- und Gesamt-Hash;
+- Restore und frischer Host setzen mindestens 1.000 Ticks mit gequeuten
+  Commands byte-/hashidentisch fort;
+- Windows x64 und macOS arm64 erzeugen über 10.000 Ticks identische
+  Checkpoints und finale Snapshotbytes;
+- Truncation, übergroße Längen, unbekannte Blöcke und Bitfehler werden
+  deterministisch abgelehnt.
+
+## 7. Kompatibilität
+
+Vor G1 erfolgt einmalig ein vollständiger Formatreset. Prototyp-Saves,
+-Replays, -Pakete und -Fixtures werden nicht migriert. Kanonische Schemata
+beginnen bei 1.0.
+
+Nach G1:
+
+- Replay: keine Migration, exakter Fingerprint;
+- Savegame: nur explizite `from → to`-Migration;
+- jede Migration besitzt Golden Input/Output, Fehler- und
+  Fortsetzungstests;
+- keine stillen Defaultfelder oder Best-Effort-Ladevorgänge.
 
 ## Offene Punkte
 
-- **Kompression:** LZ4/Deflate über Snapshot- und Replay-Payload noch nicht entschieden; Snapshots sind unkomprimiert bereits klein, Langzeit-Replays (35 min × N Commands) und Reconnect-Snapshots (Beta) könnten Kompression rechtfertigen. Entscheidung mit ersten Größenmessungen in Sprint 7.
-- **MessagePack-C# als Fallback:** Falls der Pflegeaufwand der handgeschriebenen Serializer bei wachsendem State unverhältnismäßig wird, ist MessagePack-C# der dokumentierte Ersatzkandidat – erfordert dann erneute Determinismus-Validierung (Phase-0-Spike-Methodik, ARM↔x86).
-- **Hash-Algorithmus:** xxHash32 vorgeschlagen (schnell, ausreichend für Desync-Erkennung); kryptografische Stärke ist nicht gefordert, aber Kollisionsresistenz bei 500-Entity-State ungeprüft – Messung im SimRunner.
-- **Endianness ARM↔x86:** Little-Endian als Kontrakt festgelegt; Big-Endian-Hosts werden derzeit nicht unterstützt (Win/macOS primär, D-006) – Bestätigung im Phase-0-Determinismus-Spike.
-- **CommandRecord-Payload-Größenobergrenze:** Offen, ob variable Payloads oder feste 32-Byte-Records (einfacherer Parser, etwas größer); nach Command-Inventar aus GDD entscheiden.
+- Kompression ist eine äußere Storage-Optimierung und wird erst nach Messung
+  entschieden; kanonische unkomprimierte Bytes bleiben führend.
 
 ## Nächste Schritte
 
-- Sprint 7: `SimBinaryWriter/Reader` + Serializer für `WorldState`-Kern implementieren; Roundtrip- und Hash-Tests in den SimRunner-CI-Lauf aufnehmen (D-036).
-- Größenmessung: Referenz-Snapshot (500 Entities, L-Karte) serialisieren und Zahlen für Größe/Schreibdauer hier dokumentieren (Version 0.2).
-- Hash-Checkpoint-Intervall mit Networking.md (Lockstep-Bandbreite) abstimmen.
+1. Golden Bytes und Blockhash-Tests in G1 erstellen.
+2. Parser-Fuzz-/Grenztests gegen 64-MiB-Hardcap ausführen.
+3. Serializerquellen zwischen Unity und SimRunner identisch halten.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Technical Director |
+| 1.0.0 | 2026-07-24 | Kanonische Little-Endian-Blockserialisierung, XXH64-Domänen, Fingerprint, Limits und Kompatibilitätsreset D-057/D-058 festgelegt | Lead Technical Director |
+| 1.1.0 | 2026-07-24 | Versions-/Count-Breiten und nullterminierte Hashdomänen bytegenau festgelegt | Lead Technical Director |

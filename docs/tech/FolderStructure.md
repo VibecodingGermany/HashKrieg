@@ -1,152 +1,127 @@
-# Folder Structure – Verbindliche Unity-Projektstruktur
+# Ordner- und Projektstruktur
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 3–4
+**Version:** 1.2.0 | **Status:** verbindliches G0-A/G0-B-Ziel – noch nicht nachgewiesen | **Verantwortungsbereich:** Lead Technical Director / Lead DevOps Engineer | **Sprint:** 7
 
 ## Zweck
 
-Dieses Dokument legt die verbindliche Verzeichnis- und Assembly-Struktur des Unity-Projekts fest. Es konkretisiert den TPD-§10-Vorschlag und die Assembly-Empfehlung aus dem Sprint-1-Research (Unity_BestPractices.md §4) unter den Bedingungen von D-033–D-036: Unity-freier Simulationskern (`Nova.Simulation`), Assembly-Trennung mit erzwungener Referenzrichtung, getrennter Third-Party-Bereich, SO-Registry-Ordner und der headless Konsolen-Runner `Nova.SimRunner` (D-036). Verbindlich für alle Implementierungs-Sprints ab Sprint 7; Abweichungen nur per ADR/Eintrag im DecisionLog.
+Definiert die Zielorte und Ownership-Grenzen für G0. Vorhandene Verzeichnisse
+gelten bis zum Architekturcheck als Prototyp, nicht als bestandene Struktur.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (Unity 6.3 LTS + URP), D-033 (Sim/View-Trennung, 5 Regeln), D-034 (Pathfinding Grid/Jobs), D-035 (OOP+SO-Gerüst, Unity-freie `Nova.Simulation`), D-036 (`Nova.SimRunner`), D-043 (kanonische Assembly-Topologie inkl. `Nova.AI`/`Nova.AI.Data`), D-045 (Managed-first), D-049 (GameDatabase-Sharding)
-- [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md) – §4 (Assembly Definitions), §3 (SO-Datenmodell)
-- [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – §7 (Architekturregeln)
-- [../../RTS_Technisches_Planungsdokument.md](../../RTS_Technisches_Planungsdokument.md) – §10 (Ausgangsstruktur), §11 (datengetrieben)
-- [./CodingGuidelines.md](./CodingGuidelines.md) – Layer-Regeln, die diese Struktur durchsetzt
-- [./NamingConvention.md](./NamingConvention.md) – Namespaces, die der Ordnerstruktur entsprechen
-- [./Testing.md](./Testing.md) – CI-/Test-Integration (SimRunner, EditMode-Tests)
+- [Architecture.md](Architecture.md) und
+  [DependencyGraph.md](DependencyGraph.md)
+- [Deployment.md](Deployment.md)
+- [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-043,
+  D-057, D-059, D-061, D-062, D-063 und D-064
 
-## 1. Repository-Grundstruktur
-
-Der Repository-Root **ist** gleichzeitig die Unity-Projekt-Wurzel. Dadurch liegen `docs/` und `tools/` als normale Geschwister neben `Assets/`, ohne vom Unity-Import erfasst zu werden.
+## 1. Zielbaum
 
 ```text
-<Repo-Root>/
-├── Assets/                  # Unity-Projektinhalt (siehe §2)
-├── Packages/                # manifest.json, packages-lock.json (URP, Burst, Jobs, Test Framework)
-├── ProjectSettings/         # Unity-Projektsettings (Unity-Version gepinnt, D-006)
-├── tools/
-│   └── Nova.SimRunner/      # .NET-Konsolen-App, headless KI-vs-KI (D-036, siehe §6)
-├── docs/                    # Projektwiki (bestehend, unverändert)
-└── ci/                      # Build-/CI-Skripte (BuildPipeline-API, GitHub Actions; vgl. Research §9)
-```
-
-## 2. Assets-Struktur
-
-Erstanbieter-Code und -Content liegen vollständig unter `Assets/_Project/` (führender Unterstrich sortiert den Ordner im Project-Window nach oben und grenzt ihn sichtbar von `ThirdParty/` ab). Gekaufte Assets werden ausschließlich unverändert unter `Assets/ThirdParty/` abgelegt (TPD §7.1).
-
-```text
-Assets/
-├── _Project/
-│   ├── Art/                         # Modelle, Texturen, Materialien, VFX, Shader Graphs
-│   │   ├── Characters/  Vehicles/  Buildings/  Environment/  Resources/  VFX/  UI/
-│   │   └── Materials/  Textures/  Shaders/
-│   ├── Audio/
-│   │   ├── Music/  SFX/  UI/  Voice/
-│   ├── Data/                        # SO-Assets (Definitionsdaten) + Sub-Registries (§4, D-049)
-│   │   ├── Registries/              # Sub-Registry-Assets pro Kategorie + generierter Master-Index
-│   │   │   ├── UnitRegistry.asset  BuildingRegistry.asset  WeaponRegistry.asset  TechRegistry.asset
-│   │   │   ├── FactionRegistry.asset  MapRegistry.asset  BiomeRegistry.asset  AiRegistry.asset
-│   │   │   └── GameDatabaseMaster.asset   # GENERIERT durch Nova.Editor, nie händisch editieren
-│   │   ├── Units/  Buildings/  Weapons/  Tech/  Factions/  AI/  Maps/  Biomes/
-│   ├── Prefabs/
-│   │   ├── Units/  Buildings/  Projectiles/  Environment/  UI/
-│   ├── Scenes/
-│   │   ├── Boot/  Menu/  Gameplay/  Test/
-│   ├── Scripts/                     # Laufzeit-Code, eine Assembly pro Ordner (§3)
-│   │   ├── Core/                    # → Nova.Core.asmdef
-│   │   ├── Data/                    # → Nova.Data.asmdef (SO-Schemas)
-│   │   ├── Simulation/              # → Nova.Simulation.asmdef (Unity-frei)
-│   │   │   ├── Commands/  State/  Definitions/
-│   │   │   └── Systems/  Economy/  Combat/  Movement/  Pathfinding/  FogOfWar/
-│   │   ├── Simulation.Burst/        # → Nova.Simulation.Burst.asmdef (Jobs/Burst-Varianten, nur hinter Feature-Flag, D-045)
-│   │   ├── AI/                      # → Nova.AI.asmdef (Unity-frei, KI-Entscheidungslogik; D-043)
-│   │   │   ├── Strategy/  Tactics/  Squads/
-│   │   ├── AI.Data/                 # → Nova.AI.Data.asmdef (KI-SO-Schemas; D-043)
-│   │   ├── Gameplay/                # → Nova.Gameplay.asmdef (MonoBehaviours, Sim-Brücke)
-│   │   │   ├── Match/  Commands/  Spawning/  Pools/
-│   │   └── Presentation/            # → Nova.Presentation.asmdef (View, VFX, Audio, UI)
-│   │       ├── Rendering/  Units/  UI/  Audio/  Camera/
-│   ├── Editor/                      # → Nova.Editor.asmdef (EINZIGER Editor-Ordner, §5)
-│   │   ├── Inspectors/  Validators/  DataTools/
-│   └── Settings/                    # URP Pipeline Assets, Renderer, Quality-/Graphics-Profiles
-├── ThirdParty/                      # gekaufte Pakete, 1 Unterordner pro Paket, read-only
-└── Tests/                           # Unity Test Framework (§5)
+Assets/_Project/
+├── Scripts/
+│   ├── Core/             Nova.Core
+│   ├── Simulation/       Nova.Simulation
+│   ├── AI/               Nova.AI
+│   ├── AI.Data/          AI-Authoring
+│   ├── Data/             Definitions-SOs/Registries
+│   ├── Gameplay/         MatchSession/Ingress/Composition
+│   ├── Presentation/     World View/Camera/Rendering
+│   └── UI/               HUD/Settings/Persistence UI
+└── Tests/
     ├── EditMode/
-    │   ├── Simulation/              # → Nova.Simulation.Tests.asmdef
-    │   └── Gameplay/                # → Nova.Gameplay.Tests.asmdef
-    └── PlayMode/                    # → Nova.PlayMode.Tests.asmdef
+    └── PlayMode/
+
+tools/
+└── Nova.SimRunner/       versioniertes .NET-Projekt
+
+quality/
+├── content/
+├── scenarios/
+├── schemas/              Schema 1.2 integritäts-only; Schema 1.3 ist G0-A-Ziel
+├── scripts/              Schema-, Semantik- und fail-closed Gate-Prüfungen
+├── package.json          gepinnte Quality-Toolchain
+├── package-lock.json     reproduzierbarer Dependency-Lock
+└── evidence/             nur reale append-only Versuche
 ```
 
-Regeln:
+`quality/evidence/` wird nicht als leeres Gerüst angelegt.
+Das Trusted-Tool-Bundle wird vom geschützten Authorize-Job aus einem
+separaten Checkout bezogen und ist kein vom geprüften Subject aufgelöster
+zweiter In-Tree-Pfad.
 
-1. **Keine Quelldateien außerhalb der genannten Ordner** – insbesondere keine Skripte in `ThirdParty/`, `Art/`, `Prefabs/` oder Szenenordnern.
-2. **Kein `Resources/`-Ordner** – Definitionsdaten werden per direktem Asset-Link referenziert, nicht per `Resources.Load`/Pfad-Strings (Research §3).
-3. `ThirdParty/` wird nie editiert; Anpassungen an gekauften Assets erfolgen über eigene Prefab-Varianten/Materialien in `_Project/`.
-4. Ordner werden nur mit Inhalt angelegt (keine leeren Struktur-Leichen, analog D-004).
+## 2. Quellenvertrag
 
-## 3. Assembly-Definitionen und Referenzrichtung
+Core/Simulation/AI werden so projektgebunden, dass Unity und SimRunner dieselben
+Quelldateien und determinismusrelevanten Defines kompilieren. Unzulässig sind:
 
-| Assembly | Pfad | Engine-Referenzen | Referenziert | Inhalt |
-|---|---|---|---|---|
-| `Nova.Core` | `Scripts/Core/` | **keine** (`noEngineReferences`) | – | Basistypen (`EntityId`, `Tick`), `INovaLogger`, Result-Typen, Pools/Puffer |
-| `Nova.Simulation` | `Scripts/Simulation/` | **keine** (`noEngineReferences`) | `Nova.Core` | Commands, State-Structs, Sim-Definitionen, ISimSystem, Sim-Logik (D-033/D-035) |
-| `Nova.Simulation.Burst` | `Scripts/Simulation.Burst/` | Unity.Collections, Unity.Burst, Unity.Jobs, Unity.Mathematics | `Nova.Core`, `Nova.Simulation` | Burst/Jobs-Varianten der Hotspots (Pathfinding, FoW, Sicht; D-034/D-035) – nur hinter Feature-Flag, Managed ist Auslieferungspfad (D-045) |
-| `Nova.AI` | `Scripts/AI/` | **keine** (`noEngineReferences`) | `Nova.Core`, `Nova.Simulation` | KI-Entscheidungslogik (Strategie/Taktik/Squads), Blackboard, Plan-/BT-Laufzeit; Client der Sim über Commands + gefilterte Sicht (D-043) |
-| `Nova.AI.Data` | `Scripts/AI.Data/` | UnityEngine | `Nova.Core` | KI-SO-Schemas (`DifficultyProfileSO` u. a.), Überführung in Unity-freie Records beim Match-Setup (D-043) |
-| `Nova.Data` | `Scripts/Data/` | UnityEngine | `Nova.Core` | SO-Schemas, Sub-Registry-SOs, `GameDatabaseMasterSO` (Definitions-only, D-049) |
-| `Nova.Gameplay` | `Scripts/Gameplay/` | UnityEngine + Collections/Burst | Core, Simulation, Simulation.Burst, Data | MonoBehaviours, Match-Runner, SO→Sim-Überführung, Pools |
-| `Nova.Presentation` | `Scripts/Presentation/` | UnityEngine, URP, UI Toolkit | Core, Gameplay | View-Layer, Render Features, Audio, UI |
-| `Nova.Editor` | `Editor/` | UnityEngine + UnityEditor | Core, Data, Gameplay | Custom Inspectors, SO-Validatoren, Datenbank-Tools |
-| `Nova.*.Tests` | `Tests/` | Test Framework | nur die getesteten Assemblies | EditMode-/PlayMode-Tests |
+- kopierte Source-Bäume unter `tools/`,
+- separate Command-/State-/Serializer-/PRNG-/Hash-Implementierungen,
+- generierte Quellen ohne versionierten Generator und Golden Output,
+- Unity-Abhängigkeiten im SimRunner-Transitivgraphen.
 
-**Referenzgesetze:**
+## 3. Assembly-Dateien
 
-- Referenzrichtung strikt: `Presentation → Gameplay → Simulation → Core` und `Gameplay → Data → Core`. Rückwärtsreferenzen sind durch die asmdef-Konfiguration **unmöglich** zu machen, nicht nur konventionell verboten.
-- `Nova.Simulation` und `Nova.Core` werden mit `noEngineReferences = true` konfiguriert – ein `using UnityEngine;` im Sim-Pfad ist damit ein **Kompilierfehler** (Durchsetzung von D-033 Regel 2 per Werkzeug statt per Disziplin).
-- `Nova.Simulation` kennt `Nova.Data` nicht: SOs sind Unity-typisiert. Die Überführung der Definitionsdaten in Unity-freie Sim-Definitionen (immutable Snapshots beim Match-Start) ist Aufgabe von `Nova.Gameplay` (Detaildesign in GameState.md).
-- `Nova.AI` ist Unity-frei (`noEngineReferences`) und referenziert nur `Nova.Core` und `Nova.Simulation`: Die KI ist ein Client der Simulation (Commands über `ICommandSink` hinein, gefilterte Sicht `IAiWorldView` heraus) und läuft unverändert im SimRunner (D-036/D-043). `Nova.AI.Data` steht neben `Nova.Data`; die Überführung KI-SO → Unity-freie Records erfolgt beim Match-Setup durch `Nova.Gameplay`.
-- `Nova.Simulation.Burst` ist die einzige Assembly mit Burst/Jobs-Abhängigkeiten nahe am Sim-Kern; sie ist kein Auslieferungspfad, sondern existiert nur hinter Feature-Flag (Managed-first, D-045; Paritäts-Regel in [./CodingGuidelines.md](./CodingGuidelines.md) §3).
+Jede produktive Schicht besitzt genau eine klar benannte asmdef je
+Verantwortungsbereich. Tests referenzieren Produktassemblies, nicht
+umgekehrt. `Nova.Simulation.Burst` darf als reservierte Assembly existieren,
+ist für MS-1 aber deaktiviert und keine Produktdependency.
 
-## 4. SO-Registry-Ordner (`Data/`)
+## 4. Definitionen
 
-- Alle Definitions-SOs liegen unter `_Project/Data/<Typ>/`, gruppiert nach Fraktion (`Units/Allianz/UNIT_Allianz_Rifleman.asset`, Dateikonvention siehe [./NamingConvention.md](./NamingConvention.md)).
-- **Registry-Sharding (D-049.3):** Es gibt **kein** einzelnes Registry-Asset mehr. Pro Kategorie existiert ein Sub-Registry-Asset unter `_Project/Data/Registries/` – `UnitRegistry`, `BuildingRegistry`, `WeaponRegistry`, `TechRegistry`, `FactionRegistry`, `MapRegistry`, `BiomeRegistry`, `AiRegistry` – das seine Definitionen per stabiler ID indiziert (Datenbank-Pattern, Research §3 – Pflicht ab ~150+ Definitionen).
-- Der **Master-Index `GameDatabaseMaster.asset`** aggregiert die acht Sub-Registries und wird **von `Nova.Editor` generiert** (Generator läuft bei Datenänderung im Editor und in der CI als Aktualitäts-Check). Er wird nie händisch editiert und ist im Asset wie im Schema als generiert markiert.
-- **Begründung (D-049, Review Wartbarkeit F-05):** Ein Single-File-Registry-Asset ist der Merge-Konflikt-Magnet der parallelen Agenten-/Worktree-Arbeit (TPD §12): Jede Definitions-Ergänzung – egal welcher Kategorie – würde dieselbe Datei anfassen. Kategorienweise Sub-Registries kollidieren nur bei echter Fachüberschneidung; der generierte Master-Index ist deterministisch reproduzierbar und damit konfliktfrei.
-- Laufzeit-Zugriff erfolgt ausschließlich über Master-Index bzw. Sub-Registries, nicht über Szenen-Suchlauf.
-- Laufzeit-Status wird **nie** in diesen Assets gespeichert (Definitions-only, D-035; Durchsetzung in CodingGuidelines §4).
+Statische Definitionsassets sind nach Kategorie geshardet. Ein deterministisch
+generierter/validierter Masterindex erzeugt den kanonischen
+`DefinitionSnapshot`. Runtime-State gehört nie in SOs oder Registry-Assets.
 
-## 5. Editor vs. Runtime vs. Tests
+## 5. Generierter Output
 
-- **Runtime-Code:** ausschließlich unter `Scripts/` (Assembly-Trennung §3). Keine `#if UNITY_EDITOR`-Blöcke für substanzielle Logik – Editor-Funktionalität gehört in `Nova.Editor`.
-- **Editor-Code:** ausschließlich unter `_Project/Editor/` mit `Nova.Editor.asmdef` (Include Platforms: Editor). Eine einzige Editor-Assembly statt verstreuter `Editor/`-Unterordner pro Modul – hält die Kompilierzeiten flach und die Grenze sichtbar.
-- **Tests:** getrennt unter `Assets/Tests/`, gespiegelt nach Layer. `Nova.Simulation.Tests` referenziert nur `Nova.Simulation` + `Nova.Core` und läuft als EditMode-Suite ohne Szene – dieselbe Suite ist die Referenz für den SimRunner (§6). Für `Nova.AI` gilt analog: EditMode-Tests ohne Szene, da die Assembly Unity-frei ist (D-043). Test-Assemblies referenzieren niemals `Presentation` oder `Editor`.
+Nicht tracken:
 
-## 6. Nova.SimRunner (`tools/`, D-036)
+- `Library/`, `Temp/`, `Logs/`, `Build/`, `Builds/`,
+- `bin/`, `obj/`, TestResults und Coverage-Ausgaben,
+- Player-/Profiler-/Benchmark-Binaries,
+- lokale Evidence-Entwürfe oder Dirty-Run-Artefakte.
 
-- `tools/Nova.SimRunner/` ist eine eigenständige .NET-Lösung **außerhalb** von `Assets/` (Unity importiert sie nicht, CI baut sie mit `dotnet build`).
-- `Nova.Simulation.csproj` in `tools/` kompiliert **dieselben Quelldateien** wie `Assets/_Project/Scripts/Simulation/` per `<Compile Include="..\..\..\Assets\_Project\Scripts\**\*.cs" Link="..." />` (Core, Simulation **und AI**, nicht Simulation.Burst – der Runner muss die KI laden können, D-043). Es gibt genau eine Quelle der Wahrheit; die Doppel-Projektion (asmdef + csproj) ist der vereinbarte Mechanismus.
-- Möglich ist das nur, weil `Nova.Simulation`/`Nova.Core`/`Nova.AI` `noEngineReferences` haben – die Ordnerstruktur erzwingt also direkt die D-036-Voraussetzung.
-- Ausgaben (Match-Result-Datensätze, Replay-/Seed-Fixtures) werden unter `tools/Nova.SimRunner/out/` geschrieben und sind nicht Teil des Unity-Projekts.
+G0 prüft getrackte Dateien und scheitert bei generierten Binaries.
 
-## 7. Verhältnis zum TPD-§10-Vorschlag
+## 6. G0-Nachweis
 
-Übernommen: Art/Audio/Prefabs/Scenes-Einteilung, `ScriptableObjects`-Konzept (als `Data/`), `ThirdParty/`. Geändert: (a) First-Party unter `_Project/` gruppiert; (b) `Scripts/` nach **Assemblies/Schichten** statt nach Fachdomänen (`Units/`, `Combat/` …) gegliedert – Fachdomänen leben als Unterordner innerhalb der Schicht, weil die Schichtgrenze (D-033/D-035) die härtere Anforderung ist; (c) Assembly-Definitions-, Tests-, Editor- und SimRunner-Struktur ergänzt; (d) `Resources/`-Mechanik entfernt.
+Der Architecture Check validiert:
+
+- Verzeichnis→Assembly-Ownership,
+- erlaubte Referenzen,
+- Source-Parität Unity/SimRunner,
+- Paket-/Define-Parität,
+- keine generierten Binaries,
+- Negative Control gegen eine verbotene Kante,
+- ein kanonisches Prüfergebnis je G0-Kriterium einschließlich gebundener
+  stdout-, stderr- und Check-Artefakte,
+- nach G0-A eine geschützte CI-Attestierung und einen unabhängigen
+  Reviewer-Nachweis gemäß Schema 1.3,
+- die vollständige geordnete `authorizedEvidence`-Kette sowie
+  `environmentId`-Bindung von Command und Performance-Messung und
+- getrennte Windows-x64-Referenz- und Mac-M2-Funktionsmethoden.
+
+Schema 1.2 kann diese Struktur nur auf Integrität prüfen. Jeder Pass-Versuch
+bleibt mit `E_AUTHORIZATION_BOOTSTRAP` gesperrt. Die G0-A-Bundle-Änderung wird
+ohne Gate-Fortschritt gemergt; erst ein nachfolgender sauberer Subject-Commit
+darf G0-B und damit G0 nachweisen.
 
 ## Offene Punkte
 
-- **Burst/Managed-Doppelstruktur:** Durch D-045 weitgehend entschieden – Managed ist bis zur Fixed-Point-Beta der einzige Auslieferungspfad; `Nova.Simulation.Burst` existiert nur hinter Feature-Flag (Toleranz-Parität ≤1e-4, alarmierend statt blockierend). Offen bleibt nur, welche Burst-Hotspots nach den Phase-0-Messungen (D-034/D-044) überhaupt entwickelt werden.
-- **Repo-Root = Unity-Root:** Falls die spätere Backend-/Server-Entwicklung (TPD §9, ab Beta) ein eigenes Repo oder Monorepo-Layout erfordert, ist diese Grundstruktur erneut zu prüfen.
-- **Odin Inspector o. ä.** für die SO-Datenbank wurde nicht bewertet (Budget-Frage, Research-Offener-Punkt) – bei Zukauf ändert sich nur `ThirdParty/`, nicht diese Struktur.
-- **Addressables** (Content-Updates ab Phase 2) sind unentschieden (TPD §16) und würden einen eigenen Content-Ordner erfordern.
+- Trusted-Tool-Checkout, Schema 1.3 und der kanonische `run_gate_check.py`
+  werden als gemeinsames Trust-Bundle in G0-A implementiert. Die exakten
+  `.csproj`-/Source-Include-Mechanismen folgen in G0-B und werden versioniert.
 
 ## Nächste Schritte
 
-1. Konsistenzreview mit Architecture.md, Testing.md und GameState.md (Schnittstelle SO→Sim-Definitionen).
-2. Sprint 7: Struktur beim Projekt-Setup anlegen, asmdefs mit Referenzmatrix und `noEngineReferences` konfigurieren (inkl. `Nova.AI`/`Nova.AI.Data`, D-043), Leerprojekt + Hello-Tick gegen CI verifizieren.
-3. Sprint 7: Sub-Registry-Assets pro Kategorie anlegen und den Master-Index-Generator in `Nova.Editor` umsetzen (inkl. CI-Aktualitäts-Check, D-049).
-4. `Nova.SimRunner`-Skeleton (csproj-Linking inkl. `Nova.AI`) mit einem minimalen Tick-Lauf aufsetzen (D-036, Pflicht in Sprint 7).
+1. G0-A Trusted-Tool-Bundle einschließlich Gate-Runner ohne Gate-Fortschritt
+   implementieren und mergen.
+2. Vorhandene Prototypstruktur gegen diesen Zielbaum inventarisieren.
+3. Kleinste G0-B-Korrektur ohne Gameplayänderung implementieren.
+4. Gate-Runner, Clean Builds/Tests und Negative Controls erst am
+   nachfolgenden sauberen Subject in Schema-1.3-Evidence festhalten.
 
 ## Änderungsverlauf
 
@@ -154,3 +129,7 @@ Regeln:
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Technical Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Nova.AI/Nova.AI.Data in Baum & Assembly-Matrix (D-043), GameDatabase-Sharding mit Sub-Registries + generiertem Master-Index (D-049), Managed-first/Feature-Flag-Vermerke (D-045), SimRunner lädt Nova.AI | Lead Technical Director |
+| 1.0.0 | 2026-07-24 | Ordnerstruktur als G0-Ziel mit Source-Parität, Quality-Verträgen und Binary-Hygiene rebaselined | Lead Technical Director / Lead DevOps Engineer |
+| 1.0.1 | 2026-07-24 | Versionierte Quality-Skripte im G0-Zielbaum ergänzt | Lead Technical Director / Lead DevOps Engineer |
+| 1.1.0 | 2026-07-24 | Quality-Toolchain, kanonische Prüfartefakte und geschützte Evidence-Autorisierung nach D-063 ergänzt | Lead Technical Director / Lead DevOps Engineer |
+| 1.2.0 | 2026-07-24 | D-064-Trennung von subject-unabhängigem G0-A-Trust-Bundle und nachfolgendem G0-B-Subject in der Zielstruktur verankert | Lead Technical Director / Lead DevOps Engineer |

@@ -1,181 +1,256 @@
-# Testing-Strategie
+# Teststrategie
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 4
+**Version:** 1.4.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
-Definiert die Test-Strategie von Project Nova: Test-Pyramide, Determinismus- und Golden-Master-Tests auf dem Unity-freien Sim-Kern, KI-vs-KI-Nachtläufe im SimRunner, Desync-Test-Strategie (ab Beta), Coverage-Ziele, Testdaten-Disziplin, CI-Pipeline und den Bug-/Regressionsprozess. Verbindlich für alle Code-Beiträge ab Sprint 7 (Implementierung). Ziel: Die Architekturregeln aus D-033 (Determinismus-Fähigkeit, Command-only-Mutation, Sim/View-Trennung) werden nicht nur gebaut, sondern dauerhaft automatisiert bewacht.
+Definiert Testpyramide, Coverage, Matchkadenz, Gate-Evidence und
+Fehlerdenominator. Die Anforderungen beschreiben den zu bauenden
+`quality-gate`; aktuell existiert nur `docs-check`, G0 ist offen.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-006 (Unity 6.3 LTS), D-033 (Sim-/MP-Modell, 5 Regeln), D-034 (Pathfinding), D-035 (OOP + Burst, `Nova.Simulation`), D-036 (`Nova.SimRunner`), D-044 (Pflicht-Gate V5: Combat-/KI-Kostenmodell), D-045 (Managed als einziger Auslieferungs-/CI-Messpfad bis Fixed-Point-Beta), D-049 (CI-Realismus: Nightly-Umfang, Sharding, xxHash64, ≤60 s/Match), D-050 (Branching: main + Feature-Branches bis Sprint 6, develop ab Sprint 7)
-- [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Lockstep-/Desync-Grundlagen
-- [../research/KI_Architektur.md](../research/KI_Architektur.md) – KI-Schichten, DifficultyProfileSO
-- [../gamedesign/Balancing.md](../gamedesign/Balancing.md) – Messpipeline Stufe 1/2 (Metriken, Kadenz, Wertesets)
-- [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) – `MatchResult`-Kennzahlen
-- [./Deployment.md](./Deployment.md) – CI-/Build-Infrastruktur, Runner
+- [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-057 bis
+  D-064
+- [SimulationCore.md](SimulationCore.md), [Commands.md](Commands.md) und
+  [FogOfWar.md](FogOfWar.md)
+- [PerformanceBudget.md](PerformanceBudget.md)
+- [`../../quality/scenarios/mvp-v1.json`](../../quality/scenarios/mvp-v1.json)
+- [`../../quality/schemas/GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
+- [`../../quality/scripts/validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
+- [`../../quality/package-lock.json`](../../quality/package-lock.json) –
+  gepinntes Ajv Draft 2020-12
 
-## Test-Pyramide
+## 1. Ebenen
 
-| Ebene | Werkzeug | Laufumgebung | Umfang-Ziel | Kadenz |
-|---|---|---|---|---|
-| 1. Sim-Unit-Tests | NUnit (Unity Test Framework, EditMode) | `Nova.Simulation`-Assembly, kein Unity nötig | größte Testmasse (~60–70 % aller Tests) | bei jedem Commit/PR |
-| 2. Sim-Integrationstests | NUnit EditMode über `Nova.SimRunner`-Host | headless, vollständige Matches (beschleunigt) | Kernloop, Ökonomie, Kampf, Sieg/Niederlage | PR + Nightly |
-| 3. Golden-Master-Replay-Tests | Replay-Fixtures (Seed + Command-Log → State-Hash) | headless | kuratierte Szenarien-Matrix | PR (Pflicht) |
-| 4. PlayMode-UI-Tests | Unity Test Framework, PlayMode | Editor/Player, sparsam | nur kritische UI-Flüsse | Nightly |
-| 5. Performance-Regressionstests | Profiler-gestützte Mess-Szenen + Sim-Benchmarks | self-hosted Runner | wenige Budget-Tests | Nightly |
+| Ebene | Schwerpunkt |
+|---|---|
+| Unit | SimFixed, PRNG, IDs, Payloads, Moduleinvarianten |
+| Contract | Golden Bytes, Hashdomänen, Fingerprint, Parser, asmdef-Grenzen |
+| Integration | MatchSession→Ingress→Kernel→Snapshots, Save/Load, AI-Sidecar |
+| Metamorphic | Hidden World, Umordnung/Dedupe, Restore/Fresh Host |
+| Scenario | V1–V5b, MVP_FULL_100, Headless Matches |
+| Manual | G4-Usability, G5-UI-only-Matches und neue Task-Tester |
 
-Begründung der Verteilung: Der fachliche Kern liegt in `Nova.Simulation` (D-035) und ist ohne Unity testbar (D-033 Regel 2, D-036). View- und UI-Code trägt wenig Regel-Logik; PlayMode-Tests sind langsam und flaky-anfällig, daher bewusst sparsam (nur: Match-Start-Flow, Bau-Menü, Ergebnis-Screen, Savegame-Laden).
+Tests verwenden produktive Quellen und denselben Managed-Pfad wie MS-1.
+Test-only-Direktmutation ist nur in expliziten Buildern vor Matchstart erlaubt.
 
-### Ebene 1: Sim-Unit-Tests (EditMode)
+## 2. G0-Baseline
 
-- Testen reine Sim-Logik: Command-Verarbeitung, Ökonomie (Harvester-Zyklen, Lager-Kapazität, Überernte), Schadens-/Rüstungssystem, FoW-Bitmask-Logik, Flow-Field-Aufbau, PRNG-Sequenzen.
-- Keine UnityEngine-APIs im Sim-Pfad (D-033 Regel 2) heißt: Diese Tests laufen als plain .NET/NUnit und können zusätzlich außerhalb von Unity ausgeführt werden (siehe CI).
-- Jede Command-Art (D-033 Regel 1) erhält mindestens einen Test: Ausführung, Validierung/Ablehnung, Undo-freie Zustandsänderung.
+### G0-A – Trusted-Gate-Bootstrap
 
-### Ebene 2: Sim-Integrationstests
+Schema 1.2 prüft nur Struktur und Semantik. Jeder Pass-Versuch endet aktuell
+zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`. G0-A implementiert Schema 1.3,
+den subject-unabhängigen Trusted-Tool-Checkout, die vollständige geordnete
+`authorizedEvidence`-Kette und die `environmentId`-Bindung. Die Bootstrap-
+Änderung wird ohne Gate-Fortschritt geschützt gemergt und darf sich nicht
+selbst autorisieren. Erst ein nachfolgender sauberer Subject-Commit darf den
+neuen Trustpfad für G0-B verwenden.
 
-- Vollständige Matches headless über denselben Host wie der `Nova.SimRunner` (D-036): zwei KI-Instanzen (Mittel-Schwierigkeit, unverrauscht – Balancing.md), fester Seed, beschleunigter Tick.
-- Prüfen fachliche Invarianten über ganze Matches: kein negatives AE-Konto, Elite-Limits (D-015), Superwaffen-Limit (D-023), Vernichtungs-Regel (D-031.4/D-032.2), Match-Terminierung spätestens bei Zeitlimit.
-- Ziel-Laufzeit pro Match-Test **≤ 60 s (Managed-Pfad, D-049)** – Sim ohne Rendering. Die frühere Vorgabe „< 10 s" war rechnerisch nicht einlösbar; 60 s/Match hält die Suite bei Sharding PR-tauglich.
+### G0-B – Plattformbasis
 
-### Ebene 3: Golden-Master-Replay-Tests (Determinismus-Wächter)
+G0-B implementiert und belegt:
 
-Kernidee (D-033 Regeln 1, 4, 5): Aus `(MapId, Seed, Command-Log)` muss jederzeit exakt derselbe State-Verlauf reproduzierbar sein. Der Test spielt ein aufgezeichnetes Command-Log ab und vergleicht den kanonischen State-Hash an definierten Tick-Marken.
+- exakte Unity-, .NET- und Paketpins,
+- Windows-x64-/macOS-arm64-Clean-Build,
+- .NET- und EditMode-Suiten,
+- asmdef-/Architekturcheck,
+- Architektur-Negative-Control, die bei absichtlicher verbotener Kante
+  fehlschlägt,
+- Schema- plus Semantikvalidator und dessen generierte Negativkontrollen,
+- Prüfung auf getrackte generierte Binärdateien.
 
-```csharp
-namespace Nova.Simulation.Testing
-{
-    // Kanonische, serialisierbare Momentaufnahme (D-033 Regel 5).
-    public interface IStateHasher
-    {
-        // Stabiler Hash über den vollständigen Sim-State (nicht über View-Daten).
-        StateHash ComputeHash(in SimState state);
-    }
+Ein roter Test wird nicht durch Filter, Ignore oder Quarantäne grün gerechnet.
 
-    // Versionierte Replay-Fixture als Testdaten-Artefakt (JSON im Repo).
-    public sealed record ReplayFixture(
-        string FixtureId,        // z. B. "eco-harvest-3player-v1"
-        int    DataVersion,      // Schema-Version des Command-Logs
-        string MapId,
-        int    Seed,             // eigener seedbarer PRNG (D-033 Regel 4)
-        int    PlayerCount,
-        IReadOnlyList<TimedCommand> Commands,   // Tick + Command (einzige Mutation, Regel 1)
-        IReadOnlyList<HashCheckpoint> Checkpoints // Tick-Marke + erwarteter StateHash
-    );
+## 3. G1-Pflichtsuiten
 
-    public sealed record HashCheckpoint(int Tick, StateHash Expected);
-}
-```
+### Numerik und PRNG
 
-- Fixture-Pflege: Bei jeder bewussten Sim-Änderung (Balancing-Werteset, Regel-Fix) werden Fixtures neu aufgezeichnet und der Hash-Stand im selben PR committed; unbeabsichtigte Hash-Abweichung = Test-Rot = Regressions-Befund.
-- **Hash-Breite (D-049):** Verbindlich **xxHash64 überall** – Golden-Master-Hashes, Desync-Probe, Savegame-Verifikation. (64 bit halbieren die Kollisionswahrscheinlichkeit bei langen Replay-Serien; frühere xxHash32-Annahmen sind damit hinfällig.)
-- **Messpfad = Auslieferungspfad (D-045):** Golden-Master-Hashes und alle Sim-CI-Messungen laufen auf dem **Managed-Pfad**, der bis zur Fixed-Point-Beta der einzige Auslieferungspfad ist. Burst-Vergleichsläufe sind nur diagnostisch (Feature-Flag); **Toleranz-Parität:** relative Abweichung ≤ 1e-4 im Hash-Vergleich löst Alarm aus, blockiert aber nicht.
-- Fixture-Matrix: mindestens 1× Ökonomie, 1× Kampf mit Konter, 1× FoW/Detektion, 1× Aetherium-Ausbreitung/Überernte, 1× volles Match bis Sieg; je Kartengröße S/M/L (128/192/256) mindestens eine Fixture.
-- **Bekannte Einschränkung MVP:** Mit Float-Arithmetik (D-033: Float im MVP erlaubt) sind Hashes nur auf derselben Plattform/Compiler-Konfiguration stabil. Cross-Plattform-Hash-Vergleich (ARM macOS ↔ x86 Windows) wird erst mit der Fixed-Point-Umstellung (Beta) Pflicht – bis dahin dokumentiert der Test seine Plattform.
+- Q16.16-Grenzen, ties-to-even, negatives Welt→Grid-floor;
+- Overflow/Division-by-zero als geprüfte deterministische Fehler;
+- `SimAngle`-Wrap;
+- XorShift128PlusV1-Golden-Vektoren und Snapshot-Fortsetzung.
 
-### Ebene 4: PlayMode-UI-Tests (sparsam)
+### Commands
 
-- Nur End-to-End-Glückspfade: Spiel starten → Match beginnt → UI zeigt Ressourcen → Gebäude platzieren → Match beenden → Ergebnis-Screen zeigt `MatchResult`-Daten.
-- Keine pixelgenauen Vergleiche, keine Timing-abhängigen Animationstests.
+- 100 % des aktivierten Inventars;
+- Golden Bytes je Payloadversion;
+- unknown/invalid/reordered;
+- byteidentisches und konflikthaftes Duplicate;
+- Sequence/Dedupe über Snapshot;
+- Backpressure und zustandsabhängiger Fail ohne Mutation.
 
-### Ebene 5: Performance-Regressionstests
+### State/Persistence
 
-- Sim-Benchmarks headless: Tick-Dauer bei 500 Einheiten (Ziel: 60 FPS-Budget, Sim-Tick 10 Hz), Pathfinding-Budget ≤ 2–4 ms (D-034), FoW-Sicht-Tick (5–10 Hz) – jeweils mit Warn-/Fail-Schwellen gegen Baseline.
-- **V5-Pflicht-Gate (Phase-0-Spike, D-044): Combat-/KI-Kostenmodell** – die Messung belegt das Rest-Sim-Unterbudget ≤ 3 ms ([./PerformanceBudget.md](./PerformanceBudget.md) §2, bis V5 unbelegt) mit: Targeting über **Spatial-Hash** (Pflichtbestand des Kampfmoduls, kein O(n²)-Scan über alle Einheiten), **FoW-Filter** bei der Zielsuche und **KI-Command-Verarbeitung** (Utility-Director + HTN + Squad-BTs). Ohne bestandenes V5 **kein Sprint-7-Start des Kampfmoduls**. Gemessen wird auf dem Managed-Pfad (D-045); ein P95 > 6 ms des Sim-Ticks ist gleichzeitig der Trigger für den Worker-Tick-Wechsel ab Alpha (D-044).
-- Rendering-Budgets (GPU, Batches) laufen auf dem self-hosted Runner als Nightly-Mess-Szene; Schwellen als Trend-Warnung, nicht als harter PR-Blocker (GPU-Messungen sind umgebungsabhängig).
+- jedes autoritative Feld hash-sensitiv;
+- Snapshot-Roundtrip byteidentisch;
+- Restore/Fresh Host ≥1.000 Ticks mit pending Commands;
+- Parser-Hardcap, Truncation und Korruption;
+- Replay mit Human+AI-Commands ohne erneute AI-Ausführung.
 
-## KI-vs-KI-Nachtläufe (Balancing-Pipeline Stufe 2)
+### Plattform
 
-Der `Nova.SimRunner` (D-036) ist Pflicht-Träger der Balancing-Messpipeline Stufe 2 ([../gamedesign/Balancing.md](../gamedesign/Balancing.md)): seeded, command-basiert, ohne Renderer.
+`DETERMINISM_10000` erzeugt auf Windows x64 und macOS arm64 exakte
+Checkpoint-Hashes und finale Bytes. Numerische Toleranzwerte dürfen diesen
+Vergleich nicht ersetzen.
 
-- **Kadenz/Umfang (D-049):** Nightly in CI: **6 Matchup-Cluster × 20 Matches**, parallelisiert auf **8 Shards** (seriell wären die früher geplanten ≥ 200 Matches/Cluster pro Nacht rechnerisch unmöglich); **200-Match-Vollläufe je Cluster wöchentlich**. Schwierigkeit Mittel, gespiegelte Startpositionen zur Halbierung des Map-Bias. Zielvorgabe **≤ 60 s/Match (Managed-Pfad, D-045/D-049)**.
-- **Auswertung:** Der Runner aggregiert je Lauf die `MatchResult`-Struktur ([../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md)) plus Stufe-2-Metriken: Winrate je Matchup (Zielband 45–55 %), Matchdauer-Median (Korridor 20–35 min, D-010), Zeit bis erster Angriff, Strategiearchetyp-Verteilung, First-Expansion-Zeit.
+## 4. Coverage
 
-```csharp
-namespace Nova.SimRunner
-{
-    // Ergebnis-Datensatz eines Nachtlaufs (JSON-Artefakt, Basis der BAL-Einträge).
-    public sealed record SimRunReport(
-        string RunId,            // CI-Run + Werteset-Version ("balance-v0.x")
-        string BalanceSetVersion,
-        int    MatchesTotal,
-        IReadOnlyList<MatchupStats> Matchups  // Winrate, Matchdauer-Median, ...
-    );
-}
-```
+Am G1-SHA:
 
-- Reports werden als CI-Artefakt abgelegt und im Balance-Changelog (`BAL-xxx`, Balancing.md) als Datenquelle referenziert. Wertänderungen > ±10–15 % erfordern Simulations-Begründung aus ≥ 200 Matches (Balancing.md) – die **wöchentlichen 200-Match-Vollläufe** (D-049) liefern genau diese Evidenz.
-- Jede Fixture/Report-Versionierung folgt dem Werteset: Ein Report ist nur zusammen mit seiner `balance-v0.x`-Version interpretierbar.
+| Scope | Mindest-Line-Coverage |
+|---|---:|
+| `Nova.Simulation` | 80 % |
+| Command | 90 % |
+| PRNG | 90 % |
+| Serializer | 90 % |
+| Hash | 90 % |
+| Replay | 90 % |
+| aktiviertes Command-Inventar | 100 % Fälle |
 
-## Desync-Test-Strategie (ab Beta, D-033-Zielarchitektur)
+Coverage-Artefakte werden gehasht in Evidence aufgenommen. Prozentwerte ohne
+Reportartefakt sind ungültig.
 
-- **Hash-Sync-Probe:** Ab der Lockstep-Einführung senden Clients periodisch (alle N Ticks, konfigurierbar) ihren `StateHash` an den Command-Relay; Divergenz = Desync-Fund. Debug-Builds erlauben Tick-für-Tick-Hashing zur Eingrenzung.
-- **Cross-Plattform-Matrix:** Desync-Tests laufen explizit ARM-macOS ↔ x86-Windows (Pflicht-Validierung aus dem Phase-0-Spike: Fixed-Point-Determinismus ARM↔x86). Voraussetzung ist die Fixed-Point-Umstellung (fester Teil der Beta-MP-Arbeiten, D-033) – vorher sind Cross-Plattform-Desync-Tests nicht aussagefähig.
-- **Desync-Forensik:** Bei Divergenz werden Seed, Command-Log und erster divergierender Tick als Replay-Fixture konserviert; die Fixture wird zum Reproduktions-Test (Regression-Dauergast in Ebene 3).
-- **MVP-Vorläufer:** Schon im MVP laufen Ebene-3-Tests plattformübergreifend als *diagnostische* (nicht blockierende) Jobs, um Float-Abweichungen früh sichtbar zu machen.
+## 5. FoW-/KI-Tests
 
-## Coverage-Ziele
+Hidden-World-Metamorphics variieren ausschließlich verborgenen Gegnerstate.
+Committed Player-View, KI-Intents und legale Combat-Entscheidungen müssen
+identisch bleiben. Zusätzlich:
 
-| Bereich | Ziel | Messung |
+- Radar-Ping ohne Zielrecht,
+- Sichtwechsel erst am 5-Hz-Commit,
+- AI liest keine Sim-Infrastruktur,
+- Save/Load setzt AI-Sidecar identisch fort,
+- Replay wendet AI nicht zweimal an.
+
+## 6. Performance-Validierungen
+
+| ID | Zeitpunkt | Pflicht |
 |---|---|---|
-| `Nova.Simulation` (Sim-Core) | ≥ 80 % Zeilenabdeckung | Unity Code Coverage (EditMode) + NUnit-Lauf außerhalb Unity |
-| Command-Verarbeitung & PRNG | 100 % der öffentlichen Command-Typen | Test-Inventar je Command |
-| View/Präsentation, UI | kein Coverage-Ziel; Smoke-Tests (Ebene 4) | – |
-| Third-Party/Asset-Store-Code | ausgenommen | – |
+| V1 | G1/MS-0 | exakte Plattformparität 10.000 Ticks |
+| V2 | MS-0 | Rendering-CPU P95≤4 ms im 500-Objekt-Spike |
+| V3 | MS-0 | Animation P95≤1,5 ms im 500-Objekt-Spike |
+| V4 | MS-0 | Path P95≤4 ms bei 500 Agenten |
+| V5a | vor G2 | SpatialHash+FoW-Filter+Commands; Pre-Combat-Rest P95≤3 ms |
+| V5b | G3 | 500 Agenten mit realem Combat/AI; kein Crash/unbegrenztes Wachstum, Rohwerte |
 
-Coverage ist PR-Gate nur für `Nova.Simulation`; Verschlechterung > 2 Prozentpunkte gegen `main` ist reviewpflichtig (Baseline `develop` erst ab Sprint 7, D-050).
+Full-Content-Akzeptanz ist `MVP_FULL_100`; Full-Content-500 bleibt Diagnose.
+Performance-Commands und -Messungen referenzieren dieselbe `environmentId`;
+Windows-x64-Referenz und Mac-M2-Funktionslauf verwenden getrennte
+Methodenprofile.
 
-## Testdaten (SO-Fixtures)
+## 7. Automatische Matchvalidität
 
-- Definitions-only-Prinzip (Vier-Säulen): Testdaten sind **eigene ScriptableObject-Fixture-Sets** (reduzierte `GameDatabase` mit Test-Definitionen) unter einem Test-Ordner außerhalb der Produktiv-Registry; kein Runtime-State in SOs.
-- EditMode-Tests instanziieren SOs zur Laufzeit (`ScriptableObject.CreateInstance`) statt Assets zu laden, wo immer möglich – kein Asset-Datenbank-Zugriff im Test = schnelle, stabile Läufe.
-- Balance-relevante Tests referenzieren das versionierte Werteset (`balance-v0.x`), damit Test-Aussagen und Nachtlauf-Reports denselben Datenstand abbilden.
-- Produktiv-Definitionen werden durch statische Lint-Tests geprüft (Balancing.md Stufe 1: DPS/AE, EHP/AE, Konter-Matrix, Pflichtfelder der 12 Gebäudetypen / ~90 Einheiten).
+Ein Headless-Match zählt nur mit:
 
-## CI-Pipeline (GitHub Actions)
+1. State-Hashes,
+2. monotonen Ticks,
+3. gültigem Matchresultat,
+4. Core-Action-Trace und
+5. lückenloser Checkpoint-Kette.
 
-| Job | Trigger | Inhalt | Laufzeit-Budget |
-|---|---|---|---|
-| `editmode-tests` | PR + push auf `main` (Doku-Phase, D-050; `develop` erst ab Sprint 7) | Sim-Unit-Tests, Lint Stufe 1, Coverage-Gate Sim-Core | < 15 min |
-| `replay-tests` | PR + push | Golden-Master-Matrix (Ebene 3), plattformgleich, xxHash64 (D-049) | < 10 min |
-| `integration-tests` | PR (label-abhängig) + Nightly | Sim-Integrationstests (Ebene 2) | < 30 min |
-| `simrunner-nightly` | Nightly | KI-vs-KI: **6 Matchup-Cluster × 20 Matches auf 8 Shards** (D-049), Report-Artefakt | < 4 h |
-| `simrunner-weekly` | Wöchentlich | **200-Match-Vollläufe je Cluster** (Balancing-Evidenz, D-049), Report-Artefakt | < 6 h |
-| `playmode-ui` | Nightly | Ebene 4 auf self-hosted Runner | < 45 min |
-| `performance` | Nightly | Ebene 5, Trend-Report (Managed-Pfad, D-045) | < 1 h |
-| `build-matrix` | PR (ausgewählte) + Release-Branches (ab Sprint 7, D-050) | Windows + macOS Builds (Details: [./Deployment.md](./Deployment.md)) | < 1 h |
+Crash, Timeout, ungültiger Output oder fehlendes Pflichtfeld bleibt als Fail im
+Nenner.
 
-- EditMode-Tests auf `Nova.Simulation` laufen zusätzlich als reine `dotnet test`-Ausführung ohne Unity-Editor (D-036-Nebenprodukt) – schnellstes Feedback (< 3 min) und Lizenz-unabhängig.
-- Flaky-Policy: Ein Test, der 2× in Folge nicht reproduzierbar fehlschlägt, wird quarantäniert (Issue mit Label `flaky`), blockiert aber nicht dauerhaft den Merge; Quarantäne-Tests haben eine 2-Sprint-Frist zur Behebung oder Löschung.
+## 8. Kadenz
 
-## Bug-/Regressionsprozess
+| Lauf | Umfang |
+|---|---|
+| jeder PR | aggregiertes `quality-gate`: Tests, Coverage, Architektur, Golden, 4 Headless-Matches |
+| Nightly | 2 geordnete Fraktionscluster ×20, gespiegelt =40 |
+| Weekly | 2×200=400 |
+| G5 | 3 Nightly-Matrizen am selben SHA =120 |
 
-1. **Reproduktion sichern:** Jeder Sim-Bug wird vor dem Fix als scheiternder Test festgehalten – als Replay-Fixture (falls aus Match/Replay) oder als Sim-Unit-Test. Kein Fix ohne roten Test.
-2. **Fix + Grün:** Der Fix macht den Test grün; Fixture-Hashes werden nur bei bewusster Verhaltensänderung neu aufgezeichnet (mit Begründung im PR).
-3. **Dauerregression:** Der Test wandert in die Standard-Suite; Desync-/Match-Bugs werden zusätzlich als Golden-Master-Fixture kuratiert.
-4. **Triage-Klassen:** `blocker` (Sim-Inkorrektheit, Crash, Datenverlust), `major` (Regelverletzung ohne Crash), `minor` (View/UI). Blocker stoppen den Release-Kandidaten (Checkliste in [./Deployment.md](./Deployment.md)).
+Docs-only-PRs deklarieren Scope explizit; `quality-gate` wird nicht
+übersprungen. Bis G0 den Workflow real erzeugt, darf sein Ergebnis nicht
+behauptet werden.
 
-## Savegame-Migrations-Tests
+## 9. G5
 
-- Savegames sind serialisierter Sim-State + Metadaten (D-033 Regel 5) mit expliziter `SaveVersion`. Jede Schema-Änderung erhöht die Version und liefert eine Migration `v(n) → v(n+1)`.
-- **Pflicht-Test je Migration:** Referenz-Savegames aller noch unterstützten Altversionen werden als Test-Artefakte vorgehalten; der Test lädt, migriert kaskadierend auf die aktuelle Version und verifiziert per State-Hash (Ebene 3), dass das migrierte Spiel fortsetzbar und deterministisch identisch fortzusetzen ist.
-- Kein stilles Droppen: Wird eine Altversion nicht mehr unterstützt, ist das ein dokumentierter Eintrag in den Release-Notes und Teil der Release-Checkliste.
+- zwei manuelle UI-only-Matches, je eines pro Fraktion;
+- drei neue Task-Tester;
+- Median 20–35 Minuten;
+- Save/Load an jedem Fünf-Minuten-Autosave-Punkt Minute 5–45;
+- null offene P0/P1;
+- keine gatekritische Quarantäne;
+- `MVP_FULL_100` und Mac-M2-Baseline grün.
+
+## 10. Evidence und Review
+
+Jeder Gate-Versuch ist append-only sowie schema- und semantikvalid. Skip,
+Cancel oder fehlendes Pflichtresultat ist Fail. Reviewer und Writer sind
+verschieden; der Reviewer reproduziert mindestens einen kanonischen
+Clean-Clone-Check als eigene Ausführung. Relevante Änderungen machen frühere
+Evidence stale.
+
+Die öffentliche CLI führt gepinntes Ajv Draft 2020-12 und die
+Cross-Field-Prüfung für Schema 1.2 gemeinsam aus. Diese Prüfung ist
+integrity-only: Für `verdict=pass` entsteht unabhängig von einem
+`--trust-context <external.json>` zusätzlich
+`E_AUTHORIZATION_BOOTSTRAP`. Ohne externen Kontext bleibt außerdem
+`E_TRUST_CONTEXT`. Schema 1.2 autorisiert daher kein Gate.
+
+Der Schema-1.3-Zielvertrag führt Manifest, Szenariovertrag, Schema, Python-
+Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und Authorize-
+Workflow aus einem separaten Trusted-Tool-Checkout aus und bindet
+Subject-/Trusted-Commit, SHA-256 sowie die exakte Node-Version. Eine Änderung
+an diesem Bundle wird ohne Gate-Fortschritt gemergt und gilt erst für einen
+nachfolgenden sauberen Subject-Commit.
+
+Der externe Kontext enthält die vollständige geordnete
+`authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag bindet
+Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie CI- und
+Review-Attestierung und wird gegen GitHub verifiziert. Fehlende, zusätzliche,
+vertauschte oder nur lokale Einträge sind Fail.
+
+`--self-test` erzeugt positive und negative Fälle nur temporär und muss in G0
+unter anderem No-op-Commands, falsche/missing Check-Artefakte, lokale
+Pass-Autorisierung, falsche Units, negative Samples, unvollständige
+Drei-Lauf-Messungen, Szenarioschwellen, Subject-Blob-Hashes,
+schemawidrige Vorgänger und eine fehlende Gate-Kette ablehnen. Für G0-A kommen
+manipuliertes Subject-Schema/Ajv-Wrapper/Lockfile, unvollständige
+`authorizedEvidence`-Ketten, falsche oder widersprüchliche Umgebungen,
+fehlender Node-/Ajv-Stack und ein hängender Schema-Subprozess hinzu. Kriterien-
+und Szenarioprofile kommen aus
+[`mvp-v1.json`](../../quality/scenarios/mvp-v1.json).
+
+Ab G1 verweist jeder Gateversuch genau auf die semantikvalide Evidence des
+unmittelbaren Vorgängergates am selben Subject-Commit/-Tree. Szenariometriken
+heißen `scenario.<ID>.<metric>`; Pflichtassertions
+`scenario.<ID>.assertion.<assertion>` mit `unit=bool` und `[1]`. Das
+Szenariokriterium referenziert zusätzlich `check:<criterionId>`. Genau dieser
+kanonische Implementation-Check muss das Szenario als ausgeführt deklarieren;
+ein freier `command:<id>` genügt nicht. `stdout`, `stderr` und Check-Ergebnis
+sind gehashte Attempt-Artefakte.
+
+Der Trust-Kontext autorisiert nicht nur diese unmittelbare Referenz, sondern
+die vollständige geordnete Kette von G0 bis zum aktuellen Gate.
+
+Punktmetriken besitzen exakt `name`, `unit`, `samples`; Performance-Metriken
+exakt `name`, `unit`, `measurement`. Letzteres bindet den 30-s-Warmup und drei
+getrennte 120-s-Läufe mit mindestens einer nichtnegativen Rohprobe pro
+Sekunde. P95/P99 werden per Nearest-Rank je Lauf und kombiniert berechnet;
+Ausreißer werden nicht entfernt. Schema 1.3 ergänzt `environmentId` an Command
+und Messung; beide Werte müssen identisch sein und auf das getrennte
+Windows-x64- beziehungsweise Mac-M2-Methodenprofil zeigen.
+
+Im Solo-/KI-Modus reicht unabhängiges read-only Review. Ab zwei aktiven
+menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 
 ## Offene Punkte
 
-- **Coverage-Tooling:** Unity Code Coverage Package vs. externe .NET-Coverage (z. B. coverlet) für die Unity-freie `Nova.Simulation`-Assembly – Tool-Wahl in Sprint 7 am lauffähigen Setup entscheiden.
-- **PlayMode-UI-Testframework:** Unity Test Framework allein vs. Ergänzung um ein UI-Toolkit-Test-Hilfspaket – nach erstem UI-Toolkit-Prototyp (Sprint 7) bewerten; bis dahin Ebene 4 minimal halten.
-- **Float-Hash-Stabilität:** Ob Ebene-3-Hashes im MVP bereits editorübergreifend (Windows/macOS-CI) stabil sind, ist empirisch unklar; der Phase-0-Spike (Fixed-Point-Validierung ARM↔x86) liefert die Daten. Bis dahin sind Cross-Plattform-Hash-Jobs nur diagnostisch (s. Desync-Strategie).
-- **Performance-Baselines:** Schwellen für Ebene 5 (Sim-Tick-Budget bei 500 Einheiten, FoW-Tick) können erst am Phase-0-Spike-/Sprint-7-Messstand final kalibriert werden; vorläufige Anker: Pathfinding ≤ 2–4 ms (D-034), 60 FPS Gesamtbudget, ≤ 60 s/Match Managed (D-049). Das Rest-Sim-Unterbudget ≤ 3 ms bleibt bis Pflicht-Gate V5 (D-044) unbelegt.
-- **Desync-Probe-Protokoll:** Intervall N und Hash-Transport im Command-Relay werden erst mit Networking.md/Replication.md (D-033-Konsequenz) final definiert.
+- Der reale Schema-1.3-/Trusted-Tool-Authorize-Workflow ist G0-A-Arbeit und
+  in diesem Rebaseline absichtlich noch nicht als bestanden behauptet.
 
 ## Nächste Schritte
 
-- Sprint 7: `Nova.Simulation`-Testprojekt + `dotnet test`-CI-Job als erstes lauffähiges Artefakt; erste Replay-Fixture ("eco-harvest") mit `IStateHasher`.
-- Sprint 7: `Nova.SimRunner`-Report-Format (`SimRunReport`) gemeinsam mit Balancing-Verantwortlichen gegen Stufe-2-Metriken abnehmen.
-- Sprint 7: Coverage-Gate (≥ 80 % Sim-Core) in der PR-Pipeline aktivieren.
-- Beta-Vorbereitung: Desync-Test-Matrix und Cross-Plattform-Hash-Pflicht in diesen Plan aufnehmen (abhängig von Fixed-Point-Umstellung, D-033).
+1. G0-A Trusted-Tool-Bundle und Schema 1.3 ohne Gate-Fortschritt
+   implementieren und geschützt mergen.
+2. Am nachfolgenden sauberen Subject den Trustpfad, G0-B-Suiten,
+   Umgebungsprofile und Negative Controls beweisen.
+3. G1-Golden-/Coverage-Gates vor Gameplay aufbauen und Evidence nur aus
+   realen, sauberen Läufen schreiben.
 
 ## Änderungsverlauf
 
@@ -183,3 +258,8 @@ Coverage ist PR-Gate nur für `Nova.Simulation`; Verschlechterung > 2 Prozentpun
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead QA Engineer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead QA Engineer |
+| 1.0.0 | 2026-07-24 | Testvertrag auf G0–G5, G1-Coverage, V1–V5b, Matchdenominator und D-061-Evidence rebaselined | Lead QA Engineer |
+| 1.1.0 | 2026-07-24 | Evidence-Semantikvalidator, Negativkontrollen und maschinenlesbare Gate-Profile ergänzt | Lead QA Engineer |
+| 1.2.0 | 2026-07-24 | D-062-Szenariobindung, Nearest-Rank-Schwellen, Subject-Blobs und Same-Subject-Vorgängergates ergänzt | Lead QA Engineer |
+| 1.3.0 | 2026-07-24 | D-063-Schema 1.2, Check-Artefakte, externen Trust-Kontext, rekursive Ajv-Prüfung und getrennte Performance-Läufe verankert | Lead QA Engineer |
+| 1.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Tool-Bootstrap, vollständige Kette und Umgebungsprofile verankert | Lead QA Engineer |

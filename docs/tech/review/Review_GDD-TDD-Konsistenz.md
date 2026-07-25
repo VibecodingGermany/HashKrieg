@@ -1,10 +1,16 @@
 # Architecture Review – GDD↔TDD-Konsistenz
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (GDD↔TDD-Konsistenz) | **Sprint:** 4
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Unabhängiger Reviewer (GDD↔TDD-Konsistenz) | **Sprint:** 4
 
 ## Zweck
 
 Adversariale Konsistenzprüfung zwischen dem Game Design (docs/gamedesign/, docs/vision/) und dem Technical Design (docs/tech/). Geprüft wurden: (a) GDD-Regeln ohne technisches Zuhause, (b) TDD-Systeme ohne Design-Basis (Scope-Inflation), (c) Zahlen-Widersprüche zwischen den Dokumenten, (d) Datenmodell-Lücken (im GDD spezifizierte SO-Felder ohne Abbild im GameState-/Modul-Modell). Jeder Befund ist mit Beleg (Datei:Zeile bzw. Abschnitt) und eigener Gegenrechnung versehen. Dieser Review ändert keine Bestandsdateien; Maßnahmen sind Empfehlungen an die Dokument-Verantwortlichen.
+
+## Abhängigkeiten
+
+- [../Architecture.md](../Architecture.md) – zum Review-Zeitpunkt geprüfter Technikstand
+- [../../production/DecisionLog.md](../../production/DecisionLog.md) – nachgelagerte Entscheidungen D-043 bis D-061
+- [../../production/MVPRecoveryPlan.md](../../production/MVPRecoveryPlan.md) – heute führender Recovery- und Gate-Vertrag
 
 ## Geprüfte Dokumente
 
@@ -67,8 +73,14 @@ Folgende Prüfbereiche wurden explizit gegengeprüft und **tragen** (Auswahl der
 - **Nicht Gegenstand dieses Reviews:** TDD-interne Themen ohne GDD-Bezug (z. B. Burst/Managed-Parität D-037, Hash-Intervall-Abstimmung) wurden nur bei GDD-Berührung aufgenommen. Hinweis an den MP-Reviewer: Hash-Breiten-Inkonsistenz xxHash32/`uint` (Serialization.md:54) vs. xxHash64/`ulong` (Replication.md:58–87) – TDD-intern, hier nicht als Befund gewertet.
 - **Index-/Changelog-Pflicht:** Dieses Dokument ist neu; die Aufnahme in docs/README.md (Index) und CHANGELOG.md ([Unreleased]) obliegt dem Orchestrator, da der Review-Auftrag Änderungen an Bestandsdateien ausschließt.
 
+## Nächste Schritte
+
+- Dieses Review als historischen Befund erhalten; Umsetzung und Priorität nur
+  aus den nachgelagerten D-IDs und dem aktiven Recovery-Plan ableiten.
+
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstprüfung | Reviewer |
+| 0.1.1 | 2026-07-24 | Pflichtabschnitte ergänzt und historischen Review gegenüber dem aktiven Recovery-Vertrag eingeordnet | Technical Writer |
