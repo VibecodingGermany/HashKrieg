@@ -27,5 +27,10 @@ namespace Nova.Core
         {
             return (uint)BitConverter.SingleToInt32Bits(value);
         }
+
+        public static float UInt32BitsToSingle(uint value)
+        {
+            return BitConverter.Int32BitsToSingle(unchecked((int)value));
+        }
     }
 }

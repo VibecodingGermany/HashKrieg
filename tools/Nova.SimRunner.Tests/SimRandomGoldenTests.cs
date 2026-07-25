@@ -87,5 +87,41 @@ namespace Nova.SimRunner.Tests
                 Assert.That(value, Is.GreaterThanOrEqualTo(-5).And.LessThan(17));
             }
         }
+
+        [Test]
+        public void GetState_SetState_ContinuesSequenceIdentically()
+        {
+            var original = new SimRandom(42UL);
+            for (int i = 0; i < 10; i++)
+            {
+                original.NextUInt();
+            }
+
+            original.GetState(out ulong s0, out ulong s1);
+            var restored = new SimRandom(999UL);
+            restored.SetState(s0, s1);
+
+            for (int i = 0; i < 100; i++)
+            {
+                Assert.That(restored.NextUInt(), Is.EqualTo(original.NextUInt()), $"continuation diverged at index {i}");
+            }
+        }
+
+        [Test]
+        public void GetState_DoesNotAdvanceSequence()
+        {
+            var rng = new SimRandom(7UL);
+            rng.GetState(out ulong s0a, out ulong s1a);
+            rng.GetState(out ulong s0b, out ulong s1b);
+            Assert.That(s0b, Is.EqualTo(s0a));
+            Assert.That(s1b, Is.EqualTo(s1a));
+        }
+
+        [Test]
+        public void SetState_RejectsDegenerateZeroState()
+        {
+            var rng = new SimRandom(1UL);
+            Assert.Throws<System.ArgumentException>(() => rng.SetState(0UL, 0UL));
+        }
     }
 }

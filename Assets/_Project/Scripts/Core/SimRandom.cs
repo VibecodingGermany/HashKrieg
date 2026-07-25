@@ -60,6 +60,35 @@ namespace Nova.Core
             return (uint)((_s1 + y) >> 32);
         }
 
+        /// <summary>
+        /// Reads the two authoritative PRNG state words without advancing the
+        /// sequence (docs/tech/SimulationCore.md sections 1 and 3: the PRNG
+        /// words are part of the canonical state and of snapshots). Not part
+        /// of <see cref="ISimRandom"/> on purpose — the interface stays
+        /// unchanged; state access lives on the concrete class (Q-040(d)).
+        /// </summary>
+        public void GetState(out ulong s0, out ulong s1)
+        {
+            s0 = _s0;
+            s1 = _s1;
+        }
+
+        /// <summary>
+        /// Restores previously read state words so the sequence continues
+        /// exactly where it left off. Both words zero is the degenerate
+        /// xorshift128+ state (it would emit zeros forever) and is rejected as
+        /// a deterministic, checked error (SimulationCore.md section 1).
+        /// </summary>
+        public void SetState(ulong s0, ulong s1)
+        {
+            if (s0 == 0UL && s1 == 0UL)
+            {
+                throw new ArgumentException("Degenerate xorshift128+ state (both words zero).");
+            }
+            _s0 = s0;
+            _s1 = s1;
+        }
+
         public int NextInt(int minValue, int maxValue)
         {
             if (minValue >= maxValue)
