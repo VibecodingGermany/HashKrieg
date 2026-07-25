@@ -18,6 +18,44 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Geschützter Authorize-Workflow `gate-evidence-authorize` (G0-A2, D-066):**
+  neuer Job in `.github/workflows/quality-gate.yml`, ausschließlich per
+  `workflow_dispatch` auf `main` hinter dem geschützten Environment
+  `quality-gate` (Job-Concurrency mit `cancel-in-progress: false`). Die
+  Inputs `evidencePath`, `subjectSha`, `trustedSha` (Pflicht) und `notes`
+  (optional) laufen über `env:`-Mapping und einen fail-closed Format-Check;
+  Guards erzwingen `trustedSha != subjectSha`, `trustedSha` als Ancestor von
+  `origin/main`, `GITHUB_SHA == trustedSha` (Dispatch auf dem
+  Trusted-Commit) und committed Evidence im Subject-Checkout. Der Job holt
+  Trusted Tool (`trusted/`) und Subject (`subject/`) getrennt mit
+  `fetch-depth: 0` und `persist-credentials: false`, pinnt Node exakt,
+  ermittelt die numerische Job-ID per `gh api` + `jq` und ruft
+  `validate_gate_evidence.py --authorize` auf. Nur bei Exit 0 wird das
+  Receipt unter dem vom Validator ausgegebenen Versionspfad als Artefakt
+  `gate-authorization-G<N>-<runId>-attempt<runAttempt>` hochgeladen
+  (`upload-artifact` auf Commit-SHA gepinnt); die Versionierung erfolgt per
+  separatem append-only Folge-PR, der Workflow pusht nichts. Voraussetzung
+  für den ersten Lauf: einmalige Anlage des `quality-gate`-Environments mit
+  Required-Reviewers durch einen Maintainer (Root-of-Trust-Anker, D-066
+  Punkt 6). Dokumentiert in `docs/tech/Deployment.md` §7 und
+  `docs/tech/Testing.md` §10 (je 1.9.0).
+- **G0-A2 zweiphasiger Receipt-Vertrag (D-066) implementiert:** neues Schema
+  `quality/schemas/GateAuthorization.schema.json` (`gate-authorization-v1`,
+  Draft 2020-12, strikt) bindet Gate, Subject-Commit/-Tree,
+  Evidence-Carrier-Commit, Evidence-Pfad/-Hash, Trusted-Tool-Commit,
+  Repository, Workflow sowie Run-/Attempt-/Job-ID. Der Validator erhält den
+  geschützten Modus `--authorize` (mit `--receipt-out`, `--job-id`,
+  `--notes`): Er validiert die Evidence vollständig inklusive
+  `priorGateReceipts`, bindet den Lauf aus der GitHub-Actions-Umgebung ohne
+  Prüfung der eigenen Conclusion und schreibt bei Erfolg den hashgebundenen
+  Receipt-Kandidaten `GateAuthorization.json`; lokal ohne GitHub-Kontext
+  bleibt er fail-closed (`E_TRUST_CONTEXT`). Receipts werden append-only
+  unter
+  `quality/authorizations/G<N>/<subjectSha>/<runId>-attempt<runAttempt>/GateAuthorization.json`
+  versioniert. Self-Test auf 64 Semantik- plus 7 Topologie-Kontrollen
+  erweitert (Receipt-Emission, falsche Evidence-Hashs, Kettenlücke/
+  Vertauschung, doppelte Run-ID, falsches Gate/Subject, fehlende
+  GitHub-Umgebung).
 - **G0-A Trusted-Gate-Bootstrap (D-064) als Draft-Checkpoint angelegt:**
   Evidence-Schema
   `1.3.0` mit Pflicht-`environmentId` an jedem Command und jeder
@@ -65,6 +103,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **G0-A2-Review-N3:** Authorize-Step im Workflow erhält `GH_TOKEN`
+  (sonst scheitert jede G1+-Autorisierung an `E_RECEIPT_GITHUB`);
+  `check_docs.py` erzwingt in PR-CI append-only für
+  `quality/authorizations/` (Guard gegen Attempt-Substitution, N-1);
+  Restrisiko in Testing.md/Deployment.md dokumentiert (1.9.2).
+- **G0-A2-Review-Härtung (adversariales Re-Review):** Vorgänger-Receipts
+  werden im `--authorize`-Modus jetzt online gegen die GitHub-API
+  verifiziert (`gh` mit `GH_TOKEN`/`GITHUB_TOKEN`; exakter
+  `workflow_dispatch`-Run/-Attempt, Workflow, `conclusion=success`,
+  Trusted-Head, erfolgreicher `gate-evidence-authorize`-Job; jeder Mismatch
+  oder fehlendes Token/`gh` endet fail-closed `E_RECEIPT_GITHUB`) — ein
+  handgeschriebenes Receipt mit erfundener Run-ID wird nicht mehr
+  akzeptiert. Szenarioprofile und -schwellen kommen im Trusted-Modus
+  ausschließlich aus dem Trusted-Checkout, und `--authorize` verlangt
+  zusätzlich die Identität von `content.scenarioSha256` mit dem
+  Trusted-Vertrag (`E_SCENARIO_CONTRACT`). Der Authorize-Job erhält
+  `permissions: actions: read`, `GITHUB_WORKFLOW_REF` muss exakt
+  `...@refs/heads/main` lauten, und `validate_receipt` prüft den
+  `evidenceCarrierCommitSha` bei `verify_git` gegen die echte Git-Historie
+  (`E_RECEIPT_CARRIER`). Self-Test auf 73 Semantik- plus 7
+  Topologie-Kontrollen erweitert (Fake-`gh`-Harness ohne Netzwerk).
 - **D-066-Fail-Closed-Korrektur nach zweitem Merge-Review:** Der zuvor als
   geschlossen bezeichnete N-1-Befund war logisch nicht geschlossen. Der
   laufende Authorize-Job verlangte bereits seinen eigenen erfolgreichen
@@ -131,6 +190,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **GateEvidence-Schema auf `1.4.0` und Szenariovertrag auf
+  `two-phase-receipt-d066`:** `priorGateReceipts` ist ab G1 Pflicht
+  (geordnete Kette G0..G(n-1) aus `{gateId, receiptPath, receiptSha256}`,
+  für G0 leer/null) und ersetzt die Evidence-Kette als
+  Autorisierungsnachweis; die Same-Subject-`priorGateEvidence`-Kette bleibt
+  als Integritätsprüfung erhalten. Der tote `_validate_trust_context`-Rumpf,
+  `TRUST_CONTEXT_VERSION="2.0.0"` und `--trust-context` sind entfernt; ein
+  `verdict=pass` endet außerhalb von `--authorize` weiterhin mit
+  `E_AUTHORIZATION_BOOTSTRAP`. Testing.md §10 und Deployment.md §7 stehen
+  auf dem implementierten 1.4-Stand (1.8.0).
 - **G0-A in G0-A1/G0-A2 geteilt:** Schema 1.3 und
   `quality-gate / integrity` sind ausschließlich Integrity. Der
   Szenariovertrag meldet `integrity-only-d066`, `ci.jobName` bezeichnet den

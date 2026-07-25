@@ -78,7 +78,7 @@ docs/
 quality/
 ├── content/          ← kanonisches, maschinenlesbares MS-1-Manifest
 ├── scenarios/        ← kanonische Workloads und Schwellen
-├── schemas/          ← Schema 1.3 integritäts-only; Receipt-Vertrag ist G0-A2-Ziel
+├── schemas/          ← Evidence-Schema 1.4 + GateAuthorization-Receipt-Schema (G0-A2)
 ├── scripts/          ← verpflichtende, aktuell fail-closed Schema-/Semantikprüfung
 └── package-lock.json ← gepinnte Evidence-Validator-Abhängigkeiten
 ```
@@ -248,3 +248,4 @@ gh pr create --fill --base main
 | 3.3.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust in Governance/DoD verankert | Orchestrator |
 | 3.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Gate-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Orchestrator |
 | 3.5.0 | 2026-07-25 | D-066: G0-A1-Integrity von G0-A2-Receipt-Autorisierung getrennt und `integrity` als Quality-Vertragscheck verankert | Orchestrator |
+| 3.6.0 | 2026-07-25 | G0-A2-Umsetzungsstand: Schema-Verzeichnis auf Evidence 1.4 plus GateAuthorization-Receipt-Schema aktualisiert | Orchestrator |
