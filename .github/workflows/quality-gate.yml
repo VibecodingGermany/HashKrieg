@@ -3,15 +3,20 @@ name: Quality Gate
 # D-064 protected gate-evidence pipeline.
 #
 # Job `integrity` runs on every pull request and proves the integrity-only
-# part: pinned dependencies, validator self-test (negative controls), schema
-# validity and gate-runner CLI health. It never authorizes a gate pass.
+# part: pinned dependencies, validator self-test (negative controls),
+# topology self-test, schema validity and gate-runner CLI health. It never
+# authorizes a gate pass.
 #
 # Job `gate-evidence-authorize` runs only via manual workflow_dispatch on
-# `main` (GITHUB_WORKFLOW_REF must point at refs/heads/main) behind the
-# protected `quality-gate` environment. It validates the subject evidence
-# with the D-064 trusted tools from a subject-independent checkout
-# (`trusted/` at the mandatory `trustedSha` input) and an externally
-# generated trust context. A gate pass can only be authorized here.
+# `main` (github.ref must be refs/heads/main) behind the protected
+# `quality-gate` environment. Validator and Ajv run from the
+# subject-independent trusted tool checkout (`trusted/` at the mandatory
+# `trustedSha` input, which must be an ancestor of origin/main and must not
+# be the subject commit). The subject evidence is read directly from the
+# subject checkout via --subject-root; nothing is staged into `trusted/`,
+# so the trusted cleanliness check stays intact. The trust context is
+# generated externally (RUNNER_TEMP) and every authorizedEvidence entry is
+# verified against the GitHub API. A gate pass can only be authorized here.
 
 on:
   pull_request:
@@ -26,7 +31,7 @@ on:
       trustedSha:
         description:
           Trusted tool commit SHA (earlier clean main state per D-064; must
-          not be the subject commit itself)
+          be an ancestor of origin/main and not the subject commit itself)
         required: true
         type: string
       subjectSha:
@@ -61,6 +66,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix quality
       - name: Evidence validator self-test (D-064 negative controls)
         run: python3 quality/scripts/validate_gate_evidence.py --self-test
+      - name: Evidence validator topology self-test (CLI end-to-end)
+        run: python3 quality/scripts/validate_gate_evidence.py --self-test-topology
       - name: Ajv schema self-check (schema must be valid Draft 2020-12)
         working-directory: quality
         run: |
@@ -77,16 +84,32 @@ jobs:
         run: python3 quality/scripts/run_gate_check.py --help
 
   gate-evidence-authorize:
-    name: authorize
-    if: github.event_name == 'workflow_dispatch'
+    # Display name must equal the job id: the evidence ci.jobName const and
+    # the GitHub API job name are compared against it (D-065).
+    name: gate-evidence-authorize
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     environment: quality-gate
     runs-on: ubuntu-latest
+    env:
+      EVIDENCE_PATH: ${{ inputs.evidencePath }}
+      TRUSTED_SHA: ${{ inputs.trustedSha }}
+      SUBJECT_SHA: ${{ inputs.subjectSha || github.sha }}
     steps:
       - name: Checkout subject
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.subjectSha || github.sha }}
           fetch-depth: 0
+      - name: Verify trusted SHA is an ancestor of main (D-064)
+        run: |
+          if [ "$TRUSTED_SHA" = "$SUBJECT_SHA" ]; then
+            echo "trustedSha must not equal the subject commit" >&2
+            exit 1
+          fi
+          git merge-base --is-ancestor "$TRUSTED_SHA" origin/main || {
+            echo "trustedSha $TRUSTED_SHA is not an ancestor of origin/main" >&2
+            exit 1
+          }
       - name: Checkout trusted tools (subject-independent, D-064)
         uses: actions/checkout@v4
         with:
@@ -98,14 +121,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install pinned dependencies for the trusted tools
         run: npm ci --ignore-scripts --no-audit --no-fund --prefix trusted/quality
-      - name: Stage subject evidence into the trusted workspace
-        run: cp -R quality/evidence trusted/quality/
-      - name: Generate external trust context
+      - name: Generate external trust context (GitHub-verified chain)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CONTEXT="$RUNNER_TEMP/trust-context.json"
           python3 trusted/.github/scripts/generate_trust_context.py \
-            --evidence "trusted/${{ inputs.evidencePath }}" \
-            --trusted-sha "${{ inputs.trustedSha }}" \
+            --evidence "$EVIDENCE_PATH" \
+            --trusted-sha "$TRUSTED_SHA" \
             --output "$CONTEXT"
           echo "NOVA_TRUST_CONTEXT_SHA256=$(shasum -a 256 "$CONTEXT" | cut -d' ' -f1)" >> "$GITHUB_ENV"
           echo "TRUST_CONTEXT_PATH=$CONTEXT" >> "$GITHUB_ENV"
@@ -113,5 +136,6 @@ jobs:
         run: |
           python3 trusted/quality/scripts/validate_gate_evidence.py \
             --trusted-tool-checkout trusted \
+            --subject-root "$GITHUB_WORKSPACE" \
             --trust-context "$TRUST_CONTEXT_PATH" \
-            "trusted/${{ inputs.evidencePath }}"
+            "$EVIDENCE_PATH"

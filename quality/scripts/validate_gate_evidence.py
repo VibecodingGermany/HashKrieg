@@ -1280,11 +1280,7 @@ def _verify_trusted_tooling(
         )
         return
     subject_root = root.resolve()
-    if (
-        trusted_root == subject_root
-        or trusted_root in subject_root.parents
-        or subject_root in trusted_root.parents
-    ):
+    if trusted_root == subject_root:
         errors.append(
             (
                 "E_TRUSTED_TOOL",
@@ -1295,12 +1291,27 @@ def _verify_trusted_tooling(
         return
     try:
         head = _git("rev-parse", "HEAD", root=trusted_root)
+        top_level = Path(
+            _git("rev-parse", "--show-toplevel", root=trusted_root)
+        ).resolve()
         status = _git("status", "--porcelain", root=trusted_root)
     except ValueError as error:
         errors.append(
             (
                 "E_TRUSTED_TOOL",
                 f"trusted tool checkout is not a git worktree: {error}",
+            )
+        )
+        return
+    # A nested checkout (e.g. `<subject>/trusted` in the protected workflow)
+    # is only independent when it is its own git worktree; otherwise subject
+    # files could pose as trusted tools.
+    if top_level != trusted_root:
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                "trusted tool checkout must be its own git worktree, "
+                f"not a directory inside {top_level}",
             )
         )
         return
@@ -1790,6 +1801,17 @@ def validate_document(
         expected_checks = command.get("expectedCheckCount")
         check_items = command.get("checks")
         executor = command.get("executor")
+        expected_prefix = {"implementation": "impl-", "reviewer": "review-"}.get(
+            executor if isinstance(executor, str) else ""
+        )
+        if expected_prefix is None or not command_id.startswith(expected_prefix):
+            errors.append(
+                (
+                    "E_COMMAND_EXECUTOR",
+                    f"{command_id}: command id must start with the executor "
+                    "prefix (impl- for implementation, review- for reviewer)",
+                )
+            )
         if conclusion == "success" and exit_code != 0:
             errors.append(
                 ("E_COMMAND_EXIT", f"{command_id}: success requires exitCode 0")
@@ -2692,7 +2714,7 @@ def _self_test_fixture() -> tuple[
             "runId": "123",
             "runAttempt": 1,
             "jobId": "456",
-            "jobName": "quality-gate",
+            "jobName": "gate-evidence-authorize",
             "headSha": commit,
             "url": "https://github.com/VibecodingGermany/Project_Nova/actions/runs/123",
             "conclusion": "success",
@@ -2761,6 +2783,299 @@ def _self_test_fixture() -> tuple[
         }
     }
     return fixture, profiles, scenarios, methods, evidence_path
+
+
+def _substitute(value: Any, old: str, new: str) -> Any:
+    if isinstance(value, str):
+        return value.replace(old, new)
+    if isinstance(value, list):
+        return [_substitute(item, old, new) for item in value]
+    if isinstance(value, dict):
+        return {key: _substitute(item, old, new) for key, item in value.items()}
+    return value
+
+
+def _harness_scenario_contract_bytes() -> bytes:
+    """Minimal but fully valid 1.3.0 scenario contract for harness repos."""
+
+    timing = {
+        "warmupSeconds": 30,
+        "measurementSeconds": 120,
+        "repetitions": 3,
+        "minimumSamplesPerSecond": 1,
+        "outlierRemoval": False,
+        "rawSamplesRequired": True,
+    }
+    windows_environment = {
+        "os": "Windows",
+        "architecture": "x64",
+        "hardware": "Ryzen 5 5600, RTX 3060, 16 GB RAM, NVMe",
+        "build": "standalone-il2cpp-development",
+        "executionPath": "managed",
+        "burstEnabled": False,
+        "resolution": "2560x1440",
+        "qualityProfile": "NovaReference",
+        "vSyncEnabled": False,
+        "deepProfilingEnabled": False,
+        "replay": "fixed",
+    }
+    mac_environment = {
+        "os": "macOS",
+        "architecture": "arm64",
+        "hardware": "Apple M2",
+        "build": "standalone-il2cpp-development",
+        "executionPath": "managed",
+        "burstEnabled": False,
+        "resolution": "1920x1080",
+        "qualityProfile": "Medium",
+        "vSyncEnabled": False,
+        "deepProfilingEnabled": False,
+        "replay": "fixed",
+    }
+    contract = {
+        "schemaVersion": SCHEMA_VERSION,
+        "scenarioSetId": "self-test",
+        "status": "binding-requirement",
+        "authorizationStatus": SCENARIO_AUTHORIZATION_STATUS,
+        "performanceMethod": {**windows_environment, **timing},
+        "macM2FunctionalMethod": {**mac_environment, **timing},
+        "scenarios": [
+            {
+                "id": "SELF_TEST_SCENARIO",
+                "gateUsage": ["G0"],
+                "requiredAssertions": ["validator-pass"],
+                "thresholds": {"latencyMs": {"unit": "score", "maximum": 1.0}},
+            }
+        ],
+        "gateProfiles": {
+            gate: {
+                "requiredPriorGateIds": (
+                    [] if index == 0 else [GATE_SEQUENCE[index - 1]]
+                ),
+                "requiredCriterionIds": ["G0-SELF-TEST"] if gate == "G0" else [],
+                "requiredScenarioIds": (
+                    ["SELF_TEST_SCENARIO"] if gate == "G0" else []
+                ),
+                "requiredCoverage": {},
+            }
+            for index, gate in enumerate(GATE_SEQUENCE)
+        },
+    }
+    return (json.dumps(contract, indent=2) + "\n").encode("utf-8")
+
+
+def _build_trusted_harness(
+    fixture: dict[str, Any],
+    harness_root: Path,
+    *,
+    weaken_subject_schema: bool = False,
+    document_mutation: Callable[[dict[str, Any]], None] | None = None,
+) -> tuple[dict[str, Any], Path, Path, Path, Path, bytes]:
+    """Create a subject repo, a trusted tool checkout and a trust context."""
+
+    subject_repo = harness_root / "subject"
+    trusted_repo = harness_root / "trusted"
+    external = harness_root / "external"
+    for repository in (subject_repo, trusted_repo):
+        (repository / "quality/content").mkdir(parents=True)
+        (repository / "quality/scenarios").mkdir(parents=True)
+        (repository / "quality/schemas").mkdir(parents=True)
+        (repository / "quality/scripts").mkdir(parents=True)
+        (repository / ".github/workflows").mkdir(parents=True)
+    external.mkdir(parents=True)
+    schema_bytes = EVIDENCE_SCHEMA.read_bytes()
+    subject_schema_bytes = (
+        b'{"type":"object"}\n' if weaken_subject_schema else schema_bytes
+    )
+    component_bytes = {
+        "manifest": b'{"subject":"manifest"}\n',
+        "scenarioContract": _harness_scenario_contract_bytes(),
+        "evidenceSchema": subject_schema_bytes,
+        "evidenceValidator": Path(__file__).read_bytes(),
+        "ajvWrapper": (
+            ROOT / "quality/scripts/validate_evidence_schema.mjs"
+        ).read_bytes(),
+        "packageManifest": b'{"name":"harness-quality"}\n',
+        "packageLock": b'{"lockfileVersion":3}\n',
+        "gateRunner": b"#!/usr/bin/env python3\n",
+        "authorizeWorkflow": b"name: quality-gate\n",
+    }
+    trusted_component_bytes = dict(
+        component_bytes, evidenceSchema=schema_bytes
+    )
+    for component_id, raw_bytes in component_bytes.items():
+        target = subject_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+        target.write_bytes(raw_bytes)
+    for component_id, raw_bytes in trusted_component_bytes.items():
+        target = trusted_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+        target.write_bytes(raw_bytes)
+    (trusted_repo / ".gitignore").write_text(
+        "quality/node_modules/\n", encoding="utf-8"
+    )
+    (trusted_repo / "quality/node_modules").symlink_to(
+        ROOT / "quality/node_modules"
+    )
+    for repository in (subject_repo, trusted_repo):
+        for arguments in (
+            ("init", "-q"),
+            ("config", "user.email", "self-test@example.invalid"),
+            ("config", "user.name", "Evidence Self Test"),
+            ("add", "."),
+            ("commit", "-qm", "harness"),
+        ):
+            subprocess.run(
+                ["git", *arguments],
+                cwd=repository,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    subject_commit = _git("rev-parse", "HEAD", root=subject_repo)
+    subject_tree = _git("rev-parse", "HEAD^{tree}", root=subject_repo)
+    trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
+    node_version = _node_version()
+    if node_version is None:
+        raise ValueError("node is unavailable for the trusted harness")
+
+    document = _substitute(
+        copy.deepcopy(fixture), fixture["subject"]["commitSha"], subject_commit
+    )
+    document["subject"].update(
+        commitSha=subject_commit, treeSha=subject_tree
+    )
+    document["ci"]["headSha"] = subject_commit
+    for component_id, (_, digest_field) in CONTENT_COMPONENT_FIELDS.items():
+        subject_digest = sha256_bytes(component_bytes[component_id])
+        trusted_digest = sha256_bytes(trusted_component_bytes[component_id])
+        document["content"][digest_field] = subject_digest
+        component = document["trustBundle"]["components"][component_id]
+        component["subjectSha256"] = subject_digest
+        component["trustedSha256"] = trusted_digest
+    document["trustBundle"]["trustedCommitSha"] = trusted_commit
+    document["trustBundle"]["nodeVersion"] = node_version
+    if document_mutation is not None:
+        document_mutation(document)
+
+    payloads: dict[str, Any] = {}
+    for command in document["commands"]:
+        payloads[command["stdoutArtifact"]["path"]] = b"stdout\n"
+        payloads[command["stderrArtifact"]["path"]] = b""
+        payloads[command["checksArtifact"]["path"]] = {
+            "schemaVersion": "gate-check-result-v1",
+            "gateId": document["gateId"],
+            "subjectCommitSha": subject_commit,
+            "commandId": command["id"],
+            "executor": command["executor"],
+            "command": command["command"],
+            "workingDirectory": command["workingDirectory"],
+            "durationSeconds": command["durationSeconds"],
+            "exitCode": command["exitCode"],
+            "conclusion": command["conclusion"],
+            "checks": command["checks"],
+            "scenarioIds": command["scenarioIds"],
+        }
+    for metric in document["rawMetrics"]:
+        metric_payload: dict[str, Any] = {
+            "name": metric["name"],
+            "unit": metric["unit"],
+        }
+        if "samples" in metric:
+            metric_payload["samples"] = metric["samples"]
+        if "measurement" in metric:
+            metric_payload["measurement"] = metric["measurement"]
+        payloads[metric["rawArtifact"]["path"]] = metric_payload
+    ci_section = document["ci"]
+    payloads[ci_section["attestationArtifact"]["path"]] = {
+        "schemaVersion": "github-actions-attestation-v1",
+        "provider": ci_section["provider"],
+        "repository": ci_section["repository"],
+        "workflowPath": ci_section["workflowPath"],
+        "runId": ci_section["runId"],
+        "runAttempt": ci_section["runAttempt"],
+        "jobId": ci_section["jobId"],
+        "jobName": ci_section["jobName"],
+        "headSha": ci_section["headSha"],
+        "url": ci_section["url"],
+        "conclusion": ci_section["conclusion"],
+    }
+    reviewer_section = document["reviewer"]
+    payloads[reviewer_section["reviewArtifact"]["path"]] = {
+        "schemaVersion": "gate-review-v1",
+        "gateId": document["gateId"],
+        "subjectCommitSha": subject_commit,
+        "subjectTreeSha": subject_tree,
+        "reviewerId": reviewer_section["id"],
+        "implementationWriter": document["implementationWriter"],
+        "reproducedCommandId": reviewer_section["reproducedCommandId"],
+        "result": "approve",
+    }
+    for artifact in _artifact_objects(document):
+        payload = payloads[artifact["path"]]
+        raw = (
+            payload
+            if isinstance(payload, bytes)
+            else json.dumps(payload, indent=2).encode("utf-8")
+        )
+        artifact_path = subject_repo / Path(artifact["path"])
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_bytes(raw)
+        artifact["sha256"] = sha256_bytes(raw)
+        artifact["bytes"] = len(raw)
+
+    evidence_file = subject_repo / Path(document["attempt"]["evidencePath"])
+    evidence_file.parent.mkdir(parents=True, exist_ok=True)
+    evidence_raw = json.dumps(document, indent=2).encode("utf-8")
+    evidence_file.write_bytes(evidence_raw)
+    evidence_digest = sha256_bytes(evidence_raw)
+    chain_entry = {
+        "gateId": document["gateId"],
+        "evidencePath": document["attempt"]["evidencePath"],
+        "evidenceSha256": evidence_digest,
+        "subjectCommitSha": subject_commit,
+        "subjectTreeSha": subject_tree,
+        "ciRunId": ci_section["runId"],
+        "ciJobId": ci_section["jobId"],
+        "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
+        "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
+    }
+    context = {
+        "schemaVersion": TRUST_CONTEXT_VERSION,
+        "repository": "VibecodingGermany/Project_Nova",
+        "workflowPath": ".github/workflows/quality-gate.yml",
+        "authorizingRunId": "999",
+        "authorizingRunAttempt": 1,
+        "authorizingJob": "gate-evidence-authorize",
+        "subjectCommitSha": subject_commit,
+        "subjectTreeSha": subject_tree,
+        "evidencePath": document["attempt"]["evidencePath"],
+        "evidenceSha256": evidence_digest,
+        "evidenceCiRunId": ci_section["runId"],
+        "evidenceCiJobId": ci_section["jobId"],
+        "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
+        "reviewerId": reviewer_section["id"],
+        "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
+        "trustedToolCommitSha": trusted_commit,
+        "authorizedEvidence": [chain_entry],
+    }
+    context_path = external / "trust-context.json"
+    context_raw = json.dumps(context, indent=2).encode("utf-8")
+    context_path.write_bytes(context_raw)
+    return document, evidence_file, context_path, subject_repo, trusted_repo, context_raw
+
+
+def _harness_environment(context_raw: bytes) -> dict[str, str]:
+    return {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
+        "GITHUB_RUN_ID": "999",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_JOB": "gate-evidence-authorize",
+        "GITHUB_WORKFLOW_REF": (
+            "VibecodingGermany/Project_Nova/"
+            ".github/workflows/quality-gate.yml@refs/heads/main"
+        ),
+        "NOVA_TRUST_CONTEXT_SHA256": sha256_bytes(context_raw),
+    }
 
 
 def run_self_test() -> int:
@@ -2933,6 +3248,11 @@ def run_self_test() -> int:
             lambda value: value["trustBundle"]["components"]["manifest"].update(
                 subjectSha256="0" * 64
             ),
+        ),
+        (
+            "command-id-prefix",
+            "E_COMMAND_EXECUTOR",
+            lambda value: value["commands"][0].update(id="worker-g0-self-test"),
         ),
     ]
 
@@ -3280,226 +3600,6 @@ def run_self_test() -> int:
             print("SELF-TEST FAIL: worktree digest replaced the subject-blob digest")
             return 1
 
-    def substitute(value: Any, old: str, new: str) -> Any:
-        if isinstance(value, str):
-            return value.replace(old, new)
-        if isinstance(value, list):
-            return [substitute(item, old, new) for item in value]
-        if isinstance(value, dict):
-            return {key: substitute(item, old, new) for key, item in value.items()}
-        return value
-
-    def build_trusted_harness(
-        harness_root: Path,
-        *,
-        weaken_subject_schema: bool = False,
-        document_mutation: Callable[[dict[str, Any]], None] | None = None,
-    ) -> tuple[dict[str, Any], Path, Path, Path, Path, bytes]:
-        """Create a subject repo, a trusted tool checkout and a trust context."""
-
-        subject_repo = harness_root / "subject"
-        trusted_repo = harness_root / "trusted"
-        external = harness_root / "external"
-        for repository in (subject_repo, trusted_repo):
-            (repository / "quality/content").mkdir(parents=True)
-            (repository / "quality/scenarios").mkdir(parents=True)
-            (repository / "quality/schemas").mkdir(parents=True)
-            (repository / "quality/scripts").mkdir(parents=True)
-            (repository / ".github/workflows").mkdir(parents=True)
-        external.mkdir(parents=True)
-        schema_bytes = EVIDENCE_SCHEMA.read_bytes()
-        subject_schema_bytes = (
-            b'{"type":"object"}\n' if weaken_subject_schema else schema_bytes
-        )
-        component_bytes = {
-            "manifest": b'{"subject":"manifest"}\n',
-            "scenarioContract": b'{"subject":"scenarios"}\n',
-            "evidenceSchema": subject_schema_bytes,
-            "evidenceValidator": Path(__file__).read_bytes(),
-            "ajvWrapper": (
-                ROOT / "quality/scripts/validate_evidence_schema.mjs"
-            ).read_bytes(),
-            "packageManifest": b'{"name":"harness-quality"}\n',
-            "packageLock": b'{"lockfileVersion":3}\n',
-            "gateRunner": b"#!/usr/bin/env python3\n",
-            "authorizeWorkflow": b"name: quality-gate\n",
-        }
-        trusted_component_bytes = dict(
-            component_bytes, evidenceSchema=schema_bytes
-        )
-        for component_id, raw_bytes in component_bytes.items():
-            target = subject_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
-            target.write_bytes(raw_bytes)
-        for component_id, raw_bytes in trusted_component_bytes.items():
-            target = trusted_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
-            target.write_bytes(raw_bytes)
-        (trusted_repo / ".gitignore").write_text(
-            "quality/node_modules/\n", encoding="utf-8"
-        )
-        (trusted_repo / "quality/node_modules").symlink_to(
-            ROOT / "quality/node_modules"
-        )
-        for repository in (subject_repo, trusted_repo):
-            for arguments in (
-                ("init", "-q"),
-                ("config", "user.email", "self-test@example.invalid"),
-                ("config", "user.name", "Evidence Self Test"),
-                ("add", "."),
-                ("commit", "-qm", "harness"),
-            ):
-                subprocess.run(
-                    ["git", *arguments],
-                    cwd=repository,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-        subject_commit = _git("rev-parse", "HEAD", root=subject_repo)
-        subject_tree = _git("rev-parse", "HEAD^{tree}", root=subject_repo)
-        trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
-        node_version = _node_version()
-        if node_version is None:
-            raise ValueError("node is unavailable for the trusted harness")
-
-        document = substitute(
-            copy.deepcopy(fixture), fixture["subject"]["commitSha"], subject_commit
-        )
-        document["subject"].update(
-            commitSha=subject_commit, treeSha=subject_tree
-        )
-        document["ci"]["headSha"] = subject_commit
-        for component_id, (_, digest_field) in CONTENT_COMPONENT_FIELDS.items():
-            subject_digest = sha256_bytes(component_bytes[component_id])
-            trusted_digest = sha256_bytes(trusted_component_bytes[component_id])
-            document["content"][digest_field] = subject_digest
-            component = document["trustBundle"]["components"][component_id]
-            component["subjectSha256"] = subject_digest
-            component["trustedSha256"] = trusted_digest
-        document["trustBundle"]["trustedCommitSha"] = trusted_commit
-        document["trustBundle"]["nodeVersion"] = node_version
-        if document_mutation is not None:
-            document_mutation(document)
-
-        payloads: dict[str, Any] = {}
-        for command in document["commands"]:
-            payloads[command["stdoutArtifact"]["path"]] = b"stdout\n"
-            payloads[command["stderrArtifact"]["path"]] = b""
-            payloads[command["checksArtifact"]["path"]] = {
-                "schemaVersion": "gate-check-result-v1",
-                "gateId": document["gateId"],
-                "subjectCommitSha": subject_commit,
-                "commandId": command["id"],
-                "executor": command["executor"],
-                "command": command["command"],
-                "workingDirectory": command["workingDirectory"],
-                "durationSeconds": command["durationSeconds"],
-                "exitCode": command["exitCode"],
-                "conclusion": command["conclusion"],
-                "checks": command["checks"],
-                "scenarioIds": command["scenarioIds"],
-            }
-        for metric in document["rawMetrics"]:
-            metric_payload: dict[str, Any] = {
-                "name": metric["name"],
-                "unit": metric["unit"],
-            }
-            if "samples" in metric:
-                metric_payload["samples"] = metric["samples"]
-            if "measurement" in metric:
-                metric_payload["measurement"] = metric["measurement"]
-            payloads[metric["rawArtifact"]["path"]] = metric_payload
-        ci_section = document["ci"]
-        payloads[ci_section["attestationArtifact"]["path"]] = {
-            "schemaVersion": "github-actions-attestation-v1",
-            "provider": ci_section["provider"],
-            "repository": ci_section["repository"],
-            "workflowPath": ci_section["workflowPath"],
-            "runId": ci_section["runId"],
-            "runAttempt": ci_section["runAttempt"],
-            "jobId": ci_section["jobId"],
-            "jobName": ci_section["jobName"],
-            "headSha": ci_section["headSha"],
-            "url": ci_section["url"],
-            "conclusion": ci_section["conclusion"],
-        }
-        reviewer_section = document["reviewer"]
-        payloads[reviewer_section["reviewArtifact"]["path"]] = {
-            "schemaVersion": "gate-review-v1",
-            "gateId": document["gateId"],
-            "subjectCommitSha": subject_commit,
-            "subjectTreeSha": subject_tree,
-            "reviewerId": reviewer_section["id"],
-            "implementationWriter": document["implementationWriter"],
-            "reproducedCommandId": reviewer_section["reproducedCommandId"],
-            "result": "approve",
-        }
-        for artifact in _artifact_objects(document):
-            payload = payloads[artifact["path"]]
-            raw = (
-                payload
-                if isinstance(payload, bytes)
-                else json.dumps(payload, indent=2).encode("utf-8")
-            )
-            artifact_path = subject_repo / Path(artifact["path"])
-            artifact_path.parent.mkdir(parents=True, exist_ok=True)
-            artifact_path.write_bytes(raw)
-            artifact["sha256"] = sha256_bytes(raw)
-            artifact["bytes"] = len(raw)
-
-        evidence_file = subject_repo / Path(document["attempt"]["evidencePath"])
-        evidence_file.parent.mkdir(parents=True, exist_ok=True)
-        evidence_raw = json.dumps(document, indent=2).encode("utf-8")
-        evidence_file.write_bytes(evidence_raw)
-        evidence_digest = sha256_bytes(evidence_raw)
-        chain_entry = {
-            "gateId": document["gateId"],
-            "evidencePath": document["attempt"]["evidencePath"],
-            "evidenceSha256": evidence_digest,
-            "subjectCommitSha": subject_commit,
-            "subjectTreeSha": subject_tree,
-            "ciRunId": ci_section["runId"],
-            "ciJobId": ci_section["jobId"],
-            "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
-            "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
-        }
-        context = {
-            "schemaVersion": TRUST_CONTEXT_VERSION,
-            "repository": "VibecodingGermany/Project_Nova",
-            "workflowPath": ".github/workflows/quality-gate.yml",
-            "authorizingRunId": "999",
-            "authorizingRunAttempt": 1,
-            "authorizingJob": "gate-evidence-authorize",
-            "subjectCommitSha": subject_commit,
-            "subjectTreeSha": subject_tree,
-            "evidencePath": document["attempt"]["evidencePath"],
-            "evidenceSha256": evidence_digest,
-            "evidenceCiRunId": ci_section["runId"],
-            "evidenceCiJobId": ci_section["jobId"],
-            "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
-            "reviewerId": reviewer_section["id"],
-            "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
-            "trustedToolCommitSha": trusted_commit,
-            "authorizedEvidence": [chain_entry],
-        }
-        context_path = external / "trust-context.json"
-        context_raw = json.dumps(context, indent=2).encode("utf-8")
-        context_path.write_bytes(context_raw)
-        return document, evidence_file, context_path, subject_repo, trusted_repo, context_raw
-
-    def harness_environment(context_raw: bytes) -> dict[str, str]:
-        return {
-            "GITHUB_ACTIONS": "true",
-            "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
-            "GITHUB_RUN_ID": "999",
-            "GITHUB_RUN_ATTEMPT": "1",
-            "GITHUB_JOB": "gate-evidence-authorize",
-            "GITHUB_WORKFLOW_REF": (
-                "VibecodingGermany/Project_Nova/"
-                ".github/workflows/quality-gate.yml@refs/heads/main"
-            ),
-            "NOVA_TRUST_CONTEXT_SHA256": sha256_bytes(context_raw),
-        }
-
     environment_names = (
         "GITHUB_ACTIONS",
         "GITHUB_REPOSITORY",
@@ -3521,11 +3621,11 @@ def run_self_test() -> int:
                     subject_repo,
                     trusted_repo,
                     context_raw,
-                ) = build_trusted_harness(Path(temp))
+                ) = _build_trusted_harness(fixture, Path(temp))
             except (OSError, ValueError) as error:
                 print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
                 return 1
-            os.environ.update(harness_environment(context_raw))
+            os.environ.update(_harness_environment(context_raw))
 
             def trusted_codes(
                 candidate: dict[str, Any],
@@ -3656,6 +3756,110 @@ def run_self_test() -> int:
                 print("SELF-TEST FAIL: swapped authorization chain was accepted")
                 return 1
 
+            for env_name, wrong_value in (
+                ("GITHUB_JOB", "integrity"),
+                (
+                    "GITHUB_WORKFLOW_REF",
+                    "VibecodingGermany/Project_Nova/"
+                    ".github/workflows/quality-gate.yml@refs/heads/topic",
+                ),
+                ("NOVA_TRUST_CONTEXT_SHA256", "0" * 64),
+            ):
+                saved_value = os.environ[env_name]
+                os.environ[env_name] = wrong_value
+                checks += 1
+                if "E_TRUST_CONTEXT" not in trusted_codes(
+                    trusted_document, trusted_context_path
+                ):
+                    print(
+                        f"SELF-TEST FAIL: mismatched {env_name} escaped the "
+                        "protected-environment binding"
+                    )
+                    return 1
+                os.environ[env_name] = saved_value
+
+            wrong_subject_context = strict_load(trusted_context_path)
+            wrong_subject_context["authorizedEvidence"] = [
+                dict(
+                    wrong_subject_context["authorizedEvidence"][0],
+                    subjectCommitSha="0" * 40,
+                )
+            ]
+            wrong_subject_path = external / "trust-context-subject.json"
+            wrong_subject_raw = json.dumps(wrong_subject_context).encode("utf-8")
+            wrong_subject_path.write_bytes(wrong_subject_raw)
+            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(
+                wrong_subject_raw
+            )
+            checks += 1
+            if "E_AUTHORIZATION_CHAIN" not in trusted_codes(
+                trusted_document, wrong_subject_path
+            ):
+                print(
+                    "SELF-TEST FAIL: chain entry with a foreign subject commit "
+                    "was accepted"
+                )
+                return 1
+            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(context_raw)
+
+            # A "locally created" predecessor: the on-disk G0 evidence does not
+            # match the CI-attested chain entry, so authorization must fail.
+            local_prior = subject_repo / Path(
+                trusted_document["attempt"]["evidencePath"].replace(
+                    "/G0/", "/G0-local/"
+                )
+            )
+            local_prior.parent.mkdir(parents=True, exist_ok=True)
+            local_prior_document = {
+                "gateId": "G0",
+                "subject": dict(trusted_document["subject"]),
+                "verdict": {"result": "pass"},
+                "ci": {
+                    "runId": "777",
+                    "jobId": "888",
+                    "attestationArtifact": {"sha256": "a" * 64},
+                },
+                "reviewer": {"reviewArtifact": {"sha256": "b" * 64}},
+            }
+            local_prior_raw = json.dumps(local_prior_document).encode("utf-8")
+            local_prior.write_bytes(local_prior_raw)
+            g1_context = strict_load(trusted_context_path)
+            g1_current = dict(g1_context["authorizedEvidence"][0], gateId="G1")
+            g1_context["authorizedEvidence"] = [
+                dict(
+                    g1_current,
+                    gateId="G0",
+                    evidencePath=local_prior.relative_to(
+                        subject_repo
+                    ).as_posix(),
+                    evidenceSha256=sha256_bytes(local_prior_raw),
+                ),
+                g1_current,
+            ]
+            g1_path = external / "trust-context-local-prior.json"
+            g1_raw = json.dumps(g1_context).encode("utf-8")
+            g1_path.write_bytes(g1_raw)
+            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(g1_raw)
+            g1_document = copy.deepcopy(trusted_document)
+            g1_document["gateId"] = "G1"
+            g1_errors: list[tuple[str, str]] = []
+            _validate_trust_context(
+                g1_path,
+                g1_document,
+                trusted_evidence,
+                subject_repo,
+                g1_errors,
+                gate_id="G1",
+            )
+            checks += 1
+            if "E_AUTHORIZATION_CHAIN" not in {code for code, _ in g1_errors}:
+                print(
+                    "SELF-TEST FAIL: locally created predecessor escaped the "
+                    "authorization chain"
+                )
+                return 1
+            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(context_raw)
+
         with tempfile.TemporaryDirectory() as temp:
             try:
                 (
@@ -3665,7 +3869,8 @@ def run_self_test() -> int:
                     weakened_subject,
                     weakened_trusted,
                     weakened_context_raw,
-                ) = build_trusted_harness(
+                ) = _build_trusted_harness(
+                    fixture,
                     Path(temp),
                     weaken_subject_schema=True,
                     document_mutation=lambda value: value.update(forbidden=True),
@@ -3673,7 +3878,7 @@ def run_self_test() -> int:
             except (OSError, ValueError) as error:
                 print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
                 return 1
-            os.environ.update(harness_environment(weakened_context_raw))
+            os.environ.update(_harness_environment(weakened_context_raw))
             weakened_codes = {
                 code
                 for code, _ in validate_document(
@@ -3776,7 +3981,331 @@ def run_self_test() -> int:
                 print(f"SELF-TEST FAIL: strict loader accepted {path.name}")
                 return 1
 
+    topology_result = run_self_test_topology()
+    if topology_result != 0:
+        return 1
+    generator_result = run_generator_self_test()
+    if generator_result != 0:
+        return 1
+
     print(f"OK: {checks} Evidence-Semantik-Negativkontrollen bestanden.")
+    return 0
+
+
+def run_self_test_topology() -> int:
+    """End-to-end CLI controls for the trusted/subject topology (D-064).
+
+    Unlike the in-process controls above, these cases invoke the validator
+    exactly like the protected workflow does: the script runs from the
+    trusted tool checkout and learns the subject repository only via
+    ``--subject-root``.
+    """
+
+    fixture, _, _, _, _ = _self_test_fixture()
+    checks = 0
+    environment_names = (
+        "GITHUB_ACTIONS",
+        "GITHUB_REPOSITORY",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+        "GITHUB_JOB",
+        "GITHUB_WORKFLOW_REF",
+        "NOVA_TRUST_CONTEXT_SHA256",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+    )
+    saved_environment = {name: os.environ.get(name) for name in environment_names}
+    try:
+        with tempfile.TemporaryDirectory() as temp:
+            harness_root = Path(temp)
+            try:
+                (
+                    document,
+                    evidence_file,
+                    context_path,
+                    subject_repo,
+                    trusted_repo,
+                    context_raw,
+                ) = _build_trusted_harness(fixture, harness_root)
+            except (OSError, ValueError) as error:
+                print(f"SELF-TEST-TOPOLOGY FAIL: cannot build harness: {error}")
+                return 1
+            del document
+            environment = os.environ.copy()
+            environment.update(_harness_environment(context_raw))
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            validator = trusted_repo / "quality/scripts/validate_gate_evidence.py"
+
+            def run_cli(*cli_arguments: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [sys.executable, str(validator), *cli_arguments],
+                    cwd=harness_root,
+                    env=environment,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=180,
+                )
+
+            checks += 1
+            positive = run_cli(
+                "--trusted-tool-checkout",
+                str(trusted_repo),
+                "--subject-root",
+                str(subject_repo),
+                "--trust-context",
+                str(context_path),
+                str(evidence_file),
+            )
+            if positive.returncode != 0 or "AUTHORIZED PASS" not in positive.stdout:
+                print(
+                    "SELF-TEST-TOPOLOGY FAIL: trusted CLI topology rejected "
+                    f"an authorized pass:\n{positive.stdout}"
+                )
+                return 1
+
+            checks += 1
+            same_root = run_cli(
+                "--trusted-tool-checkout",
+                str(subject_repo),
+                "--subject-root",
+                str(subject_repo),
+                "--trust-context",
+                str(context_path),
+                str(evidence_file),
+            )
+            if same_root.returncode == 0 or "E_TRUSTED_TOOL" not in same_root.stdout:
+                print(
+                    "SELF-TEST-TOPOLOGY FAIL: identical trusted/subject root "
+                    "was accepted"
+                )
+                return 1
+
+            staged = trusted_repo / "quality/evidence/G0/staged/GateEvidence.json"
+            staged.parent.mkdir(parents=True, exist_ok=True)
+            staged.write_text("{}\n", encoding="utf-8")
+            try:
+                checks += 1
+                dirty = run_cli(
+                    "--trusted-tool-checkout",
+                    str(trusted_repo),
+                    "--subject-root",
+                    str(subject_repo),
+                    "--trust-context",
+                    str(context_path),
+                    str(evidence_file),
+                )
+                if dirty.returncode == 0 or "E_TRUSTED_TOOL" not in dirty.stdout:
+                    print(
+                        "SELF-TEST-TOPOLOGY FAIL: staged untracked evidence "
+                        "inside the trusted checkout was accepted"
+                    )
+                    return 1
+            finally:
+                staged.unlink()
+
+            checks += 1
+            default_root = subprocess.run(
+                [
+                    sys.executable,
+                    str(validator),
+                    "--trusted-tool-checkout",
+                    str(trusted_repo),
+                    "--trust-context",
+                    str(context_path),
+                    str(evidence_file),
+                ],
+                cwd=trusted_repo,
+                env=environment,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=180,
+            )
+            if (
+                default_root.returncode == 0
+                or "AUTHORIZED PASS" in default_root.stdout
+            ):
+                print(
+                    "SELF-TEST-TOPOLOGY FAIL: missing --subject-root did not "
+                    "fail closed"
+                )
+                return 1
+
+            checks += 1
+            generator = ROOT / ".github/scripts/generate_trust_context.py"
+            api_environment = {
+                name: value
+                for name, value in environment.items()
+                if name not in ("GH_TOKEN", "GITHUB_TOKEN")
+            }
+            offline = subprocess.run(
+                [
+                    sys.executable,
+                    str(generator),
+                    "--evidence",
+                    str(evidence_file),
+                    "--trusted-sha",
+                    "0" * 40,
+                    "--output",
+                    str(harness_root / "external/offline-context.json"),
+                ],
+                cwd=harness_root,
+                env=api_environment,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=60,
+            )
+            if offline.returncode == 0:
+                print(
+                    "SELF-TEST-TOPOLOGY FAIL: trust context generation "
+                    "succeeded without GitHub API credentials"
+                )
+                return 1
+    finally:
+        for name, previous in saved_environment.items():
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
+
+    print(f"OK: {checks} Topologie-End-to-End-Kontrollen bestanden.")
+    return 0
+
+
+def run_generator_self_test() -> int:
+    """Offline controls for generate_trust_context.verify_chain (D-065).
+
+    The GitHub API layer (``gh_api``) is replaced with canned responses; no
+    network access happens in the self-test.
+    """
+
+    import importlib.util
+
+    generator_path = ROOT / ".github/scripts/generate_trust_context.py"
+    spec = importlib.util.spec_from_file_location(
+        "generate_trust_context", generator_path
+    )
+    if spec is None or spec.loader is None:
+        print("SELF-TEST-GENERATOR FAIL: cannot load generate_trust_context.py")
+        return 1
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    sha = "1" * 40
+
+    def entry(gate: str, run_id: str, job_id: str) -> dict[str, Any]:
+        return {
+            "gateId": gate,
+            "evidencePath": (
+                f"quality/evidence/{gate}/{sha}/attempt/GateEvidence.json"
+            ),
+            "evidenceSha256": "2" * 64,
+            "subjectCommitSha": sha,
+            "subjectTreeSha": "3" * 40,
+            "ciRunId": run_id,
+            "ciJobId": job_id,
+            "ciAttestationSha256": "4" * 64,
+            "reviewArtifactSha256": "5" * 64,
+        }
+
+    authorize_job = {
+        "id": 456,
+        "name": "gate-evidence-authorize",
+        "conclusion": "success",
+    }
+    integrity_job = {"id": 789, "name": "integrity", "conclusion": "success"}
+
+    def run_document(
+        event: str = "workflow_dispatch",
+        conclusion: str = "success",
+        head_sha: str = sha,
+    ) -> dict[str, Any]:
+        return {
+            "path": ".github/workflows/quality-gate.yml",
+            "event": event,
+            "conclusion": conclusion,
+            "head_sha": head_sha,
+        }
+
+    cases: list[
+        tuple[str, list[dict[str, Any]], dict[str, Any], dict[str, Any], bool]
+    ] = [
+        (
+            "valid-two-gate-chain",
+            [entry("G0", "100", "456"), entry("G1", "101", "456")],
+            {"100": run_document(), "101": run_document()},
+            {
+                "100": {"jobs": [dict(authorize_job)]},
+                "101": {"jobs": [dict(authorize_job)]},
+            },
+            False,
+        ),
+        (
+            "pull-request-event-run",
+            [entry("G0", "100", "456")],
+            {"100": run_document(event="pull_request")},
+            {"100": {"jobs": [dict(authorize_job)]}},
+            True,
+        ),
+        (
+            "integrity-job-instead-of-authorize",
+            [entry("G0", "100", "789")],
+            {"100": run_document()},
+            {"100": {"jobs": [dict(integrity_job)]}},
+            True,
+        ),
+        (
+            "reused-run-id-across-gates",
+            [entry("G0", "100", "456"), entry("G1", "100", "456")],
+            {"100": run_document()},
+            {"100": {"jobs": [dict(authorize_job)]}},
+            True,
+        ),
+        (
+            "head-sha-mismatch",
+            [entry("G0", "100", "456")],
+            {"100": run_document(head_sha="9" * 40)},
+            {"100": {"jobs": [dict(authorize_job)]}},
+            True,
+        ),
+    ]
+
+    checks = 0
+    for name, chain, runs, jobs, expect_problems in cases:
+        def fake_gh_api(
+            endpoint: str,
+            _runs: dict[str, Any] = runs,
+            _jobs: dict[str, Any] = jobs,
+        ) -> dict[str, Any]:
+            prefix = f"repos/{module.REPOSITORY}/actions/runs/"
+            if endpoint.endswith("/jobs"):
+                run_id = endpoint[len(prefix) : -len("/jobs")]
+                if run_id not in _jobs:
+                    raise ValueError(f"unknown run {run_id}")
+                return _jobs[run_id]
+            run_id = endpoint[len(prefix) :]
+            if run_id not in _runs:
+                raise ValueError(f"unknown run {run_id}")
+            return _runs[run_id]
+
+        module.gh_api = fake_gh_api
+        problems = module.verify_chain(
+            chain, ["gate-evidence-authorize"] * len(chain)
+        )
+        checks += 1
+        if expect_problems and not problems:
+            print(f"SELF-TEST-GENERATOR FAIL: {name} was accepted")
+            return 1
+        if not expect_problems and problems:
+            print(f"SELF-TEST-GENERATOR FAIL: {name} was rejected: {problems}")
+            return 1
+
+    print(f"OK: {checks} Generator-GitHub-Verifikations-Kontrollen bestanden.")
     return 0
 
 
@@ -3800,6 +4329,14 @@ def main() -> int:
         help="run generated positive/negative controls without creating evidence",
     )
     parser.add_argument(
+        "--self-test-topology",
+        action="store_true",
+        help=(
+            "run only the CLI topology controls (trusted checkout plus "
+            "subject root as separate git worktrees)"
+        ),
+    )
+    parser.add_argument(
         "--trust-context",
         type=Path,
         help=(
@@ -3815,10 +4352,23 @@ def main() -> int:
             "pinned npm dependencies); required to authorize verdict=pass"
         ),
     )
+    parser.add_argument(
+        "--subject-root",
+        type=Path,
+        default=ROOT,
+        help=(
+            "subject repository root the evidence belongs to; defaults to "
+            "the repository containing this script. In the protected "
+            "workflow the script runs from the trusted checkout, so the "
+            "subject must be passed explicitly"
+        ),
+    )
     arguments = parser.parse_args()
 
     if arguments.self_test:
         return run_self_test()
+    if arguments.self_test_topology:
+        return run_self_test_topology()
     if not arguments.evidence:
         parser.error("provide at least one GateEvidence.json or use --self-test")
 
@@ -3833,6 +4383,7 @@ def main() -> int:
         errors = validate_document(
             document,
             path,
+            root=arguments.subject_root,
             trust_context_path=arguments.trust_context,
             trusted_checkout=arguments.trusted_tool_checkout,
         )
