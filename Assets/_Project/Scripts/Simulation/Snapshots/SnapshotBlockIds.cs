@@ -22,5 +22,8 @@ namespace Nova.Simulation.Snapshots
 
         /// <summary>Pathfinding block (flow-field target; the field itself is rebuilt on restore).</summary>
         public const ushort Pathfinding = FirstSystemBlock + 1;
+
+        /// <summary>Fog of War block (committed per-team masks, last recompute tick), written by FogOfWarSystem.</summary>
+        public const ushort FogOfWar = FirstSystemBlock + 2;
     }
 }

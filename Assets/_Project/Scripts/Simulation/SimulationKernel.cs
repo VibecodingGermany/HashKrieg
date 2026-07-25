@@ -95,10 +95,20 @@ namespace Nova.Simulation
         /// match-relevant state MUST implement <see cref="IStatefulSimSystem"/>
         /// — otherwise its state is missing from the canonical state hash and
         /// from snapshots, and restored hosts silently desync. The prototype
-        /// scaffolding systems (Combat, Economy, Production, Vision — with
+        /// scaffolding systems (Combat, Economy, Production — with
         /// known 20 Hz and float relics) deliberately do NOT satisfy this yet
         /// and must be migrated in their domain slices BEFORE they may be
         /// registered here.
+        /// <para>
+        /// Tick order (SimulationCore.md section 2): systems execute in exact
+        /// registration order, so the registration order must mirror the
+        /// canonical pipeline — pathfinding/movement first, then the Fog of
+        /// War system (its 5 Hz recompute sees the final positions of the
+        /// tick), then combat and projectiles, then match/victory logic. A
+        /// FoW system registered before movement would recompute on stale
+        /// positions; a combat system registered before FoW would judge
+        /// targeting on the previous recompute.
+        /// </para>
         /// </summary>
         public void RegisterSystem(ISimSystem system)
         {

@@ -285,6 +285,37 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   `authorizedEvidence`-Kette, `NOVA_TRUST_CONTEXT_SHA256`-Bindung). Der
   Authorize-Job bleibt bis zur Korrektur der Checkout-, Input- und
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
+- **G1 Fog of War kanonisch (ohne Gate-Status, ohne Evidence):** erstes
+  Domain-System nach Movement auf den kanonischen Vertrag migriert
+  ([docs/tech/FogOfWar.md](docs/tech/FogOfWar.md), D-058). `FogOfWarSystem`
+  in `Nova.Simulation.Vision` (ersetzt das Prototyp-Scaffolding
+  `VisionSystem`/`VisionGrid`): committed 1-m-Grid-Maske pro Team
+  (128 × 128, byte-Array, 16 KiB/Team) mit den Zuständen
+  `Unexplored`/`Explored`/`Visible`; 5-Hz-Recompute intern auf jedem zweiten
+  Tick (`tick % 2 == 0`), registriert nach Movement und vor Combat
+  ([docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §2);
+  MS-1-Sichtmodell nur Radien (exakter Zellmittelpunkt-Test in Q16.16,
+  Grenze inklusiv, stabile aufsteigende Entity-Index-Reihenfolge);
+  `TeamView` als einzige committed Sicht (kein System kann eine vorläufige
+  oder selbst berechnete Sicht ziehen), `GetVisibleEntities` (eigene immer,
+  fremde nur in `Visible`-Zellen), `GetRadarSignatures` als Minimap-Pings
+  ohne `EntityId` und ohne Targeting-Berechtigung (provisorische
+  Radar-Reichweite = 2 × Sichtweite — Q-040-Kandidat). Autoritativer
+  Snapshot-Block 102 (v1: Dimensionen, Teamzahl, letzter Recompute-Tick,
+  beide Team-Masken; hash-sensitiv pro Zelle; zweiphasiges
+  TryValidate/TryRestore). `UnitState.SightRadius` als autoritatives
+  SimFixed-Feld ergänzt (Default 10 m, provisorisch — Q-040-Kandidat;
+  Entity-Store-Block v3, v1/v2 werden hart abgelehnt). Verdrahtung in
+  `MatchRunner` und `Nova.SimRunner` in kanonischer Tickreihenfolge.
+  Tests in beiden Lanes (`FogOfWarSystemTests`): Zustandsübergänge,
+  5-Hz-Kadenz inkl. committed Sicht zwischen Recomputes, exakte
+  Kreisrasterung, Teamtrennung, Radar-Vertrag, Hidden-World-Metamorphics
+  ([docs/tech/Testing.md](docs/tech/Testing.md) §5: verborgene
+  Gegner-Variation lässt committed Maske, Zielmenge und Radar der eigenen
+  Sicht bitidentisch; keine Wirkung vor dem Commit-Tick), Snapshot-
+  Roundtrip/-Fortsetzung über Recomputes hinweg, Zwei-Kernel-Determinismus
+  über 200 Ticks, Parser-Härtung; EntityStore-Suite auf v3 gehoben
+  (`EntityStoreSnapshotTests`, vormals `…V2Tests`).
 
 ### Behoben
 - **EditMode-Testzählung im Gate-Runner:** `run_gate_check.py` zählte
