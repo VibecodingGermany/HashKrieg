@@ -77,6 +77,19 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void Multiplication_MaxValueTimesMaxValue_Throws()
+        {
+            Assert.Throws<OverflowException>(() =>
+            {
+                var _ = SimFixed.MaxValue * SimFixed.MaxValue;
+            });
+            Assert.Throws<OverflowException>(() =>
+            {
+                var _ = SimFixed.MinValue * SimFixed.MinValue;
+            });
+        }
+
+        [Test]
         public void Division_ByZero_Throws()
         {
             Assert.Throws<DivideByZeroException>(() =>
@@ -126,6 +139,21 @@ namespace Nova.SimRunner.Tests
             // Exact results are unaffected by rounding.
             Assert.That((SimFixed.One / two).RawValue, Is.EqualTo(32768), "1 / 2 = 0.5 exact");
             Assert.That((SimFixed.FromInt(7) / two).RawValue, Is.EqualTo(7 * 32768), "7 / 2 = 3.5 exact");
+        }
+
+        [Test]
+        public void Division_NegativeDivisorAndDividend_RoundTiesToEven()
+        {
+            // Exact sign combinations.
+            Assert.That((SimFixed.FromRaw(98304) / SimFixed.FromRaw(-131072)).RawValue, Is.EqualTo(-49152), "1.5 / -2 = -0.75");
+            Assert.That((SimFixed.FromRaw(-98304) / SimFixed.FromRaw(-131072)).RawValue, Is.EqualTo(49152), "-1.5 / -2 = 0.75");
+            // Ties with a negative dividend.
+            var two = SimFixed.FromInt(2);
+            Assert.That((SimFixed.FromRaw(-1) / two).RawValue, Is.EqualTo(0), "-0.5 raw -> 0 (even)");
+            Assert.That((SimFixed.FromRaw(-5) / two).RawValue, Is.EqualTo(-2), "-2.5 raw -> -2 (even)");
+            // Tie with a negative divisor.
+            Assert.That((SimFixed.FromRaw(3) / SimFixed.FromInt(-2)).RawValue, Is.EqualTo(-2), "1.5 raw / -2 -> -2 (even)");
+            Assert.That((SimFixed.FromRaw(-3) / SimFixed.FromInt(-2)).RawValue, Is.EqualTo(2), "-1.5 raw / -2 -> 2 (even)");
         }
 
         [Test]

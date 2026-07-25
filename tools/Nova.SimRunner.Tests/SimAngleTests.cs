@@ -40,6 +40,21 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void FromDegrees_FractionalDegrees_RoundTiesToEven()
+        {
+            // units = degreesRaw / 360; raw ≡ 180 (mod 360) is an exact half-unit tie.
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(180)).RawValue, Is.EqualTo(0), "0.5 units -> 0 (even)");
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(540)).RawValue, Is.EqualTo(2), "1.5 units -> 2 (even)");
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(900)).RawValue, Is.EqualTo(2), "2.5 units -> 2 (even)");
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(-180)).RawValue, Is.EqualTo(0), "-0.5 units -> 0 (even)");
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(-540)).RawValue, Is.EqualTo(65534), "-1.5 units -> -2 wraps to 65534");
+            // Non-tie fractions round to nearest.
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(100)).RawValue, Is.EqualTo(0), "0.278 units -> 0");
+            Assert.That(SimAngle.FromDegrees(SimFixed.FromRaw(260)).RawValue, Is.EqualTo(1), "0.722 units -> 1");
+            Assert.That(SimAngle.FromDegrees(SimFixed.One).RawValue, Is.EqualTo(182), "1 deg -> 182.04 units -> 182");
+        }
+
+        [Test]
         public void ToDegrees_IsExact()
         {
             Assert.That(SimAngle.FromRaw(1).ToDegrees().RawValue, Is.EqualTo(360));

@@ -74,6 +74,19 @@ namespace Nova.Core.Tests
         }
 
         [Test]
+        public void Multiplication_MaxValueTimesMaxValue_Throws()
+        {
+            Assert.Throws<OverflowException>(() =>
+            {
+                var _ = SimFixed.MaxValue * SimFixed.MaxValue;
+            });
+            Assert.Throws<OverflowException>(() =>
+            {
+                var _ = SimFixed.MinValue * SimFixed.MinValue;
+            });
+        }
+
+        [Test]
         public void Division_ByZero_Throws()
         {
             Assert.Throws<DivideByZeroException>(() =>
@@ -114,6 +127,18 @@ namespace Nova.Core.Tests
             Assert.AreEqual(2, (SimFixed.FromRaw(5) / two).RawValue, "2.5 raw -> 2 (even)");
             Assert.AreEqual(-2, (SimFixed.FromRaw(-3) / two).RawValue, "-1.5 raw -> -2 (even)");
             Assert.AreEqual(32768, (SimFixed.One / two).RawValue, "1 / 2 = 0.5 exact");
+        }
+
+        [Test]
+        public void Division_NegativeDivisorAndDividend_RoundTiesToEven()
+        {
+            Assert.AreEqual(-49152, (SimFixed.FromRaw(98304) / SimFixed.FromRaw(-131072)).RawValue, "1.5 / -2 = -0.75");
+            Assert.AreEqual(49152, (SimFixed.FromRaw(-98304) / SimFixed.FromRaw(-131072)).RawValue, "-1.5 / -2 = 0.75");
+            var two = SimFixed.FromInt(2);
+            Assert.AreEqual(0, (SimFixed.FromRaw(-1) / two).RawValue, "-0.5 raw -> 0 (even)");
+            Assert.AreEqual(-2, (SimFixed.FromRaw(-5) / two).RawValue, "-2.5 raw -> -2 (even)");
+            Assert.AreEqual(-2, (SimFixed.FromRaw(3) / SimFixed.FromInt(-2)).RawValue, "1.5 raw / -2 -> -2 (even)");
+            Assert.AreEqual(2, (SimFixed.FromRaw(-3) / SimFixed.FromInt(-2)).RawValue, "-1.5 raw / -2 -> 2 (even)");
         }
 
         [Test]

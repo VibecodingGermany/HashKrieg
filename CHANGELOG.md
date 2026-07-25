@@ -155,6 +155,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **G1-Vorarbeit, Review-Auflagen (P2-1 bis P2-5):** `SimRandom.SetSeed`
+  nutzt jetzt kanonisches SplitMix64 mit einem einzigen laufenden Zustand
+  (pro Wort um `0x9E3779B97F4A7C15` weitergeschaltet), sodass die beiden
+  Zustandswörter auch für Seed 0 statistisch unabhängig sind; die
+  PRNG-Sequenz ändert sich dadurch (Pre-G1-Reset, D-057) und die
+  Golden-Vektoren für Seed 0/1 sind in beiden Test-Lanes neu erzeugt.
+  Testlücken geschlossen: Division mit negativem Divisor/Dividend inklusive
+  Tie-Fällen, `SimAngle.FromDegrees` mit gebrochenen Graden inklusive
+  Tie-Fällen sowie `MaxValue × MaxValue`-Überlauf. Das Unity-Projekt setzt
+  nun `NOVA_FIXED_POINT` in `scriptingDefineSymbols` (Standalone-Gruppe),
+  womit Unity- und .NET-Projekte denselben Define-Stand haben
+  ([docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §9).
 - **G0-B-Assembly-Bereinigung (D-061-Kontrakt):** Die reinen Logik-Klassen
   `SelectionManager`, `CommandCardPresenter` und `MinimapRenderer` liegen
   jetzt in `Nova.Gameplay` (Host/Bridge), die Definitions-SOs

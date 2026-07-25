@@ -583,7 +583,8 @@ PlayerSettings:
   webGLCloseOnQuit: 0
   webWasm2023: 1
   webEnableSubmoduleStrippingCompatibility: 0
-  scriptingDefineSymbols: {}
+  scriptingDefineSymbols:
+    1: NOVA_FIXED_POINT
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend: {}

@@ -37,6 +37,19 @@ namespace Nova.Core.Tests
         }
 
         [Test]
+        public void FromDegrees_FractionalDegrees_RoundTiesToEven()
+        {
+            Assert.AreEqual(0, SimAngle.FromDegrees(SimFixed.FromRaw(180)).RawValue, "0.5 units -> 0 (even)");
+            Assert.AreEqual(2, SimAngle.FromDegrees(SimFixed.FromRaw(540)).RawValue, "1.5 units -> 2 (even)");
+            Assert.AreEqual(2, SimAngle.FromDegrees(SimFixed.FromRaw(900)).RawValue, "2.5 units -> 2 (even)");
+            Assert.AreEqual(0, SimAngle.FromDegrees(SimFixed.FromRaw(-180)).RawValue, "-0.5 units -> 0 (even)");
+            Assert.AreEqual(65534, SimAngle.FromDegrees(SimFixed.FromRaw(-540)).RawValue, "-1.5 units -> -2 wraps to 65534");
+            Assert.AreEqual(0, SimAngle.FromDegrees(SimFixed.FromRaw(100)).RawValue, "0.278 units -> 0");
+            Assert.AreEqual(1, SimAngle.FromDegrees(SimFixed.FromRaw(260)).RawValue, "0.722 units -> 1");
+            Assert.AreEqual(182, SimAngle.FromDegrees(SimFixed.One).RawValue, "1 deg -> 182 units");
+        }
+
+        [Test]
         public void ToDegrees_IsExact()
         {
             Assert.AreEqual(360, SimAngle.FromRaw(1).ToDegrees().RawValue);
