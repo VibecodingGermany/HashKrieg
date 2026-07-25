@@ -1,6 +1,6 @@
 # Modulspezifikation – Map- & Biom-Erweiterung (`Nova.Presentation.Maps`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Level Designer / Lead Technical Director | **Sprint:** Phase 2 (Modul 19)
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Level Designer / Lead Technical Director | **Sprint:** Phase 2 (Modul 19)
 
 ## Zweck
 
@@ -44,7 +44,7 @@ Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweite
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`MapDefinitionTests.cs`](../../../Assets/Tests/EditMode/Presentation/MapDefinitionTests.cs) (Validierung von Kartenabmessungen, Spawn-Punkten und Biom-Typen).
+* **Unit Tests:** [`MapDefinitionTests.cs`](../../../Assets/Tests/EditMode/Data/MapDefinitionTests.cs) (Validierung von Kartenabmessungen, Spawn-Punkten und Biom-Typen).
 
 ## Offene Punkte
 
@@ -63,3 +63,4 @@ Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweite
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Testpfad korrigiert: `MapDefinitionSO`/`MapBiomeType` liegen nach der G0-B-Assembly-Bereinigung in `Nova.Data`, der Test in `Nova.Data.Tests` | Lead Technical Director |

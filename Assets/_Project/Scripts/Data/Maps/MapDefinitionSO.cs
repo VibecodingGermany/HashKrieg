@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Nova.Presentation.Maps
+namespace Nova.Data
 {
     /// <summary>
     /// ScriptableObject defining map layout, spawn points, resource locations, and biome profile.

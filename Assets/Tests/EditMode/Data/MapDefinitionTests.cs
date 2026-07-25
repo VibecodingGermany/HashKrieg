@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
-using Nova.Presentation.Maps;
+using Nova.Data;
 
-namespace Nova.Presentation.Tests
+namespace Nova.Data.Tests
 {
     [TestFixture]
     public class MapDefinitionTests

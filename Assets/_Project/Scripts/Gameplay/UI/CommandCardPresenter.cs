@@ -1,6 +1,6 @@
 using System;
 
-namespace Nova.Presentation.UI
+namespace Nova.Gameplay
 {
     [Flags]
     public enum CommandButtonType

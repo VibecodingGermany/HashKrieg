@@ -107,6 +107,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **G0-B-Assembly-Bereinigung (D-061-Kontrakt):** Die reinen Logik-Klassen
+  `SelectionManager`, `CommandCardPresenter` und `MinimapRenderer` liegen
+  jetzt in `Nova.Gameplay` (Host/Bridge), die Definitions-SOs
+  `MapDefinitionSO`/`MapBiomeType` in `Nova.Data`; die leeren Assemblies
+  `Nova.Presentation.UI`/`Nova.Presentation.Maps` und die Test-Assembly
+  `Nova.Presentation.Tests` sind aufgelöst. Die vier Tests wurden ohne
+  inhaltliche Änderung nach `Nova.Data.Tests`/`Nova.Gameplay.Tests`
+  verschoben (kein Test gelöscht); die historischen Modul-Specs
+  `MapExpansion_Spec.md`/`RtsUi_Spec.md` verweisen auf die neuen Pfade.
 - `.gitignore`: die pauschale `*.csproj`-Regel ist jetzt root-scharf
   (`/*.csproj`), damit handgeschriebene Tool-Projektdateien versionierbar
   bleiben, während Unity-generierte Root-Projektdateien weiterhin ignoriert

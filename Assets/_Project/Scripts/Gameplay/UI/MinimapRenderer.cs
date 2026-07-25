@@ -1,6 +1,6 @@
 using System;
 
-namespace Nova.Presentation.UI
+namespace Nova.Gameplay
 {
     /// <summary>
     /// Minimap rendering utility converting 2D simulation world coordinates to minimap UI canvas coordinates.

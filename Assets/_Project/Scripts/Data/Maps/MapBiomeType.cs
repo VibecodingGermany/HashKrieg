@@ -1,4 +1,4 @@
-namespace Nova.Presentation.Maps
+namespace Nova.Data
 {
     /// <summary>
     /// Enum defining map biome environments in Project Nova.

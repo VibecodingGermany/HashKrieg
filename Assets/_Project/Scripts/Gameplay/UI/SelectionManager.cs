@@ -2,7 +2,7 @@ using System;
 using Nova.Core;
 using Nova.Simulation.State;
 
-namespace Nova.Presentation.UI
+namespace Nova.Gameplay
 {
     /// <summary>
     /// Presentation manager handling RTS unit selection (single click & drag box bounds).

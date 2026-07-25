@@ -1,6 +1,6 @@
 # Modulspezifikation – RTS-UI & Command-Card (`Nova.Presentation.UI`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** UI/UX Architect / Lead Technical Director | **Sprint:** Phase 1 (Modul 14)
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** UI/UX Architect / Lead Technical Director | **Sprint:** Phase 1 (Modul 14)
 
 ## Zweck
 
@@ -45,7 +45,7 @@ Dieses Dokument beschreibt die Präsentations-Schicht der **RTS-UI & Command-Car
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`SelectionManagerTests.cs`](../../../Assets/Tests/EditMode/Presentation/SelectionManagerTests.cs) (Rechtecks-Kollision, Command-Card Flag-Auswertung und Minimap-Skalierung).
+* **Unit Tests:** [`SelectionManagerTests.cs`](../../../Assets/Tests/EditMode/Gameplay/SelectionManagerTests.cs) (Rechtecks-Kollision, Command-Card Flag-Auswertung und Minimap-Skalierung).
 
 ## Offene Punkte
 
@@ -64,3 +64,4 @@ Dieses Dokument beschreibt die Präsentations-Schicht der **RTS-UI & Command-Car
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Testpfad korrigiert: `SelectionManager`/`CommandCardPresenter`/`MinimapRenderer` liegen nach der G0-B-Assembly-Bereinigung in `Nova.Gameplay`, der Test in `Nova.Gameplay.Tests` | Lead Technical Director |

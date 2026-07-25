@@ -1,9 +1,9 @@
 using NUnit.Framework;
 using Nova.Core;
-using Nova.Presentation.UI;
+using Nova.Gameplay;
 using Nova.Simulation.State;
 
-namespace Nova.Presentation.Tests
+namespace Nova.Gameplay.Tests
 {
     [TestFixture]
     public class SelectionManagerTests
