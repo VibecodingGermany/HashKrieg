@@ -18,6 +18,9 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- `global.json` im Repo-Root mit exaktem .NET-SDK-Pin `8.0.318`
+  (`rollForward: disable`), damit `dotnet`-Toolchain und Unity-Projekt
+  reproduzierbar denselben SDK-Stand verwenden (G0-B).
 - **G0-A Trusted-Gate-Bootstrap (D-064) als Draft-Checkpoint angelegt:**
   Evidence-Schema
   `1.3.0` mit Pflicht-`environmentId` an jedem Command und jeder
@@ -104,6 +107,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- `.gitignore`: die pauschale `*.csproj`-Regel ist jetzt root-scharf
+  (`/*.csproj`), damit handgeschriebene Tool-Projektdateien versionierbar
+  bleiben, während Unity-generierte Root-Projektdateien weiterhin ignoriert
+  werden; zusätzlich wird das Unity-generierte Purchasing-Artefakt
+  `Assets/Resources/BillingMode.json` (plus `.meta`) ignoriert.
+- `tools/Nova.SimRunner/Nova.SimRunner.csproj` ist jetzt versioniert und
+  setzt den Determinismus-Define `NOVA_FIXED_POINT`; der Define-Name ist in
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §9 (Version
+  1.1.1) als verbindlich für Unity und SimRunner festgelegt.
 - **Szenariovertrag `mvp-v1.json` auf `1.3.0`:** `authorizationStatus`
   beschreibt den vorgesehenen
   `trusted-tool-checkout-authorization`-Pfad; bis dessen geschützter Merge und
@@ -154,6 +166,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - [ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) dokumentiert Testfehler, Integrationslücken, fehlende Akzeptanznachweise und Planungswidersprüche am eingefrorenen Stand `460290e`.
 - [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) ersetzt pauschale Modul-Fertigmeldungen durch sequenzielle Gates G0–G5.
 - Sprint-6-Abschluss, Sprint-7-GO, 445-PT-Verbindlichkeit sowie die ungültigen Schließungen Q-018/Q-019 wurden durch D-055 zurückgezogen; R-16 wurde reaktiviert und R-17 ergänzt.
+
+### Entfernt
+- Getrackte Build-Outputs unter `tools/Nova.SimRunner/bin/` sind aus dem
+  Git-Index entfernt (die Dateien bleiben lokal erhalten; der Ordner ist
+  ignoriert). Damit erfüllt das Repo die G0-B-Regel „keine getrackten
+  generierten Binärdateien".
 
 ### Entschieden
 - **D-056:** Dependency-closed MS-1 mit Allianz/Legion, Glutrinne, neun
