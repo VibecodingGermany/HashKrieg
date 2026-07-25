@@ -402,6 +402,11 @@ namespace Nova.Simulation.CommandsV1
             }
 
             _dedupe.AddPending(record);
+            // The sequence floor tracks the accepted stream on every node
+            // identically (stream-derived authoritative sequence state); for
+            // replay import this is what reconstructs the recording host's
+            // floor from the recorded records alone.
+            _dedupe.RaiseSequenceFloor(record.PlayerSlot, record.Sequence);
             return CommandIngressResult.Accepted;
         }
 

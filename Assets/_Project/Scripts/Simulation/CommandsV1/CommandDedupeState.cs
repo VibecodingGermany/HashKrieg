@@ -52,7 +52,17 @@ namespace Nova.Simulation.CommandsV1
             }
         }
 
-        /// <summary>Next sequence the local slot will assign; 1 before the first command.</summary>
+        /// <summary>
+        /// Next sequence a slot will assign; 1 before the first command.
+        /// The floor also tracks the accepted stream: every accepted record
+        /// raises it past its own sequence (see
+        /// <see cref="RaiseSequenceFloor"/>), so the authoritative sequence
+        /// state is a deterministic function of the accepted stream and a
+        /// replay playback through the historical intake reconstructs it
+        /// exactly. A sequence burned by a rejected local submission is the
+        /// documented exception the stream cannot reconstruct (Q-040
+        /// candidate).
+        /// </summary>
         public uint NextLocalSequence(byte playerSlot) => _nextLocalSequence[playerSlot];
 
         /// <summary>Highest sealed sequence of a slot; 0 before the first sealed record.</summary>
@@ -100,6 +110,32 @@ namespace Nova.Simulation.CommandsV1
         public void AddPending(in CommandRecord record)
         {
             _pending[record.PlayerSlot].Add(record.Sequence, record);
+        }
+
+        /// <summary>
+        /// Raises the next-sequence floor of a slot past an accepted stream
+        /// sequence. Called by the ingress for every accepted record, live or
+        /// historical, so the floor reflects the stream on every node
+        /// identically; a local assignment has already advanced the floor
+        /// past its own sequence, so this never lowers it. The overflow
+        /// marker 0 is terminal (Commands.md section 1: the session is never
+        /// continued with a reused sequence); an accepted uint32-maximum
+        /// sequence moves the slot into the overflow state.
+        /// </summary>
+        public void RaiseSequenceFloor(byte playerSlot, uint acceptedSequence)
+        {
+            uint floor = _nextLocalSequence[playerSlot];
+            if (floor == 0) return;
+            if (acceptedSequence == uint.MaxValue)
+            {
+                _nextLocalSequence[playerSlot] = 0;
+                return;
+            }
+            uint raised = acceptedSequence + 1;
+            if (raised > floor)
+            {
+                _nextLocalSequence[playerSlot] = raised;
+            }
         }
 
         /// <summary>Number of pending records targeting the given tick (backpressure).</summary>
