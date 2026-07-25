@@ -5,7 +5,9 @@ using Nova.Simulation.State;
 namespace Nova.Gameplay
 {
     /// <summary>
-    /// Presentation manager handling RTS unit selection (single click & drag box bounds).
+    /// Gameplay-side tracker for RTS unit selection state (single click & drag box bounds).
+    /// UI-only state, no simulation mutation. Placement in Nova.Gameplay is the conscious
+    /// G0-B interim until Nova.UI exists (see Architecture.md section 2).
     /// </summary>
     public sealed class SelectionManager
     {

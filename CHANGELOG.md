@@ -18,6 +18,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G0-B-Review-Nacharbeiten:** `Builds/` als Player-Build-Ausgabeverzeichnis in
+  `.gitignore` ignoriert; veralteten Klassenkommentar in `SelectionManager`
+  korrigiert; G0-B-Interimsplatzierung der Prototyp-Selektions-/HUD-Logik in
+  `Nova.Gameplay` in [docs/tech/Architecture.md](docs/tech/Architecture.md)
+  §2 dokumentiert (Überführung nach `Nova.UI` mit G2, Version 1.3.1).
 - **G0-B-Buildbasis:** `Assets/_Project/Editor/BuildScript.cs` mit den
   CLI-Build-Methoden `BuildWindows64`/`BuildMacOSArm64` (Szenenliste aus den
   EditorBuildSettings, sauberes `companyName`/`productName`, fail-closed bei

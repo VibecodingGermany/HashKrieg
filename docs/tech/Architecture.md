@@ -1,6 +1,6 @@
 # Gesamtarchitektur
 
-**Version:** 1.3.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
+**Version:** 1.3.1 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
@@ -52,6 +52,12 @@ werden in fokussierten TDDs gepflegt; bei Abweichung führen D-056–D-064 und
 `Nova.Simulation` referenziert weder KI, Gameplay, Data, Presentation, UI noch
 Unity. Unity und SimRunner kompilieren dieselben Core-/Simulation-Quellen und
 determinismusrelevanten Defines.
+
+Bewusste G0-B-Interimsplatzierung: Die aus dem Prototyp übernommene reine
+Selektions-/HUD-Logik (`SelectionManager`, `CommandCardPresenter`,
+`MinimapRenderer`) liegt vorerst in `Nova.Gameplay`, weil `Nova.UI` erst mit
+G2 entsteht und die Klassen keine Unity-Abhängigkeit besitzen. Mit G2 werden
+sie in die dann entstehende UI-Assembly überführt.
 
 ## 3. Laufzeitfluss
 
@@ -152,3 +158,4 @@ und Byteparität belegt.
 | 1.1.0 | 2026-07-24 | D-062-Evidence-Semantik als führenden Architektur-Nachweis ergänzt | Lead Technical Director |
 | 1.2.0 | 2026-07-24 | D-063-Schema-1.2-/Check-/Trust-Vertrag als verbindliche Gate-Autorität ergänzt | Lead Technical Director |
 | 1.3.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt und G0-A-Trust-Bootstrap vor G0-B als Architektur-Exit ergänzt | Lead Technical Director |
+| 1.3.1 | 2026-07-25 | G0-B-Interimsplatzierung der Prototyp-Selektions-/HUD-Logik in `Nova.Gameplay` dokumentiert (Überführung nach `Nova.UI` mit G2) | Lead Technical Director |

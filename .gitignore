@@ -83,3 +83,6 @@ npm-debug.log*
 # Python
 __pycache__/
 *.pyc
+
+# Player build outputs
+Builds/
