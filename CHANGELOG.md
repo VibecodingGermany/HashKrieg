@@ -18,6 +18,38 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Vorarbeit Snapshot-Blockformat v1 (ohne Gate-Status, ohne Evidence):**
+  kanonischer Snapshot-Container in `Nova.Simulation.Snapshots` gemäß
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §7 und
+  [docs/tech/Serialization.md](docs/tech/Serialization.md) §2/§5 — festes
+  24-Byte-Envelope (Magic ASCII `NOVASNAP` als dokumentierte Eigenwahl, da
+  die Spec keinen Magic-Wert festlegt; FormatVersion u16 = 1, BlockCount,
+  PayloadBytes, State-Hash), Block-Tabelle (BlockId u16, Länge u32,
+  BlockHash u64 als reiner Content-Hash über `NOVA_FILE_V1`) und State-Hash
+  über `NOVA_STATE_V1` in strikt aufsteigender BlockId-Reihenfolge.
+  `SnapshotWriter` serialisiert deterministisch unabhängig von der
+  Übergabe-Reihenfolge (byteidentischer Roundtrip, §7 Punkt 1);
+  `SnapshotBlockWriter`/`SnapshotBlockReader` kodieren Little-Endian
+  feldidentisch zu `SimHashWriter` (`SimFixed`/`SimAngle`/`Tick`/`EntityId`,
+  Längenpräfixe). Parserhärtung nach §7 Punkt 4: 64-MiB-Hardcap vor dem
+  Payload-Parse, alle Längen arithmetisch (long) vor jeder Allokation
+  geprüft, Truncation an jeder Position, Bit-Korruption an jedem Byte,
+  gefälschte Längenfelder, unbekannte FormatVersion, doppelte/unsortierte
+  BlockIds und Trailing Bytes deterministisch über `SnapshotReadError`
+  abgelehnt — nie Exception, nie Partial State. Hash-Sensitivität nach §7
+  Punkt 3: 1-Bit-Mutation in einem Block ändert exakt dessen BlockHash und
+  den State-Hash, keine anderen Blockhashes. 4-MiB-Ziel als dokumentierter
+  Warn-/Info-Pfad (`ExceedsSoftTarget`), kein harter Fehler; 0 Blocke sind
+  dokumentiert kein kanonisches Artefakt (Writer-Throw, Reader
+  `EmptyBlockTable`). Golden-Bytes-Hex-Master als Format-Freeze-Regression.
+  Testsuiten in beiden Lanes (Unity EditMode + `tools/Nova.SimRunner.Tests`).
+  Der Prototyp-State (`State/`) bleibt bis zur G1-Integration unverändert
+  (D-057); das Blockformat ist eine eigenständig getestete Einheit ohne
+  State-Semantik. Offene Q-040-Kandidaten: endgültige BlockId-Registry des
+  Root-Inventars (Serialization.md §4) bei der G1-Integration, Magic-Wert
+  `NOVASNAP` als bis dahin implementierungsseitig eingefrorene Wahl,
+  Kompression bleibt Post-G1-Größenmessung vorbehalten (Serialization.md
+  „Offene Punkte").
 - **G1-Vorarbeit versiegelter Command-Pfad v1 (ohne Gate-Status, ohne
   Evidence):** kanonische Command-Schicht in `Nova.Simulation.CommandsV1`
   gemäß [docs/tech/Commands.md](docs/tech/Commands.md) — numerisch
