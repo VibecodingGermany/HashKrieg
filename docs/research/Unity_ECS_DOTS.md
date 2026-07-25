@@ -1,6 +1,6 @@
 # Unity ECS/DOTS vs. klassisches OOP – Architekturvergleich für Project Nova
 
-**Version:** 0.1.0 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 1
+**Version:** 0.1.1 | **Status:** Entwurf | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 1
 
 ## Zweck
 
@@ -159,12 +159,6 @@ Bridge/                   // Sim<->Presentation-Mapping, Pooling, Event-Puffer
 4. Abstimmung mit Q-013-Ergebnis (Netzwerkmodell); bei Lockstep-Entscheidung Fixed-Point-Recherche als Folge-Research beauftragen.
 5. Kalender-Reminder: Entities-Re-Evaluierung nach Unity-6.4-Release.
 
-## Änderungsverlauf
-
-| Version | Datum | Änderung | Verantwortlich |
-|---|---|---|---|
-| 0.1.0 | 2026-07-21 | Research-Erstfassung | Lead Technical Director |
-
 ## Quellen
 
 - [ECS Development Status – December 2025 (Unity Discussions, offizieller ECS-Team-Post)](https://discussions.unity.com/t/ecs-development-status-december-2025/1699284)
@@ -175,3 +169,10 @@ Bridge/                   // Sim<->Presentation-Mapping, Pooling, Event-Puffer
 - [Entities Graphics – Feature Matrix (Unity Manual)](https://docs.unity3d.com/Packages/com.unity.entities.graphics@1.0/manual/entities-graphics-versions.html)
 - [jdxdev-Blog: DOTS/Burst-Determinismus (Sekundärquelle, als Einschätzung gewertet)](https://www.jdxdev.com/blog/tag/unity/)
 - [Unity Discussions: Determinismus für RTS-Lockstep](https://discussions.unity.com/t/how-do-i-make-unity-deterministic-for-a-deterministic-lockstep-architecture-rts-development/254743)
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Verantwortlich |
+|---|---|---|---|
+| 0.1.0 | 2026-07-21 | Research-Erstfassung | Lead Technical Director |
+| 0.1.1 | 2026-07-24 | Quellen vor den terminalen Änderungsverlauf verschoben | Technical Writer |

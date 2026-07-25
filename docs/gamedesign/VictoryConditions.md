@@ -1,6 +1,6 @@
 # Victory Conditions – Sieg, Remis, Timeout, Aufgabe
 
-**Version:** 0.3.1 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.4.0 | **Status:** Vollspiel-Zielbild mit verbindlichem MS-1-Override | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 7
 
 ## Zweck
 
@@ -8,11 +8,34 @@ Definiert, wann ein Match von *Project Nova* endet und wer gewinnt: den Standard
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-007 (SP/Skirmish-first), D-008 (12 Gebäudetypen), D-015 (Elite-Einheiten), D-016 (Neutrale), D-018 (Modi-Staffelung), D-025 (Alpha-FFA lokal vs. KI, Online-Modi ab Beta), D-029 (PvP-Timeout-Schlüssel erst Beta-Balancing)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056
+  (führender MS-1-Siegvertrag) sowie D-007/D-008/D-015/D-016/D-018/D-025/D-029
+- [../production/MVPContentManifest.md](../production/MVPContentManifest.md)
 - [../vision/GameLoop.md](../vision/GameLoop.md) – Match-Phasen und Anti-Stall-Taktgeber
 - [../vision/CoreGameplay.md](../vision/CoreGameplay.md) – UI-Feedback-Prinzipien
 - [./MultiplayerModes.md](./MultiplayerModes.md) – Modi-Definitionen (Sprint 2, parallel)
 - [./Balancing.md](./Balancing.md) – Matchdauer-Tuning (Sprint 2, parallel)
+
+## MS-1-Override (D-056)
+
+Für G0–G5 gilt ausschließlich:
+
+- Auswertung nach Combat am Tickende;
+- Niederlage bei null lebenden Einheiten **und** null lebenden Gebäuden
+  einschließlich Baustellen;
+- Eliminierung einer Seite: `Victory.Elimination`;
+- Eliminierung beider Seiten im selben Tick:
+  `Draw.MutualAnnihilation`;
+- Tick 27.000 ohne Eliminierung: `Draw.TimeLimit`;
+- bei null Gebäuden und höchstens drei Einheiten werden diese nach 600
+  ununterbrochenen Ticks sichtbar und zielbar; endet die Bedingung, wird der
+  Zähler zurückgesetzt;
+- keine automatische KI-Aufgabe und kein Spieler-Surrender-Command.
+
+Optionale Zeitlimits, Mauerausnahmen, Aufgabe, Commander-Feedback,
+Team-/Survival-/PvP-Regeln und alle weiteren Profile im Alttext sind
+Post-MVP-Zielbild. Sie dürfen den MS-1-Vertrag nicht konfigurieren oder
+überschreiben.
 
 ## Standard-Sieg: Vernichtung
 
@@ -95,9 +118,10 @@ Im Solo-Skirmish ist der Screen ohne Zeitdruck verlassbar; im MP (ab Beta) führ
 
 ## Nächste Schritte
 
-- `VictoryProfile`-Datenstruktur in Sprint 3 mit Technical Design finalisieren.
-- KI-Aufgabe-Schwellen gemeinsam mit dem KI-Design abstimmen (Sprint 2/3).
-- Regeln für Koop-Zuschauer und Team-Reveal mit MultiplayerModes.md verzahnen.
+- In G4 ausschließlich den MS-1-Override gegen Contentmanifest und
+  Headless-Ergebniscodes abnehmen.
+- Optionale `VictoryProfile`, Surrender und KI-Aufgabe erst nach G5 mit neuer
+  D-ID planen.
 
 ## Änderungsverlauf
 
@@ -107,3 +131,4 @@ Im Solo-Skirmish ist der Screen ohne Zeitdruck verlassbar; im MP (ab Beta) führ
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030): Mauern aus Vernichtungsbedingung ausgenommen, Last-Unit-Reveal auf versteckte Gebäude ohne Einheiten (Evolvierte-Keime) ausgeweitet, D-025-Klarstellung (Alpha-FFA lokal, Online-Modi ab Beta), PvP-Timeout-Schlüssel auf Beta-Balancing verschoben (D-029) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Feinschliff Sprint 2 Runde 2 (D-031) | Lead Gameplay Designer |
 | 0.3.1 | 2026-07-21 | Technischer Abbruch (MP) auf finale D-038-Regel angeglichen (60-s-Grace, KI-Übernahme, kein Re-Entry; führend tech/Networking.md) | Lead Technical Director |
+| 0.4.0 | 2026-07-24 | Exakten D-056-Sieg-/Remis-/Reveal-Vertrag für MS-1 vorangestellt und widersprechende Altregeln auf Post-MVP begrenzt | Lead Gameplay Designer / Lead Technical Director |

@@ -1,6 +1,6 @@
 # Fahrzeuge (Vehicles)
 
-**Version:** 0.3.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -18,6 +18,25 @@ Spezifikation aller Bodenfahrzeuge für die drei Fraktionen (Allianz, Legion, Ev
 - [Economy](./Economy.md) – Währung AE, Startressourcen 1.000 AE, Harvester-Ladung ~300 AE
 - [Resources](./Resources.md) – Überernte-Regeln am Mutterkristall (D-010)
 - [KnowledgeBase](../analysis/KnowledgeBase.md) – Asset-Umfang 36 Fahrzeuge (APL Paket 05)
+
+## MS-1-Override (D-056)
+
+Für MS-1 gelten genau sechs Fahrzeugrollen je aktiver Fraktion:
+
+| Rolle | Allianz | Legion | Tier |
+|---|---|---|---|
+| Builder | Pionier „Atlas“ | Vorarbeiter | T1 |
+| Harvester | Sammler „Demeter“ | Schürfer | T1 |
+| Scout | Jackal-Aufklärer | Hyäne (Buggy) | T1 |
+| Leichter Panzer | Lynx | Räuber | T1 |
+| Kampfpanzer | Aegis | Koloss | T2 |
+| Artillerie | Longbow | Donnerkanone | T2 |
+
+Die Harvester-Kapazität beträgt für Allianz 330 AE und für Legion 300 AE.
+Frühere aktive Fähigkeiten, Umschalter, Drohnen, Eliten und alle weiteren
+Vollroster-Fahrzeuge sind Post-MVP. MS-1 führt dafür kein generisches
+Fähigkeits-, Status-, Kanal- oder Aurensystem ein. Führende Inhaltsquelle ist
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Datenmodell (ScriptableObject-tauglich)
 
@@ -169,12 +188,13 @@ Derzeit keine unentschiedenen Punkte. Stand nach Korrekturlauf Sprint 2 und Spri
 - Radar-Fahrzeug-Feuerleitung: **entschieden (D-026)** – Verbandsmechanik gestrichen; Radar-Fahrzeug = mobiler Radar + Detektor.
 - Harvester-Überernte: **keine eigenen Regeln hier** – Details in [Resources](./Resources.md) und [Economy](./Economy.md) (D-010).
 - Reichweiten-/Sichtweiten-Harmonisierung: **entschieden (D-047, Korrekturlauf Sprint 4)** – 1 Grid-Feld ≙ 1 m; [Weapons](./Weapons.md) führend für Waffenwerte (z. B. Artillerie 18–22 statt 80–85, Panzerkanonen 8–10), [FogOfWar](./FogOfWar.md) führend für Sichtklassen; alle Reichweiten-/Sicht-Spalten hier angeglichen bzw. durch Verweise ersetzt.
-- Alpha-Mutant-Doppeldefinition: **entschieden (Korrekturlauf Sprint 4, Review F-04)** – Vehicles.md ist führend für die Elite-Werte (3.000 AE, 7.000 HP, ~200-DPS-Klasse, Limit 1 MVP/2 Release); Produktionsgebäude = Brutkammer (Evolvierte-Kaserne, D-011); [Infantry](./Infantry.md) wird auf einen Verweis reduziert (separater Korrektur-Schritt am Infantry-Dokument).
+- Alpha-Mutant-Doppeldefinition: **historisch entschieden, durch D-056 aus
+  MS-1 verschoben** – Werte und Produktionsweg bleiben Post-MVP-Zielbild.
 
 ## Nächste Schritte
 
 1. Review durch Game Director und Lead Systems Design (Konter-Matrix, Kostenkurve).
-2. Werte-Export als ScriptableObject-Datensätze (Unity 6.3, flache Struktur oben) für das Balancing-Tool.
+2. Werte-Export als ScriptableObject-Datensätze (Unity `6000.5.4f1`, Revision `d550df8bd089`, flache Struktur oben) für das Balancing-Tool.
 3. Abstimmung mit [Economy](./Economy.md): Harvester-Zykluszeiten gegen Ziel-Matchdauer 20–35 min simulieren.
 4. Abstimmung mit [Aircraft](./Aircraft.md): gemeinsame Schadens-/Panzerungstypen finalisieren.
 5. Erste Playtest-Iteration (Skirmish 1v1 vs. KI, D-018) mit Allianz vs. Legion zur Kalibrierung der ±20 %-Kostenkurve.
@@ -186,3 +206,4 @@ Derzeit keine unentschiedenen Punkte. Stand nach Korrekturlauf Sprint 2 und Spri
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Vehicle Artist / Lead Gameplay Designer |
+| 0.4.0 | 2026-07-24 | Sechs MS-1-Fahrzeugrollen, Harvester-Kapazitäten und deaktivierte Fähigkeiten gemäß D-056 festgelegt | Lead Vehicle Artist / Lead Gameplay Designer |

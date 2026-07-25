@@ -1,6 +1,6 @@
 # Factions – Fraktions-Masterdokument
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -12,6 +12,23 @@ Zentrales Fraktions-Masterdokument: definiert Identität, Spielstil-Versprechen,
 - Wissensbasis: [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md)
 - Markt-/Zielgruppen-Research: [../research/RTS_Markt_Wettbewerb.md](../research/RTS_Markt_Wettbewerb.md)
 - Fachdokumente (Sprint 2, hier referenziert): ./Infantry.md, ./Vehicles.md, ./Aircraft.md, ./Buildings.md, ./Economy.md, ./Resources.md, ./ResearchTree.md, ./NeutralUnits.md, ./Campaign.md
+
+## MS-1-Override (D-056)
+
+MS-1 enthält nur Allianz und Legion. Die Evolvierten sowie ihre
+Wachstums-/Regenerationsmechaniken sind Post-MVP. Fraktionsidentität entsteht
+im geschlossenen Core ausschließlich lokal über Waffen- und
+Wirtschaftsdefinitionen:
+
+- Allianz: höhere Kosten, Präzision und Einzelschaden; 330 AE
+  Harvester-Kapazität.
+- Legion: niedrigere Kosten, schnellere Produktion, Salven und
+  Flächenschaden; 300 AE Harvester-Kapazität.
+
+Aktive Umschalter und ein generisches Fähigkeiten-/Statussystem sind nicht
+erforderlich. Der exakte Roster steht in
+[MVPContentManifest.md](../production/MVPContentManifest.md); der nachfolgende
+Drei-Fraktionen-Entwurf bleibt Post-MVP-Zielbild.
 
 ## Asymmetrie-Grundsatz
 
@@ -171,3 +188,4 @@ Alle Werte sind datengetrieben als flache Datensätze (ScriptableObject-tauglich
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
+| 0.3.0 | 2026-07-24 | MS-1 auf Allianz und Legion mit lokaler Waffen-/Wirtschaftsasymmetrie gemäß D-056 begrenzt | Lead Gameplay Designer |

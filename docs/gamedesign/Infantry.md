@@ -1,6 +1,6 @@
 # Infanterie – Einheiten-Design (24 Einheiten)
 
-**Version:** 0.3.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -12,6 +12,21 @@ Vollständige, spielbar spezifizierte Infanterie-Roster aller drei Fraktionen (8
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – Fraktions-Grunddaten
 - `RTS_Asset_Pipeline.md` (Projektroot), Paket 04 – verbindliche Einheitennamen
 - `./Factions.md`, `./Economy.md`, `./Buildings.md`, `./Vehicles.md`, `./Aircraft.md`, `./ResearchTree.md` (parallel in Sprint 2 in Arbeit) – Zahlengeüst: Währung AE, Start 1.000 AE, Harvester-Ladung ~300 AE, Tech-Tiers 1–3, Low-Power-Regel
+
+## MS-1-Override (D-056)
+
+MS-1 enthält pro aktiver Fraktion genau zwei Infanterierollen:
+
+| Rolle | Allianz | Legion | Tier |
+|---|---|---|---|
+| Basisinfanterie | Rifleman | Rekrut | T1 |
+| Panzerabwehrinfanterie | Rocket Soldier | Raketenschütze | T2 |
+
+Alle übrigen Einträge dieses Vollrosters sind Post-MVP. Frühere aktive
+Fähigkeiten dieser vier Einheiten sind deaktiviert; MS-1 führt kein generisches
+System für Fähigkeiten, Status, Kanäle oder Auren ein. Das verbindliche
+Gesamtmanifest liegt in
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Werte-Rahmen und Maßstäbe
 
@@ -142,3 +157,4 @@ Bereinigt im Korrekturlauf Sprint 4: Alpha-Mutant-Doppelwerte (Kosten/HP/DPS/Fä
 | 0.1.0 | 2026-07-21 | Erstfassung: 24 Infanterieeinheiten mit Rollen, Konter-Matrix, Werte-Richtwerten, Fähigkeiten, Tech-Voraussetzungen | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Alpha-Mutant-Werte/-Fähigkeiten durch Verweis auf Vehicles.md ersetzt (D-047-Grundsatzregel, keine Doppelpflege) | Lead Gameplay Designer |
+| 0.4.0 | 2026-07-24 | MS-1 auf Basis- und Panzerabwehrinfanterie von Allianz und Legion begrenzt; aktive Fähigkeiten gemäß D-056 deaktiviert | Lead Gameplay Designer |

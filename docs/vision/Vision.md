@@ -1,6 +1,6 @@
 # Vision – Project Nova
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Game Director | **Sprint:** 2
+**Version:** 0.4.1 | **Status:** Entwurf – MS-1-Recovery abgegrenzt | **Verantwortungsbereich:** Game Director | **Sprint:** 2
 
 ## Zweck
 
@@ -8,12 +8,23 @@ Das Leitbild von Project Nova: Was das Spiel sein soll, für wen, und nach welch
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – verbindliche Entscheidungen D-007–D-030
+- [../production/DecisionLog.md](../production/DecisionLog.md) – Vision-Entscheidungen D-007–D-030 und Recovery-Entscheidungen D-056/D-060
 - [../research/RTS_Markt_Wettbewerb.md](../research/RTS_Markt_Wettbewerb.md) – Marktbelege für Positionierung und Erfolgsszenario
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – gemeinsamer Faktenraum
 - [./USP.md](./USP.md) – ausformulierte Alleinstellungsmerkmale
 - [./TargetAudience.md](./TargetAudience.md) – Personas H1–H4
 - Quelldokument Projektroot: `RTS_Game_Design_Outline.md` (historischer Stand)
+
+## MS-1-Liefergrenze
+
+Diese Vision beschreibt bewusst das Vollspiel-Zielbild. Für den aktuell
+autorisierten MS-1-Produktionspfad führt D-056 beziehungsweise
+[MVPContentManifest.md](../production/MVPContentManifest.md): Allianz und
+Legion, ein lokales 1v1 gegen KI auf der klaren Wüstenkarte Glutrinne, je neun
+Gebäude- und acht Einheitenrollen sowie der vollständige Aetherium-Kern.
+Evolvierte, weitere Karten/Biome, Wetter, Kampagne, Online und sonstige hier
+genannte Vollspielbreite sind Post-MVP und keine versteckte Abhängigkeit des
+Coding-Starts.
 
 ## Leitbild
 
@@ -58,7 +69,11 @@ Drei Fraktionen sind Genre-Standard – kein USP. Der Anspruch ist, dass sich di
 - **Allianz** – High-Tech, präzise, teuer. Wenige, starke Einheiten; Ionenstrahl-Superwaffe. Identität: Qualität, Kontrolle, Overkill-Präzision.
 - **Legion** – Masse statt Klasse, günstig. Flammen und Raketen; thermobarische Superwaffe. Identität: Druck, Überwältigung, Opferbereitschaft.
 - **Evolvierte** – biologisch mutierte Kristallwesen. Wachstums-Bauweise statt Konstruktion (Keim pflanzen → reift; Aetherium-Nähe beschleunigt; Regeneration statt Reparatur) gemäß D-011; Kristallsturm-Superwaffe. Identität: Anpassung, Heilung, Symbiose mit Aetherium – die einzige Fraktion, die vom USP direkt profitiert.
-- **Identitäts-Layer statt Mechanik-Ballast:** Commander liefern Portrait, Voice und Story, aber keine Match-Mechanik im MVP (D-009). Asymmetrie entsteht über Bauweise, Ökonomie und Einheitenrollen – nicht über ein zweites Balancing-Universum.
+- **Identitäts-Layer statt Mechanik-Ballast:** Commander liefern im
+  Vollspiel-Zielbild Portrait, Voice und Story, aber keine Match-Mechanik
+  (D-009). D-056 verschiebt den gesamten Commander-Layer einschließlich
+  Portrait und Voice hinter MS-1. Die MS-1-Asymmetrie entsteht ausschließlich
+  über Wirtschaft, Werte und Einheitenrollen.
 - **Tiefe gestaffelt:** Elite-Einheiten (D-015), Support-Drohnen (D-014) und gezielte Zerstörbarkeit (D-012) geben jeder Fraktion Endspiel-Werkzeuge, ohne die Kernlesbarkeit zu gefährden.
 
 ### Säule 4: Solo-First-Qualität
@@ -78,7 +93,7 @@ Premium-Qualität heißt: Das Spiel muss ohne jede Online-Komponente vollständi
 - **Lesbarkeit als Art-Direction-Regel:** Silhouette > Detail. Jede Einheit muss in 2-facher Zoom-Entfernung per Umriss und Fraktionsfarbe identifizierbar sein. Details leben in der Nahansicht (Zoom belohnt Inspektion).
 - **Fraktions-Codes:** Allianz = kantig, metallisch, Azurblau/Stahlgrau, saubere Energieeffekte; Legion = massiv, verrostet, Rostrot/Ocker, dreckige Verbrennung; Evolvierte = organisch-kristallin, Violett/Bio-Grün, leuchtende Adern und Wachstumsanimationen (D-011 macht Bauen zum sichtbaren Schauspiel).
 - **Aetherium als visueller Anker:** Die Kristalle sind das Wiedererkennungszeichen des Spiels – Screenshots müssen ohne Logo als "Nova" erkennbar sein. Leuchten, Pulsieren, Ausbreitung und Verfall (Überernte) sind Key-VFX.
-- **Referenzrahmen:** Näher an Tempest Rising / C&C3-Ästhetik als an AoE IV oder BAR. Stilisierung ist auch Budget-Realismus (Asset-Pipeline, Unity 6.3/URP).
+- **Referenzrahmen:** Näher an Tempest Rising / C&C3-Ästhetik als an AoE IV oder BAR. Stilisierung ist auch Budget-Realismus (Asset-Pipeline, Unity `6000.5.4f1`, Revision `d550df8bd089`, URP).
 
 ## Was Project Nova bewusst NICHT ist
 
@@ -88,24 +103,26 @@ Anti-Ziele sind verbindlich: Wer ein Feature vorschlägt, das hier steht, muss z
 - **Keine Vollzerstörbarkeit / keine Terrain-Deformation** (D-012). Zerstörbar sind Gebäude, Einheiten, Vegetation/Dekor (brennbar), Brücken und Aetherium-Felder – gezielt und taktisch, nicht simulativ.
 - **Kein Marine-Combat** (D-013). Wasser ist Terrain-Feature (unpassierbar bzw. Brücken), keine dritte Kampfebene.
 - **Kein kompetitives Fundament:** MP ist Feature, nicht Fundament (D-007); Ranked existiert nur unter Vorbehalt (D-018). Wir bauen kein Esports-Spiel.
-- **Kein mechanisches Commander-/RPG-System im MVP** (D-009). Keine Heldeneinheiten mit Leveln, keine Match-Progression.
+- **Kein Commander-/RPG-System in MS-1** (D-056; D-009 teilweise ersetzt).
+  Keine Portrait-/Voice-Pipeline, Heldeneinheiten mit Leveln oder
+  Match-Progression.
 - **Kein Handelssystem / keine Händler** (D-016); keine Diplomatie-Simulation.
 - **Keine Konsolen-/Mobile-Version:** Desktop Windows/macOS (D-007).
 - **Keine Feature-Breite als Strategie:** Lieber ein polierter Kernloop als drei halbe Systeme (Markt-Research §4, Scheiternsursache 3).
 
 ## Offene Punkte
 
-- **DLC-/Longtail-Strategie:** Das Premium-Modell mit DLC-Longtail ist Marktempfehlung, aber zeitlich/inhaltlich nicht eingeordnet – kein Sprint-2-Blocker, für Produktionsplanung (Sprint 6) relevant. Status: offen.
-- **Preispunkt:** ~30–40 € (D-007) ist der verbindliche Korridor; finaler Preispunkt offen (Q-018, Sprint 6).
+- **DLC-/Longtail-Strategie:** Post-MVP; vor G5 keine Planungsabhängigkeit.
+- **Preispunkt:** ~30–40 € (D-007) ist der historische Korridor; finaler
+  Preispunkt Q-018 bleibt offen und blockiert MS-1 nicht.
 
 Entschieden seit 0.1.0: **Kampagnenstatus** (D-020 – Solo-Kampagne ja, Phase 3; aufgenommen in Säule 4, Konzeptrahmen [../gamedesign/Campaign.md](../gamedesign/Campaign.md)); **Persona-/Sandbox-Frage** (Sandbox-/Skalierungs-Nische ist Nicht-Zielgruppe, begründet über D-007 – siehe [./TargetAudience.md](./TargetAudience.md)).
 
 ## Nächste Schritte
 
-- [./USP.md](./USP.md) und [./TargetAudience.md](./TargetAudience.md) als verbindliche Detailausformulierung dieser Vision reviewen.
-- GDD-Dokumente (CoreGameplay, Resources/Economy, Factions, Buildings, Maps/Biomes) gegen die vier Säulen und die Anti-Ziele prüfen; jede Säulenverletzung → OpenQuestions.
-- Kampagne (D-020): [../gamedesign/Campaign.md](../gamedesign/Campaign.md) ist der verbindliche Phase-3-Konzeptrahmen; Detail- und Budgetplanung ist Phase-3-/Sprint-6-Thema.
-- Konsistenzreview Sprint 2: Begriff "isometrisch" aus allen GDD-Dokumenten entfernen (D-019).
+- Den MS-1-Produktionspfad ausschließlich gegen D-056 und das
+  Inhaltsmanifest prüfen.
+- Vollspiel-Säulen erst nach G5 in eine neue Scope-Entscheidung überführen.
 
 ## Änderungsverlauf
 
@@ -113,3 +130,6 @@ Entschieden seit 0.1.0: **Kampagnenstatus** (D-020 – Solo-Kampagne ja, Phase 3
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung: Leitbild, 4 Design-Säulen, Art Direction, Anti-Ziele | Game Director |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Game-Design-Spezialist |
+| 0.3.0 | 2026-07-24 | Recovery-Entscheidungen und exakten Unity-Pin gemäß D-056/D-060 eingeordnet | Game Director |
+| 0.4.0 | 2026-07-24 | Vollspiel-Vision explizit vom verbindlichen Closed-Core-MS-1-Lieferscope getrennt | Game Director |
+| 0.4.1 | 2026-07-24 | Commander-Identitätslayer vollständig als Post-MVP markiert und D-009-Teilersetzung durch D-056 sichtbar gemacht | Game Director |

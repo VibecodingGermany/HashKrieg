@@ -1,6 +1,6 @@
 # BUILD/MODIFY-Backlog (Eigenbau-Assets)
 
-**Version:** 1.0.0 | **Status:** sprint-freigegeben | **Verantwortungsbereich:** Art Director / Technical Artist | **Sprint:** 5
+**Version:** 1.1.0 | **Status:** sprint-freigegeben – MS-1 rebaselined | **Verantwortungsbereich:** Art Director / Technical Artist | **Sprint:** 5
 
 ## Zweck
 
@@ -24,7 +24,9 @@ Bündelt alle im [AssetRegister.md](AssetRegister.md) als **BUILD** oder aufwän
 
 ## 2. Backlog (priorisiert)
 
-Priorität: **P0** = für spielbaren MVP/Phase-0-Referenz zwingend; **P1** = für Alpha; **P2** = Beta/Release. Aufwand grob und **vor Phase-0-Kalibrierung** (siehe Offene Punkte).
+Priorität: **P0** = für MS-1 beziehungsweise den G0–G5-Pfad zwingend;
+**P1/P2** = Post-MVP. Aufwand grob und **vor G4-Kalibrierung** (siehe Offene
+Punkte).
 
 | # | Asset-Paket | Umfang | Prio | Aufwand (grob) | Bauvorgabe |
 |---|---|---|---|---|---|
@@ -39,30 +41,37 @@ Priorität: **P0** = für spielbaren MVP/Phase-0-Referenz zwingend; **P1** = fü
 | B-09 | **Alpha-Mutant (Elite)** | 1 Hero-Einheit | P1 | 3 PT | Ausnahmebudget (2× 2048²) |
 | B-10 | **RTS-UI-Layout** | Command-Card, Ressourcenleiste, Minimap, Gruppenporträts | **P0** | 4–6 PT | uGUI/UI Toolkit; Icons zugekauft |
 | B-11 | **Fraktions-Signaturen** | 3× Logo/Banner/Farbpalette/Ladebildschirm | P1 | 3–5 PT | Teamfarben-Masken-Standard |
-| B-12 | **Commander-Art + VO** | 3 Portraits/Key Art + Voice-Sets (~42–55 Lines MVP) | P1 | Art 3–5 PT + VO-Auftrag | [CommanderSystem.md](../gamedesign/CommanderSystem.md) |
+| B-12 | **Commander-Art + VO** | 3 Portraits/Key Art + Voice-Sets (~42–55 Lines Post-MVP) | P1 | Art 3–5 PT + VO-Auftrag | [CommanderSystem.md](../gamedesign/CommanderSystem.md) |
 | B-13 | **Superwaffen-Signatur-Aufbau** | 3 Gebäude-Kitbash (Ionenstrahl/Thermobar/Kristallsturm) | P2 | 6–9 PT | ≤35.000 Tris ([AssetBudget.md](../tech/AssetBudget.md) §1) |
 | B-14 | **MODIFY-Sammelposten** | Teamfarben-/LOD-/Material-Pässe für alle gekauften Allianz/Legion-Einheiten (~50 Typen) | P0–P1 | 0,25–1 PT je Typ | Material-Standard, LOD-Ketten |
 
 **Grobsumme Eigenbau (P0–P2, ohne VO-Auftrag):** Größenordnung **~110–180 Person-Tage** – dominiert von der kompletten Evolvierten-Fraktion (B-04–B-08 + B-09) und den Aetherium-Signatur-Assets (B-01–B-03). Diese Zahl ist die zentrale Realität für die Kapazitäts-/Zeitplanung (R-16) und **muss** in Sprint 6 in die Roadmap einfließen.
 
-## 3. Kritischer Pfad für Phase 0 / MVP
+## 3. Kritischer Pfad für MS-1
 
-Der spielbare Vertical Slice braucht zuerst: **B-01/B-02** (Aetherium als Signature-Referenz-Frame, [ProcurementStrategy.md](ProcurementStrategy.md) §Nächste Schritte), **B-10** (RTS-UI, ohne die kein Match bedienbar ist) und **B-14** (Material-Pass, damit gekaufte Einheiten kohärent aussehen). Die komplette Evolvierten-Fraktion (B-04–B-09) ist **nicht** MVP-kritisch, wenn der MVP auf Allianz/Legion beschränkt startet – das ist eine Scope-Entscheidung für Sprint 6.
+Der MS-1-Pfad braucht zuerst **B-01/B-02** (Aetherium als
+Signature-Referenz-Frame), **B-10** (bedienbares RTS-UI) und die für die
+Manifesttypen nötigen Teile von **B-14**. D-056 hat den Scope verbindlich auf
+Allianz und Legion begrenzt; B-04–B-09 sind Post-MVP und kein G0–G5-Kriterium.
+Der exakte Umfang steht in
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Offene Punkte
 
 - **Alle Person-Tage sind grobe Vorab-Schätzungen** ohne kalibrierten Referenz-Frame. Nach dem Phase-0-Bau von B-01 (Aetherium-Signature) sind sie in v1.1.0 nachzujustieren.
-- **MVP-Fraktions-Scope** (starten Allianz/Legion, Evolvierte ab Alpha?) ist eine Sprint-6-Entscheidung und verschiebt die P-Stufen von B-04–B-09.
+- **Post-MVP-Priorisierung:** Die Reihenfolge von B-04–B-09 wird erst nach G5
+  mit einer neuen Scope-Entscheidung festgelegt.
 - **VO-Aufwand** hängt am Composer-/Sprecher-Vertrag ([Licenses.md](Licenses.md), Offene Punkte).
 
 ## Nächste Schritte
 
-1. Sprint 6: Backlog in Roadmap/Meilensteine überführen; P-Stufen an den MVP-Fraktions-Scope binden; Grobsumme in die R-16-Aufwandsschätzung einspeisen.
-2. Phase 0: B-01/B-02 zuerst bauen (Signature-Referenz-Frame + Budget-Kalibrierung).
-3. Aufwand nach Phase 0 als v1.1.0 kalibrieren.
+1. Ab G4 nur die P0-Anteile gegen das MS-1-Manifest integrieren.
+2. B-01/B-02 zuerst bauen und als Signature-Referenz vermessen.
+3. Post-MVP-Backlog und Aufwand erst nach G5 neu entscheiden.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-07-22 | Erstfassung Sprint 5: 14 Eigenbau-Pakete priorisiert, Grobsumme ~110–180 PT, kritischer Phase-0-Pfad markiert | Art Director / Technical Artist |
+| 1.1.0 | 2026-07-24 | Fraktions-Scope gemäß D-056 geschlossen und P0-Pfad auf das MS-1-Manifest begrenzt | Art Director / Technical Artist |

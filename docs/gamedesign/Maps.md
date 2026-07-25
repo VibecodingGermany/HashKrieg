@@ -1,6 +1,6 @@
 # Karten (Maps)
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Level Designer | **Sprint:** 2
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Level Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -15,6 +15,23 @@ Definiert das Layout-Regelwerk für alle Project-Nova-Karten: Größenklassen, S
 - [./Resources.md](./Resources.md), [./Economy.md](./Economy.md) – Feld-Phasen, Ertragsraten, Startressourcen (1.000 AE)
 - [../research/Pathfinding.md](../research/Pathfinding.md), [../research/FogOfWar.md](../research/FogOfWar.md) – Grid- und Sicht-Budgets
 - [../production/SprintPlanning.md](../production/SprintPlanning.md) – Phasen MVP/Alpha/Beta/Release
+
+## MS-1-Override (D-056)
+
+MS-1 enthält ausschließlich **Glutrinne**: Wüste, Größe S, 128 × 128 Zellen
+bei 1 m/Zelle, klares Wetter und zwei symmetrische Hauptangriffswege.
+
+| Feldtyp | Anzahl | Reserve je Feld |
+|---|---:|---:|
+| Startfeld | 2 | 9.000 AE |
+| natürliche Expansion | 2 | 9.000 AE |
+| zentrales Feld | 1 | 15.000 AE |
+
+Es gibt keine Neutralen, Brücken, Capture-Ziele, Wettereffekte, Hazards oder
+Umgebungszerstörung; nur Aetherium darf sich verändern beziehungsweise
+dauerhaft beschädigt werden. Alle weiteren Karten, Größen und Biome im
+nachfolgenden Vollspielentwurf sind Post-MVP. Führende Inhaltsquelle ist
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Kartengrößen
 
@@ -148,3 +165,4 @@ Jede Karte ist ein flacher Datensatz (ScriptableObject-tauglich): `MapId, BiomeI
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung: Größenklassen, Layout-Regeln, Feld-Mengengerüst, Roadmap, Produktionsprozess | Lead Level Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Level Designer |
+| 0.3.0 | 2026-07-24 | Glutrinne mit Raster, Feldern, Routen und expliziten Nicht-Zielen als einzige MS-1-Karte gemäß D-056 festgelegt | Lead Level Designer |

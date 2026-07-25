@@ -1,20 +1,31 @@
 # Commander-System
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 2
+**Version:** 0.3.0 | **Status:** Post-MVP-Zielbild gemäß D-056 | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 7
 
 ## Zweck
 
-Definiert das Commander-System gemäß **D-009**: Commander sind der **Identitäts-Layer** von Project Nova – Portrait, Voice-Persönlichkeit und Hintergrund pro Fraktion – **ohne Match-Mechanik im MVP**. Das Dokument legt Konzept, Einsatzorte, Voice-Line-Kategorien mit Mengengerüst, den Signature-Asset-Bezug (TPD §7.2) und den evaluierbaren Doktrinen-Ausblick ab Beta fest. Verbindlich für UI/UX, Audio, Narrative und Art.
+Definiert das Commander-Vollspielziel gemäß **D-009**. D-056 verschiebt
+Commander, Portrait/Key Art, Voice und Doktrinen vollständig hinter G5; dieses
+Dokument autorisiert keine MS-1-Implementierung.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-009 (Commander als Identität, keine Match-Mechanik; Doktrinen frühestens Beta), D-007 (Zielgruppe H1, SP-first), D-018 (Phasenstaffelung), D-020 (Kampagne Phase 3, Solo; Koop über separate Szenarien)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-009
+  (Vollspielziel, für MS-1 teilweise ersetzt) und D-056 (Commander/Voice
+  Post-MVP)
 - [RTS_Technisches_Planungsdokument.md](../../RTS_Technisches_Planungsdokument.md) §7.2 – Commander als Signature-Asset
 - [../research/Animation_Audio_UI.md](../research/Animation_Audio_UI.md) – Voice-Management, `AudioService`-Abstraktion, FMOD ab Alpha
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – Fraktions-Stammdaten, Zahlengerüst
 - [./Factions.md](./Factions.md) – Fraktionsidentitäten, an die die Commander anschließen
 - [./Campaign.md](./Campaign.md) – Kampagnen-Dialoge als Einsatzort (Phase 3, D-020; keine Koop-Kampagne, Koop über separate Szenarien)
 - [./Biomes.md](./Biomes.md) – Wetter-/Hazard-Event-Namen für reaktive Barks (§4)
+
+## MS-1-Override (D-056)
+
+MS-1 registriert keine Commander-Definitionen, Portraits, Key Arts,
+Voice-Profile, Barks oder Doktrinen. UI und MatchResult dürfen keine
+Commander-Abhängigkeit besitzen. Der folgende Entwurf bleibt vollständig
+Post-MVP und wird erst nach bestandenem G5 mit einer neuen D-ID reaktiviert.
 
 ## 1. Grundprinzip (D-009)
 
@@ -125,10 +136,9 @@ Voraussetzungen, bevor das evaluiert werden kann:
 
 ## Nächste Schritte
 
-- Sprecher-Casting-Profile und Aufnahme-Skript für MVP-Kategorien (§4) erstellen, sobald [./Factions.md](./Factions.md) und Narrative-Grundlagen stehen.
-- Portrait-/Key-Art-Briefings an Art (Signature-Asset-Prozess, TPD §7.2) – 3 Commander, je 1 Portrait + 1 Key Art.
-- UI-Mockups: Fraktionsauswahl mit Commander-Portrait, Event-Ansagen-Einblendung im HUD (Wireframe, MVP).
-- Doktrinen-Ausblick nach Beta-Kickoff erneut auf den Tisch legen (Evaluierung gemäß D-009), inkl. Aufwandsschätzung Datenmodell + Balancing.
+- Keine Commander-Arbeit in G0–G5 einplanen.
+- Nach G5 Scope, Fraktionszahl, Asset-/Voice-Budget und Doktrinen mit neuer
+  D-ID neu bewerten.
 
 ## Änderungsverlauf
 
@@ -136,3 +146,4 @@ Voraussetzungen, bevor das evaluiert werden kann:
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead UI/UX Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030): Kampagne Phase 3 (D-020), 1 Commander/Fraktion + Post-Release-Option, "Der Chor" bestätigt, Vertonung EN→DE+EN (Q-018-Abhängigkeit), Wetter-/Hazard-Bark-Events aus Biomes.md | Lead UI/UX Designer |
+| 0.3.0 | 2026-07-24 | Commander, Voice, Portrait/Key Art und Doktrinen gemäß D-056 vollständig hinter G5 verschoben | Lead UI/UX Designer / Game Director |

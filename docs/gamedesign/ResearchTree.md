@@ -1,6 +1,6 @@
 # Technologiebaum (Research Tree)
 
-**Version:** 0.3.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -15,6 +15,15 @@ Definiert den Forschungsbaum aller drei Fraktionen (Allianz, Legion, Evolvierte)
 - [./Infantry.md](./Infantry.md), [./Vehicles.md](./Vehicles.md), [./Aircraft.md](./Aircraft.md) – Einheitenwerte, auf die Militär-Techs wirken; Elite-Einheiten-Definition in Vehicles.md (Sprint 2, parallel)
 - [./Buildings.md](./Buildings.md) – Forschungslabor, HQ-Neuaufbau ("Basis-Neugründung", §2.1), Superwaffen-Gebäude
 - [RTS_Game_Design_Outline.md](../../RTS_Game_Design_Outline.md) – Kategorien Tier 1–3, Wirtschaft/Militär/Spezialfähigkeiten/Superwaffen
+
+## MS-1-Override (D-056)
+
+MS-1 implementiert keinen Forschungsbaum. Die Fertigstellung des
+Forschungslabors schaltet T2 unmittelbar frei. Forschungs-Upgrades,
+Forschungswarteschlange, Ausschlussentscheidungen, T3, Eliten und Superwaffen
+sind Post-MVP. Die nachfolgenden Tech-Datensätze bleiben Vollspiel-Zielbild und
+sind kein G0–G5-Abnahmekriterium. Führende Inhaltsquelle ist
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Designprinzipien
 
@@ -108,7 +117,7 @@ Ausschluss-Begründung Legion: `THERMO` belohnt Flächenkontrolle und Synergie m
 | `TECH_EV_SPC_AGGRMUT` | Aggressive Mutation | SPC | 2 | 850 AE | 50 s | Forschungslabor (Bio-Äquivalent); schließt `REGENMUT` aus | Alle Einheiten: +15 % Angriffsgeschwindigkeit, −10 % Trefferpunkte (Glas-Cannon-Profil) |
 | `TECH_EV_SPC_REGENMUT` | Regenerative Mutation | SPC | 2 | 850 AE | 50 s | Forschungslabor; schließt `AGGRMUT` aus | Regeneration +50 % (Baseline-Regen verdoppelt sich faktisch), +10 % Trefferpunkte |
 | `TECH_EV_SPC_SPORE` | Aether-Sporen | SPC | 3 | 1.500 AE | 85 s | `T3_ERCORE` | Aktivierbare Fähigkeit: beschleunigt Aetherium-Feldausbreitung im Zielgebiet 120 s um +100 % (D-010) und heilt eigene Einheiten dort leicht |
-| `TECH_EV_MIL_ELITE` | Elite-Freischaltung (Evolvierte) | MIL | 3 | 1.500 AE | 75 s | `T3_ERCORE` | Schaltet die Evolvierte-Elite-Einheit frei (Definition in [./Vehicles.md](./Vehicles.md); Limit 1 im MVP, 2 ab Release gemäß D-015) |
+| `TECH_EV_MIL_ELITE` | Elite-Freischaltung (Evolvierte) | MIL | 3 | 1.500 AE | 75 s | `T3_ERCORE` | Historisches Post-MVP-Zielbild; in MS-1 deaktiviert (D-056) |
 
 Ausschluss-Begründung Evolvierte: `AGGRMUT` vs. `REGENMUT` ist die klassische Risiko-/Beständigkeits-Entscheidung; beides zusammen würde die Baseline-Schwäche (niedrige Einzelwerte, auf Regeneration angewiesen) vollständig kompensieren.
 
@@ -154,3 +163,4 @@ Begründung des zweistufigen Gates (Forschung + Bau): verhindert "Superwaffen-Ru
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Feinschliff Sprint 2 Runde 2 (D-031) | Lead Gameplay Designer |
+| 0.4.0 | 2026-07-24 | MS-1 auf unmittelbare T2-Freischaltung ohne Forschung, Queue oder T3 gemäß D-056 begrenzt | Lead Gameplay Designer |

@@ -1,6 +1,6 @@
 # Luftfahrzeuge (Aircraft)
 
-**Version:** 0.3.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.4.0 | **Status:** Post-MVP-Zielbild | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -18,6 +18,13 @@ Spezifikation aller Luftfahrzeuge für die drei Fraktionen (Allianz, Legion, Evo
 - [Economy](./Economy.md) – Währung AE
 - [FogOfWar-Research](../research/FogOfWar.md) – Sicht-/Aufklärungsregeln für Luft-Scouting
 - [KnowledgeBase](../analysis/KnowledgeBase.md) – Asset-Umfang 21 Luftfahrzeuge (APL Paket 06)
+
+## MS-1-Override (D-056)
+
+Luftfahrzeuge, Flugfeld, Flak und alle luftbezogenen Fähigkeiten sind
+vollständig Post-MVP. Keine Definition dieses Dokuments ist ein
+G0–G5-Abnahmekriterium. MS-1 umfasst ausschließlich die Bodeneinheiten aus
+[MVPContentManifest.md](../production/MVPContentManifest.md).
 
 ## Datenmodell (ScriptableObject-tauglich)
 
@@ -129,7 +136,9 @@ Alle Evolvierten-Flieger sind Kreaturen: Regeneration ~1 % HP/s nach 5 s kampffr
 | Heavy Gunship | Himmelsleviathan | 3 | 1.650 | 42 | 1.350 | – | 100 (Bio) | 9 | 11 | – | Kristallhaut (+25 % Panzerung bei vollem HP); wirft Bio-Brut ab (2 Nahkampf-Kreaturen beim Tod) | + Tier 3 |
 | Spezial | Säure-Bomberin „Siechschwinge" | 3 | 1.850 | 46 | 700 | – | 220/Abwurf (Bio-Säure) | Abwurf | 16 | 2 | Konzentrierter Säureabwurf: hoher DoT vs. Schwer/Gebäude, Säurepfütze verweigert Gelände 15 s | + Tier 3 |
 
-**Begründung Spezial:** Die Säure-Bomberin ist die MVP-Spezialeinheit der Evolvierten (D-026): die bio-horrorhafte Entsprechung zu EMP (Allianz) und Napalm (Legion) – asymmetrisch, aber gleich teuer und gleich selten (Tier 3, 2 Munition), ohne Controller-Wechsel-Logik. **Ausblick ab Beta:** Die Parasiten-Königin (dauerhafte Übernahme feindlicher Fahrzeuge <800 HP pro Abwurf) bleibt als Beta-Kandidat dokumentiert; sie scheidet für den MVP wegen Neuer-Controller-Logik und MP-Sync-Risiko aus (D-026).
+**Historischer Vollspielentwurf:** Die Säure-Bomberin war als früheste
+Spezialeinheit der Evolvierten vorgesehen (D-026). D-056 verschiebt sie und
+die Parasiten-Königin vollständig hinter MS-1.
 
 ## Balance-Leitplanken (fraktionsübergreifend)
 
@@ -146,9 +155,10 @@ Alle Evolvierten-Flieger sind Kreaturen: Regeneration ~1 % HP/s nach 5 s kampffr
 Entschieden im Korrekturlauf Sprint 2 (aus der Liste entfernt):
 
 - Verlust des Heimat-Flugfelds: milde Variante bestätigt – weiterfliegen, kein Nachladen ohne freie Bucht, kein Absturz.
-- Landebuchten: 4 pro Flugfeld bestätigt (kein Buchten-Ausbau-Upgrade im MVP).
+- Landebuchten: 4 pro Flugfeld im Post-MVP-Zielbild.
 - Evolvierte-Scout-Notwehr: als Bio-Asymmetrie akzeptiert (bleibt einziger bewaffneter Scout).
-- Parasiten-Königin: **entschieden (D-026)** – MVP-Spezialeinheit ist die Säure-Bomberin; Parasiten-Königin frühestens ab Beta (siehe Ausblick oben).
+- Parasiten-Königin: **durch D-056 verschoben** – gemeinsam mit der
+  Säure-Bomberin Post-MVP.
 
 ## Nächste Schritte
 
@@ -165,3 +175,4 @@ Entschieden im Korrekturlauf Sprint 2 (aus der Liste entfernt):
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Vehicle Artist / Lead Gameplay Designer |
+| 0.4.0 | 2026-07-24 | Gesamten Luft-/Flak-Umfang gemäß D-056 als Post-MVP abgegrenzt | Lead Vehicle Artist / Lead Gameplay Designer |

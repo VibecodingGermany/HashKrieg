@@ -1,6 +1,6 @@
 # Multiplayer- und Spielmodi
 
-**Version:** 0.4.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Vollspiel-Zielbild mit verbindlichem MS-1-Override | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 7
 
 ## Zweck
 
@@ -8,12 +8,30 @@ Definiert die Regeln aller Spielmodi von Project Nova gemäß der Phasenstaffelu
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-018 (Modi-Staffelung), D-020 (Kampagne Phase 3, Solo; Koop über separate Szenarien), D-025 (Alpha-FFA lokal vs. KI; Netz-Modi frühestens Beta), D-028 (Survival auf Standard-Karten), D-029 (kein Ressourcentransfer, Survival bis 4, kein Voice-Chat, PvP-Timeout-Formel erst Beta), D-007 (Premium, SP-first, MP = Feature), D-017 (Karten-Roadmap, Größen S/M/L, Biome/Hazards), D-016 (Neutrale, kein Handelssystem), D-010 (Ziel-Matchdauer 20–35 Min.), D-015 (Elite-Limit)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056/D-058
+  (führender MS-1-Modus und Kapazität) sowie D-007/D-010/D-015–D-018/
+  D-020/D-025/D-028/D-029
+- [../production/MVPContentManifest.md](../production/MVPContentManifest.md)
 - [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Lockstep-Empfehlung, Replay-/Observer-Modell, Map-Hack-Risiko (§4–§6)
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – Zahlengerüst (Startressourcen 1.000 AE, Harvester ~300 AE)
 - [./Economy.md](./Economy.md), [./Maps.md](./Maps.md) – Wirtschafts- und Kartendetails
 - [./Campaign.md](./Campaign.md) – Solo-Kampagne Phase 3 (D-020)
 - [../production/RiskAnalysis.md](../production/RiskAnalysis.md) – R-02 (MP-Architektur), R-10 (Server-MP nicht als Fundament)
+
+## MS-1-Override (D-056/D-058)
+
+MS-1 besitzt genau einen lokalen Modus: ein Mensch gegen eine KI, Allianz und
+Legion, zwei aktive von acht reservierten Slots, Glutrinne S 128×128 bei
+klarem Wetter. Je Seite starten ein fertiges HQ, eine fertige Raffinerie, ein
+Builder, zwei Harvester und 1.000 AE. Die Start-Raffinerie ist die einzige
+Voraussetzungsausnahme und erzeugt keinen zusätzlichen Harvester.
+
+Fest sind Standard-FoW, Spieltempo 1,0, Pause/Save/Load und die
+45-Minuten-Grenze aus D-056. Es gibt keine frei konfigurierbaren
+Ressourcen-/Starttruppen-/Wetter-/Superwaffen-/Elite-/Zeitlimit-Toggles,
+keinen Netzwerktransport und höchstens 100 Produktionseinheiten insgesamt.
+Alle abweichenden MatchSettings, der 600er-Deckel sowie Koop, FFA, Survival,
+PvP, Observer und Ranked im nachfolgenden Text sind Post-MVP-Zielbild.
 
 ## 1. Übersicht und Phasenstaffelung (D-018, D-025)
 
@@ -171,10 +189,9 @@ Technische Grundlage und Begründung: [../research/Multiplayer_Simulation.md](..
 
 ## Nächste Schritte
 
-- Lobby-/Match-Flow-Wireframes (Slot-Screen, Match-Einstellungen, Kartenwahl, Observer-Dashboard) als UI-Spezifikation ausarbeiten.
-- Mit [./Maps.md](./Maps.md) die Pool-Zuordnung (§5) und Layout-Anforderungen (KotH-Zone, Survival-Engstellen) abstimmen.
-- Mit MP-Engineering (Sprint 3, Q-013) die Lobby-Annahmen (Host-Modell, Ready-Check, Observer-Delay, Disconnect-Regel) gegen die Simulationsarchitektur validieren.
-- Ranked-Anforderungsliste (§3.7) als Evaluierungs-Checkliste in die Release-Planung übergeben.
+- In G4 nur das feste MS-1-Matchsetup und die UI dafür abnehmen.
+- Variable Lobbys, zusätzliche Modi und Online-Anforderungen erst nach G5
+  mit neuer D-ID reaktivieren.
 
 ## Änderungsverlauf
 
@@ -186,3 +203,4 @@ Technische Grundlage und Begründung: [../research/Multiplayer_Simulation.md](..
 | 0.3.1 | 2026-07-21 | Vernichtungs-Definition an VictoryConditions.md harmonisiert (D-032) | Lead Gameplay Designer |
 | 0.3.2 | 2026-07-21 | Disconnect-Regel als entschieden markiert und §3.2 auf D-038 angeglichen (60-s-Grace, KI-Übernahme, kein Re-Entry; führend tech/Networking.md) | Lead Technical Director |
 | 0.4.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): D-048 eingearbeitet – globales Einheiten-Deckel 600/Match (Produktionsstopp + UI-Hinweis), Survival-Endlos-Abflachung ab Welle 25 (linear) + Despawn, AetheriumDensity ≤1,5 bei 5–6 Spielern | Lead UI/UX Designer |
+| 0.5.0 | 2026-07-24 | Festes MS-1-Matchsetup, 100er-Produktionscap und Post-MVP-Grenze gemäß D-056/D-058 vorangestellt | Lead UI/UX Designer / Lead Technical Director |

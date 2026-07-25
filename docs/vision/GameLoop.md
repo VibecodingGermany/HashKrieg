@@ -1,6 +1,6 @@
 # Game Loop – Kernloop, Match-Phasen, Spannungsbögen
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -16,6 +16,21 @@ Beschreibt den spielerischen Kernloop von *Project Nova*, den zeitlichen Ablauf 
 - [../gamedesign/ResearchTree.md](../gamedesign/ResearchTree.md) – Tech-Tiers 1–3 (Sprint 2, parallel)
 - [../gamedesign/Maps.md](../gamedesign/Maps.md) und [../gamedesign/Biomes.md](../gamedesign/Biomes.md) – Kartengerüst (Sprint 2, parallel)
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – Zahlenkorsett (1.000 AE Start, ~300 AE Harvester-Ladung)
+
+## MS-1-Override (D-056)
+
+Der verbindliche MS-1-Loop ist ein lokales Solo-Skirmish Mensch gegen KI auf
+Glutrinne:
+
+`Sammeln → Bauen → Produzieren → Angreifen → Kontrollieren → Gewinnen`
+
+Ziel bleiben 20–35 Minuten. Artillerie öffnet statische Situationen; endliche,
+nachwachsende und durch Überernte dauerhaft schädigbare Aetherium-Felder
+erzwingen Expansion und bilden gemeinsam den Finisher. T3, Superwaffen,
+Evolvierte, Luft, Neutrale, Capture, Wetter, Online-Modi und weitere Karten
+sind Post-MVP. Die exakte Inhaltsgrenze steht in
+[MVPContentManifest.md](../production/MVPContentManifest.md); bei Widerspruch
+übersteuert dieser Abschnitt den nachfolgenden Vollspiel-Loop.
 
 ## Der Kernloop
 
@@ -111,3 +126,4 @@ Explizit **keine** Anti-Stall-Maßnahmen: keine plötzlichen Ressourcen-Influx-E
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030): D-025-Klarstellung (Alpha-FFA lokal vs. KI, Online-Modi ab Beta), Überernte-Härte an 4-Stufen-Modell aus Resources.md referenziert, Biom-Ausbreitungsmodifier an Biomes.md referenziert, Superwaffen-Limit 1 (D-023) ergänzt | Lead Gameplay Designer |
+| 0.3.0 | 2026-07-24 | Geschlossenen MS-1-Kernloop mit Artillerie und endlichen Aetherium-Feldern als Finisher gemäß D-056 festgelegt | Lead Gameplay Designer |

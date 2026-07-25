@@ -1,6 +1,6 @@
 # Asset-Register (Asset Audit)
 
-**Version:** 1.1.0 | **Status:** sprint-freigegeben | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 5
+**Version:** 1.2.1 | **Status:** sprint-freigegeben – MS-1 rebaselined | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 5
 
 ## Zweck
 
@@ -16,6 +16,15 @@ Die Bedarfsmengen folgen der **Single-Source-of-Truth-Regel** (D-047): jede Zahl
 - [../tech/AssetBudget.md](../tech/AssetBudget.md) – Polycount-/Textur-/LOD-Budgets, Kauf-Prüfung §6
 - [../research/AssetStore_Landschaft.md](../research/AssetStore_Landschaft.md) – Marktquellen und Preisniveaus
 - Führende GDD-Quellen: [../gamedesign/Factions.md](../gamedesign/Factions.md), [Buildings.md](../gamedesign/Buildings.md), [Infantry.md](../gamedesign/Infantry.md), [Vehicles.md](../gamedesign/Vehicles.md), [Aircraft.md](../gamedesign/Aircraft.md), [NeutralUnits.md](../gamedesign/NeutralUnits.md), [Biomes.md](../gamedesign/Biomes.md), [Maps.md](../gamedesign/Maps.md), [Resources.md](../gamedesign/Resources.md), [CommanderSystem.md](../gamedesign/CommanderSystem.md)
+
+## MS-1-Override (D-056)
+
+Das Register bewahrt den Vollspielbedarf als Beschaffungsinventar. Für MS-1
+werden jedoch ausschließlich die zwei Fraktionen, neun Gebäuderollen, acht
+Einheitenrollen und Glutrinne aus
+[MVPContentManifest.md](../production/MVPContentManifest.md) produziert.
+Evolvierte, Luft, Eliten, Superwaffen, Drohnen, Commander und weitere Biome
+sind Post-MVP.
 
 ## 1. Fraktionen (Kontext für alle Einheiten-Kategorien)
 
@@ -34,7 +43,7 @@ Die APL nennt an mehreren Stellen überholte Mengen; die GDD-Entscheidungen aus 
 | Infanterie | 24 | **24** (8/Fraktion) | – | [Infantry.md](../gamedesign/Infantry.md) |
 | Fahrzeuge | 36 | **36** (12/Fraktion) | – | [Vehicles.md](../gamedesign/Vehicles.md) |
 | Luftfahrzeuge | 21 | **21** (7/Fraktion) | – | [Aircraft.md](../gamedesign/Aircraft.md) |
-| Spezial-/Elite | 15 | **3 (MVP) → 9 (Release)** + 3 Superwaffen | D-015 / D-023 | [Vehicles.md](../gamedesign/Vehicles.md) / [Buildings.md](../gamedesign/Buildings.md) |
+| Spezial-/Elite | 15 | **0 (MS-1) → 9 (Vollspiel)** + 3 Superwaffen | D-056 / D-015 / D-023 | [Vehicles.md](../gamedesign/Vehicles.md) / [Buildings.md](../gamedesign/Buildings.md) |
 | Drohnen | 6 (Typen) | **3/Fraktion = 9** | D-014 | [Vehicles.md](../gamedesign/Vehicles.md) |
 | Neutrale | Tiere/Banditen/Mutanten/**Händler**/Türme | Critters 10 + Lager-Sätze + 3 Türme, **kein Handel** | D-016 | [NeutralUnits.md](../gamedesign/NeutralUnits.md) |
 | Biome | 10 | **10** | D-017 | [Biomes.md](../gamedesign/Biomes.md) |
@@ -120,7 +129,7 @@ Führend Elite-Werte: [Vehicles.md](../gamedesign/Vehicles.md) (D-015); Superwaf
 
 | Posten | Bedarf | Kandidatenquelle | Kosten | Aufwand | Klasse |
 |---|---|---|---|---|---|
-| Elite (Titan-Mech, Mobile Festung) | 2 von 3 menschlich (MVP 1/Fraktion → Release 3/Fraktion) | Synty Mech Pack als Basis | ~50 USD | 2–3 PT Hero-Detail/LOD (2× 2048² Ausnahmebudget) | **MODIFY** |
+| Elite (Titan-Mech, Mobile Festung) | 2 von 3 menschlich (Post-MVP; Vollspiel 3/Fraktion) | Synty Mech Pack als Basis | ~50 USD | 2–3 PT Hero-Detail/LOD (2× 2048² Ausnahmebudget) | **MODIFY** |
 | Elite Evolvierte (Alpha-Mutant) | 1 | — organisch — | – | 3 PT Eigenbau | **BUILD** |
 | Superwaffen-Gebäude | 3 (1/Fraktion) | Kitbash aus Gebäude-Kits | in Packs | 2–3 PT/Stk Signature-Aufbau | **MODIFY/BUILD** |
 
@@ -195,7 +204,9 @@ Humanoid-Retargeting gleicht Rig-Unterschiede aus; RTS-Distanz verzeiht generisc
 
 ### 3.14 Fraktionsidentität & Commander
 
-Führend: [CommanderSystem.md](../gamedesign/CommanderSystem.md) (D-009, reiner Identitäts-Layer, keine MVP-Match-Mechanik).
+Führend für das Post-MVP-Zielbild:
+[CommanderSystem.md](../gamedesign/CommanderSystem.md) (D-009). D-056
+verschiebt Commander-Portraits, Key Art und Voice vollständig hinter MS-1.
 
 | Posten | Bedarf | Quelle | Klasse |
 |---|---|---|---|
@@ -233,3 +244,5 @@ Führend: [CommanderSystem.md](../gamedesign/CommanderSystem.md) (D-009, reiner 
 |---|---|---|---|
 | 1.0.0 | 2026-07-22 | Erstfassung Sprint 5: vollständiges Asset-Register über 14 Kategorien, kanonische GDD-Zahlen (APL-Reconciliation), BUY/MODIFY/BUILD-Klassifikation, Kosten-/Aufwandsschätzungen | Technical Art Director / Lead Environment Artist |
 | 1.1.0 | 2026-07-24 | Update auf D-054 (0 € Open-Source & KI-Pipeline), Q-035 geschlossen (0 € Budget), Kostenschätzung angepasst | Project Owner / Producer |
+| 1.2.0 | 2026-07-24 | Vollspielinventar vom verbindlichen Allianz-/Legion-MS-1-Produktionsumfang gemäß D-056 getrennt | Technical Art Director / Lead Environment Artist |
+| 1.2.1 | 2026-07-24 | Commander-Art und -Voice im Detailregister eindeutig als Post-MVP-Bedarf markiert | Technical Art Director / Lead Environment Artist |

@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.4.1 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -16,6 +16,22 @@ Spielbare Spezifikation aller 12 Gebäudetypen (D-008) für die drei Fraktionen 
 - [./Weapons.md](./Weapons.md), [./Aircraft.md](./Aircraft.md) – Flak-Modul-Rahmenwerte
 - [./Maps.md](./Maps.md) – Baugrid, Terrain, Biome
 - [../research/Pathfinding.md](../research/Pathfinding.md) – Grid-/Flow-Field-Grundlage für Platzierung
+
+## MS-1-Override (D-056)
+
+Für MS-1 gelten ausschließlich die neun Rollen aus
+[MVPContentManifest.md](../production/MVPContentManifest.md): HQ, Kraftwerk,
+Raffinerie, Lager, Kaserne, Fahrzeugfabrik, Forschungslabor, Radar und
+Verteidigungsplattform – jeweils mit den dort festgelegten Allianz- und
+Legionsnamen. Mauern, Flugfeld und Superwaffe bleiben Post-MVP.
+
+Jede Seite startet mit fertiggestelltem HQ und fertiggestellter Raffinerie. Nur
+diese Start-Raffinerie darf ihre normale Kraftwerk-Voraussetzung umgehen und
+erzeugt keinen zusätzlichen Harvester. Ein fertiggestelltes Forschungslabor
+schaltet T2 unmittelbar frei; Forschung, Forschungsqueue und T3 sind
+deaktiviert. Die Verteidigungsplattform unterstützt `MG` auf T1 und `Rocket`
+auf T2; `Flak` ist nicht Teil von MS-1. Bei Widerspruch übersteuert dieser
+Abschnitt den nachfolgenden Vollspielentwurf.
 
 ## 1. Grundprinzipien
 
@@ -227,7 +243,8 @@ Module werden auf dem fertigen Podest installiert (nicht als separates Gebäude)
 
 ## Offene Punkte
 
-- **Tor-Modul (Status: Beta-Evaluierung):** Kein Tor-Gebäude im MVP – Durchlass per Segment-Verkauf (50 % Rückerstattung) ist die entschiedene MVP-Lösung. Ein Mauer-Tor-Modul (analog den Plattform-Modulen) wird frühestens zur Beta evaluiert; Entscheidung Game Director.
+- **Tor-Modul (Post-MVP):** Mauern und Tore sind nicht Teil von MS-1. Ein
+  späterer Scope entscheidet Durchlass- und Torregel gemeinsam neu.
 - **Flak-DPS-Korridor: entschieden (D-047, Korrekturlauf Sprint 4).** [Weapons.md](./Weapons.md) ist die einzige Werte-Quelle für das Flak-Modul (Reichweite 11–12 Felder ≙ m, Schaden 25–40 pro Schuss / 1,5 s Abklingzeit, ×2,0-Multiplikator gegen Luft ≈ 33–53 DPS effektiv); [Aircraft.md](./Aircraft.md) wurde im selben Korrekturlauf auf diesen Korridor angeglichen (der frühere Wert 90 DPS ist überholt und entfällt). Punkt geschlossen.
 - **Footprints (Status: Abgleich mit Maps.md läuft):** Exakte Footprints (2×2 bis 4×4) sind Annahmen; Finalisierung mit Maps.md.
 
@@ -249,3 +266,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.3.1 | 2026-07-21 | HQ-Grundenergie +30 als führend bestätigt, Offener Punkt geschlossen (D-032) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): als führende Quelle für Gebäudekosten/-energie/-bauzeiten festgelegt (Review F-03, D-047-Grundsatzregel); Offene Punkte bereinigt | Lead Gameplay Designer |
 | 0.4.1 | 2026-07-21 | Offener Punkt "Flak-DPS-Korridor" geschlossen: veralteter Querverweis auf Aircraft.md (90 DPS) entfernt, auf Weapons.md als einzige Werte-Quelle (25–40 Schaden/1,5 s, ×2,0 vs. Luft ≈ 33–53 DPS, D-047) umformuliert | Lead Gameplay Designer |
+| 0.5.0 | 2026-07-24 | Neun Gebäuderollen, Start-Ausnahme, T2-Freischaltung und MG-/Raketenmodule für MS-1 gemäß D-056 abgegrenzt | Lead Gameplay Designer |
