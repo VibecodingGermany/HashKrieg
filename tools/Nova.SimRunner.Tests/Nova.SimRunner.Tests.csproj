@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Nova.SimRunner.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Same sources and determinism define as the Unity host and SimRunner
+         (docs/tech/SimulationCore.md section 9; G0-B shared-sources contract). -->
+    <DefineConstants>$(DefineConstants);NOVA_FIXED_POINT</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Assets\_Project\Scripts\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\_Project\Scripts\Simulation\**\*.cs" Link="Simulation\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+
+</Project>

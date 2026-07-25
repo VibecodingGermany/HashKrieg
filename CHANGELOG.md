@@ -18,6 +18,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G0-B-.NET-Testlane:** `tools/Nova.SimRunner.Tests` (NUnit, net8.0)
+  kompiliert dieselben Core-/Simulation-Quellen mit demselben
+  `NOVA_FIXED_POINT`-Define wie Unity-Host und SimRunner; 4 Smoke-Tests
+  (Tick-/EntityId-Wertesemantik, SimRandom-Sequenzdeterminismus). Damit ist
+  `G0-TEST-DOTNET` lokal belegbar (repo-lokales SDK 8.0.318, gitignoriert
+  unter `.dotnet/`); `.gitignore` ignoriert Build-Outputs nun für alle
+  Tool-Projekte (`tools/**/bin|obj|out`).
 - **G0-B-Review-Nacharbeiten:** `Builds/` als Player-Build-Ausgabeverzeichnis in
   `.gitignore` ignoriert; veralteten Klassenkommentar in `SelectionManager`
   korrigiert; G0-B-Interimsplatzierung der Prototyp-Selektions-/HUD-Logik in

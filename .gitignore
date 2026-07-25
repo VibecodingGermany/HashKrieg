@@ -61,10 +61,10 @@ sysinfo.txt
 *.opendb
 *.VC.db
 
-# Tools / SimRunner Build-Outputs
-tools/Nova.SimRunner/bin/
-tools/Nova.SimRunner/obj/
-tools/Nova.SimRunner/out/
+# Tools / Build-Outputs (alle .NET-Tool-Projekte)
+tools/**/bin/
+tools/**/obj/
+tools/**/out/
 
 # Unity Asset Meta-Daten von ignorierten Ordnern
 /[Aa]ssets/[Aa]ssetStoreTools*
@@ -86,3 +86,6 @@ __pycache__/
 
 # Player build outputs
 Builds/
+
+# Repo-local .NET SDK
+.dotnet/
