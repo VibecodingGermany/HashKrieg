@@ -316,6 +316,45 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Roundtrip/-Fortsetzung über Recomputes hinweg, Zwei-Kernel-Determinismus
   über 200 Ticks, Parser-Härtung; EntityStore-Suite auf v3 gehoben
   (`EntityStoreSnapshotTests`, vormals `…V2Tests`).
+- **G1 Combat kanonisch (ohne Gate-Status, ohne Evidence):** drittes Glied
+  der Tickordnung [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md)
+  §2 (Movement → FoW → Combat, Schritt 8). `CombatSystem` in
+  `Nova.Simulation.Combat` vom Prototyp-Scaffolding auf den kanonischen
+  Vertrag migriert: MS-1-Hitscan direkt Einheit-gegen-Einheit (sofortiger
+  Schaden, keine Projektile/Flugbahnen, kein Splash), rein ganzzahlig —
+  Reichweite `SimFixed`, Schaden int32, Cooldown in ganzen Ticks
+  (provisorische Defaults 8 m / 15 / 5 Ticks = 0,5 s bei 10 Hz —
+  Q-040-Kandidaten; der alte Kommentar „10 Ticks = 0,5 s" war ein
+  20-Hz-Relikt). Tick-Logik in strikt aufsteigender Entity-Index-Reihenfolge:
+  Cooldowns herunterzählen, dann Zielvalidierung — ein Schuss ist nur legal,
+  wenn das Ziel lebt, die Mittelpunkt-Distanz ≤ `WeaponRange + Radius` des
+  Ziels liegt (Grenze inklusiv, exakter Vergleich in aufgeweiteter
+  Q32.32-Long-Arithmetik) UND die Zielzelle in der committed Team-Sicht
+  `Visible` ist ([docs/tech/FogOfWar.md](docs/tech/FogOfWar.md) §2/§3:
+  `Explored` und Radar-Pings verleihen KEINE Targeting-Berechtigung; zwischen
+  den 5-Hz-Recomputes gilt die committed Sicht — Feuer läuft bis zum nächsten
+  Commit weiter). Tote Ziele werden aus allen Angriffsbefehlen noch im
+  selben Tick aufgelöst; lebende, aber unsichtbare oder außer Reichweite
+  befindliche Ziele werden gehalten, nicht fallengelassen (Verfolgung ist
+  Movement-Sache). Einheiten auf Slots ohne committed Team-Sicht (MS-1:
+  Team-Index == Slot) können nicht feuern. FoW-Verdrahtung per
+  Konstruktor-Injektion des `FogOfWarSystem` durch den Host (der Kernel
+  bietet keine Cross-System-API; gleiches Muster wie Movement ←
+  EntityStore/Pathfinding), Registrierung NACH FoW in `MatchRunner` und
+  `Nova.SimRunner`. Kein eigener Snapshot-Block: der gesamte autoritative
+  Combat-State (Health, `WeaponCooldownTicks`, `AttackTarget`) liegt im
+  EntityStore-Block 100, Hitscan hält keinen schwebenden Zustand — das System
+  ist bewusst `ISimSystem` ohne `IStatefulSimSystem` und damit konform zur
+  Registrierungs-Checkliste. Tests in beiden Lanes (`CombatSystemTests`):
+  Feuern nur bei lebendig + in Reichweite + `Visible`, kein Feuer bei
+  Radar-only/`Explored`/vor dem ersten Commit/ohne Team-Sicht, committed
+  Sicht zwischen Recomputes (Sichtverlust auf ungeradem Tick → Feuer stoppt
+  erst nach dem Commit), exakte 5-Tick-Cooldown-Kadenz, Tod bei Health ≤ 0
+  mit Despawn und Order-Auflösung Dritter, tote Angreifer feuern nicht,
+  Reichweiten-Grenzfall inklusiv/exklusiv, Zwei-Kernel-Determinismus über
+  300 Ticks mit Gefecht, Hash-Sensitivität auf Health-Änderung, Replay-
+  Aufzeichnung/-Playback mit End-Hash-Verifikation, Mid-Combat-Snapshot-
+  Restore mit identischer Fortsetzung.
 
 ### Behoben
 - **EditMode-Testzählung im Gate-Runner:** `run_gate_check.py` zählte
