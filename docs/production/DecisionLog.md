@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.13.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.14.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
