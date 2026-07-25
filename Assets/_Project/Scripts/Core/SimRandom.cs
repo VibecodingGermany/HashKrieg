@@ -10,8 +10,9 @@ namespace Nova.Core
     /// two uint64 state words, canonical xorshift128+ transitions with the
     /// (23, 17, 26) shift triple. The spec fixes neither seeding nor the 64-to-32
     /// bit output reduction; both are implementation details pinned by the
-    /// golden-vector tests (SimRandomGoldenTests). Seeding uses a SplitMix64 mix
-    /// of the seed; <see cref="NextUInt"/> emits the high 32 bits of the
+    /// golden-vector tests (SimRandomGoldenTests). Seeding uses canonical
+    /// SplitMix64 with a running state advanced per word (seed 0 included,
+    /// non-degenerate); <see cref="NextUInt"/> emits the high 32 bits of the
     /// xorshift128+ sum output.
     /// </para>
     /// </summary>
@@ -30,17 +31,23 @@ namespace Nova.Core
 
         private void SetSeed(ulong seed)
         {
-            // SplitMix64 generator to initialize state from a single seed
-            ulong state = seed == 0 ? 0x9E3779B97F4A7C15UL : seed;
-            
-            state = (state ^ (state >> 30)) * 0xBF58476D1CE4E5B9UL;
-            state = (state ^ (state >> 27)) * 0x94D049BB133111EBUL;
-            _s0 = state ^ (state >> 31);
+            // Canonical SplitMix64 with a single running state: each state word
+            // comes from a consecutive SplitMix64 draw (state advances by the
+            // golden gamma per word), so s0 and s1 are statistically
+            // independent. Seed 0 yields a well-defined non-degenerate state
+            // (xorshift128+ only requires not both words to be zero).
+            ulong state = seed;
+            state += 0x9E3779B97F4A7C15UL;
+            _s0 = SplitMix64Mix(state);
+            state += 0x9E3779B97F4A7C15UL;
+            _s1 = SplitMix64Mix(state);
+        }
 
-            state = seed + 0x9E3779B97F4A7C15UL;
-            state = (state ^ (state >> 30)) * 0xBF58476D1CE4E5B9UL;
-            state = (state ^ (state >> 27)) * 0x94D049BB133111EBUL;
-            _s1 = state ^ (state >> 31);
+        private static ulong SplitMix64Mix(ulong z)
+        {
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+            return z ^ (z >> 31);
         }
 
         public uint NextUInt()

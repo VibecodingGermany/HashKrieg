@@ -14,17 +14,19 @@ namespace Nova.SimRunner.Tests
         // "XorShift128PlusV1" with two uint64 words but neither seeding nor the
         // 64-to-32 bit output reduction. These are the first 8 NextUInt values
         // (high 32 bits of the xorshift128+ sum output) generated once from the
-        // SimRandom implementation on this branch (feat/g1-simfixed-core).
+        // SimRandom implementation on this branch (feat/g1-simfixed-core) after
+        // the review-driven seeding fix (canonical SplitMix64 with running
+        // state, P2-1).
         private static readonly uint[] GoldenSeed0 =
         {
-            4276001226U, 4276001175U, 421263670U, 246480255U,
-            1318571328U, 4294698456U, 288549032U, 4250171493U
+            4284376650U, 1555263592U, 1995837922U, 3488402303U,
+            1202433501U, 927087696U, 4280932643U, 2686686964U
         };
 
         private static readonly uint[] GoldenSeed1 =
         {
-            1511669830U, 2003738471U, 4173142179U, 2907444091U,
-            1161169546U, 1419021331U, 882423014U, 3385031663U
+            2559615116U, 2443280914U, 3555056611U, 1532080945U,
+            3125919927U, 4205842318U, 2753659703U, 582798359U
         };
 
         [Test]
