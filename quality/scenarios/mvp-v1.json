@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3.0",
+  "schemaVersion": "1.4.0",
   "scenarioSetId": "mvp-v1",
   "status": "binding-requirement",
   "decisionIds": [
@@ -11,7 +11,7 @@
     "D-064",
     "D-066"
   ],
-  "authorizationStatus": "integrity-only-d066",
+  "authorizationStatus": "two-phase-receipt-d066",
   "contentManifest": "quality/content/mvp-v1.json",
   "validHeadlessMatchRequirements": [
     "state-hashes",

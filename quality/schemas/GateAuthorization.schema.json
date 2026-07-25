@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/VibecodingGermany/Project_Nova/quality/schemas/GateAuthorization.schema.json",
+  "title": "Project Nova Gate Authorization Receipt",
+  "description": "Two-phase authorization receipt per D-066 (G0-A2). A successful protected gate-evidence-authorize run emits this hash-bound candidate next to the unchanged GateEvidence.json. It binds gate, subject commit/tree, evidence carrier commit, evidence path/hash, trusted tool commit, repository, workflow and run/attempt/job id. The run never checks its own pending conclusion; later gates verify the exact workflow_dispatch run via the GitHub API. Versioned append-only under quality/authorizations/G<N>/<subjectCommitSha>/<runId>-attempt<runAttempt>/GateAuthorization.json after a small follow-up PR.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gateId",
+    "subjectCommitSha",
+    "subjectTreeSha",
+    "evidenceCarrierCommitSha",
+    "evidencePath",
+    "evidenceSha256",
+    "trustedToolCommitSha",
+    "repository",
+    "workflow",
+    "runId",
+    "runAttempt",
+    "jobId",
+    "authorizingJob",
+    "createdAtUtc"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "gate-authorization-v1"
+    },
+    "gateId": {
+      "type": "string",
+      "pattern": "^G[0-5]$"
+    },
+    "subjectCommitSha": {
+      "$ref": "#/$defs/gitSha",
+      "description": "Commit of the tested product state. May differ from the evidence carrier and trusted tool commits."
+    },
+    "subjectTreeSha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "evidenceCarrierCommitSha": {
+      "$ref": "#/$defs/gitSha",
+      "description": "Commit in which the referenced GateEvidence.json is versioned. Derived from git history at emission time."
+    },
+    "evidencePath": {
+      "type": "string",
+      "pattern": "^quality/evidence/G[0-5]/[0-9a-f]{40,64}/[^/]+/GateEvidence\\.json$"
+    },
+    "evidenceSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trustedToolCommitSha": {
+      "$ref": "#/$defs/gitSha",
+      "description": "Commit of the subject-independent trusted tools (validator, schema, workflow) that ran the protected authorize job."
+    },
+    "repository": {
+      "const": "VibecodingGermany/Project_Nova"
+    },
+    "workflow": {
+      "const": "quality-gate.yml",
+      "description": "Workflow file name of the protected authorize run (basename of GITHUB_WORKFLOW_REF)."
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "runAttempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "authorizingJob": {
+      "const": "gate-evidence-authorize"
+    },
+    "createdAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

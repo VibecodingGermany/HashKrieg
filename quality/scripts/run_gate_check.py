@@ -503,12 +503,12 @@ def check_evidence_validator() -> tuple[bool, list[str]]:
     with tempfile.TemporaryDirectory(prefix="nova-local-pass-") as scratch:
         synthetic = Path(scratch) / "LocalPass.json"
         # A non-hex pseudo subject keeps the validator off the git path, so
-        # the working-tree 1.3.0 contract is loaded and the run reaches the
+        # the working-tree 1.4.0 contract is loaded and the run reaches the
         # authorization branch; the verdict must still be rejected.
         synthetic.write_text(
             json.dumps(
                 {
-                    "schemaVersion": "1.3.0",
+                    "schemaVersion": "1.4.0",
                     "gateId": "G0",
                     "subject": {
                         "commitSha": "local-untrusted",
