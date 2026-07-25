@@ -1,6 +1,6 @@
 # Modulspezifikation – Multiplayer Command-Relay (`Nova.Networking`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Network Architect / Lead Technical Director | **Sprint:** Phase 2 (Modul 18)
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Network Architect / Lead Technical Director | **Sprint:** Phase 2 (Modul 18)
 
 ## Zweck
 
@@ -45,7 +45,7 @@ Dieses Dokument beschreibt das **Multiplayer Command-Relay System** von *Project
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`LockstepRelayBufferTests.cs`](../../../Assets/Tests/EditMode/Networking/LockstepRelayBufferTests.cs) (Binär-Serialisierung, Turn-Tick-Vollständigkeitsprüfung & Desync-Erkennung).
+* **Unit Tests:** Die Prototyp-Tests (`LockstepRelayBufferTests.cs`) wurden mit der G1-Kernel-Integration entfernt (Pre-G1-Reset gemäß D-057; das 34-Byte-Paketformat ist unsupported). Ein kanonischer Netzwerk-Transport ist eine spätere Scheibe.
 
 ## Offene Punkte
 
@@ -64,3 +64,4 @@ Dieses Dokument beschreibt das **Multiplayer Command-Relay System** von *Project
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Toten Prototyp-Testlink nach G1-Kernel-Integration (F-001/F-005, D-057-Reset) korrigiert | Lead Technical Director |

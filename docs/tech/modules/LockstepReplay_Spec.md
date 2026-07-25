@@ -1,6 +1,6 @@
 # Modulspezifikation – Lockstep State Hashing, Replay & Visual Debug View (`Nova.Simulation.State` & `Nova.Presentation`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
@@ -33,7 +33,7 @@ Dieses Dokument beschreibt das **Lockstep State Hashing**, die **Replay-Aufzeich
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`LockstepReplayTests.cs`](../../../Assets/Tests/EditMode/Simulation/LockstepReplayTests.cs) (Validierung der Hash-Berechnung und Replay-Replikation).
+* **Unit Tests:** Die Prototyp-Tests (`LockstepReplayTests.cs`) wurden mit der G1-Kernel-Integration entfernt (F-005; FNV-1a-Hash und rein aufzeichnender `ReplayBuffer` waren nicht kanonisch). Kanonischer State-Hash und Snapshot-Fortsetzung werden durch [`KernelIntegrationTests.cs`](../../../Assets/Tests/EditMode/Simulation/KernelIntegrationTests.cs) abgedeckt.
 
 ## Offene Punkte
 
@@ -52,3 +52,4 @@ Dieses Dokument beschreibt das **Lockstep State Hashing**, die **Replay-Aufzeich
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Toten Prototyp-Testlink nach G1-Kernel-Integration (F-001/F-005, D-057-Reset) korrigiert | Lead Technical Director |

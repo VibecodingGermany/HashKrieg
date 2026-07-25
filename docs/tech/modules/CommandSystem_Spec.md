@@ -1,6 +1,6 @@
 # Modulspezifikation – Command Bus & Order System (`Nova.Simulation.Commands`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Sim Engine Architect | **Sprint:** 7
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Sim Engine Architect | **Sprint:** 7
 
 ## Zweck
 
@@ -41,7 +41,7 @@ Dieses Dokument beschreibt das **Command Bus & Order System** von *Project Nova*
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`CommandSystemTests.cs`](../../../Assets/Tests/EditMode/Simulation/CommandSystemTests.cs) (Validierung der Befehlseinreihung und deterministischen Zielaktualisierung).
+* **Unit Tests:** Die Prototyp-Tests (`CommandSystemTests.cs`) wurden mit der G1-Kernel-Integration entfernt (F-001; der alte Buffer-Pfad war defekt). Der kanonische Command-Pfad wird durch [`KernelIntegrationTests.cs`](../../../Assets/Tests/EditMode/Simulation/KernelIntegrationTests.cs) abgedeckt.
 
 ## Offene Punkte
 
@@ -60,3 +60,4 @@ Dieses Dokument beschreibt das **Command Bus & Order System** von *Project Nova*
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Toten Prototyp-Testlink nach G1-Kernel-Integration (F-001/F-005, D-057-Reset) korrigiert | Lead Technical Director |
