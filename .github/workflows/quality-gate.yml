@@ -1,23 +1,49 @@
 name: Quality Gate
 
-# D-066 integrity-only foundation.
+# D-066 two-phase quality gate.
 #
-# This workflow validates the contracts and their negative controls on pull
-# requests. It deliberately cannot authorize a gate pass. The former manual
-# authorize job was removed because it circularly required its own successful
-# completion and conflated the tested subject with the later evidence carrier.
-# Authorization stays fail-closed until the two-phase GateAuthorization receipt
-# contract from D-066 is implemented and independently reviewed.
+# Job "integrity" runs on every pull request and validates the contracts and
+# their negative controls. It deliberately cannot authorize a gate pass.
+#
+# Job "gate-evidence-authorize" implements the protected authorize path of
+# the two-phase GateAuthorization receipt contract (D-066, G0-A2). It runs
+# only via manual workflow_dispatch on main behind the protected
+# "quality-gate" environment (a maintainer must create that environment with
+# required reviewers once before the first authorize run can start).
+#
+# IMPORTANT for dispatchers: the validator binds the run to GITHUB_SHA and
+# requires it to equal the trusted tool checkout HEAD. Dispatch this workflow
+# with ref "main" while the origin/main HEAD equals the intended trustedSha;
+# a guard step fails closed otherwise. The trusted tool commit must also be
+# an ancestor of origin/main and differ from the subjectSha.
+#
+# Concurrency is job-scoped on purpose: a workflow-level
+# cancel-in-progress: true group would cancel a running authorize attempt on
+# repeated dispatch, so each job owns its group.
 
 on:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      evidencePath:
+        description: 'Committed evidence path in the subject checkout, e.g. quality/evidence/G0/<subjectSha>/<attempt>/GateEvidence.json'
+        required: true
+        type: string
+      subjectSha:
+        description: '40-hex subject commit the evidence belongs to'
+        required: true
+        type: string
+      trustedSha:
+        description: '40-hex trusted tool commit; must equal the dispatched ref HEAD and be an ancestor of origin/main'
+        required: true
+        type: string
+      notes:
+        description: 'Optional free-text note embedded in the emitted receipt'
+        required: false
+        type: string
 
 permissions:
   contents: read
-
-concurrency:
-  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 env:
   # Must equal trustBundle.nodeVersion declared in the evidence.
@@ -27,6 +53,9 @@ jobs:
   integrity:
     name: integrity
     runs-on: ubuntu-latest
+    concurrency:
+      group: integrity-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -54,3 +83,127 @@ jobs:
           "
       - name: Gate runner CLI smoke test
         run: python3 quality/scripts/run_gate_check.py --help
+
+  # Protected authorize path (D-066, G0-A2). Manual workflow_dispatch on
+  # main only, behind the "quality-gate" environment. Emits the
+  # GateAuthorization.json receipt as a CI artifact; the receipt is
+  # versioned unchanged via a separate append-only follow-up PR. This job
+  # never pushes or commits.
+  gate-evidence-authorize:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: quality-gate
+    permissions:
+      contents: read
+      # Jobs-API: resolves this run's numeric job id and lets the validator
+      # verify prior receipts' workflow_dispatch runs/attempts/jobs.
+      actions: read
+    concurrency:
+      group: gate-evidence-authorize-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      EVIDENCE_PATH: ${{ inputs.evidencePath }}
+      SUBJECT_SHA: ${{ inputs.subjectSha }}
+      TRUSTED_SHA: ${{ inputs.trustedSha }}
+      NOTES: ${{ inputs.notes }}
+    steps:
+      - name: Validate dispatch inputs (fail-closed)
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$SUBJECT_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "subjectSha must be 40 lowercase hex characters"
+          [[ "$TRUSTED_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "trustedSha must be 40 lowercase hex characters"
+          [ "$TRUSTED_SHA" != "$SUBJECT_SHA" ] || fail "trustedSha must differ from subjectSha (distinct trusted tool and subject commits)"
+          [[ "$EVIDENCE_PATH" != *..* ]] || fail "evidencePath must not contain '..'"
+          if [[ "$EVIDENCE_PATH" =~ ^quality/evidence/G[0-9]+/([0-9a-f]{40})/[^/]+/GateEvidence\.json$ ]]; then
+            [ "${BASH_REMATCH[1]}" = "$SUBJECT_SHA" ] || fail "evidencePath subject segment must equal subjectSha"
+          else
+            fail "evidencePath must match quality/evidence/G<N>/<subjectSha>/<attempt>/GateEvidence.json"
+          fi
+      # The validator requires GITHUB_SHA == trusted checkout HEAD, so the
+      # dispatch must run on the trusted commit itself (dispatch ref "main"
+      # while origin/main HEAD equals trustedSha; enforced by the guard
+      # below). fetch-depth: 0 is required for the origin/main ancestor
+      # guard and for full tool history.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: trusted
+          ref: ${{ env.TRUSTED_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      # Subject checkout at the tested commit. fetch-depth: 0 is required
+      # because the validator derives the evidence carrier commit via
+      # git log and resolves content digests from git blobs.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: subject
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guard trusted commit binding (fail-closed)
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [ "$GITHUB_SHA" = "$TRUSTED_SHA" ] || fail "GITHUB_SHA ($GITHUB_SHA) != trustedSha ($TRUSTED_SHA): dispatch this workflow with ref 'main' while the origin/main HEAD equals trustedSha"
+          git -C trusted fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          git -C trusted merge-base --is-ancestor "$TRUSTED_SHA" origin/main || fail "trustedSha is not an ancestor of origin/main"
+      - name: Guard committed evidence in subject (fail-closed)
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [ -f "subject/$EVIDENCE_PATH" ] || fail "evidence file not found in subject checkout: $EVIDENCE_PATH"
+          CARRIER="$(git -C subject log -1 --format=%H -- "$EVIDENCE_PATH")"
+          [[ "$CARRIER" =~ ^[0-9a-f]{40}$ ]] || fail "evidence is not committed in the subject checkout: $EVIDENCE_PATH"
+          echo "evidence carrier commit: $CARRIER"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install pinned trusted evidence-validator dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix trusted/quality
+      - name: Resolve this run's authorize job id
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Binds the run via the GitHub API. This is NOT a self-conclusion
+          # check: the validator never inspects its own pending conclusion.
+          JOB_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
+            | jq -r --arg job "$GITHUB_JOB" '.jobs[] | select(.name == $job) | .id')"
+          [[ "$JOB_ID" =~ ^[1-9][0-9]*$ ]] || { echo "::error::could not resolve numeric job id for job '$GITHUB_JOB'"; exit 1; }
+          echo "JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
+      - name: Authorize evidence and emit receipt candidate
+        env:
+          # Required from G1 on: the validator verifies every prior receipt
+          # against the GitHub API (fail-closed without a token).
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ARGS=(
+            trusted/quality/scripts/validate_gate_evidence.py --authorize
+            --trusted-tool-checkout trusted
+            --subject-root subject
+            --job-id "$JOB_ID"
+            --receipt-out "$RUNNER_TEMP/GateAuthorization.json"
+          )
+          if [ -n "$NOTES" ]; then
+            ARGS+=(--notes "$NOTES")
+          fi
+          python3 "${ARGS[@]}" "subject/$EVIDENCE_PATH" | tee "$RUNNER_TEMP/authorize.log"
+          VERSION_PATH="$(grep -m1 '^RECEIPT VERSION PATH: ' "$RUNNER_TEMP/authorize.log" | sed 's/^RECEIPT VERSION PATH: //')"
+          [[ "$VERSION_PATH" =~ ^quality/authorizations/G[0-9]+/[0-9a-f]{40}/[0-9]+-attempt[0-9]+/GateAuthorization\.json$ ]] \
+            || { echo "::error::validator did not emit a valid receipt version path"; exit 1; }
+          echo "VERSION_PATH=$VERSION_PATH" >> "$GITHUB_ENV"
+      - name: Stage receipt at its conventional version path
+        run: |
+          set -euo pipefail
+          GATE_ID="$(echo "$VERSION_PATH" | cut -d/ -f3)"
+          mkdir -p "receipt/$(dirname "$VERSION_PATH")"
+          cp "$RUNNER_TEMP/GateAuthorization.json" "receipt/$VERSION_PATH"
+          echo "ARTIFACT_NAME=gate-authorization-${GATE_ID}-${GITHUB_RUN_ID}-attempt${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+      - name: Upload GateAuthorization receipt
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: receipt/
+          if-no-files-found: error

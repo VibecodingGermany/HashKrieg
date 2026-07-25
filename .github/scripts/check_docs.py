@@ -103,6 +103,48 @@ def markdown_files() -> list[Path]:
     return [ROOT / relative for relative in sorted(relative_paths)]
 
 
+def receipt_append_only_violations() -> list[str]:
+    """Enforce the append-only contract for versioned receipts (D-066).
+
+    A GateAuthorization.json under quality/authorizations/ may only ever be
+    added. In PR CI (GITHUB_BASE_REF is set) any modification, deletion or
+    rename of an existing receipt is a violation. Locally, without a base
+    ref, the check is skipped.
+    """
+    base_ref = os.environ.get("GITHUB_BASE_REF")
+    if not base_ref:
+        return []
+    base = f"origin/{base_ref}"
+    probe = subprocess.run(
+        ["git", "rev-parse", "--verify", base],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        return [
+            f"Basis-Referenz {base} nicht verfügbar; "
+            "append-only-Prüfung nicht möglich (fetch-depth?)"
+        ]
+    result = subprocess.run(
+        ["git", "diff", "--name-status", f"{base}...HEAD", "--", "quality/authorizations/"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ["git diff für quality/authorizations/ fehlgeschlagen"]
+    violations: list[str] = []
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        status, _, path = line.partition("\t")
+        if status.startswith(("M", "D", "R")):
+            violations.append(f"{status}\t{path}")
+    return violations
+
+
 def main() -> int:
     dead: list[str] = []
     decode_errors: list[str] = []
@@ -182,6 +224,13 @@ def main() -> int:
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
             quality_errors.append(f"{rel}: {error}")
+
+    receipt_violations = receipt_append_only_violations()
+    if receipt_violations:
+        quality_errors.append(
+            "GateAuthorization-Receipts sind append-only (D-066); "
+            "Änderung/Löschung erkannt:\n" + "\n".join(receipt_violations)
+        )
 
     if not quality_errors:
         environment = os.environ.copy()
