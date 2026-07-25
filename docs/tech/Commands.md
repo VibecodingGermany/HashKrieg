@@ -1,6 +1,6 @@
 # Kanonischer Command-Vertrag
 
-**Version:** 1.1.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director / Lead Multiplayer Engineer | **Sprint:** 7
+**Version:** 1.1.1 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director / Lead Multiplayer Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -32,6 +32,21 @@ Weder UI noch KI dürfen `PlayerSlot`, `Sequence` oder `TargetTick` frei wählen
 Sequenzen beginnen bei 1. Der Wert 0 und ein Überlauf von `uint32` sind
 strukturelle Fehler; die Session wird nicht mit einer wiederverwendeten Sequenz
 fortgesetzt.
+
+Die Grenze wird kompilierseitig erzwungen (`CommandRecord`/`CommandBatch`
+besitzen ausschließlich `internal`-Konstruktoren). Reflection kann sie
+prinzipiell umgehen; das ist ein akzeptiertes Restrisiko, weil ein so
+manipulierter Prozess nur sich selbst desynchronisiert — der Replay- und
+Hash-Nachweis bleibt davon unberührt.
+
+Der Byte-Intake des Ingress (`TryAcceptRecordBytes` /
+`TryAcceptHistoricalRecordBytes`) ist öffentlich, weil der Transport ihn
+aufrufen muss. In MS-1 gilt die Vertrauensannahme, dass ausschließlich
+Transport-/Session-Code ihn aufruft; jeder Aufruf durchläuft unabhängig vom
+Aufrufer die vollständige strukturelle Validierung. Für den Replay-Import liegt
+die geforderte Fingerprint-Prüfung des Stroms beim Aufrufer — der Ingress
+erzwingt alle übrigen strukturellen Regeln, kann die Herkunftsprüfung aber
+nicht selbst leisten.
 
 ## 2. Kanonisches Record-Format
 
@@ -81,6 +96,13 @@ dedupliziert auf `(PlayerSlot, Sequence)`:
 
 Der Dedupe- und Sequenzzustand ist autoritativ und wird in Snapshots
 serialisiert.
+
+Die Watermark-Dedupe abgeschlossener Sequenzen setzt verbindlich eine
+zuverlässige, geordnete Zustellung je Spieler voraus; der
+`LocalLoopbackTransport` erfüllt das per Konstruktion. Ein künftiger
+Netzwerk-Transport mit möglicher Unordnung darf verspätete Sequenzen nicht
+still verwerfen, sondern benötigt ein eigenes Lücken-Fehlermodell
+(Post-MVP-Netzwerk-Anforderung, keine MS-1-Änderung).
 
 ## 4. Zwei Validierungsstufen
 
@@ -167,3 +189,4 @@ Das aktivierte Command-Inventar muss 100 % Testabdeckung besitzen.
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Ingress-Autorität, Little-Endian-Envelope, Dedupe und Schema-v1-Tests gemäß D-057 festgelegt | Lead Technical Director / Lead Multiplayer Engineer |
 | 1.1.0 | 2026-07-24 | Sequenz-, Record-, Batch- und Payload-Grenzen geschlossen sowie Session-Aktionen aus dem Sim-Commandstrom getrennt | Lead Technical Director / Lead Multiplayer Engineer |
+| 1.1.1 | 2026-07-25 | Review-Klarstellungen ohne Vertragsänderung: Reflection-Restrisiko der kompilierseitigen Vertrauensgrenze, Vertrauensannahme des öffentlichen Byte-Intake samt caller-seitiger Fingerprint-Prüfung beim Replay-Import und Zustellungsannahme der Watermark-Dedupe als Post-MVP-Netzwerk-Anforderung | Lead Technical Director / Lead Multiplayer Engineer |
