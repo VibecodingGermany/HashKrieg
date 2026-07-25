@@ -64,6 +64,45 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Authorize-Job bleibt bis zur Korrektur der Checkout-, Input- und
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
+### Behoben
+- **G0-A-Härtung nach adversarialem Review:** Der Authorize-Job führt
+  Validator und Ajv nun aus dem Trusted-Checkout aus und liest die Evidence
+  über den neuen `--subject-root`-Parameter aus dem Subject-Checkout —
+  kein Evidence-Staging nach `trusted/` mehr (Trusted-Cleanliness bleibt
+  intakt); neuer CLI-Topologie-End-to-End-Selbsttest
+  (`--self-test-topology`, zusätzlich in `--self-test` und im
+  Integrity-Job).
+- `generate_trust_context.py` verifiziert jedes
+  `authorizedEvidence`-Kettenglied gegen die GitHub-API (Run gehört zu
+  `quality-gate.yml`, `conclusion=success`, `headSha`=Subject-Commit,
+  Job erfolgreich); fehlendes `gh`-Tool/Token ist fail-closed. Neue
+  Negativkontrollen: falsches `GITHUB_JOB`/`GITHUB_WORKFLOW_REF`/
+  `NOVA_TRUST_CONTEXT_SHA256`, Kettenglied mit fremdem Subject-Commit und
+  nur lokal erzeugter Vorgänger.
+- Authorize-Job nur noch bei `workflow_dispatch` auf `refs/heads/main`;
+  `trustedSha` muss per `git merge-base --is-ancestor` Vorgänger von
+  `origin/main` sein und darf nicht der Subject-Commit sein;
+  Dispatch-Inputs laufen ausschließlich über `env:`-Mapping.
+- `commandId`-Präfix-Konvention (`impl-`/`review-`) wird maschinell
+  erzwungen; `NOVA_GATE_EXECUTOR`, Reviewer-Reproduktion und die
+  Trusted-/Subject-Hash-Differenz sind in Testing.md/Deployment.md
+  dokumentiert.
+- **N-1 (Re-Review) geschlossen — Authorize-Run-Bindung:** Die
+  GitHub-Verifikation der `authorizedEvidence`-Kette erzwingt jetzt pro
+  Eintrag `event=workflow_dispatch`, den erfolgreichen
+  `gate-evidence-authorize`-Job (Evidence-`ci.jobName`-Konstante und
+  Workflow-Anzeigename darauf vereinheitlicht) und über die Kette
+  eindeutige Run-IDs — PR-Event-Runs, reine Integrity-Runs und
+  Run-Wiederverwendung werden abgelehnt; neue Generator-Kontrollen mit
+  gemockter GitHub-API (kein Netzwerk im Self-Test).
+
+### Entschieden
+- **D-065 (Authorize-Run-Bindung der Evidence-Kette):** Replay-/Reuse-
+  Befund N-1 aus dem G0-A-Re-Review; entschieden wurde die Event-/Job-/
+  Eindeutigkeits-Bindung gegen die Alternativen „Doku abschwächen" und
+  „Evidence-Hash als Run-Artefakt", mit ehrlich dokumentiertem Restrisiko
+  (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
+
 ### Geändert
 - **Szenariovertrag `mvp-v1.json` auf `1.3.0`:** `authorizationStatus`
   beschreibt den vorgesehenen

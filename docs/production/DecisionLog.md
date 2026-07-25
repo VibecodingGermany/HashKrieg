@@ -996,6 +996,55 @@ nachfolgenden sauberen Subject bewiesen ist, sind G0–G5 zwingend offen.
 D-064 ergänzt D-063 und ersetzt dessen Autorisierungsanspruch für Schema 1.2;
 alle übrigen D-063-Prüfungen bleiben verbindliche Vorstufe.
 
+### D-065 | verbindlich | Sprint 7 (Authorize-Run-Bindung der Evidence-Kette)
+
+**Kontext:** Das unabhängige Re-Review von G0-A fand (Befund N-1), dass die
+GitHub-Verifikation der `authorizedEvidence`-Kette replay- und reuse-anfällig
+war: Ein `pull_request`-Run mit grünem `integrity`-Job bestand die Prüfung,
+obwohl er nie etwas autorisiert hatte, und derselbe Authorize-Run war für
+beliebig viele Gates wiederverwendbar.
+
+**Alternativen:** (a) Die Dokumentation ehrlich abschwächen („nur ein
+grüner Lauf nötig") und den Anker allein auf das Environment-Approval legen;
+(b) den Evidence-Hash als Run-Artefakt an den Run binden (Artifact-
+Upload/-Download im geschützten Job — stärker, aber komplexer und mit
+eigener Angriffsfläche über Artifact-Retention); (c) Event-, Job- und
+Eindeutigkeits-Bindung der Ketteneinträge bei der GitHub-Verifikation.
+
+**Entscheidung:** (c):
+
+1. Jeder Ketteneintrag muss einen Run mit `event == workflow_dispatch` des
+   Workflows `.github/workflows/quality-gate.yml` belegen; `pull_request`-
+   oder andere Runs zählen nie als Autorisierung.
+2. Der verifizierte Job muss der Authorize-Job sein: Name exakt
+   `gate-evidence-authorize` mit `conclusion == success`. Die Evidence
+   (`ci.jobName`) ist per Schema-Konstante auf denselben Wert festgelegt;
+   Anzeigename und Job-ID des Workflow-Jobs sind identisch.
+3. Run-IDs sind über die gesamte `authorizedEvidence`-Kette eindeutig; jedes
+   Gate benötigt seinen eigenen geschützten Authorize-Run.
+4. `head_sha == subjectCommitSha` des Eintrags bleibt bestehen.
+
+Alle Prädikate sind fail-closed; fehlendes `gh`-Tool oder Token blockiert
+die Kontexterzeugung. Das ehrlich dokumentierte Restrisiko: Die
+API-Verifikation belegt „ein echter geschützter Authorize-Lauf auf diesem
+Subject hat stattgefunden"; die Bindung des aktuellen Laufs an die exakten
+Evidence-Bytes läuft über `NOVA_TRUST_CONTEXT_SHA256`; verbleibender Anker
+ist die GitHub-Environment-Protection. Die Review-Attestierung bleibt
+hash-gebunden ohne API-Verifikation.
+
+**Begründung:** (a) würde den reproduzierten Replay-/Reuse-Pfad als
+akzeptables Risiko festschreiben; (b) schließt ihn zwar vollständig,
+fügt aber neue Angriffsfläche (Artifact-Retention/-Substitution) und
+Komplexität im geschützten Job hinzu. (c) schließt den Pfad mit bereits
+vorhandenen API-Feldern und hält den geschützten Job minimal.
+
+**Konsequenzen:** D-065 ergänzt D-064 und ändert weder Evidence-Schema 1.3
+noch Trust-Kontext 2.0.0 strukturell (außer der `ci.jobName`-Konstante, die
+ohnehin noch keine reale Evidence betrifft). `generate_trust_context.py`,
+der Authorize-Workflow und die Negativkontrollen (PR-Event-Run,
+Integrity-Job statt Authorize-Job, wiederverwendete Run-ID) sind gemeinsam
+führend.
+
 ---
 
 ## Offene Punkte
@@ -1034,3 +1083,4 @@ alle übrigen D-063-Prüfungen bleiben verbindliche Vorstufe.
 | 1.11.1 | 2026-07-24 | D-039-Folgen an die MS-1-Begrenzung durch D-056/D-058 angeglichen | Project Owner / Lead Technical Director |
 | 1.12.0 | 2026-07-24 | D-063: Evidence-Schema 1.2, kanonische Check-Artefakte, geschützten Trust-Kontext, rekursive Draft-2020-12-Prüfung und Drei-Lauf-Messmethode entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.13.0 | 2026-07-24 | D-064: Pass-Autorisierung bis zum subject-unabhängigen Trusted-Gate-Bootstrap gesperrt und Schema-1.3-Zielvertrag entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
+| 1.14.0 | 2026-07-25 | D-065: Authorize-Run-Bindung der Evidence-Kette (workflow_dispatch-Event, exklusiver Authorize-Job, eindeutige Run-IDs) nach Re-Review-Befund N-1 entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |

@@ -1,6 +1,6 @@
 # Teststrategie
 
-**Version:** 1.4.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
+**Version:** 1.6.0 | **Status:** verbindlich für MS-1 – G0-A implementiert, Gate-Pass ausstehend | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -184,25 +184,51 @@ verschieden; der Reviewer reproduziert mindestens einen kanonischen
 Clean-Clone-Check als eigene Ausführung. Relevante Änderungen machen frühere
 Evidence stale.
 
-Die öffentliche CLI führt gepinntes Ajv Draft 2020-12 und die
-Cross-Field-Prüfung für Schema 1.2 gemeinsam aus. Diese Prüfung ist
-integrity-only: Für `verdict=pass` entsteht unabhängig von einem
-`--trust-context <external.json>` zusätzlich
-`E_AUTHORIZATION_BOOTSTRAP`. Ohne externen Kontext bleibt außerdem
-`E_TRUST_CONTEXT`. Schema 1.2 autorisiert daher kein Gate.
+Der kanonische Check-Command trägt nie einen Executor-Schalter. Die
+Implementation führt ihn unverändert aus; der Reviewer wiederholt denselben
+Command im Clean Clone mit der Umgebungsvariable `NOVA_GATE_EXECUTOR=reviewer`
+(der Schalter `--executor` existiert nur für lokale Reproduktion). Die
+`commandId` folgt maschinell erzwungen dem Präfix `impl-` (Implementation)
+beziehungsweise `review-` (Reviewer), etwa `impl-g0-architecture` und
+`review-g0-architecture` für denselben Check.
 
-Der Schema-1.3-Zielvertrag führt Manifest, Szenariovertrag, Schema, Python-
-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und Authorize-
-Workflow aus einem separaten Trusted-Tool-Checkout aus und bindet
-Subject-/Trusted-Commit, SHA-256 sowie die exakte Node-Version. Eine Änderung
-an diesem Bundle wird ohne Gate-Fortschritt gemergt und gilt erst für einen
-nachfolgenden sauberen Subject-Commit.
+Die öffentliche CLI führt gepinntes Ajv Draft 2020-12 und die
+Cross-Field-Prüfung für Schema 1.3 gemeinsam aus. Lokal bleibt diese Prüfung
+integrity-only: Für `verdict=pass` entsteht ohne
+`--trusted-tool-checkout <checkout>` zusätzlich
+`E_AUTHORIZATION_BOOTSTRAP`, ohne `--trust-context <external.json>` bleibt
+`E_TRUST_CONTEXT`. Ein lokales Evidence-Dokument autorisiert daher kein Gate.
+
+Seit G0-A führt der geschützte Authorize-Job Manifest, Szenariovertrag,
+Schema, Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner
+und Authorize-Workflow ausschließlich aus einem separaten Trusted-Tool-
+Checkout aus (`trusted/`, Vorgänger-Commit von `main`, niemals der Subject-
+Commit selbst) und bindet Subject-/Trusted-Commit, SHA-256 sowie die exakte
+Node-Version. Validator und Ajv laufen dabei aus `trusted/`; die Evidence
+wird nicht in den Trusted-Checkout kopiert, sondern über
+`--subject-root <subject>` gelesen, sodass die Cleanliness-Prüfung des
+Trusted-Checkouts intakt bleibt. `subjectSha256` und `trustedSha256` von
+Manifest und Szenariovertrag dürfen differieren (der Trusted-Stand ist
+älter); Schwellenänderungen laufen bewusst ausschließlich über PR-Review.
+Eine Änderung an diesem Bundle wird ohne Gate-Fortschritt gemergt und gilt
+erst für einen nachfolgenden sauberen Subject-Commit.
 
 Der externe Kontext enthält die vollständige geordnete
 `authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag bindet
 Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie CI- und
-Review-Attestierung und wird gegen GitHub verifiziert. Fehlende, zusätzliche,
-vertauschte oder nur lokale Einträge sind Fail.
+Review-Attestierung und wird vom geschützten Job gegen die GitHub-API mit
+der D-065-Authorize-Run-Bindung verifiziert: `ciRunId` gehört zu
+`quality-gate.yml` mit `event=workflow_dispatch` und `conclusion=success`,
+`headSha` gleicht dem Subject-Commit des Eintrags, und `ciJobId` ist der
+erfolgreiche `gate-evidence-authorize`-Job dieses Runs (die
+Evidence-`ci.jobName`-Konstante ist identisch). Run-IDs sind über die Kette
+eindeutig — jedes Gate braucht seinen eigenen Authorize-Run. Fehlende,
+zusätzliche, vertauschte oder nur lokale Einträge sind Fail; fehlendes
+`gh`-Tool oder Token ist fail-closed. Verbleibender Anker ist die
+GitHub-Environment-Protection des manuellen Dispatch auf `main` samt dieser
+API-Verifikation; die Bindung des Laufs an die Evidence-Bytes läuft über
+`NOVA_TRUST_CONTEXT_SHA256`, und die Review-Attestierung ist hash-gebunden,
+aber ohne PR-/Review-ID nicht API-verifizierbar (dokumentiertes Restrisiko).
 
 `--self-test` erzeugt positive und negative Fälle nur temporär und muss in G0
 unter anderem No-op-Commands, falsche/missing Check-Artefakte, lokale
@@ -240,8 +266,10 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 
 ## Offene Punkte
 
-- Der reale Schema-1.3-/Trusted-Tool-Authorize-Workflow ist G0-A-Arbeit und
-  in diesem Rebaseline absichtlich noch nicht als bestanden behauptet.
+- Schema 1.3, Trusted-Tool-Checkout und der geschützte Authorize-Workflow
+  sind seit G0-A implementiert und per `--self-test`/`--self-test-topology`
+  belegt; ein autorisierter Gate-Pass an einem nachfolgenden sauberen
+  Subject-Commit steht noch aus, sodass G0 offen bleibt.
 
 ## Nächste Schritte
 
@@ -263,3 +291,5 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 | 1.2.0 | 2026-07-24 | D-062-Szenariobindung, Nearest-Rank-Schwellen, Subject-Blobs und Same-Subject-Vorgängergates ergänzt | Lead QA Engineer |
 | 1.3.0 | 2026-07-24 | D-063-Schema 1.2, Check-Artefakte, externen Trust-Kontext, rekursive Ajv-Prüfung und getrennte Performance-Läufe verankert | Lead QA Engineer |
 | 1.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Tool-Bootstrap, vollständige Kette und Umgebungsprofile verankert | Lead QA Engineer |
+| 1.5.0 | 2026-07-25 | G0-A-Umsetzungsstand: Schema 1.3/Trusted-Checkout mit `--subject-root`-Topologie, GitHub-API-Verifikation der Kette, `NOVA_GATE_EXECUTOR`/commandId-Konvention und Restrisiko Review-Attestierung dokumentiert | Lead QA Engineer |
+| 1.6.0 | 2026-07-25 | D-065-Authorize-Run-Bindung (workflow_dispatch-Event, exklusiver `gate-evidence-authorize`-Job, eindeutige Run-IDs, `ci.jobName`-Konstante) und Restrisiko-Präzisierung aufgenommen | Lead QA Engineer |
