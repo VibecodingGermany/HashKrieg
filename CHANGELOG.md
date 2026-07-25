@@ -336,7 +336,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Commit weiter). Tote Ziele werden aus allen Angriffsbefehlen noch im
   selben Tick aufgelöst; lebende, aber unsichtbare oder außer Reichweite
   befindliche Ziele werden gehalten, nicht fallengelassen (Verfolgung ist
-  Movement-Sache). Einheiten auf Slots ohne committed Team-Sicht (MS-1:
+  Movement-Sache). **Duell-Asymmetrie (Review-Feststellung):** da die
+  Engagement-Phase in aufsteigender Index-Reihenfolge läuft und der Tod
+  sofort wirkt, gewinnt bei gegenseitigem Töten im selben Tick immer die
+  Einheit mit dem kleineren Index — die Spawn-Reihenfolge entscheidet
+  gleichstarke Duelle (deterministisch und spec-konform, aber
+  balance-relevant, daher explizit dokumentiert). Einheiten auf Slots ohne committed Team-Sicht (MS-1:
   Team-Index == Slot) können nicht feuern. FoW-Verdrahtung per
   Konstruktor-Injektion des `FogOfWarSystem` durch den Host (der Kernel
   bietet keine Cross-System-API; gleiches Muster wie Movement ←

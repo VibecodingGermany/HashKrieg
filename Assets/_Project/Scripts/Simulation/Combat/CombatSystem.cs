@@ -25,12 +25,20 @@ namespace Nova.Simulation.Combat
     /// dead id is cleared from every unit's attack order in the same tick.
     /// </para>
     /// <para>
+    /// Duel asymmetry (review finding): because engagements run in ascending
+    /// entity-index order and death takes effect immediately, mutual kills
+    /// inside one tick are won by the unit with the LOWER index — spawn order
+    /// decides an even duel. This is deterministic and spec-conform
+    /// (SimulationCore.md section 2 phase order) but balance-relevant and
+    /// therefore stated explicitly.
+    /// </para>
+    /// <para>
     /// Range rule (simplest documented rule, boundary inclusive): the
     /// center-to-center distance must satisfy
     /// <c>dist &lt;= WeaponRange + target.Radius</c> — edge-adjusted on the
     /// target side only, the attacker's own radius is ignored. The comparison
-    /// is exact fixed-point in widened Q32.32 long arithmetic, so no squared
-    /// distance can overflow the Q16.16 domain.
+    /// is exact fixed-point in widened Q32.32 long arithmetic; a squared
+    /// distance can overflow only beyond ~46 km, far outside any map domain.
     /// </para>
     /// <para>
     /// Targeting permission (docs/tech/FogOfWar.md sections 2 and 3): the
