@@ -234,6 +234,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **Atomarer Snapshot-Restore (Serialization.md §5, Review-Auflage P1-1):**
+  `SimulationKernel.TryRestoreSnapshot` committete Ingress-, Tick-, PRNG- und
+  System-Blöcke sequenziell — ein semantisch invalider späterer Block hinter
+  gültigem Container-Hash erzeugte Franken-State. Der Restore ist jetzt
+  strikt zweiphasig: Phase A validiert alles mutationsfrei
+  (`IStatefulSimSystem.TryValidateState`, neuer Interface-Pfad;
+  `CommandIngress.TryValidateState`; Kernel-Block weiterhin komplett in
+  lokale Variablen), Phase B committet erst nach vollständigem Erfolg — ein
+  Fehler lässt den laufenden Host garantiert bitidentisch. Neue Tests in
+  beiden Lanes: `FailedRestore_LeavesHostCompletelyUnchanged` (gefälschter,
+  semantisch invalider Entity-Store-Block hinter valide neu gehashtem
+  Container sowie Foreign-Capacity-Block; Hash UND `SaveSnapshot()`-Bytes vor
+  == nach) und `Restore_IsBlockIdBased_IndependentOfRegistrationOrder`
+  (Restore und Fortsetzung bei umgekehrter System-Registrierungsreihenfolge).
 - **F-001 — Kanonischer Command-Pfad verwirft Commands**
   ([ImplementationAudit](docs/production/ImplementationAudit_2026-07-24.md)):
   Der Prototyp-Kernel pufferte angenommene Commands, ohne sie je an ein
@@ -317,6 +331,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **Float-/Double-Numerik im Movement-State als Risiko deklariert
+  (Review-Auflage P1-2, Q-040(i)):**
+  [docs/production/OpenQuestions.md](docs/production/OpenQuestions.md)
+  (Version 1.11.3) benennt offen, dass `Transform2D`-Floats und die
+  `SimMath`-Transzendenten (`Atan2`/`Sin`/`Cos`/`Sqrt` auf `System.Math`) im
+  hash-relevanten Movement-State zwar pro Runtime bitstabil serialisieren,
+  aber zwischen Mono, IL2CPP und .NET nicht garantiert bitidentisch sind —
+  ein latenter Cross-Runtime-Desync im Sinne von SimulationCore.md §1/§9.
+  Provisorium: Die Prototyp-Floats bleiben bis zur Movement-Domain-Scheibe;
+  vor dem G1-Schema-Freeze ist per D-ID zwischen SimFixed-Migration und
+  kanonischer Fixed-Point-Approximation zu entscheiden. Doc-Kommentare in
+  `MovementSystem` und `Transform2D` verweisen auf Q-040(i); der Kernel
+  dokumentiert an `RegisterSystem` die Pflicht, dass jedes System mit
+  Match-relevantem State `IStatefulSimSystem` implementieren muss — die
+  Scaffolding-Systeme (Combat/Economy/Production/Vision mit 20-Hz- und
+  Float-Relikten) sind vor Registrierung zu migrieren (Review-Nachzügler
+  P2-1).
 - **API-Bruch `SimulationKernel` (intendiert; D-055 erklärt Prototypen zu
   Input, D-057 macht Prototyp-Formate unsupported):** Der Konstruktor nimmt
   jetzt die Konkretklasse `SimRandom` (statt `ISimRandom`, das Interface
