@@ -18,6 +18,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Vorarbeit Hash-Domänen (ohne Gate-Status, ohne Evidence):** kanonischer
+  XXH64-Hasher in `Nova.Core` (`XxHash64` One-Shot, `XxHash64State`
+  Streaming, safe-managed, explizite Little-Endian-Lanes) plus kanonischer
+  Domänen-Writer `SimHashWriter` (ASCII-Präfixe `NOVA_STATE_V1`,
+  `NOVA_DEFINITIONS_V1`, `NOVA_FILE_V1`, `NOVA_REPLAY_CHAIN_V1` mit
+  `0x00`-Terminierung, Feld-Tags, Längenpräfixe und typsichere Schreiber für
+  `SimFixed`/`Tick`/`EntityId` in Little-Endian) gemäß
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §5. Korrektheit
+  über die offiziellen xxHash-Sanity-Vektoren verankert (xxHash-Repo,
+  `tests/sanity_test_vectors.h`), nicht über selbst erzeugte Golden-Werte;
+  Streaming == One-Shot über alle Längen 0–200 und Stripe-Grenzen
+  31/32/33/64/65. Testsuiten in beiden Lanes (Unity EditMode +
+  `tools/Nova.SimRunner.Tests`). `StateHashUtility` (FNV-1a-Prototyp) bleibt
+  bis zur G1-Integration bestehen (D-057); offener Punkt für Q-040: Der
+  bestehende `EntityId`-Typ (int Index + ushort Version) entspricht noch
+  nicht dem gepackten `uint32`-Bitlayout aus §1, `WriteEntityId` hasht die
+  aktuellen Felder.
 - **Q-040 registriert:** G1-Numerik-Detailfragen, die
   [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) offenlässt
   (`ToInt()`-Rundung, `SimAngle`-Einheit, PRNG-Seeding/-Serialisierung), mit
