@@ -18,6 +18,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Review-Folgearbeit Snapshot-Blockformat v1 (ohne Gate-Status, ohne
+  Evidence):** zwei bewusste v1-Abweichungen von
+  [docs/tech/Serialization.md](docs/tech/Serialization.md) offen deklariert
+  statt nachimplementiert — (a) kein Datei-Hash im Container (§2 Punkt 7):
+  State-Hash plus exakte Längenarithmetik decken Integrität und Truncation
+  bereits ab, ein Datei-Hash wäre redundant; (b) Major-only
+  `FormatVersion u16` statt `Major u16 + Minor u16` (§1), Minor implizit 0.
+  Beide Punkte sind als Q-040 (g)/(h) in
+  [docs/production/OpenQuestions.md](docs/production/OpenQuestions.md)
+  (Version 1.11.2) erfasst, vor dem G1-Schema-Freeze per D-ID zu
+  ratifizieren, und im Format-Doc-Kommentar (`SnapshotFormat.cs`)
+  markiert. Zudem: `SnapshotWriter.AddBlock` lehnt mehr als 65.535 Blöcke
+  mit `InvalidOperationException` ab (kein stiller u16-Wrap des
+  BlockCount-Felds, Test: 65.536. Block), und ein tautologischer
+  Hash-Test wurde zugunsten des bestehenden echten Nachbartests
+  (gleicher Content unter zwei BlockIds → gleicher BlockHash,
+  differierender State-Hash) in beiden Lanes entfernt.
 - **G1-Vorarbeit Snapshot-Blockformat v1 (ohne Gate-Status, ohne Evidence):**
   kanonischer Snapshot-Container in `Nova.Simulation.Snapshots` gemäß
   [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §7 und
