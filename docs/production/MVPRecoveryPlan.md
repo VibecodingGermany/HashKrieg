@@ -1,6 +1,6 @@
 # MVP-Recovery-Plan
 
-**Version:** 1.4.0 | **Status:** verbindlich – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Producer / Lead Technical Director / Lead QA Engineer | **Sprint:** 7
+**Version:** 1.5.0 | **Status:** verbindlich – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Producer / Lead Technical Director / Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -13,7 +13,7 @@ Stand ist **G0 offen**; MS-0 und MS-1 sind nicht erreicht.
 
 - [ImplementationAudit_2026-07-24.md](ImplementationAudit_2026-07-24.md) –
   eingefrorener Ausgangsbefund
-- [DecisionLog.md](DecisionLog.md) – D-055 bis D-064
+- [DecisionLog.md](DecisionLog.md) – D-055 bis D-066
 - [MVPContentManifest.md](MVPContentManifest.md) – exakter MS-1-Inhalt
 - [Milestones.md](Milestones.md) – Zuordnung von Gates zu MS-0/MS-1
 - [../tech/SimulationCore.md](../tech/SimulationCore.md),
@@ -122,17 +122,20 @@ D-063 ersetzt Schema 1.1 und verschärft:
 - ein Trust-Kontext aus dem unveränderten geschützten Workflow auf `main`
   bindet Evidence-Hash, Subject, CI- und Reviewer-Attestierung.
 
-D-064 sperrt den Autorisierungsanspruch von Schema 1.2 und macht folgende
-Punkte zum zwingenden G0-A-Exit:
+D-064/D-066 sperren den Autorisierungsanspruch von Schema 1.2/1.3 und teilen
+den zwingenden G0-A-Exit:
 
-- Schema 1.3 wird aus einem subject-unabhängigen Trusted-Tool-Checkout
-  ausgeführt und bindet Manifest, Szenariovertrag, Schema, Python-/Ajv-
-  Validator, Paketdateien, Gate-Runner und Authorize-Workflow samt exakter
-  Node-Version;
+- G0-A1 prüft Schema 1.3, Manifest, Szenariovertrag, Python-/Ajv-Validator,
+  Paketdateien, Gate-Runner, Integrity-Workflow und Umgebungen als
+  integrity-only Trust-Bundle;
+- G0-A2 trennt Subject-, Evidence-Carrier- und Trusted-Tool-Commit und bindet
+  abgeschlossene Authorize-Läufe über append-only
+  `GateAuthorization.json`-Receipts;
 - Trust-Bundle-Änderungen werden zuerst ohne Gate-Fortschritt gemergt und
   dürfen erst einen nachfolgenden sauberen Subject-Commit prüfen;
-- der externe Kontext autorisiert die vollständige geordnete Gate-Kette,
-  nicht nur das aktuelle Dokument;
+- kein Lauf attestiert seinen eigenen noch ausstehenden Erfolg; frühere
+  Receipts werden gegen exakten Run, Attempt, Job, Gate und Evidence-Hash
+  verifiziert;
 - Command und Performance-Messung referenzieren dieselbe geprüfte Umgebung;
   Windows-x64 und Mac M2 verwenden getrennte Methodenprofile;
 - Manipulations-, Ketten-, Umgebungs-, Missing-Tool- und Timeout-Negativtests
@@ -144,11 +147,12 @@ Punkte zum zwingenden G0-A-Exit:
 
 ### G0-A – Trusted-Gate-Bootstrap
 
-Zuerst wird D-064 als Bootstrap-Änderung implementiert und ohne Gate-
-Fortschritt über den geschützten PR-Prozess gemergt. Der anschließende
-saubere Subject-Commit muss Schema 1.3, das externe Trusted Tooling, die
-vollständige Autorisierungskette und die Umgebungsbindung beweisen. Eine
-Änderung am Trust-Bundle darf nicht zugleich diese Änderung autorisieren.
+G0-A1 wird als Integrity-Bootstrap ohne Gate-Fortschritt über den geschützten
+PR-Prozess gemergt. G0-A2 implementiert danach separat den zweiphasigen
+D-066-Receipt-Authorizer. Erst nach beiden Bausteinen darf ein sauberer
+Subject-Commit die vollständige Receipt-Kette und Umgebungsbindung beweisen.
+Eine Änderung am Trust-Bundle darf nicht zugleich diese Änderung
+autorisieren.
 
 ### G0-B – Plattformbasis
 
@@ -170,7 +174,8 @@ Danach verlangt G0:
 8. keine getrackten generierten Binärdateien; und
 9. keinerlei Gate-Pass aus einem lokalen/untrusted Evidence-Dokument.
 
-**Exit:** G0-A ist zuvor aus einem älteren Trusted-Tool-Stand aktiviert. Alle
+**Exit:** G0-A1 und G0-A2 sind zuvor aus einem älteren Trusted-Tool-Stand
+aktiviert. Alle
 G0-B-Kriterien liegen am selben nachfolgenden sauberen SHA in
 Schema-1.3-Evidence vor. Ein lokaler Teilcheck oder Schema 1.2 schließt G0
 nicht.
@@ -333,11 +338,11 @@ gültiges Ergebnis, Core-Action-Trace und Checkpoint-Kette vorliegen.
 
 ## Nächste Schritte
 
-1. Ausschließlich G0-A implementieren und als nicht selbstautorisierende
-   Bootstrap-Änderung mergen.
-2. Am nachfolgenden sauberen Subject G0-B implementieren und belegen.
-3. Danach G1 test-first aufbauen; keine G2-Funktion vor bestandenem V5a.
-4. Evidence-Verzeichnisse erst durch reale Gate-Versuche erzeugen.
+1. G0-A1 als nicht autorisierende Integrity-Grundlage mergen.
+2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren.
+3. Am nachfolgenden sauberen Subject G0-B implementieren und belegen.
+4. Danach G1 test-first aufbauen; keine G2-Funktion vor bestandenem V5a.
+5. Evidence-Verzeichnisse erst durch reale Gate-Versuche erzeugen.
 
 ## Änderungsverlauf
 
@@ -351,3 +356,4 @@ gültiges Ergebnis, Core-Action-Trace und Checkpoint-Kette vorliegen.
 | 1.3.0 | 2026-07-24 | D-063: Schema 1.2, kanonische Check-Artefakte, geschützten Trust-Kontext, rekursive Draft-2020-12-Prüfung und Drei-Lauf-Methode verankert | Producer / Lead Technical Director / Lead QA Engineer |
 | 1.3.1 | 2026-07-24 | Punkt- und Performance-Metrikartefakte im D-062/D-063-Übergang eindeutig getrennt | Producer / Lead Technical Director / Lead QA Engineer |
 | 1.4.0 | 2026-07-24 | D-064: Schema 1.2 auf Integritätsprüfung begrenzt und G0-A Trusted-Gate-Bootstrap vor G0-B eingeführt | Producer / Lead Technical Director / Lead QA Engineer |
+| 1.5.0 | 2026-07-25 | D-066: G0-A in fail-closed Integrity-Basis G0-A1 und zweiphasigen Receipt-Authorizer G0-A2 geteilt | Producer / Lead Technical Director / Lead QA Engineer |

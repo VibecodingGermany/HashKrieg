@@ -5,8 +5,9 @@ JSON Schema remains the structural contract. This standard-library validator
 adds comparisons, reference resolution, repository checks and negative
 controls that Draft 2020-12 cannot express reliably. Per D-064, Schema 1.3
 authorizes a gate pass only from a subject-independent trusted tool checkout
-(`--trusted-tool-checkout`) with an externally generated trust context; local
-runs remain integrity-only and fail closed on any pass verdict.
+(`--trusted-tool-checkout`). D-066 removed the self-referential authorizer;
+all runs remain integrity-only and fail closed on any pass verdict until the
+separate two-phase receipt contract is implemented.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ EVIDENCE_SCHEMA = ROOT / "quality/schemas/GateEvidence.schema.json"
 SCHEMA_VALIDATOR = ROOT / "quality/scripts/validate_evidence_schema.mjs"
 SCHEMA_VERSION = "1.3.0"
 TRUST_CONTEXT_VERSION = "2.0.0"
-SCENARIO_AUTHORIZATION_STATUS = "trusted-tool-checkout-authorization"
+SCENARIO_AUTHORIZATION_STATUS = "integrity-only-d066"
 # D-064: the trust bundle binds every tool/contract component per subject and
 # trusted commit plus SHA-256. Component ids are canonical; paths are
 # repository-relative and enforced semantically.
@@ -43,7 +44,7 @@ TRUST_BUNDLE_COMPONENTS = {
     "packageManifest": "quality/package.json",
     "packageLock": "quality/package-lock.json",
     "gateRunner": "quality/scripts/run_gate_check.py",
-    "authorizeWorkflow": ".github/workflows/quality-gate.yml",
+    "integrityWorkflow": ".github/workflows/quality-gate.yml",
 }
 CONTENT_COMPONENT_FIELDS = {
     "manifest": ("manifestPath", "manifestSha256"),
@@ -54,7 +55,7 @@ CONTENT_COMPONENT_FIELDS = {
     "packageManifest": ("packageManifestPath", "packageManifestSha256"),
     "packageLock": ("packageLockPath", "packageLockSha256"),
     "gateRunner": ("gateRunnerPath", "gateRunnerSha256"),
-    "authorizeWorkflow": ("authorizeWorkflowPath", "authorizeWorkflowSha256"),
+    "integrityWorkflow": ("integrityWorkflowPath", "integrityWorkflowSha256"),
 }
 # D-064: environment fields compared exactly against the method profiles of
 # the scenario contract (Windows-x64 reference vs. Mac M2 functional).
@@ -940,7 +941,23 @@ def _validate_trust_context(
     *,
     gate_id: str,
 ) -> None:
-    """Authorize a pass only inside the protected GitHub workflow."""
+    """Validate the retired draft context without authorizing a pass.
+
+    D-066 found that the first protected authorizer was self-referential:
+    the current run could not already be successful, and committed evidence
+    could not know its own future carrier SHA. Until the two-phase
+    GateAuthorization receipt exists, every pass stays fail-closed even when
+    an otherwise well-formed legacy context is supplied.
+    """
+
+    errors.append(
+        (
+            "E_AUTHORIZATION_BOOTSTRAP",
+            "D-066 keeps gate authorization disabled until the two-phase "
+            "GateAuthorization receipt binds subject, evidence carrier, "
+            "trusted tools and the completed protected run independently",
+        )
+    )
 
     if trust_context_path is None:
         errors.append(
@@ -1015,7 +1032,7 @@ def _validate_trust_context(
         "schemaVersion": TRUST_CONTEXT_VERSION,
         "repository": "VibecodingGermany/Project_Nova",
         "workflowPath": ".github/workflows/quality-gate.yml",
-        "authorizingJob": "gate-evidence-authorize",
+        "authorizingJob": "d066-disabled-authorizer",
         "subjectCommitSha": subject.get("commitSha"),
         "subjectTreeSha": subject.get("treeSha"),
         "evidencePath": attempt.get("evidencePath"),
@@ -1228,7 +1245,7 @@ def _validate_trust_context(
         "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
         "GITHUB_RUN_ID": str(context.get("authorizingRunId")),
         "GITHUB_RUN_ATTEMPT": str(context.get("authorizingRunAttempt")),
-        "GITHUB_JOB": "gate-evidence-authorize",
+        "GITHUB_JOB": "d066-disabled-authorizer",
         "GITHUB_WORKFLOW_REF": (
             "VibecodingGermany/Project_Nova/"
             ".github/workflows/quality-gate.yml@refs/heads/main"
@@ -2577,7 +2594,7 @@ def _self_test_fixture() -> tuple[
         "packageManifest": "f1" * 32,
         "packageLock": "f2" * 32,
         "gateRunner": "f3" * 32,
-        "authorizeWorkflow": "f4" * 32,
+        "integrityWorkflow": "f4" * 32,
     }
     trusted_digests = {
         component_id: "e" + f"{index:x}" + "e" * 62
@@ -2625,8 +2642,8 @@ def _self_test_fixture() -> tuple[
             "packageLockSha256": content_digests["packageLock"],
             "gateRunnerPath": "quality/scripts/run_gate_check.py",
             "gateRunnerSha256": content_digests["gateRunner"],
-            "authorizeWorkflowPath": ".github/workflows/quality-gate.yml",
-            "authorizeWorkflowSha256": content_digests["authorizeWorkflow"],
+            "integrityWorkflowPath": ".github/workflows/quality-gate.yml",
+            "integrityWorkflowSha256": content_digests["integrityWorkflow"],
         },
         "trustBundle": {
             "trustedRepository": "VibecodingGermany/Project_Nova",
@@ -2714,7 +2731,7 @@ def _self_test_fixture() -> tuple[
             "runId": "123",
             "runAttempt": 1,
             "jobId": "456",
-            "jobName": "gate-evidence-authorize",
+            "jobName": "integrity",
             "headSha": commit,
             "url": "https://github.com/VibecodingGermany/Project_Nova/actions/runs/123",
             "conclusion": "success",
@@ -2898,7 +2915,7 @@ def _build_trusted_harness(
         "packageManifest": b'{"name":"harness-quality"}\n',
         "packageLock": b'{"lockfileVersion":3}\n',
         "gateRunner": b"#!/usr/bin/env python3\n",
-        "authorizeWorkflow": b"name: quality-gate\n",
+        "integrityWorkflow": b"name: quality-gate\n",
     }
     trusted_component_bytes = dict(
         component_bytes, evidenceSchema=schema_bytes
@@ -3044,7 +3061,7 @@ def _build_trusted_harness(
         "workflowPath": ".github/workflows/quality-gate.yml",
         "authorizingRunId": "999",
         "authorizingRunAttempt": 1,
-        "authorizingJob": "gate-evidence-authorize",
+        "authorizingJob": "d066-disabled-authorizer",
         "subjectCommitSha": subject_commit,
         "subjectTreeSha": subject_tree,
         "evidencePath": document["attempt"]["evidencePath"],
@@ -3069,7 +3086,7 @@ def _harness_environment(context_raw: bytes) -> dict[str, str]:
         "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
         "GITHUB_RUN_ID": "999",
         "GITHUB_RUN_ATTEMPT": "1",
-        "GITHUB_JOB": "gate-evidence-authorize",
+        "GITHUB_JOB": "d066-disabled-authorizer",
         "GITHUB_WORKFLOW_REF": (
             "VibecodingGermany/Project_Nova/"
             ".github/workflows/quality-gate.yml@refs/heads/main"
@@ -3322,10 +3339,6 @@ def run_self_test() -> int:
             f"{fail_errors}"
         )
         return 1
-    if _is_authorized_pass(fail_fixture, fail_errors):
-        print("SELF-TEST FAIL: verdict=fail was treated as an authorized pass")
-        return 1
-
     performance_fixture = copy.deepcopy(fixture)
     performance_scenarios = copy.deepcopy(scenarios)
     performance_scenarios["SELF_TEST_SCENARIO"]["methodRef"] = "performanceMethod"
@@ -3516,7 +3529,7 @@ def run_self_test() -> int:
             "packageManifest": b'{"name":"subject-quality"}\\n',
             "packageLock": b'{"lockfileVersion":3}\\n',
             "gateRunner": b"#!/usr/bin/env python3\\n",
-            "authorizeWorkflow": b"name: quality-gate\\n",
+            "integrityWorkflow": b"name: quality-gate\\n",
         }
         for component_id, raw_bytes in component_bytes.items():
             (repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])).write_bytes(raw_bytes)
@@ -3651,14 +3664,12 @@ def run_self_test() -> int:
 
             baseline_errors = trusted_codes(trusted_document, trusted_context_path)
             checks += 1
-            if baseline_errors:
+            if baseline_errors != {"E_AUTHORIZATION_BOOTSTRAP"}:
                 print(
-                    "SELF-TEST FAIL: trusted Schema 1.3 baseline was rejected: "
+                    "SELF-TEST FAIL: retired trusted baseline did not fail "
+                    "closed only at the D-066 bootstrap lock: "
                     f"{sorted(baseline_errors)}"
                 )
-                return 1
-            if not _is_authorized_pass(trusted_document, []):
-                print("SELF-TEST FAIL: trusted baseline was not an authorized pass")
                 return 1
 
             lockfile_path = trusted_repo / "quality/package-lock.json"
@@ -3984,9 +3995,6 @@ def run_self_test() -> int:
     topology_result = run_self_test_topology()
     if topology_result != 0:
         return 1
-    generator_result = run_generator_self_test()
-    if generator_result != 0:
-        return 1
 
     print(f"OK: {checks} Evidence-Semantik-Negativkontrollen bestanden.")
     return 0
@@ -4049,7 +4057,7 @@ def run_self_test_topology() -> int:
                 )
 
             checks += 1
-            positive = run_cli(
+            fail_closed = run_cli(
                 "--trusted-tool-checkout",
                 str(trusted_repo),
                 "--subject-root",
@@ -4058,10 +4066,13 @@ def run_self_test_topology() -> int:
                 str(context_path),
                 str(evidence_file),
             )
-            if positive.returncode != 0 or "AUTHORIZED PASS" not in positive.stdout:
+            if (
+                fail_closed.returncode == 0
+                or "E_AUTHORIZATION_BOOTSTRAP" not in fail_closed.stdout
+            ):
                 print(
-                    "SELF-TEST-TOPOLOGY FAIL: trusted CLI topology rejected "
-                    f"an authorized pass:\n{positive.stdout}"
+                    "SELF-TEST-TOPOLOGY FAIL: retired trust context escaped "
+                    f"the D-066 bootstrap lock:\n{fail_closed.stdout}"
                 )
                 return 1
 
@@ -4126,7 +4137,6 @@ def run_self_test_topology() -> int:
             )
             if (
                 default_root.returncode == 0
-                or "AUTHORIZED PASS" in default_root.stdout
             ):
                 print(
                     "SELF-TEST-TOPOLOGY FAIL: missing --subject-root did not "
@@ -4134,38 +4144,6 @@ def run_self_test_topology() -> int:
                 )
                 return 1
 
-            checks += 1
-            generator = ROOT / ".github/scripts/generate_trust_context.py"
-            api_environment = {
-                name: value
-                for name, value in environment.items()
-                if name not in ("GH_TOKEN", "GITHUB_TOKEN")
-            }
-            offline = subprocess.run(
-                [
-                    sys.executable,
-                    str(generator),
-                    "--evidence",
-                    str(evidence_file),
-                    "--trusted-sha",
-                    "0" * 40,
-                    "--output",
-                    str(harness_root / "external/offline-context.json"),
-                ],
-                cwd=harness_root,
-                env=api_environment,
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=60,
-            )
-            if offline.returncode == 0:
-                print(
-                    "SELF-TEST-TOPOLOGY FAIL: trust context generation "
-                    "succeeded without GitHub API credentials"
-                )
-                return 1
     finally:
         for name, previous in saved_environment.items():
             if previous is None:
@@ -4175,149 +4153,6 @@ def run_self_test_topology() -> int:
 
     print(f"OK: {checks} Topologie-End-to-End-Kontrollen bestanden.")
     return 0
-
-
-def run_generator_self_test() -> int:
-    """Offline controls for generate_trust_context.verify_chain (D-065).
-
-    The GitHub API layer (``gh_api``) is replaced with canned responses; no
-    network access happens in the self-test.
-    """
-
-    import importlib.util
-
-    generator_path = ROOT / ".github/scripts/generate_trust_context.py"
-    spec = importlib.util.spec_from_file_location(
-        "generate_trust_context", generator_path
-    )
-    if spec is None or spec.loader is None:
-        print("SELF-TEST-GENERATOR FAIL: cannot load generate_trust_context.py")
-        return 1
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    sha = "1" * 40
-
-    def entry(gate: str, run_id: str, job_id: str) -> dict[str, Any]:
-        return {
-            "gateId": gate,
-            "evidencePath": (
-                f"quality/evidence/{gate}/{sha}/attempt/GateEvidence.json"
-            ),
-            "evidenceSha256": "2" * 64,
-            "subjectCommitSha": sha,
-            "subjectTreeSha": "3" * 40,
-            "ciRunId": run_id,
-            "ciJobId": job_id,
-            "ciAttestationSha256": "4" * 64,
-            "reviewArtifactSha256": "5" * 64,
-        }
-
-    authorize_job = {
-        "id": 456,
-        "name": "gate-evidence-authorize",
-        "conclusion": "success",
-    }
-    integrity_job = {"id": 789, "name": "integrity", "conclusion": "success"}
-
-    def run_document(
-        event: str = "workflow_dispatch",
-        conclusion: str = "success",
-        head_sha: str = sha,
-    ) -> dict[str, Any]:
-        return {
-            "path": ".github/workflows/quality-gate.yml",
-            "event": event,
-            "conclusion": conclusion,
-            "head_sha": head_sha,
-        }
-
-    cases: list[
-        tuple[str, list[dict[str, Any]], dict[str, Any], dict[str, Any], bool]
-    ] = [
-        (
-            "valid-two-gate-chain",
-            [entry("G0", "100", "456"), entry("G1", "101", "456")],
-            {"100": run_document(), "101": run_document()},
-            {
-                "100": {"jobs": [dict(authorize_job)]},
-                "101": {"jobs": [dict(authorize_job)]},
-            },
-            False,
-        ),
-        (
-            "pull-request-event-run",
-            [entry("G0", "100", "456")],
-            {"100": run_document(event="pull_request")},
-            {"100": {"jobs": [dict(authorize_job)]}},
-            True,
-        ),
-        (
-            "integrity-job-instead-of-authorize",
-            [entry("G0", "100", "789")],
-            {"100": run_document()},
-            {"100": {"jobs": [dict(integrity_job)]}},
-            True,
-        ),
-        (
-            "reused-run-id-across-gates",
-            [entry("G0", "100", "456"), entry("G1", "100", "456")],
-            {"100": run_document()},
-            {"100": {"jobs": [dict(authorize_job)]}},
-            True,
-        ),
-        (
-            "head-sha-mismatch",
-            [entry("G0", "100", "456")],
-            {"100": run_document(head_sha="9" * 40)},
-            {"100": {"jobs": [dict(authorize_job)]}},
-            True,
-        ),
-    ]
-
-    checks = 0
-    for name, chain, runs, jobs, expect_problems in cases:
-        def fake_gh_api(
-            endpoint: str,
-            _runs: dict[str, Any] = runs,
-            _jobs: dict[str, Any] = jobs,
-        ) -> dict[str, Any]:
-            prefix = f"repos/{module.REPOSITORY}/actions/runs/"
-            if endpoint.endswith("/jobs"):
-                run_id = endpoint[len(prefix) : -len("/jobs")]
-                if run_id not in _jobs:
-                    raise ValueError(f"unknown run {run_id}")
-                return _jobs[run_id]
-            run_id = endpoint[len(prefix) :]
-            if run_id not in _runs:
-                raise ValueError(f"unknown run {run_id}")
-            return _runs[run_id]
-
-        module.gh_api = fake_gh_api
-        problems = module.verify_chain(
-            chain, ["gate-evidence-authorize"] * len(chain)
-        )
-        checks += 1
-        if expect_problems and not problems:
-            print(f"SELF-TEST-GENERATOR FAIL: {name} was accepted")
-            return 1
-        if not expect_problems and problems:
-            print(f"SELF-TEST-GENERATOR FAIL: {name} was rejected: {problems}")
-            return 1
-
-    print(f"OK: {checks} Generator-GitHub-Verifikations-Kontrollen bestanden.")
-    return 0
-
-
-def _is_authorized_pass(
-    document: Any, errors: list[tuple[str, str]]
-) -> bool:
-    verdict = document.get("verdict") if isinstance(document, dict) else None
-    return (
-        not errors
-        and isinstance(verdict, dict)
-        and verdict.get("result") == "pass"
-    )
 
 
 def main() -> int:
@@ -4340,8 +4175,8 @@ def main() -> int:
         "--trust-context",
         type=Path,
         help=(
-            "external protected-CI trust context; required to authorize "
-            "verdict=pass"
+            "retired D-065 context input kept for fail-closed regression "
+            "tests; it cannot authorize verdict=pass under D-066"
         ),
     )
     parser.add_argument(
@@ -4349,7 +4184,8 @@ def main() -> int:
         type=Path,
         help=(
             "subject-independent trusted tool checkout (schema, validators, "
-            "pinned npm dependencies); required to authorize verdict=pass"
+            "pinned npm dependencies); validates integrity but cannot "
+            "authorize verdict=pass until G0-A2"
         ),
     )
     parser.add_argument(
@@ -4391,8 +4227,6 @@ def main() -> int:
             failed = True
             for code, message in errors:
                 print(f"{path}: {code}: {message}")
-        elif _is_authorized_pass(document, errors):
-            print(f"AUTHORIZED PASS: {path}")
         else:
             print(f"VALID NON-PASS EVIDENCE: {path}")
             failed = True

@@ -1,6 +1,6 @@
 # Ordner- und Projektstruktur
 
-**Version:** 1.2.0 | **Status:** verbindliches G0-A/G0-B-Ziel – noch nicht nachgewiesen | **Verantwortungsbereich:** Lead Technical Director / Lead DevOps Engineer | **Sprint:** 7
+**Version:** 1.3.0 | **Status:** verbindliches G0-A1/G0-A2/G0-B-Ziel – noch nicht nachgewiesen | **Verantwortungsbereich:** Lead Technical Director / Lead DevOps Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -39,7 +39,7 @@ tools/
 quality/
 ├── content/
 ├── scenarios/
-├── schemas/              Schema 1.2 integritäts-only; Schema 1.3 ist G0-A-Ziel
+├── schemas/              Schema 1.3 integrity-only; Receipt-Vertrag ist G0-A2-Ziel
 ├── scripts/              Schema-, Semantik- und fail-closed Gate-Prüfungen
 ├── package.json          gepinnte Quality-Toolchain
 ├── package-lock.json     reproduzierbarer Dependency-Lock
@@ -47,9 +47,9 @@ quality/
 ```
 
 `quality/evidence/` wird nicht als leeres Gerüst angelegt.
-Das Trusted-Tool-Bundle wird vom geschützten Authorize-Job aus einem
-separaten Checkout bezogen und ist kein vom geprüften Subject aufgelöster
-zweiter In-Tree-Pfad.
+Das Trusted-Tool-Bundle wird in G0-A1 als separater Checkout geprüft. Erst
+der noch offene G0-A2-Authorize-Job darf es als geschützte Autorität
+verwenden; es ist kein vom geprüften Subject aufgelöster zweiter In-Tree-Pfad.
 
 ## 2. Quellenvertrag
 
@@ -97,30 +97,30 @@ Der Architecture Check validiert:
 - Negative Control gegen eine verbotene Kante,
 - ein kanonisches Prüfergebnis je G0-Kriterium einschließlich gebundener
   stdout-, stderr- und Check-Artefakte,
-- nach G0-A eine geschützte CI-Attestierung und einen unabhängigen
-  Reviewer-Nachweis gemäß Schema 1.3,
-- die vollständige geordnete `authorizedEvidence`-Kette sowie
+- nach G0-A2 ein append-only `GateAuthorization.json`-Receipt, eine
+  geschützte CI-Attestierung und einen unabhängigen Reviewer-Nachweis,
+- die vollständige geordnete Receipt-Kette sowie
   `environmentId`-Bindung von Command und Performance-Messung und
 - getrennte Windows-x64-Referenz- und Mac-M2-Funktionsmethoden.
 
-Schema 1.2 kann diese Struktur nur auf Integrität prüfen. Jeder Pass-Versuch
-bleibt mit `E_AUTHORIZATION_BOOTSTRAP` gesperrt. Die G0-A-Bundle-Änderung wird
-ohne Gate-Fortschritt gemergt; erst ein nachfolgender sauberer Subject-Commit
-darf G0-B und damit G0 nachweisen.
+Schema 1.3 kann diese Struktur nur auf Integrität prüfen. Jeder Pass-Versuch
+bleibt mit `E_AUTHORIZATION_BOOTSTRAP` gesperrt. G0-A1 und G0-A2 werden ohne
+Gate-Fortschritt gemergt; erst ein nachfolgender sauberer Subject-Commit darf
+G0-B und damit G0 nachweisen.
 
 ## Offene Punkte
 
 - Trusted-Tool-Checkout, Schema 1.3 und der kanonische `run_gate_check.py`
-  werden als gemeinsames Trust-Bundle in G0-A implementiert. Die exakten
+  bilden G0-A1. Der zweiphasige Receipt-Pfad folgt in G0-A2. Die exakten
   `.csproj`-/Source-Include-Mechanismen folgen in G0-B und werden versioniert.
 
 ## Nächste Schritte
 
-1. G0-A Trusted-Tool-Bundle einschließlich Gate-Runner ohne Gate-Fortschritt
-   implementieren und mergen.
-2. Vorhandene Prototypstruktur gegen diesen Zielbaum inventarisieren.
-3. Kleinste G0-B-Korrektur ohne Gameplayänderung implementieren.
-4. Gate-Runner, Clean Builds/Tests und Negative Controls erst am
+1. G0-A1 ohne Gate-Fortschritt mergen.
+2. G0-A2 als separaten Receipt-Authorizer implementieren.
+3. Vorhandene Prototypstruktur gegen diesen Zielbaum inventarisieren.
+4. Kleinste G0-B-Korrektur ohne Gameplayänderung implementieren.
+5. Gate-Runner, Clean Builds/Tests und Negative Controls erst am
    nachfolgenden sauberen Subject in Schema-1.3-Evidence festhalten.
 
 ## Änderungsverlauf
@@ -133,3 +133,4 @@ darf G0-B und damit G0 nachweisen.
 | 1.0.1 | 2026-07-24 | Versionierte Quality-Skripte im G0-Zielbaum ergänzt | Lead Technical Director / Lead DevOps Engineer |
 | 1.1.0 | 2026-07-24 | Quality-Toolchain, kanonische Prüfartefakte und geschützte Evidence-Autorisierung nach D-063 ergänzt | Lead Technical Director / Lead DevOps Engineer |
 | 1.2.0 | 2026-07-24 | D-064-Trennung von subject-unabhängigem G0-A-Trust-Bundle und nachfolgendem G0-B-Subject in der Zielstruktur verankert | Lead Technical Director / Lead DevOps Engineer |
+| 1.3.0 | 2026-07-25 | D-066: Receipt-Datei und getrennte G0-A1-/G0-A2-Zielstruktur verankert | Lead Technical Director / Lead DevOps Engineer |

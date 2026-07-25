@@ -68,7 +68,7 @@ UNITY_REVISION = "d550df8bd089"
 DOTNET_SDK_MAJOR = 8
 
 VALIDATOR = ROOT / "quality/scripts/validate_gate_evidence.py"
-AUTHORIZE_WORKFLOW = ROOT / ".github/workflows/quality-gate.yml"
+INTEGRITY_WORKFLOW = ROOT / ".github/workflows/quality-gate.yml"
 SIMRUNNER_CSPROJ = "tools/Nova.SimRunner/Nova.SimRunner.csproj"
 
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -305,7 +305,7 @@ def check_architecture() -> tuple[bool, list[str]]:
 
 
 def _build_prerequisites(platform_label: str) -> tuple[bool, list[str]]:
-    """Shared G0-B.4 prerequisites; real builds are environment-bound."""
+    """Inspect prerequisites but never substitute them for a real G0-B build."""
     reasons: list[str] = []
     settings = ROOT / "ProjectSettings/EditorBuildSettings.asset"
     try:
@@ -327,22 +327,19 @@ def _build_prerequisites(platform_label: str) -> tuple[bool, list[str]]:
     if build_script is None:
         reasons.append("no build script using BuildPipeline.BuildPlayer found")
     reasons.append(
-        f"note: the real {platform_label} build itself is environment-bound "
-        "and runs in the G0-B build environment, not in this local check"
+        f"real {platform_label} build was not executed; prerequisites alone "
+        "cannot satisfy G0-B.4"
     )
-    return (
-        not [reason for reason in reasons if not reason.startswith("note:")],
-        reasons,
-    )
+    return (False, reasons)
 
 
 def check_build_windows() -> tuple[bool, list[str]]:
-    """G0-B.4 (Windows x64 reference): build prerequisites only."""
+    """G0-B.4 (Windows x64): fail closed until the real build is wired."""
     return _build_prerequisites("Windows-x64")
 
 
 def check_build_macos() -> tuple[bool, list[str]]:
-    """G0-B.4 (macOS arm64): build prerequisites only."""
+    """G0-B.4 (macOS arm64): fail closed until the real build is wired."""
     return _build_prerequisites("macOS-arm64")
 
 
@@ -487,10 +484,10 @@ def check_evidence_validator() -> tuple[bool, list[str]]:
         ast.parse(runner.read_text(encoding="utf-8"))
     except (OSError, SyntaxError) as error:
         reasons.append(f"run_gate_check.py: {error}")
-    if not AUTHORIZE_WORKFLOW.is_file():
+    if not INTEGRITY_WORKFLOW.is_file():
         reasons.append(".github/workflows/quality-gate.yml is missing")
     else:
-        workflow_text = AUTHORIZE_WORKFLOW.read_text(encoding="utf-8")
+        workflow_text = INTEGRITY_WORKFLOW.read_text(encoding="utf-8")
         if "validate_gate_evidence.py --self-test" not in workflow_text:
             reasons.append(
                 "quality-gate.yml does not document/run the validator self-test"

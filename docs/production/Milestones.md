@@ -1,6 +1,6 @@
 # Meilenstein-Planung
 
-**Version:** 2.4.0 | **Status:** verbindlicher Recovery-Stand – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Producer / Game Director / Lead QA Engineer | **Sprint:** 7
+**Version:** 2.5.0 | **Status:** verbindlicher Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Producer / Game Director / Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -12,7 +12,7 @@ Ergebnisstufe, keine Phase, Dateiliste oder Prozentangabe.
 
 - [MVPRecoveryPlan.md](MVPRecoveryPlan.md) – führende Gate-Kriterien
 - [MVPContentManifest.md](MVPContentManifest.md) – MS-1-Inhalt
-- [DecisionLog.md](DecisionLog.md) – D-055 bis D-064
+- [DecisionLog.md](DecisionLog.md) – D-055 bis D-066
 - [Roadmap.md](Roadmap.md) – Schätz- und Terminregeln
 - [`../../quality/schemas/GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
 - [`../../quality/scripts/validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
@@ -36,7 +36,7 @@ MS-0 besteht ausschließlich aus:
 
 | Bestandteil | Ergebnis |
 |---|---|
-| G0 | G0-A Trusted-Gate-Bootstrap, danach G0-B reproduzierbare Plattform und grüne Basis |
+| G0 | G0-A1 Integrity, G0-A2 Receipt-Authorizer, danach G0-B reproduzierbare Plattform und grüne Basis |
 | G1 | kanonischer Fixed-Point-/Command-/State-/Snapshot-/Replay-Kern |
 | V1 | exakte Cross-Plattform-Hashes und finale Bytes |
 | V2 | tragfähiger URP-Renderingpfad |
@@ -44,11 +44,11 @@ MS-0 besteht ausschließlich aus:
 | V4 | Pathfinding-P95 ≤4 ms im 500-Agenten-Spike |
 | V5a | Pre-Combat-SpatialHash/FoW/Commands, Rest-Sim-P95 ≤3 ms |
 
-**MS-0-Exit:** G0-A wurde zuvor als nicht selbstautorisierende Trust-Bundle-
-Änderung ohne Gate-Fortschritt gemergt. G0-B und G1/V1–V5a sind an einem
+**MS-0-Exit:** G0-A1 und G0-A2 wurden zuvor ohne Gate-Fortschritt gemergt.
+G0-B und G1/V1–V5a sind an einem
 nachfolgenden sauberen Subject-Commit/-Tree mit Schema 1.3 bestanden. Der
-subject-unabhängige externe Trust-Kontext autorisiert die vollständige
-geordnete `authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Schema 1.2
+subject-unabhängige Receipt-Vertrag autorisiert die vollständige geordnete
+Gate-Kette von G0 bis zum aktuellen Gate. Schema 1.2/1.3 ohne Receipt
 erfüllt diesen Exit nicht. MS-0 enthält noch kein MVP-Versprechen.
 
 ## 3. MS-1 – Closed-Core MVP
@@ -63,9 +63,9 @@ MS-1 ist der exakte Inhalt aus
 | G4 | exakter Produktionsinhalt, Glutrinne, UI, Settings, Persistence, Accessibility und Provenienz |
 | G5 | eingefrorene automatisierte, manuelle und Performance-Abnahme |
 
-**MS-1-Exit:** subject-unabhängig autorisierter Schema-1.3-G5-`pass` am
-abgenommenen SHA mit vollständiger geordneter `authorizedEvidence`-Kette bis
-G0. Die Content-Grenze sind zwei Fraktionen, eine Karte, neun Gebäude- und
+**MS-1-Exit:** subject-unabhängig autorisierter G5-`pass` am abgenommenen SHA
+mit vollständiger geordneter Receipt-Kette bis G0. Die Content-Grenze sind
+zwei Fraktionen, eine Karte, neun Gebäude- und
 acht Einheitenrollen je Fraktion sowie 100 Produktionseinheiten. Der
 500-Agenten-Lauf bleibt synthetische Architekturreserve.
 
@@ -114,3 +114,4 @@ keinen Alpha-Termin und kein Alpha-GO.
 | 2.2.0 | 2026-07-24 | D-062-Same-Subject-Vorgängergate-Kette als MS-0-/MS-1-Exit verankert | Producer / Lead QA Engineer |
 | 2.3.0 | 2026-07-24 | D-063-Schema 1.2 und Protected-CI-Trust-Autorisierung als Meilenstein-Exit ergänzt | Producer / Lead QA Engineer |
 | 2.4.0 | 2026-07-24 | D-064: Schema 1.2 als Integritätsvorstufe zurückgestuft und zweistufigen Schema-1.3-Trust-Bootstrap als Meilenstein-Voraussetzung ergänzt | Producer / Lead QA Engineer |
+| 2.5.0 | 2026-07-25 | D-066: G0-A1/G0-A2 und vollständige Receipt-Kette als Meilenstein-Voraussetzung festgelegt | Producer / Lead QA Engineer |

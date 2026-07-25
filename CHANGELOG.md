@@ -13,7 +13,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.11.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.12.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
@@ -65,6 +65,21 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **D-066-Fail-Closed-Korrektur nach zweitem Merge-Review:** Der zuvor als
+  geschlossen bezeichnete N-1-Befund war logisch nicht geschlossen. Der
+  laufende Authorize-Job verlangte bereits seinen eigenen erfolgreichen
+  Abschluss, und Subject-/Evidence-Carrier-Commit waren vermischt. Jeder
+  `verdict=pass` endet nun auch mit alten Trust-Argumenten zwingend mit
+  `E_AUTHORIZATION_BOOTSTRAP`; der frühere positive Trusted-Topology-Test ist
+  ein Negativtest. Die 58 Semantik- und vier Topologie-Kontrollen bleiben
+  grün, autorisieren aber bewusst keinen Pass.
+- GitHub-Actions im `docs-check`- und `integrity`-Pfad sind auf vollständige
+  Commit-SHAs gepinnt; Checkout-Credentials bleiben nicht erhalten und beide
+  Workflows verwenden explizit Node `24.4.1`.
+- `G0-BUILD-WINDOWS` und `G0-BUILD-MACOS` können nicht länger allein durch
+  vorhandene Build-Voraussetzungen `pass` melden. Bis reale
+  plattformspezifische Builds angebunden sind, enden beide Kriterien
+  ausdrücklich fail-closed.
 - **G0-A-Härtung nach adversarialem Review:** Der Authorize-Job führt
   Validator und Ajv nun aus dem Trusted-Checkout aus und liest die Evidence
   über den neuen `--subject-root`-Parameter aus dem Subject-Checkout —
@@ -96,7 +111,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Run-Wiederverwendung werden abgelehnt; neue Generator-Kontrollen mit
   gemockter GitHub-API (kein Netzwerk im Self-Test).
 
+### Entfernt
+- Der zirkuläre `workflow_dispatch`-Job `gate-evidence-authorize` und
+  `.github/scripts/generate_trust_context.py` wurden aus dem Mergekandidaten
+  entfernt. Es existiert weder ein geschützter Authorize-Lauf noch ein
+  konfiguriertes `quality-gate`-Environment; G0-A und G0 bleiben offen.
+
 ### Entschieden
+- **D-066 (Fail-Closed-Foundation und zweiphasige Autorisierung):** D-065
+  wurde ersetzt. G0-A1 umfasst nur die mergefähige Integritätsgrundlage;
+  G0-A2 muss Subject, Evidence-Carrier und Trusted Tooling trennen und
+  append-only `GateAuthorization.json`-Receipts nach abgeschlossenem
+  geschütztem Lauf verifizieren. Kein Lauf darf seinen eigenen Erfolg
+  attestieren.
 - **D-065 (Authorize-Run-Bindung der Evidence-Kette):** Replay-/Reuse-
   Befund N-1 aus dem G0-A-Re-Review; entschieden wurde die Event-/Job-/
   Eindeutigkeits-Bindung gegen die Alternativen „Doku abschwächen" und
@@ -104,6 +131,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **G0-A in G0-A1/G0-A2 geteilt:** Schema 1.3 und
+  `quality-gate / integrity` sind ausschließlich Integrity. Der
+  Szenariovertrag meldet `integrity-only-d066`, `ci.jobName` bezeichnet den
+  Evidence-Produzenten und der künftige Receipt-Vertrag startet ohne
+  Migration mit GateEvidence 1.4.0/Trust-Kontext 3.0.0. Wiki,
+  Beitragsregeln, Test- und Deploymentvertrag stehen auf 0.12.0/D-066.
 - **Szenariovertrag `mvp-v1.json` auf `1.3.0`:** `authorizationStatus`
   beschreibt den vorgesehenen
   `trusted-tool-checkout-authorization`-Pfad; bis dessen geschützter Merge und

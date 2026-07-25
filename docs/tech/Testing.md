@@ -1,18 +1,19 @@
 # Teststrategie
 
-**Version:** 1.6.0 | **Status:** verbindlich für MS-1 – G0-A implementiert, Gate-Pass ausstehend | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
+**Version:** 1.7.0 | **Status:** verbindlich für MS-1 – G0-A1 implementiert, G0-A2 und Gate-Pass offen | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
 Definiert Testpyramide, Coverage, Matchkadenz, Gate-Evidence und
-Fehlerdenominator. Die Anforderungen beschreiben den zu bauenden
-`quality-gate`; aktuell existiert nur `docs-check`, G0 ist offen.
+Fehlerdenominator. `docs-check` und der integrity-only PR-Job des
+`quality-gate` existieren; eine Gate-Pass-Autorisierung existiert nicht und
+G0 ist offen.
 
 ## Abhängigkeiten
 
 - [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
 - [../production/DecisionLog.md](../production/DecisionLog.md) – D-057 bis
-  D-064
+  D-066
 - [SimulationCore.md](SimulationCore.md), [Commands.md](Commands.md) und
   [FogOfWar.md](FogOfWar.md)
 - [PerformanceBudget.md](PerformanceBudget.md)
@@ -41,12 +42,19 @@ Test-only-Direktmutation ist nur in expliziten Buildern vor Matchstart erlaubt.
 ### G0-A – Trusted-Gate-Bootstrap
 
 Schema 1.2 prüft nur Struktur und Semantik. Jeder Pass-Versuch endet aktuell
-zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`. G0-A implementiert Schema 1.3,
-den subject-unabhängigen Trusted-Tool-Checkout, die vollständige geordnete
-`authorizedEvidence`-Kette und die `environmentId`-Bindung. Die Bootstrap-
-Änderung wird ohne Gate-Fortschritt geschützt gemergt und darf sich nicht
-selbst autorisieren. Erst ein nachfolgender sauberer Subject-Commit darf den
-neuen Trustpfad für G0-B verwenden.
+zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`.
+
+- **G0-A1 (dieser Stand):** Schema 1.3, Semantikvalidator, Trusted-Checkout-
+  Topologie, Umgebungsbindung, Negative Controls und Gate-Runner bilden eine
+  integrity-only Grundlage. Der PR-Workflow führt ausschließlich
+  `integrity` aus.
+- **G0-A2 (offen):** Der zweiphasige D-066-Receipt-Vertrag trennt Subject,
+  Evidence-Carrier und Trusted Tooling. Erst dieser Folgebaustein darf einen
+  geschützten Authorize-Job einführen.
+
+Die Bootstrap-Arbeit wird ohne Gate-Fortschritt geschützt gemergt und darf
+sich nicht selbst autorisieren. Erst ein späterer sauberer Subject-Commit
+darf den abgeschlossenen Trustpfad für G0-B verwenden.
 
 ### G0-B – Plattformbasis
 
@@ -199,44 +207,38 @@ integrity-only: Für `verdict=pass` entsteht ohne
 `E_AUTHORIZATION_BOOTSTRAP`, ohne `--trust-context <external.json>` bleibt
 `E_TRUST_CONTEXT`. Ein lokales Evidence-Dokument autorisiert daher kein Gate.
 
-Seit G0-A führt der geschützte Authorize-Job Manifest, Szenariovertrag,
-Schema, Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner
-und Authorize-Workflow ausschließlich aus einem separaten Trusted-Tool-
-Checkout aus (`trusted/`, Vorgänger-Commit von `main`, niemals der Subject-
-Commit selbst) und bindet Subject-/Trusted-Commit, SHA-256 sowie die exakte
-Node-Version. Validator und Ajv laufen dabei aus `trusted/`; die Evidence
-wird nicht in den Trusted-Checkout kopiert, sondern über
-`--subject-root <subject>` gelesen, sodass die Cleanliness-Prüfung des
-Trusted-Checkouts intakt bleibt. `subjectSha256` und `trustedSha256` von
-Manifest und Szenariovertrag dürfen differieren (der Trusted-Stand ist
-älter); Schwellenänderungen laufen bewusst ausschließlich über PR-Review.
-Eine Änderung an diesem Bundle wird ohne Gate-Fortschritt gemergt und gilt
-erst für einen nachfolgenden sauberen Subject-Commit.
+G0-A1 prüft Manifest, Szenariovertrag, Schema, Python-Validator,
+Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und Workflow als
+Trust-Bundle und testet getrennte Trusted-/Subject-Checkouts. Diese Prüfungen
+belegen ausschließlich Integrität. D-066 hat den zirkulären
+`gate-evidence-authorize`-Job und seinen Generator entfernt; auch ein
+syntaktisch korrekter alter Trust-Kontext endet mit
+`E_AUTHORIZATION_BOOTSTRAP`.
 
-Der externe Kontext enthält die vollständige geordnete
-`authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag bindet
-Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie CI- und
-Review-Attestierung und wird vom geschützten Job gegen die GitHub-API mit
-der D-065-Authorize-Run-Bindung verifiziert: `ciRunId` gehört zu
-`quality-gate.yml` mit `event=workflow_dispatch` und `conclusion=success`,
-`headSha` gleicht dem Subject-Commit des Eintrags, und `ciJobId` ist der
-erfolgreiche `gate-evidence-authorize`-Job dieses Runs (die
-Evidence-`ci.jobName`-Konstante ist identisch). Run-IDs sind über die Kette
-eindeutig — jedes Gate braucht seinen eigenen Authorize-Run. Fehlende,
-zusätzliche, vertauschte oder nur lokale Einträge sind Fail; fehlendes
-`gh`-Tool oder Token ist fail-closed. Verbleibender Anker ist die
-GitHub-Environment-Protection des manuellen Dispatch auf `main` samt dieser
-API-Verifikation; die Bindung des Laufs an die Evidence-Bytes läuft über
-`NOVA_TRUST_CONTEXT_SHA256`, und die Review-Attestierung ist hash-gebunden,
-aber ohne PR-/Review-ID nicht API-verifizierbar (dokumentiertes Restrisiko).
+G0-A2 muss drei Identitäten trennen:
 
-`--self-test` erzeugt positive und negative Fälle nur temporär und muss in G0
+1. `subjectCommitSha` für den geprüften Produktstand,
+2. `evidenceCarrierCommitSha` für die später eingecheckte Evidence und
+3. `trustedToolCommitSha` für die unabhängigen Prüftools.
+
+Der aktuelle geschützte Lauf erzeugt erst nach erfolgreicher Validierung
+einen hashgebundenen `GateAuthorization.json`-Kandidaten. Er bindet seinen
+Runtime-Run/-Attempt/-Job, prüft aber nicht zirkulär seine eigene noch
+ausstehende Conclusion. Nach erfolgreichem Job wird das Receipt unverändert
+append-only versioniert. Spätere Gates akzeptieren frühere Receipts nur,
+wenn GitHub den exakten Run, Attempt, Workflow, Gate, Evidence-Hash und
+Authorize-Job als erfolgreich bestätigt. G0 benötigt kein Vorgänger-Receipt;
+G1 ohne erfolgreiches G0-Receipt ist ungültig. Szenarioprofile und Schwellen
+kommen dabei aus dem Trusted-Tool-Stand, nicht aus dem änderbaren Subject.
+
+`--self-test` erzeugt Struktur-Baselines und negative Fälle nur temporär und
+muss in G0
 unter anderem No-op-Commands, falsche/missing Check-Artefakte, lokale
 Pass-Autorisierung, falsche Units, negative Samples, unvollständige
 Drei-Lauf-Messungen, Szenarioschwellen, Subject-Blob-Hashes,
 schemawidrige Vorgänger und eine fehlende Gate-Kette ablehnen. Für G0-A kommen
 manipuliertes Subject-Schema/Ajv-Wrapper/Lockfile, unvollständige
-`authorizedEvidence`-Ketten, falsche oder widersprüchliche Umgebungen,
+Autorisierungsketten, falsche oder widersprüchliche Umgebungen,
 fehlender Node-/Ajv-Stack und ein hängender Schema-Subprozess hinzu. Kriterien-
 und Szenarioprofile kommen aus
 [`mvp-v1.json`](../../quality/scenarios/mvp-v1.json).
@@ -250,8 +252,9 @@ kanonische Implementation-Check muss das Szenario als ausgeführt deklarieren;
 ein freier `command:<id>` genügt nicht. `stdout`, `stderr` und Check-Ergebnis
 sind gehashte Attempt-Artefakte.
 
-Der Trust-Kontext autorisiert nicht nur diese unmittelbare Referenz, sondern
-die vollständige geordnete Kette von G0 bis zum aktuellen Gate.
+Der zukünftige Receipt-Vertrag autorisiert nicht nur diese unmittelbare
+Referenz, sondern die vollständige geordnete Kette von G0 bis zum aktuellen
+Gate.
 
 Punktmetriken besitzen exakt `name`, `unit`, `samples`; Performance-Metriken
 exakt `name`, `unit`, `measurement`. Letzteres bindet den 30-s-Warmup und drei
@@ -266,18 +269,19 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 
 ## Offene Punkte
 
-- Schema 1.3, Trusted-Tool-Checkout und der geschützte Authorize-Workflow
-  sind seit G0-A implementiert und per `--self-test`/`--self-test-topology`
-  belegt; ein autorisierter Gate-Pass an einem nachfolgenden sauberen
-  Subject-Commit steht noch aus, sodass G0 offen bleibt.
+- Schema 1.3, Trusted-Checkout-Topologie und Gate-Runner sind als G0-A1-
+  Integritätsgrundlage implementiert. G0-A2 mit `GateAuthorization.json`,
+  geschütztem Authorize-Workflow und realem Receipt-Lauf ist offen; deshalb
+  kann weiterhin kein Gate autorisiert werden.
 
 ## Nächste Schritte
 
-1. G0-A Trusted-Tool-Bundle und Schema 1.3 ohne Gate-Fortschritt
-   implementieren und geschützt mergen.
-2. Am nachfolgenden sauberen Subject den Trustpfad, G0-B-Suiten,
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren,
+   adversarial prüfen und geschützt mergen.
+3. Am nachfolgenden sauberen Subject den Trustpfad, G0-B-Suiten,
    Umgebungsprofile und Negative Controls beweisen.
-3. G1-Golden-/Coverage-Gates vor Gameplay aufbauen und Evidence nur aus
+4. G1-Golden-/Coverage-Gates vor Gameplay aufbauen und Evidence nur aus
    realen, sauberen Läufen schreiben.
 
 ## Änderungsverlauf
@@ -293,3 +297,4 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 | 1.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Tool-Bootstrap, vollständige Kette und Umgebungsprofile verankert | Lead QA Engineer |
 | 1.5.0 | 2026-07-25 | G0-A-Umsetzungsstand: Schema 1.3/Trusted-Checkout mit `--subject-root`-Topologie, GitHub-API-Verifikation der Kette, `NOVA_GATE_EXECUTOR`/commandId-Konvention und Restrisiko Review-Attestierung dokumentiert | Lead QA Engineer |
 | 1.6.0 | 2026-07-25 | D-065-Authorize-Run-Bindung (workflow_dispatch-Event, exklusiver `gate-evidence-authorize`-Job, eindeutige Run-IDs, `ci.jobName`-Konstante) und Restrisiko-Präzisierung aufgenommen | Lead QA Engineer |
+| 1.7.0 | 2026-07-25 | D-066: G0-A1 auf Integrität begrenzt, zirkulären Authorizer zurückgezogen und G0-A2 als zweiphasigen Receipt-Vertrag mit getrennten Subject-/Carrier-/Trusted-Identitäten festgelegt | Lead QA Engineer |

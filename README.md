@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.11.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Dokumentversion:** 0.12.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 > Modernes Echtzeitstrategiespiel mit Basisbau und der lebendigen
 > Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
@@ -21,12 +21,12 @@ Gates.
 - [docs/production/MVPContentManifest.md](docs/production/MVPContentManifest.md) –
   exakter MS-1-Inhalt
 - [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – D-064
-  zum Trusted-Gate-Bootstrap
+  und D-066 zum fail-closed Trusted-Gate-Bootstrap
 
 ## Projektstatus
 
 **Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7, G0-A offen ·
-**Wiki:** 0.11.0 unveröffentlicht
+**Wiki:** 0.12.0 unveröffentlicht
 
 | Ergebnisstufe | Status |
 |---|---|
@@ -45,8 +45,10 @@ Evidence-Platzhalter erzeugt.
 
 Schema 1.2 prüft aktuell ausschließlich Integrität und autorisiert keinen
 Gate-Pass. Jeder Pass-Versuch endet fail-closed mit
-`E_AUTHORIZATION_BOOTSTRAP`. G0-A muss zuerst das subject-unabhängige Trusted
-Tooling und Schema 1.3 zweistufig etablieren; erst ein nachfolgender sauberer
+`E_AUTHORIZATION_BOOTSTRAP`. G0-A1 liefert Schema 1.3, Trusted-Checkout-
+Topologie und Gate-Runner nur als Integritätsgrundlage. G0-A2 muss danach den
+zweiphasigen D-066-Receipt-Vertrag mit getrenntem Subject, Evidence-Carrier
+und Trusted Tooling implementieren. Erst ein nachfolgender sauberer
 Subject-Commit darf damit G0 nachweisen.
 
 ## Closed-Core MS-1
@@ -104,10 +106,11 @@ gefolgt von Squash-Merge und linearer Historie. Es gibt keinen dauerhaften
 Integrationsbranch. Agenten committen oder pushen nur nach ausdrücklicher
 Anfrage für die jeweilige Aktion.
 
-Pflichtchecks sind `docs-check` und – sobald G0 ihn real implementiert –
-`quality-gate`. Der aktuelle Rebaseline baut noch keinen Code-CI-Workflow; das
-ist zuerst G0-A- und danach G0-B-Arbeit. Eine Änderung am Trust-Bundle wird
-ohne Gate-Fortschritt gemergt und kann sich nicht selbst autorisieren.
+Pflichtchecks sind `docs-check` und für Quality-Verträge `integrity`. Dieser
+Teil des `quality-gate` prüft nur Verträge und Negative Controls. Ein
+Authorize-Job existiert bis G0-A2 bewusst nicht. Eine Änderung am Trust-
+Bundle wird ohne Gate-Fortschritt gemergt und kann sich nicht selbst
+autorisieren.
 
 ## Lizenz
 
@@ -122,14 +125,12 @@ Weiterverbreitung als eigenes Werk ist nicht freigegeben.
 
 ## Nächste Schritte
 
-1. G0-A mit Schema 1.3, Trusted Tooling und Gate-Runner ohne Gate-Fortschritt
-   implementieren und geschützt mergen.
-2. Am nachfolgenden sauberen Subject G0-B herstellen und genau dort mit dem
-   bereits gemergten Trust-Bundle, der vollständigen geordneten
-   `authorizedEvidence`-Kette und der Umgebungsbindung G0 beweisen.
-3. G1 einschließlich V1–V5a erst nach bestandenem G0 beginnen.
-4. Gate-Status nur mit der subject-unabhängig autorisierten
-   Schema-1.3-Evidence ändern.
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren und
+   adversarial prüfen.
+3. Am nachfolgenden sauberen Subject G0-B herstellen und dort mit der
+   vollständigen Receipt-Kette und Umgebungsbindung G0 beweisen.
+4. G1 einschließlich V1–V5a erst nach bestandenem G0 beginnen.
 
 ## Änderungsverlauf
 
@@ -142,3 +143,4 @@ Weiterverbreitung als eigenes Werk ist nicht freigegeben.
 | 0.9.0 | 2026-07-24 | D-062-Evidence-Kette sowie Victory-, MatchConfig- und Commander-MS-1-Overrides ergänzt | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.10.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trustpfad aufgenommen | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.11.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt, G0-A vor G0-B gestellt und subject-unabhängigen Schema-1.3-Bootstrap verankert | Executive Producer / Technical Writer / Lead QA Engineer |
+| 0.12.0 | 2026-07-25 | D-066: G0-A1-Integritätsgrundlage vom zweiphasigen G0-A2-Receipt-Authorizer getrennt und zirkulären Pass-Pfad entfernt | Executive Producer / Technical Writer / Lead QA Engineer |

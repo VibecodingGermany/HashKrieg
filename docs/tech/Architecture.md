@@ -1,17 +1,17 @@
 # Gesamtarchitektur
 
-**Version:** 1.3.0 | **Status:** verbindlich für MS-1 – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
+**Version:** 1.4.0 | **Status:** verbindlich für MS-1 – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
 Definiert Schichten, Assembly-Grenzen, Hostfluss und Autorität für MS-1. Details
-werden in fokussierten TDDs gepflegt; bei Abweichung führen D-056–D-064 und
+werden in fokussierten TDDs gepflegt; bei Abweichung führen D-056–D-066 und
 [SimulationCore.md](SimulationCore.md).
 
 ## Abhängigkeiten
 
 - [../production/DecisionLog.md](../production/DecisionLog.md) – D-043,
-  D-056 bis D-064
+  D-056 bis D-066
 - [SimulationCore.md](SimulationCore.md), [Commands.md](Commands.md) und
   [FogOfWar.md](FogOfWar.md)
 - [DependencyGraph.md](DependencyGraph.md) und
@@ -121,7 +121,8 @@ und Byteparität belegt.
 
 | Gate | Architektur-Exit |
 |---|---|
-| G0-A | Trusted-Tool-Checkout, Schema 1.3, vollständige `authorizedEvidence`-Kette und Umgebungsbindung zweistufig etabliert |
+| G0-A1 | Schema 1.3, Trusted-Checkout-Topologie, Umgebungsbindung und Gate-Runner als Integrity-Basis |
+| G0-A2 | getrennte Subject-/Evidence-Carrier-/Trusted-Identitäten und vollständige append-only Receipt-Kette zweiphasig etabliert |
 | G0-B / G0 | Projekte/asmdefs/Builds/Tests an einem nachfolgenden sauberen Subject reproduzierbar, Negative Controls grün |
 | G1 | kanonischer Kern, Persistence und Plattformparität |
 | G2 | Player-Kernloop ausschließlich über Session/Commands |
@@ -136,10 +137,11 @@ und Byteparität belegt.
 
 ## Nächste Schritte
 
-1. G0-A ohne Gate-Fortschritt mergen.
-2. Assembly- und Quellenparität in G0-B am nachfolgenden sauberen Subject
+1. G0-A1 ohne Gate-Fortschritt mergen.
+2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren.
+3. Assembly- und Quellenparität in G0-B am nachfolgenden sauberen Subject
    herstellen und dieses danach mit Schema 1.3 beweisen.
-3. G1-Verträge test-first implementieren und direkte Mutations-/
+4. G1-Verträge test-first implementieren und direkte Mutations-/
    Engine-Kanten als Negative Controls absichern.
 
 ## Änderungsverlauf
@@ -152,3 +154,4 @@ und Byteparität belegt.
 | 1.1.0 | 2026-07-24 | D-062-Evidence-Semantik als führenden Architektur-Nachweis ergänzt | Lead Technical Director |
 | 1.2.0 | 2026-07-24 | D-063-Schema-1.2-/Check-/Trust-Vertrag als verbindliche Gate-Autorität ergänzt | Lead Technical Director |
 | 1.3.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt und G0-A-Trust-Bootstrap vor G0-B als Architektur-Exit ergänzt | Lead Technical Director |
+| 1.4.0 | 2026-07-25 | D-066: G0-A1-Integrity und G0-A2-Receipt-Autorisierung als getrennte Architektur-Exits festgelegt | Lead Technical Director |
