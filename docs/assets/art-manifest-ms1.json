@@ -1,0 +1,1691 @@
+{
+  "schemaVersion": "0.3.0",
+  "manifestId": "art-ms1",
+  "derivedFrom": "quality/content/mvp-v1.json",
+  "status": "draft",
+  "conventions": {
+    "unitScale": "1 Unity-Unit = 1 Meter",
+    "factionTokenMap": {
+      "alliance": "Alliance",
+      "legion": "Legion"
+    },
+    "factionPalettes": {
+      "alliance": {
+        "base": "#8A9199",
+        "secondary": "#2C6E9E",
+        "accent": "#4FD8FF"
+      },
+      "legion": {
+        "base": "#7A3524",
+        "secondary": "#B08430",
+        "accent": "#2B2018"
+      }
+    },
+    "folderPattern": {
+      "building": "Assets/_Project/Art/Buildings/<Faction>/<Role>/",
+      "unit": "Assets/_Project/Art/Units/<Faction>/<Role>/"
+    },
+    "namingPattern": {
+      "mesh": {
+        "building": "SM_BLDG_<Faction>_<Role>.fbx",
+        "unit": "SM_UNIT_<Faction>_<Role>.fbx"
+      },
+      "lodSuffixes": [
+        "_LOD0",
+        "_LOD1",
+        "_LOD2"
+      ],
+      "textureBaseColor": {
+        "building": "T_BLDG_<Faction>_<Role>_BC.png",
+        "unit": "T_UNIT_<Faction>_<Role>_BC.png"
+      },
+      "textureNormal": {
+        "building": "T_BLDG_<Faction>_<Role>_N.png",
+        "unit": "T_UNIT_<Faction>_<Role>_N.png"
+      },
+      "textureMask": {
+        "building": "T_BLDG_<Faction>_<Role>_MSK.png",
+        "unit": "T_UNIT_<Faction>_<Role>_MSK.png"
+      },
+      "material": {
+        "building": "M_BLDG_<Faction>_<Role>.mat",
+        "unit": "M_UNIT_<Faction>_<Role>.mat"
+      },
+      "prefab": {
+        "building": "PF_BLDG_<Faction>_<Role>.prefab",
+        "unit": "PF_UNIT_<Faction>_<Role>.prefab"
+      }
+    },
+    "maskChannels": {
+      "R": "Metallic",
+      "G": "Occlusion",
+      "B": "TeamMask",
+      "A": "Smoothness"
+    },
+    "footprintAssumptionNote": "Footprints (2x2/3x3/4x4) sind laut Buildings.md §6 selbst als Annahme markiert; Finalisierung mit Maps.md steht laut Buildings.md \"Offene Punkte\" noch aus. Jedes Gebäude trägt zusätzlich `footprintSource`: `gamedesign` (Wert aus Buildings.md §6 übernommen: HQ, Storage, VehicleFactory, Radar, DefensePlatform) oder `art-assumption` (hier art-seitig festgelegt, da in Buildings.md offen: Power, Refinery, Barracks, ResearchLab, 3x3 bzw. 4x4 bei Refinery wegen Harvester-Andockung). Diese Werte sind reine Art-Arbeitsannahmen, keine Simulationsvorgaben – die Simulation darf sie überschreiben, und die Modellmaße folgen dann der finalen Zellzahl, nicht umgekehrt."
+  },
+  "assets": [
+    {
+      "assetId": "alliance.building.HQ",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "HQ",
+      "displayName": "Kommandozentrale",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/HQ/SM_BLDG_Alliance_HQ.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/HQ/T_BLDG_Alliance_HQ_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/HQ/T_BLDG_Alliance_HQ_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/HQ/T_BLDG_Alliance_HQ_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/HQ/M_BLDG_Alliance_HQ.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/HQ/PF_BLDG_Alliance_HQ.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: größtes Gebäude der Basis, zentrale Silhouette mit Kommandoturm/Antennenmast, muss als Bau-Warteschlangen-Ausgangspunkt erkennbar sein.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": true,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.HQ",
+      "faction": "legion",
+      "domain": "building",
+      "role": "HQ",
+      "displayName": "Gefechtsstand",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/HQ/SM_BLDG_Legion_HQ.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/HQ/T_BLDG_Legion_HQ_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/HQ/T_BLDG_Legion_HQ_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/HQ/T_BLDG_Legion_HQ_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/HQ/M_BLDG_Legion_HQ.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/HQ/PF_BLDG_Legion_HQ.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: größtes Gebäude der Basis, zentrale Silhouette mit Kommandoturm/Antennenmast, muss als Bau-Warteschlangen-Ausgangspunkt erkennbar sein.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": true,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.Power",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "Power",
+      "displayName": "Fusionsreaktor",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/Power/SM_BLDG_Alliance_Power.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/Power/T_BLDG_Alliance_Power_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/Power/T_BLDG_Alliance_Power_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/Power/T_BLDG_Alliance_Power_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/Power/M_BLDG_Alliance_Power.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/Power/PF_BLDG_Alliance_Power.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Reaktor-/Generatorform mit sichtbaren Kühl-/Abluftelementen als Energieproduktions-Signal.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.Power",
+      "faction": "legion",
+      "domain": "building",
+      "role": "Power",
+      "displayName": "Schwerer Generator",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/Power/SM_BLDG_Legion_Power.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/Power/T_BLDG_Legion_Power_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/Power/T_BLDG_Legion_Power_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/Power/T_BLDG_Legion_Power_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/Power/M_BLDG_Legion_Power.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/Power/PF_BLDG_Legion_Power.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Reaktor-/Generatorform mit sichtbaren Kühl-/Abluftelementen als Energieproduktions-Signal.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.Refinery",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "Refinery",
+      "displayName": "Aetherium-Aufbereiter",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/Refinery/SM_BLDG_Alliance_Refinery.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/Refinery/T_BLDG_Alliance_Refinery_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/Refinery/T_BLDG_Alliance_Refinery_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/Refinery/T_BLDG_Alliance_Refinery_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/Refinery/M_BLDG_Alliance_Refinery.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/Refinery/PF_BLDG_Alliance_Refinery.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Verarbeitungsanlage mit Andockpunkt/Fördertrichter für Harvester-Abgabe.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.Refinery",
+      "faction": "legion",
+      "domain": "building",
+      "role": "Refinery",
+      "displayName": "Schmelzofen",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/Refinery/SM_BLDG_Legion_Refinery.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/Refinery/T_BLDG_Legion_Refinery_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/Refinery/T_BLDG_Legion_Refinery_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/Refinery/T_BLDG_Legion_Refinery_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/Refinery/M_BLDG_Legion_Refinery.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/Refinery/PF_BLDG_Legion_Refinery.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Verarbeitungsanlage mit Andockpunkt/Fördertrichter für Harvester-Abgabe.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.Storage",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "Storage",
+      "displayName": "Depot",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/Storage/SM_BLDG_Alliance_Storage.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/Storage/T_BLDG_Alliance_Storage_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/Storage/T_BLDG_Alliance_Storage_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/Storage/T_BLDG_Alliance_Storage_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/Storage/M_BLDG_Alliance_Storage.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/Storage/PF_BLDG_Alliance_Storage.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: kompakter Lager-/Tankbau, klar von Produktionsgebäuden unterscheidbar.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.Storage",
+      "faction": "legion",
+      "domain": "building",
+      "role": "Storage",
+      "displayName": "Bunkerdepot",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/Storage/SM_BLDG_Legion_Storage.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/Storage/T_BLDG_Legion_Storage_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/Storage/T_BLDG_Legion_Storage_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/Storage/T_BLDG_Legion_Storage_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/Storage/M_BLDG_Legion_Storage.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/Storage/PF_BLDG_Legion_Storage.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: kompakter Lager-/Tankbau, klar von Produktionsgebäuden unterscheidbar.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.Barracks",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "Barracks",
+      "displayName": "Ausbildungszentrum",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/Barracks/SM_BLDG_Alliance_Barracks.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/Barracks/T_BLDG_Alliance_Barracks_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/Barracks/T_BLDG_Alliance_Barracks_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/Barracks/T_BLDG_Alliance_Barracks_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/Barracks/M_BLDG_Alliance_Barracks.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/Barracks/PF_BLDG_Alliance_Barracks.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Kaserne mit sichtbarem Infanterie-Ausgang.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.Barracks",
+      "faction": "legion",
+      "domain": "building",
+      "role": "Barracks",
+      "displayName": "Rekrutenlager",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/Barracks/SM_BLDG_Legion_Barracks.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/Barracks/T_BLDG_Legion_Barracks_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/Barracks/T_BLDG_Legion_Barracks_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/Barracks/T_BLDG_Legion_Barracks_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/Barracks/M_BLDG_Legion_Barracks.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/Barracks/PF_BLDG_Legion_Barracks.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Kaserne mit sichtbarem Infanterie-Ausgang.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.VehicleFactory",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "VehicleFactory",
+      "displayName": "Fahrzeugwerk",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/SM_BLDG_Alliance_VehicleFactory.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/T_BLDG_Alliance_VehicleFactory_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/T_BLDG_Alliance_VehicleFactory_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/T_BLDG_Alliance_VehicleFactory_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/M_BLDG_Alliance_VehicleFactory.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/VehicleFactory/PF_BLDG_Alliance_VehicleFactory.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: große Torhalle mit Fahrzeugausgang, zweitgrößte Silhouette nach HQ.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.VehicleFactory",
+      "faction": "legion",
+      "domain": "building",
+      "role": "VehicleFactory",
+      "displayName": "Montagehalle",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/SM_BLDG_Legion_VehicleFactory.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/T_BLDG_Legion_VehicleFactory_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/T_BLDG_Legion_VehicleFactory_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/T_BLDG_Legion_VehicleFactory_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/M_BLDG_Legion_VehicleFactory.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/VehicleFactory/PF_BLDG_Legion_VehicleFactory.prefab"
+      },
+      "footprintCells": {
+        "x": 4,
+        "y": 4
+      },
+      "footprintMeters": {
+        "x": 12.0,
+        "y": 12.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: große Torhalle mit Fahrzeugausgang, zweitgrößte Silhouette nach HQ.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.ResearchLab",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "ResearchLab",
+      "displayName": "Forschungslabor",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/SM_BLDG_Alliance_ResearchLab.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/T_BLDG_Alliance_ResearchLab_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/T_BLDG_Alliance_ResearchLab_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/T_BLDG_Alliance_ResearchLab_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/M_BLDG_Alliance_ResearchLab.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/ResearchLab/PF_BLDG_Alliance_ResearchLab.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Labor-/Sensoraufbau mit Antennen- oder Kuppelelementen als Tech-Signal.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.ResearchLab",
+      "faction": "legion",
+      "domain": "building",
+      "role": "ResearchLab",
+      "displayName": "Kriegslabor",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/ResearchLab/SM_BLDG_Legion_ResearchLab.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/ResearchLab/T_BLDG_Legion_ResearchLab_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/ResearchLab/T_BLDG_Legion_ResearchLab_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/ResearchLab/T_BLDG_Legion_ResearchLab_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/ResearchLab/M_BLDG_Legion_ResearchLab.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/ResearchLab/PF_BLDG_Legion_ResearchLab.prefab"
+      },
+      "footprintCells": {
+        "x": 3,
+        "y": 3
+      },
+      "footprintMeters": {
+        "x": 9.0,
+        "y": 9.0
+      },
+      "footprintSource": "art-assumption",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Labor-/Sensoraufbau mit Antennen- oder Kuppelelementen als Tech-Signal.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.Radar",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "Radar",
+      "displayName": "Radarstation",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/Radar/SM_BLDG_Alliance_Radar.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/Radar/T_BLDG_Alliance_Radar_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/Radar/T_BLDG_Alliance_Radar_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/Radar/T_BLDG_Alliance_Radar_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/Radar/M_BLDG_Alliance_Radar.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/Radar/PF_BLDG_Alliance_Radar.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Radarschale/Antennenturm als dominantes, weithin lesbares Erkennungsmerkmal.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.Radar",
+      "faction": "legion",
+      "domain": "building",
+      "role": "Radar",
+      "displayName": "Funkposten",
+      "tier": null,
+      "assetClass": "BuildingStandard",
+      "assetClassRationale": "Gebäude Standard (AssetBudget.md §1): alle neun MS-1-Rollen sind reguläre, einmalig gebaute Produktions-/Infrastrukturgebäude ohne Sonderbudget.",
+      "triBudget": {
+        "lod0": 20000,
+        "lod1": 8000,
+        "lod2": 2000
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/Radar/SM_BLDG_Legion_Radar.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/Radar/T_BLDG_Legion_Radar_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/Radar/T_BLDG_Legion_Radar_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/Radar/T_BLDG_Legion_Radar_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/Radar/M_BLDG_Legion_Radar.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/Radar/PF_BLDG_Legion_Radar.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Radarschale/Antennenturm als dominantes, weithin lesbares Erkennungsmerkmal.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.building.DefensePlatform",
+      "faction": "alliance",
+      "domain": "building",
+      "role": "DefensePlatform",
+      "displayName": "Aegis-Plattform",
+      "tier": null,
+      "assetClass": "DefenseStructure",
+      "assetClassRationale": "Verteidigungsplattform als Podest-Bauwerk der Klasse Mauer-/Verteidigungsmodul (AssetBudget.md §1) zugeordnet, da kein eigener Budget-Eintrag \"DefenseStructure\" existiert und dieses Podest funktional dem Modul-System am nächsten steht – diskutabel.",
+      "triBudget": {
+        "lod0": 1500,
+        "lod1": 600,
+        "lod2": 200
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/SM_BLDG_Alliance_DefensePlatform.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/T_BLDG_Alliance_DefensePlatform_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/T_BLDG_Alliance_DefensePlatform_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/T_BLDG_Alliance_DefensePlatform_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/M_BLDG_Alliance_DefensePlatform.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Alliance/DefensePlatform/PF_BLDG_Alliance_DefensePlatform.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: unbewaffnetes Podest mit Modul-Anschlusspunkt oben (Waffenmodul wird separat aufgesetzt, nicht Teil dieses Assets).",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.building.DefensePlatform",
+      "faction": "legion",
+      "domain": "building",
+      "role": "DefensePlatform",
+      "displayName": "Geschützstellung",
+      "tier": null,
+      "assetClass": "DefenseStructure",
+      "assetClassRationale": "Verteidigungsplattform als Podest-Bauwerk der Klasse Mauer-/Verteidigungsmodul (AssetBudget.md §1) zugeordnet, da kein eigener Budget-Eintrag \"DefenseStructure\" existiert und dieses Podest funktional dem Modul-System am nächsten steht – diskutabel.",
+      "triBudget": {
+        "lod0": 1500,
+        "lod1": 600,
+        "lod2": 200
+      },
+      "textureSet": {
+        "resolution": 2048,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/SM_BLDG_Legion_DefensePlatform.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/T_BLDG_Legion_DefensePlatform_BC.png",
+        "textureNormal": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/T_BLDG_Legion_DefensePlatform_N.png",
+        "textureMask": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/T_BLDG_Legion_DefensePlatform_MSK.png",
+        "material": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/M_BLDG_Legion_DefensePlatform.mat",
+        "prefab": "Assets/_Project/Art/Buildings/Legion/DefensePlatform/PF_BLDG_Legion_DefensePlatform.prefab"
+      },
+      "footprintCells": {
+        "x": 2,
+        "y": 2
+      },
+      "footprintMeters": {
+        "x": 6.0,
+        "y": 6.0
+      },
+      "footprintSource": "gamedesign",
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: unbewaffnetes Podest mit Modul-Anschlusspunkt oben (Waffenmodul wird separat aufgesetzt, nicht Teil dieses Assets).",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "statisch; optionale Idle-Elemente (Antennen-/Radardrehung, Leuchtpulsieren, Rauch-/Abluft-VFX), kein Rig",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.Builder",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "Builder",
+      "displayName": "Pionier „Atlas“",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/Builder/SM_UNIT_Alliance_Builder.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/Builder/T_UNIT_Alliance_Builder_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/Builder/T_UNIT_Alliance_Builder_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/Builder/T_UNIT_Alliance_Builder_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/Builder/M_UNIT_Alliance_Builder.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/Builder/PF_UNIT_Alliance_Builder.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: kompaktes Baufahrzeug mit sichtbarem Werkzeug-/Kranarm.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "Bauarm-/Werkzeuganimation während der Errichtung; rig-los (Code-Animation)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.Builder",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "Builder",
+      "displayName": "Vorarbeiter",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/Builder/SM_UNIT_Legion_Builder.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/Builder/T_UNIT_Legion_Builder_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/Builder/T_UNIT_Legion_Builder_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/Builder/T_UNIT_Legion_Builder_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/Builder/M_UNIT_Legion_Builder.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/Builder/PF_UNIT_Legion_Builder.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: kompaktes Baufahrzeug mit sichtbarem Werkzeug-/Kranarm.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "Bauarm-/Werkzeuganimation während der Errichtung; rig-los (Code-Animation)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.Harvester",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "Harvester",
+      "displayName": "Sammler „Demeter“",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/Harvester/SM_UNIT_Alliance_Harvester.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/Harvester/T_UNIT_Alliance_Harvester_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/Harvester/T_UNIT_Alliance_Harvester_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/Harvester/T_UNIT_Alliance_Harvester_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/Harvester/M_UNIT_Alliance_Harvester.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/Harvester/PF_UNIT_Alliance_Harvester.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: großer Frachtcontainer/Sammelschaufel sichtbar, Ladezustand ablesbar.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "Ladearm-/Schaufelanimation beim Abbau und bei der Entladung an der Raffinerie; rig-los (Code-Animation)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.Harvester",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "Harvester",
+      "displayName": "Schürfer",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/Harvester/SM_UNIT_Legion_Harvester.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/Harvester/T_UNIT_Legion_Harvester_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/Harvester/T_UNIT_Legion_Harvester_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/Harvester/T_UNIT_Legion_Harvester_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/Harvester/M_UNIT_Legion_Harvester.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/Harvester/PF_UNIT_Legion_Harvester.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: großer Frachtcontainer/Sammelschaufel sichtbar, Ladezustand ablesbar.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "Ladearm-/Schaufelanimation beim Abbau und bei der Entladung an der Raffinerie; rig-los (Code-Animation)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.BasicInfantry",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "BasicInfantry",
+      "displayName": "Rifleman",
+      "tier": 1,
+      "assetClass": "Infantry",
+      "assetClassRationale": "Infanterie-Budgetklasse (AssetBudget.md §1) für Humanoid-Rig-Einheiten.",
+      "triBudget": {
+        "lod0": 4000,
+        "lod1": 1500,
+        "lod2": 400
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/BasicInfantry/SM_UNIT_Alliance_BasicInfantry.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/BasicInfantry/T_UNIT_Alliance_BasicInfantry_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/BasicInfantry/T_UNIT_Alliance_BasicInfantry_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/BasicInfantry/T_UNIT_Alliance_BasicInfantry_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/BasicInfantry/M_UNIT_Alliance_BasicInfantry.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/BasicInfantry/PF_UNIT_Alliance_BasicInfantry.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Standard-Gewehrsoldat mit klar lesbarem Gewehrprofil.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "Humanoid-Rig nötig (Idle/Lauf/Schuss/Tod, Mecanim)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.BasicInfantry",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "BasicInfantry",
+      "displayName": "Rekrut",
+      "tier": 1,
+      "assetClass": "Infantry",
+      "assetClassRationale": "Infanterie-Budgetklasse (AssetBudget.md §1) für Humanoid-Rig-Einheiten.",
+      "triBudget": {
+        "lod0": 4000,
+        "lod1": 1500,
+        "lod2": 400
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/BasicInfantry/SM_UNIT_Legion_BasicInfantry.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/BasicInfantry/T_UNIT_Legion_BasicInfantry_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/BasicInfantry/T_UNIT_Legion_BasicInfantry_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/BasicInfantry/T_UNIT_Legion_BasicInfantry_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/BasicInfantry/M_UNIT_Legion_BasicInfantry.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/BasicInfantry/PF_UNIT_Legion_BasicInfantry.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Standard-Gewehrsoldat mit klar lesbarem Gewehrprofil.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "Humanoid-Rig nötig (Idle/Lauf/Schuss/Tod, Mecanim)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.AntiArmorInfantry",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "AntiArmorInfantry",
+      "displayName": "Rocket Soldier",
+      "tier": 2,
+      "assetClass": "Infantry",
+      "assetClassRationale": "Infanterie-Budgetklasse (AssetBudget.md §1) für Humanoid-Rig-Einheiten.",
+      "triBudget": {
+        "lod0": 4000,
+        "lod1": 1500,
+        "lod2": 400
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/SM_UNIT_Alliance_AntiArmorInfantry.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/T_UNIT_Alliance_AntiArmorInfantry_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/T_UNIT_Alliance_AntiArmorInfantry_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/T_UNIT_Alliance_AntiArmorInfantry_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/M_UNIT_Alliance_AntiArmorInfantry.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/AntiArmorInfantry/PF_UNIT_Alliance_AntiArmorInfantry.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: Raketenwerfer auf der Schulter als eindeutiges Anti-Fahrzeug-Signal.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "Humanoid-Rig nötig (Idle/Lauf/Schuss/Nachladen/Tod, Mecanim)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.AntiArmorInfantry",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "AntiArmorInfantry",
+      "displayName": "Raketenschütze",
+      "tier": 2,
+      "assetClass": "Infantry",
+      "assetClassRationale": "Infanterie-Budgetklasse (AssetBudget.md §1) für Humanoid-Rig-Einheiten.",
+      "triBudget": {
+        "lod0": 4000,
+        "lod1": 1500,
+        "lod2": 400
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/SM_UNIT_Legion_AntiArmorInfantry.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/T_UNIT_Legion_AntiArmorInfantry_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/T_UNIT_Legion_AntiArmorInfantry_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/T_UNIT_Legion_AntiArmorInfantry_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/M_UNIT_Legion_AntiArmorInfantry.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/AntiArmorInfantry/PF_UNIT_Legion_AntiArmorInfantry.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: Raketenwerfer auf der Schulter als eindeutiges Anti-Fahrzeug-Signal.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "Humanoid-Rig nötig (Idle/Lauf/Schuss/Nachladen/Tod, Mecanim)",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.ScoutVehicle",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "ScoutVehicle",
+      "displayName": "Jackal-Aufklärer",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/SM_UNIT_Alliance_ScoutVehicle.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/T_UNIT_Alliance_ScoutVehicle_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/T_UNIT_Alliance_ScoutVehicle_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/T_UNIT_Alliance_ScoutVehicle_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/M_UNIT_Alliance_ScoutVehicle.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/ScoutVehicle/PF_UNIT_Alliance_ScoutVehicle.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: leichtes, offenes Aufklärungsfahrzeug mit Antenne, schlanke schnelle Silhouette.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Rad-/Antriebsdrehung",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.ScoutVehicle",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "ScoutVehicle",
+      "displayName": "Hyäne (Buggy)",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/ScoutVehicle/SM_UNIT_Legion_ScoutVehicle.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/ScoutVehicle/T_UNIT_Legion_ScoutVehicle_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/ScoutVehicle/T_UNIT_Legion_ScoutVehicle_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/ScoutVehicle/T_UNIT_Legion_ScoutVehicle_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/ScoutVehicle/M_UNIT_Legion_ScoutVehicle.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/ScoutVehicle/PF_UNIT_Legion_ScoutVehicle.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: leichtes, offenes Aufklärungsfahrzeug mit Antenne, schlanke schnelle Silhouette.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Rad-/Antriebsdrehung",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.LightTank",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "LightTank",
+      "displayName": "Lynx",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/LightTank/SM_UNIT_Alliance_LightTank.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/LightTank/T_UNIT_Alliance_LightTank_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/LightTank/T_UNIT_Alliance_LightTank_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/LightTank/T_UNIT_Alliance_LightTank_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/LightTank/M_UNIT_Alliance_LightTank.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/LightTank/PF_UNIT_Alliance_LightTank.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: kompakter Turm auf schnellem Chassis, Tier-1-Kampfsilhouette.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Turmrotation",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": true,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.LightTank",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "LightTank",
+      "displayName": "Räuber",
+      "tier": 1,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/LightTank/SM_UNIT_Legion_LightTank.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/LightTank/T_UNIT_Legion_LightTank_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/LightTank/T_UNIT_Legion_LightTank_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/LightTank/T_UNIT_Legion_LightTank_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/LightTank/M_UNIT_Legion_LightTank.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/LightTank/PF_UNIT_Legion_LightTank.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: kompakter Turm auf schnellem Chassis, Tier-1-Kampfsilhouette.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Turmrotation",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": true,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.BattleTank",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "BattleTank",
+      "displayName": "Aegis",
+      "tier": 2,
+      "assetClass": "VehicleHeavy",
+      "assetClassRationale": "Battle Tank als Tier-2-Kampfpanzer mit schwerer Panzerung (Vehicles.md) der Klasse Fahrzeug schwer/Elite zugeordnet.",
+      "triBudget": {
+        "lod0": 15000,
+        "lod1": 6000,
+        "lod2": 1500
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/BattleTank/SM_UNIT_Alliance_BattleTank.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/BattleTank/T_UNIT_Alliance_BattleTank_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/BattleTank/T_UNIT_Alliance_BattleTank_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/BattleTank/T_UNIT_Alliance_BattleTank_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/BattleTank/M_UNIT_Alliance_BattleTank.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/BattleTank/PF_UNIT_Alliance_BattleTank.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: massiver Turm mit dominanter Hauptkanone, Armeerückgrat-Silhouette.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Turmrotation, Rohrrückstoss bei Schuss",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.BattleTank",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "BattleTank",
+      "displayName": "Koloss",
+      "tier": 2,
+      "assetClass": "VehicleHeavy",
+      "assetClassRationale": "Battle Tank als Tier-2-Kampfpanzer mit schwerer Panzerung (Vehicles.md) der Klasse Fahrzeug schwer/Elite zugeordnet.",
+      "triBudget": {
+        "lod0": 15000,
+        "lod1": 6000,
+        "lod2": 1500
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/BattleTank/SM_UNIT_Legion_BattleTank.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/BattleTank/T_UNIT_Legion_BattleTank_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/BattleTank/T_UNIT_Legion_BattleTank_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/BattleTank/T_UNIT_Legion_BattleTank_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/BattleTank/M_UNIT_Legion_BattleTank.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/BattleTank/PF_UNIT_Legion_BattleTank.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: massiver Turm mit dominanter Hauptkanone, Armeerückgrat-Silhouette.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Turmrotation, Rohrrückstoss bei Schuss",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "alliance.unit.Artillery",
+      "faction": "alliance",
+      "domain": "unit",
+      "role": "Artillery",
+      "displayName": "Longbow",
+      "tier": 2,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Alliance/Artillery/SM_UNIT_Alliance_Artillery.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Alliance/Artillery/T_UNIT_Alliance_Artillery_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Alliance/Artillery/T_UNIT_Alliance_Artillery_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Alliance/Artillery/T_UNIT_Alliance_Artillery_MSK.png",
+        "material": "Assets/_Project/Art/Units/Alliance/Artillery/M_UNIT_Alliance_Artillery.mat",
+        "prefab": "Assets/_Project/Art/Units/Alliance/Artillery/PF_UNIT_Alliance_Artillery.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Eckig-präzise Formensprache mit klaren Kanten und vertikalen Akzenten (Antennen, Geschütztürme), glatte Panzerflächen (Factions.md). Funktionslesbarkeit: langes Rohr/Mörser mit sichtbaren Standbeinen/Aufstellmechanik als Indirekt-Feuer-Signal.",
+      "teamColorPlacement": {
+        "placement": "Panzerkanten und Leuchtelemente (Antennenspitzen, Sensorringe)",
+        "areaShareTarget": "10–20% der sichtbaren Fläche (Akzent, Azurblau)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Rohrrückstoss beim Schuss, Aufstellungsanimation",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    },
+    {
+      "assetId": "legion.unit.Artillery",
+      "faction": "legion",
+      "domain": "unit",
+      "role": "Artillery",
+      "displayName": "Donnerkanone",
+      "tier": 2,
+      "assetClass": "VehicleLight",
+      "assetClassRationale": "Fahrzeug leicht/mittel (AssetBudget.md §1); Builder/Harvester sind Nicht-Kampf-Nutzfahrzeuge, Scout/Light Tank/Artillery tragen leichte Panzerung (Vehicles.md) – Einordnung von Builder/Harvester trotz „Schwer“-Panzerungsstat als Nutzfahrzeug diskutabel.",
+      "triBudget": {
+        "lod0": 8000,
+        "lod1": 3000,
+        "lod2": 800
+      },
+      "textureSet": {
+        "resolution": 1024,
+        "maps": [
+          "BaseColor",
+          "Normal",
+          "Mask"
+        ],
+        "format": "BC7/BC3"
+      },
+      "paths": {
+        "mesh": "Assets/_Project/Art/Units/Legion/Artillery/SM_UNIT_Legion_Artillery.fbx",
+        "textureBaseColor": "Assets/_Project/Art/Units/Legion/Artillery/T_UNIT_Legion_Artillery_BC.png",
+        "textureNormal": "Assets/_Project/Art/Units/Legion/Artillery/T_UNIT_Legion_Artillery_N.png",
+        "textureMask": "Assets/_Project/Art/Units/Legion/Artillery/T_UNIT_Legion_Artillery_MSK.png",
+        "material": "Assets/_Project/Art/Units/Legion/Artillery/M_UNIT_Legion_Artillery.mat",
+        "prefab": "Assets/_Project/Art/Units/Legion/Artillery/PF_UNIT_Legion_Artillery.prefab"
+      },
+      "footprintCells": null,
+      "footprintMeters": null,
+      "silhouetteBrief": "Wuchtige, horizontal gestreckte Formensprache mit Röhren/Raketenständern/Schornsteinen, unregelmäßige genietete Panzerplatten (Factions.md). Funktionslesbarkeit: langes Rohr/Mörser mit sichtbaren Standbeinen/Aufstellmechanik als Indirekt-Feuer-Signal.",
+      "teamColorPlacement": {
+        "placement": "großflächige Panzerplatten (Rumpf/Aufbauten)",
+        "areaShareTarget": "40–60% der sichtbaren Fläche (Rostrot/Ocker, Rußakzente)"
+      },
+      "animationNeeds": "rig-los (Code-Animation), Rohrrückstoss beim Schuss, Aufstellungsanimation",
+      "sourceStrategy": "CC0-Base",
+      "sourceStrategyRationale": "AssetRegister.md §3.3–§3.5 stuft Allianz-/Legion-Gebäude, -Fahrzeuge und -Infanterie als BUY/MODIFY auf CC0-Basis (Synty/Kenney/Quaternius-Kitbash) ein; nur Evolvierte und Aetherium-Assets sind dort BUILD.",
+      "verticalSlice": false,
+      "status": "specified"
+    }
+  ]
+}
