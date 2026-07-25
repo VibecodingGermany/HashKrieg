@@ -6,6 +6,15 @@ namespace Nova.Simulation.State
     /// <summary>
     /// Represents a 2D position and orientation in the simulation world.
     /// Memory footprint: 12 bytes (float X, float Y, float Rotation).
+    /// <para>
+    /// Numerics caveat (Q-040(i)): prototype float storage in hash-relevant
+    /// state. The bit pattern serializes stably per runtime, but float math
+    /// and the <see cref="SimMath"/> transcendentals producing these values
+    /// are not guaranteed bit-identical across Mono/IL2CPP/.NET
+    /// (docs/tech/SimulationCore.md sections 1 and 9); the SimFixed migration
+    /// vs. a canonical fixed-point approximation is a Q-040(i) decision due
+    /// before the G1 schema freeze.
+    /// </para>
     /// </summary>
     public readonly struct Transform2D : IEquatable<Transform2D>
     {
