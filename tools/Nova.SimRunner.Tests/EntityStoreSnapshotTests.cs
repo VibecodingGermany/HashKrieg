@@ -134,5 +134,71 @@ namespace Nova.SimRunner.Tests
             byte[] after = Serialize(host);
             Assert.That(after, Is.Not.EqualTo(before), "one raw unit of sight radius must change the block bytes");
         }
+
+        [Test]
+        public void NegativeSpeedOrRadii_AreRejected_WithoutMutatingTheStore()
+        {
+            // Restore hardening (SimulationCore.md section 1): a tampered
+            // snapshot behind VALID container hashes must not smuggle a
+            // negative move speed, collision radius or sight radius into the
+            // store — the latter would crash the next FoW recompute. The
+            // validate phase rejects the block and the host stays untouched.
+            var store = new EntityManager(64);
+            store.SpawnUnit(
+                0,
+                new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)),
+                SimFixed.FromFloat(4.5f),
+                SimFixed.FromFloat(0.4f),
+                sightRadius: SimFixed.FromFloat(12.5f));
+            byte[] valid = Serialize(store);
+
+            // The chosen raw values all contain bytes that cannot occur in
+            // the header/free-list region, so the first little-endian
+            // occurrence is provably the intended unit field.
+            foreach (int raw in new[]
+            {
+                SimFixed.FromFloat(4.5f).RawValue,   // move speed
+                SimFixed.FromFloat(0.4f).RawValue,   // collision radius
+                SimFixed.FromFloat(12.5f).RawValue   // sight radius
+            })
+            {
+                byte[] tampered = WithNegatedFirstOccurrence(valid, raw);
+                var victim = new EntityManager(64);
+                Assert.That(victim.TryValidateState(tampered), Is.False,
+                    $"raw value {raw} negated must fail validation");
+                Assert.That(victim.TryRestoreState(tampered), Is.False,
+                    $"raw value {raw} negated must fail restore");
+                Assert.That(victim.ActiveCount, Is.EqualTo(0),
+                    "a rejected restore must not mutate the store");
+            }
+
+            // The untouched block still validates and restores.
+            var host = new EntityManager(64);
+            Assert.That(host.TryValidateState(valid), Is.True);
+            Assert.That(host.TryRestoreState(valid), Is.True);
+            Assert.That(host.ActiveCount, Is.EqualTo(1));
+        }
+
+        /// <summary>Returns a copy of <paramref name="block"/> with the first little-endian occurrence of <paramref name="raw"/> replaced by its negation.</summary>
+        private static byte[] WithNegatedFirstOccurrence(byte[] block, int raw)
+        {
+            var copy = (byte[])block.Clone();
+            for (int i = 0; i + 4 <= copy.Length; i++)
+            {
+                if (copy[i] == (byte)raw
+                    && copy[i + 1] == (byte)(raw >> 8)
+                    && copy[i + 2] == (byte)(raw >> 16)
+                    && copy[i + 3] == (byte)(raw >> 24))
+                {
+                    int negated = -raw;
+                    copy[i] = (byte)negated;
+                    copy[i + 1] = (byte)(negated >> 8);
+                    copy[i + 2] = (byte)(negated >> 16);
+                    copy[i + 3] = (byte)(negated >> 24);
+                    return copy;
+                }
+            }
+            throw new System.InvalidOperationException($"raw value {raw} not found in block");
+        }
     }
 }

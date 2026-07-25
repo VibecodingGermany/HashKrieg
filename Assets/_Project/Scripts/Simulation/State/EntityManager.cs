@@ -277,6 +277,13 @@ namespace Nova.Simulation.State
                 if (!reader.TryReadInt32(out int moveSpeed)) return false;
                 if (!reader.TryReadInt32(out int radius)) return false;
                 if (!reader.TryReadInt32(out int sightRadius)) return false;
+                // Domain check (SimulationCore.md section 1): negative speed
+                // or radii are outside the defined domain. A tampered
+                // snapshot with valid container hashes could otherwise
+                // smuggle in a negative sight radius that crashes the next
+                // FoW recompute, so the validate phase rejects it here and
+                // leaves the host untouched.
+                if (moveSpeed < 0 || radius < 0 || sightRadius < 0) return false;
                 if (!reader.TryReadUInt16(out ushort targetX)) return false;
                 if (!reader.TryReadUInt16(out ushort targetY)) return false;
                 if (!reader.TryReadInt32(out int currentHealth)) return false;
