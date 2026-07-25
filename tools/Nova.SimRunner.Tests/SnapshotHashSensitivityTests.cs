@@ -44,17 +44,6 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void BlockContentHash_IsPureContentHash()
-        {
-            // Identical content under different BlockIds hashes identically
-            // (the BlockId binding lives in the state hash, SnapshotFormat).
-            byte[] content = { 0x10, 0x20, 0x30 };
-            Assert.That(
-                SnapshotWriter.ComputeBlockHash(content),
-                Is.EqualTo(SnapshotWriter.ComputeBlockHash(content)));
-        }
-
-        [Test]
         public void BlockId_ChangesStateHash_WithoutChangingBlockHash()
         {
             var one = new SnapshotWriter();

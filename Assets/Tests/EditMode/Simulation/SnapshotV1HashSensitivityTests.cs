@@ -44,15 +44,6 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void BlockContentHash_IsPureContentHash()
-        {
-            byte[] content = { 0x10, 0x20, 0x30 };
-            Assert.That(
-                SnapshotWriter.ComputeBlockHash(content),
-                Is.EqualTo(SnapshotWriter.ComputeBlockHash(content)));
-        }
-
-        [Test]
         public void BlockId_ChangesStateHash_WithoutChangingBlockHash()
         {
             var one = new SnapshotWriter();
