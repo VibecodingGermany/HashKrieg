@@ -1,50 +1,88 @@
 # Sprint-Planung
 
-**Version:** 1.7.0 | **Status:** Recovery aktiv | **Verantwortungsbereich:** Executive Producer / Producer / Project Owner | **Sprint:** 7
+**Version:** 2.4.0 | **Status:** Sprint 7 gestartet – G0-A aktiv | **Verantwortungsbereich:** Executive Producer / Producer / Project Owner | **Sprint:** 7
 
 ## Zweck
 
-Definiert alle Sprints, ihre Ziele, Deliverables und Exit-Kriterien. Kein Sprint gilt als abgeschlossen, ohne dass alle Exit-Kriterien erfüllt und ein Sprint-Bericht unter [sprints/](sprints/) vorliegt.
+Definiert Sprintziele und Exit-Kriterien. Ein Sprintstatus ist nur eine
+Arbeitszuordnung; Meilensteine und Gates werden ausschließlich durch
+schema- und semantikvalide Evidenz erreicht.
 
 ## Abhängigkeiten
 
-- [../analysis/PriorityList.md](../analysis/PriorityList.md)
-- [../analysis/GapAnalysis.md](../analysis/GapAnalysis.md)
-- [DecisionLog.md](DecisionLog.md)
+- [DecisionLog.md](DecisionLog.md) – D-055 bis D-064
+- [MVPRecoveryPlan.md](MVPRecoveryPlan.md) – führender Sprint-7-Ablauf
+- [Milestones.md](Milestones.md) – MS-0/MS-1
+- [RiskAnalysis.md](RiskAnalysis.md)
+- [../meta/DocumentationStandard.md](../meta/DocumentationStandard.md)
 
 ## Sprint-Definitionen
 
-| Sprint | Thema | Ziel / Deliverables | Exit-Kriterien | Status |
-|---|---|---|---|---|
-| 0 | Projektinitialisierung | Quellenanalyse, Wissensbasis, Inkonsistenz- und Gap-Analyse, Prioritätenliste, Wiki-Grundgerüst | Alle Analyse-Dokumente vorliegend; Wiki-Standard verabschiedet; Sprint-Bericht | **abgeschlossen** |
-| 1 | Research | Research-Dokumente zu: RTS-Markt/Wettbewerb, moderne RTS-Architekturen, Unity-Best-Practices, Open-Source-RTS, Multiplayer-Simulationsmodelle, ECS/DOTS, Pathfinding, Fog of War, KI, Animation, Audio, UI, Asset-Stores | Jedes kritische Thema (P0/P1) mit ≥3 verglichenen Alternativen; Empfehlungen als Entscheidungsvorlagen; Sprint-Bericht | **abgeschlossen** |
-| 2 | Game Design | Alle GDD-Dokumente (Vision, Factions, Buildings, Units, Economy, ResearchTree, Damage/Armor, Maps, Biomes, NeutralUnits, Campaign, MultiplayerModes, Balancing, CommanderSystem, VictoryConditions, FogOfWar u. a.); Auflösung Q-001–Q-012 | Konsistenzcheck ohne offene Widersprüche; alle P0/P1-Designfragen entschieden; keine Implementierung; Sprint-Bericht | **abgeschlossen** |
-| 3 | Technical Design | Vollständige Architektur: Module, Schnittstellen, Datenmodelle, Projektstruktur, Build-Prozess, alle TDD-Dokumente gemäß Gap-Analyse §3 | Alle P0-Architekturfragen (Q-013–Q-015, Q-020) entschieden; Schnittstellen dokumentiert; Sprint-Bericht | **abgeschlossen** |
-| 4 | Architecture Review | Unabhängige Review-Agenten prüfen Architektur auf Fehler, Performance, Skalierung, Wartbarkeit, Multiplayer | Alle Findings dokumentiert und klassifiziert; kritische Findings in Architektur eingearbeitet; Sprint-Bericht | **abgeschlossen** |
-| 5 | Asset Audit | Pro benötigtem Asset: Recherche, Lizenz, Kosten, Qualität, Anpassungsaufwand; Klassifikation BUY / MODIFY / BUILD | Vollständiges Asset-Register inkl. Licenses.md; Sprint-Bericht | **abgeschlossen** |
-| 6 | Produktionsplanung | MVP / Alpha / Beta / Release mit Features, Risiken, Abhängigkeiten, Aufwand, Priorität; Roadmap.md, Milestones.md | Plan deckt sich mit Scope-Entscheidungen aus Sprint 2; Sprint-Bericht | **Abschluss zurückgezogen – D-055** |
-| 7 | Implementierungs-Recovery | Tatsächlichen Iststand sichern; MVP über G0–G5 statt Dateianwesenheit qualifizieren | Jedes Gate besitzt reproduzierbare Laufzeit-, Test- und Integrationsnachweise gemäß [MVPRecoveryPlan.md](MVPRecoveryPlan.md) | **aktiv – aktuell G0** |
+| Sprint | Thema | Ergebnis | Status |
+|---|---|---|---|
+| 0 | Projektinitialisierung | Wissensbasis, Analyse, Wiki-Standard | abgeschlossen |
+| 1 | Research | technische und marktbezogene Alternativen | abgeschlossen |
+| 2 | Game Design | GDD-Zielbild | abgeschlossen |
+| 3 | Technical Design | technische Zielarchitektur | abgeschlossen |
+| 4 | Architecture Review | Review-Befunde und D-043–D-052 | abgeschlossen |
+| 5 | Asset Audit | Register, Lizenzen, Beschaffungsstrategie | abgeschlossen |
+| 6 | Produktionsplanung | alte Abschlussbehauptung widerrufen; durch D-055 beendet und mit D-056–D-064 ersetzt | **beendet / ersetzt** |
+| 7 | Implementierungs-Recovery | Gates G0–G5 ohne Statusvorgriff | **gestartet – G0-A aktiv** |
 
-## Sprint-Abschluss-Ritual (verbindlich für jeden Sprint)
+## Sprint 7 – Arbeitsvertrag
 
-1. Vollständige Dokumentation des Sprint-Ergebnisses
-2. Self Review
-3. Architecture Review (dokument-/architekturbezogen)
-4. Risikoanalyse (Update [RiskAnalysis.md](RiskAnalysis.md))
-5. Qualitätsbewertung
-6. Offene Punkte (Update [OpenQuestions.md](OpenQuestions.md))
-7. Begründete Entscheidung über den nächsten Sprint (GO / NO-GO / Anpassung)
-8. Sprint-Bericht in [sprints/](sprints/), Index [../README.md](../README.md) aktualisieren
+Sprint 7 arbeitet strikt sequenziell:
+
+1. G0-A subject-unabhängiger Trusted-Gate-Bootstrap,
+2. G0-B reproduzierbare Plattform,
+3. G1 kanonischer Kern und V1–V5a,
+4. G2 Player-Graybox-Kern,
+5. G3 KI/Fortsetzung/V5b,
+6. G4 exakter Produktionsumfang und
+7. G5 eingefrorene Abnahme.
+
+Sprint 7 ist gestartet. Aktuell ist ausschließlich G0-A zur Implementierung
+freigegeben. Der Begriff
+„freigegeben“ bezeichnet Arbeitsscope, nicht ein bestandenes Gate. MS-0 und
+MS-1 sind nicht erreicht.
+
+## Sprint-Abschluss-Ritual
+
+1. vollständige Dokumentation des tatsächlichen Ergebnisses,
+2. unabhängiges read-only Review statt Autoren-Selbstfreigabe in Solo-/KI-Modus,
+3. Architecture Review,
+4. Update [RiskAnalysis.md](RiskAnalysis.md),
+5. Qualitätsbewertung gegen die Gate-Kriterien,
+6. Update [OpenQuestions.md](OpenQuestions.md),
+7. begründetes GO/NO-GO/Anpassung,
+8. Sprint-Bericht, Wiki-Index und `[Unreleased]`,
+9. schema- und semantikvalide Evidence für jeden beanspruchten Gate-Status.
+
+Punkt 9 verlangt nach G0-A Schema 1.3, kriterienspezifische Check-Artefakte,
+subject-unabhängiges Trusted Tooling und einen externen Trust-Kontext aus dem
+geschützten `quality-gate`. Schema 1.2 ist nur Integritätsvorstufe und kann
+keinen Pass autorisieren. Der Kontext umfasst die vollständige geordnete
+Same-Subject-Gate-Kette. Performance-Schwellen werden in drei getrennten
+Läufen pro Lauf und kombiniert sowie gegen die gebundene Windows- oder
+Mac-Umgebung geprüft.
+
+Sobald mindestens zwei aktive menschliche Maintainer existieren, ist zusätzlich
+eine zweite menschliche Freigabe Pflicht.
 
 ## Offene Punkte
 
-- Sprint-Längen sind ergebnisorientiert, nicht zeitorientiert ("Qualität vor Geschwindigkeit").
-- Q-038 und Q-039 sind P0-Blocker für G4 beziehungsweise G1.
+- Q-018 und Q-019 sind offen, aber durch D-056 nicht MS-1-blockierend.
+- Sprint 7 hat keine Kalenderdauer; [Roadmap.md](Roadmap.md) definiert die
+  Re-Estimate-Zeitpunkte.
 
 ## Nächste Schritte
 
-- Ausschließlich Gate G0 herstellen: sauberer reproduzierbarer Build, grüne verpflichtende Tests und belegte Toolchain.
-- Keine Alpha- oder Content-Breite beginnen, bevor die vorherigen Recovery-Gates bestanden sind.
+1. Nur G0-A implementieren: Trusted-Tool-Checkout, Schema-1.3-Vertrag,
+   vollständige Autorisierungskette, Umgebungsbindung und Negative Controls.
+2. G0-A als Bootstrap-Änderung ohne Gate-Fortschritt mergen; erst der
+   nachfolgende saubere Subject-Commit darf G0-B belegen.
+3. Keine Evidence-Platzhalter und keine Vorab-Fertigmeldungen erzeugen.
+4. Erst nach bestandenem G0 zu G1 wechseln.
 
 ## Änderungsverlauf
 
@@ -58,3 +96,9 @@ Definiert alle Sprints, ihre Ziele, Deliverables und Exit-Kriterien. Kein Sprint
 | 1.5.0 | 2026-07-24 | Inhaberentscheidung D-054 (0 € Open-Source & KI-Pipeline, Q-035 geschlossen) in Sprint-6-Vorbereitung eingetragen | Executive Producer |
 | 1.6.0 | 2026-07-24 | Sprint 6 (Produktionsplanung) als abgeschlossen markiert, Sprint 7 (Implementierung) GO | Executive Producer |
 | 1.7.0 | 2026-07-24 | Sprint-6-Abschluss und pauschales Sprint-7-GO durch D-055 zurückgezogen; Sprint 7 auf Recovery-Gates G0–G5 umgestellt | Executive Producer |
+| 2.0.0 | 2026-07-24 | Sprint 7 auf D-056–D-061, G0-offen und evidence-basierte Exit-Regeln rebaselined | Executive Producer / Producer / Project Owner |
+| 2.1.0 | 2026-07-24 | Evidence-Semantikprüfung und getrennte G0-Negativkontrollen in den Sprintvertrag aufgenommen | Executive Producer / Producer / Lead QA Engineer |
+| 2.1.1 | 2026-07-24 | Sprint 6 als beendet/ersetzt und Sprint 7 mit ausschließlich G0 als gestartet klargestellt | Executive Producer / Project Owner |
+| 2.2.0 | 2026-07-24 | D-062-Szenarioschwellen und Same-Subject-Vorgängergate-Kette in den Sprintabschluss aufgenommen | Executive Producer / Lead QA Engineer |
+| 2.3.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trust als Sprint-7-Exit ergänzt | Executive Producer / Lead QA Engineer |
+| 2.4.0 | 2026-07-24 | D-064 Trusted-Gate-Bootstrap als G0-A vor die Plattformarbeit gestellt und Schema 1.2 für Pass-Autorisierung gesperrt | Executive Producer / Lead QA Engineer |

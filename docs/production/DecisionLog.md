@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.9.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.13.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -59,7 +59,7 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 
 ---
 
-### D-006 | verbindlich | Sprint 1
+### D-006 | ersetzt durch D-060 | Sprint 1
 
 **Kontext:** Validierung von D-002 (Engine-Stack) anhand des Sprint-1-Research [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md); welche Unity-Version wird festgelegt?
 **Alternativen:** (a) Unreal Engine 5 (überdimensioniert für den gewählten Stil, verwirft C#-Backend-Option und Asset-Kaufstrategie); (b) Godot 4 (geringste Beleglage für 500+ Einheiten in 3D, kleiner Asset-Markt); (c) Unity mit Voll-DOTS (verworfen, siehe Q-015-Research: Umbruchphase, Asset-Bruch); (d) Unity 6.3 LTS + URP + C#, klassisch mit SO-Datenmodell.
@@ -85,13 +85,17 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Begründung:** 18 sprengt Kapazität (R-01) und MVP-Disziplin; 11 unterschlägt Mauer (C&C-Erwartung der H1-Zielgruppe) und die Aufsplittung der Verteidigung – die als Modulsystem statt als Mehrfachtyp gelöst wird.
 **Konsequenzen:** 36 Gebäude-Assets (12×3) statt 54; Buildings.md definiert Module und Voraussetzungen; APL Paket 03 wird in Sprint 5 entsprechend korrigiert.
 
-### D-009 | verbindlich | Sprint 2 (Q-002)
+### D-009 | teilweise ersetzt durch D-056 (MS-1) | Sprint 2 (Q-002)
 
 **Kontext:** Commander-System – im TPD nur als Signature-Asset genannt.
 **Alternativen:** (a) RPG-artiger Commander mit Match-Mechanik und Progression; (b) Commander als rein narrative/präsentative Identität (Portrait, Voice, Story, Key Art); (c) komplett streichen.
 **Entscheidung:** (b) – Commander als Identitäts-Layer ohne Match-Mechanik im MVP; optionales Doktrinen-System (kleine passive Fraktions-Varianten) frühestens ab Beta evaluieren.
 **Begründung:** Ein mechanisches Commander-System ist ein zweites Balancing-Universum (R-01) und für die H1-Zielgruppe kein Kaufargument; als Identität liefert es die im TPD geforderte Unverwechselbarkeit (Signature-Assets) zu geringen Kosten.
 **Konsequenzen:** CommanderSystem.md definiert Identität, Voice-Konzept und Doktrinen-Ausblick; kein Commander-Balancing im MVP.
+
+**Teilersetzung für MS-1:** D-056 verschiebt Commander, Portrait/Key Art,
+Voice-over und Doktrinen vollständig hinter G5. D-009 bleibt ausschließlich
+als Post-MVP-/Vollspiel-Zielbild bestehen.
 
 ### D-010 | verbindlich | Sprint 2 (Q-005)
 
@@ -309,7 +313,7 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 
 ---
 
-### D-033 | verbindlich | Sprint 3 (Q-013 – Simulations- & Multiplayer-Modell)
+### D-033 | teilweise ersetzt durch D-057 | Sprint 3 (Q-013 – Simulations- & Multiplayer-Modell)
 
 **Kontext:** Simulations- und Multiplayer-Architektur; Research-Vorlage [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md), Vorverhandlung [sprints/Sprint01_Report.md](sprints/Sprint01_Report.md) §3.
 **Alternativen:** (a) Striktes deterministisches Lockstep ab sofort (Fixed-Point überall, Unity-Physik-Verbot – bremst den MVP, ohne SP-Nutzen); (b) Server-autoritativer State-Sync (bei 500 voll sichtbaren Einheiten ~200–300 kB/s pro Client, Interest Management greift bei RTS-Gesamtsicht nicht – strukturell ungeeignet laut Research); (c) **Determinismus-fähige, befehlsgetriebene Tick-Simulation jetzt; deterministisches Lockstep über autoritativem Command-Relay-Server als Zielarchitektur ab Beta.**
@@ -366,6 +370,10 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Entscheidung:** (d).
 **Begründung:** Die Abstraktion macht den Middleware-Wechsel zum Nicht-Ereignis; FMOD ist unter $200k Umsatz kostenlos und löst genau das RTS-Kernproblem (hunderte Barks, adaptive Musik); Wwise-Kosten/Nutzen passt nicht.
 **Konsequenzen:** [../tech/AudioArchitecture.md](../tech/AudioArchitecture.md) führend; FMOD-Budgetpunkt in Sprint 6 aufnehmen.
+**MS-1-Status:** Durch D-056/D-058 begrenzt: Unity Audio ist für MS-1
+zulässig, Commander/Voice, adaptive Musik, finale Audio-Produktion und FMOD
+sind jedoch Post-MVP; 500 Emitter sind ausschließlich synthetische
+Architekturlast. Ein FMOD-Termin erfordert eine neue Post-MVP-Entscheidung.
 
 ### D-040 | verbindlich | Sprint 3 (Renderer- und Licht-Festlegungen)
 
@@ -403,14 +411,14 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Begründung:** D-037 verlangt die Burst-Trennung, D-036 den SimRunner-Bezug, die KI-Architektur begründet ihre Unity-Freiheit überzeugend (Records statt SOs im Entscheidungspfad); nur eine Neusynthese erfüllt alle drei.
 **Konsequenzen:** Architecture.md, ModuleOverview.md, DependencyGraph.md werden angeglichen; Assembly-Name steht im Datei-Header jeder .cs-Datei (Fehlwahl = codebase-weites Rewrite, daher vor Sprint 7 verbindlich).
 
-### D-044 | verbindlich | Sprint 4 (Sim-Tick-Ausführungsmodell + Validierungs-Gate V5)
+### D-044 | teilweise ersetzt durch D-061 | Sprint 4 (Sim-Tick-Ausführungsmodell + Validierungs-Gate V5)
 
 **Kontext:** Performance-Review F-1/F-7: Rest-Sim-Unterbudget ≤3 ms (Kampf, Wirtschaft, KI) ist unbelegt; synchrones Ausführungsmodell erzeugt Mikro-Ruckler (13,5 ms seriell im Worst Case); Zielsuche ohne Spatial-Struktur wäre O(n²).
 **Alternativen:** (a) synchron im Main-Thread; (b) Worker-Tick, View rendert Snapshot n−1; (c) gestuft.
 **Entscheidung:** (c) – **MVP synchron** (einfach, 100-ms-Tick-Fenster, MVP-Last 100 Einheiten unkritisch); **Wechsel auf Worker-Tick ab Alpha, falls die P95-Messung >6 ms zeigt** (D-033 bereitet das vor). Zusätzlich **Pflicht-Gate V5 im Phase-0-Spike: Combat-/KI-Kostenmodell** (Targeting mit Spatial-Hash als Pflichtbestand des Kampfmoduls, FoW-Filter, KI-Command-Verarbeitung) – ohne V5 kein Sprint-7-Start des Kampfmoduls.
 **Konsequenzen:** PerformanceBudget.md (V5-Gate, Ausführungsmodell), Testing.md (V5-Kriterien), Architecture.md (Worker-Tick-Vorhaltung).
 
-### D-045 | verbindlich | Sprint 4 (Auslieferungspfad Managed-first – D-037 präzisiert)
+### D-045 | teilweise ersetzt durch D-057 | Sprint 4 (Auslieferungspfad Managed-first – D-037 präzisiert)
 
 **Kontext:** Performance-Review F-2 und Wartbarkeit F-03: Bit-Parität Managed↔Burst ist im Float-Regime nicht garantiert; CI misst Managed, das Spiel liefe auf Burst – Messblindheit und Desync-Risiko bei grüner CI.
 **Alternativen:** (a) Burst als Primärpfad mit Bit-Paritätsgebot (nicht einlösbar); (b) **Managed als einziger Auslieferungspfad bis zur Fixed-Point-Beta; Burst nur hinter Feature-Flag mit Toleranz-Parität**; (c) Burst komplett streichen.
@@ -433,7 +441,7 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Entscheidung:** (b) – **1 Tile = 1 m** (D-034 bestätigt); führende Quelle für Waffenreichweiten ist Weapons.md; Vehicles.md/Aircraft.md werden angeglichen. **Angriffsreichweite > Sichtweite ist Design-Prinzip** (Scouting/Spotter, C&C-konform), kein Fehler: Sichtklassen aus FogOfWar.md bleiben unverändert.
 **Konsequenzen:** GDD-Korrekturlauf (Vehicles.md, Aircraft.md, Querverweise); Grundsatzregel "jeder Wert existiert genau einmal, alles andere sind Verweise" wird im DocumentationStandard ergänzt.
 
-### D-048 | verbindlich | Sprint 4 (Skalierungs-Deckel: Einheiten, Survival, Density)
+### D-048 | teilweise ersetzt durch D-058 (MS-1) | Sprint 4 (Skalierungs-Deckel: Einheiten, Survival, Density)
 
 **Kontext:** Skalierungs-Review F-1/F-2 (KRITISCH/HOCH): Die Kalibrierung "500 Einheiten" wird nirgends erzwungen; Survival-Endlos (+25 %/Welle) erreicht Welle 20 ≈ 555 Einheiten allein in einer Welle; FFA-6 mit Density 2,0 sprengt jedes Budget.
 **Alternativen:** (a) unbegrenzt (Engine-Bruch absehbar); (b) hartes Pop-Limit pro Spieler (widerspricht D-021-Geist); (c) **globale, performance-kalibrierte Deckel mit lesbaren Regeln.**
@@ -441,14 +449,14 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Begründung:** Macht die 500-Einheiten-Kalibrierung erzwungen statt angenommen; behält D-021 (kein Supply-Mikromanagement), weil der Deckel nur im Extremfall greift.
 **Konsequenzen:** MultiplayerModes.md, GameState.md (UnitCounter), PerformanceBudget.md, Balancing.md angleichen.
 
-### D-049 | verbindlich | Sprint 4 (Test-/CI-Realismus, Hash-Breite, Registry-Sharding)
+### D-049 | teilweise ersetzt durch D-057/D-061 | Sprint 4 (Test-/CI-Realismus, Hash-Breite, Registry-Sharding)
 
 **Kontext:** Skalierungs-Review F-3 (SimRunner-Nightly rechnerisch unmöglich: 22–43 h seriell), Wartbarkeit F-05 (GameDatabase als Single-File = Merge-Konflikt-Magnet), GDD↔TDD-Review (Hash-Breiten-Inkonsistenz xxHash32 vs. xxHash64).
 **Entscheidungen:** (1) **SimRunner-CI:** Nightly = 6 Matchup-Cluster × 20 Matches auf 8 parallele Shards; 200-Match-Vollläufe wöchentlich; Zielvorgabe ≤60 s/Match (Managed) statt "<10 s". (2) **xxHash64 überall** (Serialization.md angleichen). (3) **GameDatabase-Sharding:** Sub-Registries pro Kategorie (Units, Buildings, Weapons, Tech, Factions, Maps, Biomes, AI) + generierte Master-Index-Datei statt eines einzelnen Registry-Assets.
 **Begründung:** CI muss über Nacht laufen; parallele Agenten-Arbeit (Worktrees, TPD §12) verträgt keine Single-File-Registry; 64-bit-Hashes halbieren die Kollisionswahrscheinlichkeit bei langen Replay-Serien.
 **Konsequenzen:** Testing.md, Deployment.md, Serialization.md, FolderStructure.md, NamingConvention.md angleichen.
 
-### D-050 | verbindlich | Sprint 4 (Branching-Modell)
+### D-050 | ersetzt durch D-059 | Sprint 4 (Branching-Modell)
 
 **Kontext:** Wartbarkeit F-07: AGENTS.md (PR→main) vs. Deployment.md/Testing.md (develop-Integration) – zwei Branching-Modelle aktiv; TPD §12 definiert develop.
 **Alternativen:** (a) TPD-Modell mit develop sofort; (b) trunk-based main-only dauerhaft; (c) gestuft.
@@ -494,20 +502,515 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Begründung:** Diese Einstufung trennt überprüfbare Laufzeit-Evidenz von erzeugter Struktur und verhindert, dass weitere Planung auf falschen Fertigmeldungen aufbaut.
 **Konsequenzen:** Der Sprint-6-Abschluss und das Sprint-7-GO werden zurückgezogen. Roadmap und Meilensteine sind bis zur Neu-Schätzung nicht terminverbindlich. Alpha-Erweiterungen bleiben gesperrt, bis G5 bestanden ist. Der Projektinhaber entscheidet Q-038; Q-039 muss vor Abschluss von G1 technisch und dokumentarisch aufgelöst sein.
 
+### D-056 | verbindlich | Sprint 7 (Closed-Core MS-1; Q-031/Q-038)
+
+**Kontext:** Der Audit und Q-038 verlangen einen eindeutigen MVP-Zuschnitt. Der
+alte Vollumfang war nicht dependency-closed; der 6/6-Recovery-Vorschlag ließ
+Produkt-, Persistence- und Aetherium-Abhängigkeiten offen. Q-031 machte ein
+generisches Fähigkeiten-/Status-System implizit zum Startblocker.
+
+**Alternativen:** (a) historischer Vollumfang mit drei Fraktionen, Luft, T3,
+Eliten, Neutralen und Zusatzmodi; (b) alter Recovery-Slice mit sechs Gebäuden
+und sechs Einheiten je Fraktion; (c) symmetrischer Mirror-Demonstrator ohne
+echte Fraktions- und Wirtschaftsidentität; (d) dependency-closed Scope mit
+genau den für einen vollständigen Skirmish-Kern nötigen Regeln.
+
+**Entscheidung:** (d) – **Closed-Core MS-1**:
+
+1. Allianz und Legion; lokales Solo Mensch gegen KI; Glutrinne, Wüste, S,
+   128×128 bei 1 m, ausschließlich klares Wetter.
+2. Neun Gebäude-Rollen je Fraktion: HQ, Power, Refinery, Storage, Barracks,
+   VehicleFactory, ResearchLab, Radar, DefensePlatform. Namen sind exakt aus
+   [MVPContentManifest.md](MVPContentManifest.md) und den GDD-Tabellen zu
+   übernehmen.
+3. Acht Einheiten-Rollen je Fraktion: Builder, Harvester, BasicInfantry,
+   AntiArmorInfantry, ScoutVehicle, LightTank, BattleTank, Artillery.
+4. Start je Seite: fertiges HQ und fertige Raffinerie, ein Builder, zwei
+   Harvester, 1.000 AE. Die Start-Raffinerie ist die einzige
+   Voraussetzungsausnahme und erzeugt keinen zusätzlichen Harvester.
+5. Fertigstellung des ResearchLab schaltet T2 direkt frei; keine
+   Forschungs-Upgrades oder Forschungsqueue. DefensePlatform: MG auf T1,
+   Rocket auf T2, kein Flak.
+6. Kein generisches System für aktive Fähigkeiten, Status, Kanäle oder Auren;
+   keine aktiven Toggles nötig. Fraktionsidentität bleibt waffen- und
+   wirtschaftslokal: Allianz hochpreisig, präzise, Single-Target, 330-AE-
+   Harvester; Legion günstig, schnell produziert, Salven/Splash,
+   300-AE-Harvester.
+7. Glutrinne enthält zwei Startfelder zu je 9.000 AE, zwei Naturals zu je
+   9.000 AE und ein zentrales Feld mit 15.000 AE sowie zwei Routen. Keine
+   Neutralen, Brücken, Wetter/Hazards oder Umgebungszerstörung außer
+   Aetherium.
+8. D-010 gilt vollständig: endliche Reserve, Nachwachsen aus der Reserve,
+   Ausbreitung/Terrainfolge, permanenter Überernte-Schaden, lesbarer
+   Zustand/Warnung, KI-Management und umkämpfte Expansion. Ziel sind
+   20–35 Minuten; Artillerie und endliche Felder beenden das Match.
+9. Produktminimum: Pause; zehn manuelle Slots; rotierendes Quicksave A/B;
+   drei Autosaves alle fünf Minuten; Load/Backup-Recovery; normales UI-only-
+   Match; Rebinding; UI-Skalierung 80–150 %; Farb-/Formredundanz; reduzierte
+   Shake-/Flash-Optionen; Client-Command-Feedback ≤100 ms.
+10. Niederlage tritt ein, sobald ein Slot keine lebende Einheit und kein
+    lebendes Gebäude einschließlich Baustellen mehr besitzt. Werden beide
+    Seiten im selben Tick eliminiert, endet das Match als
+    `Draw.MutualAnnihilation`; nach 27.000 Ticks ohne Elimination als
+    `Draw.TimeLimit`. Besitzt ein Slot 600 Ticks ununterbrochen kein Gebäude
+    und höchstens drei Einheiten, werden diese bis zum Ende der Bedingung für
+    den Gegner sichtbar und zielbar. MS-1 besitzt weder automatische
+    KI-Aufgabe noch einen Spieler-Surrender-Command.
+
+**Begründung:** Nur (d) beweist den eigentlichen Nova-Loop einschließlich
+strategischer Aetherium-Feldpflege, Fraktionsunterschied und Produkt-
+Wiederaufnahme, ohne Post-MVP-Systeme als Vorbedingungen einzuschleusen.
+
+**Konsequenzen:** Zurückgestellt sind Evolvierte, Luft/Flak, Mauern, T3,
+Eliten, Superwaffen, Drohnen, generische Fähigkeiten/Status, Capture,
+Neutrale/Brücken, Wetter/Hazards, weitere Karten/Biome, Commander/Doktrinen/
+Voice-over, Kampagne, Online/Koop/FFA/Survival/PvP/Ranked, Telemetrie,
+Steam/Cloud und finale Art/Audio. D-008, D-009, D-014, D-015, D-016, D-022, D-023,
+D-026, D-030 und D-031 werden **nur für MS-1** übersteuert; ihr Vollspiel-
+Zielbild bleibt Post-MVP. Q-031 und Q-038 sind geschlossen.
+
+### D-057 | verbindlich | Sprint 7 (kanonische Deterministik und Persistence; Q-039)
+
+**Kontext:** D-033 erlaubte Float im MVP, während MS-0
+plattformübergreifende Deterministik verlangte. D-045 definierte eine
+technisch ungültige relative Hash-Toleranz. State-, Command-, Save- und
+Replay-Verträge waren nicht bytegenau geschlossen.
+
+**Alternativen:** (a) Float bis Beta beibehalten; (b) Fixed-Point ab G1;
+(c) Float-Werte vor Hash/Serialisierung quantisieren; (d) parallele
+Float-/Fixed-Point-Pfade pflegen.
+
+**Entscheidung:** (b) – der Vertrag aus
+[../tech/SimulationCore.md](../tech/SimulationCore.md) und
+[../tech/Commands.md](../tech/Commands.md) gilt ab G1:
+
+1. **Zahlen:** `SimFixed` signed Q16.16 auf `int32` mit
+   `OneRaw=65536` und Wertebereich `[-32768, 32767.9999847412109375]`,
+   `int64`-Zwischenprodukte, nearest ties-to-even, Welt→Grid floor, geprüfte
+   deterministische Faults; kein Saturieren oder Wrap außer `SimAngle`
+   `uint16`. Autoritative `float`/`double`-/Unity-Mathematik ist verboten.
+2. **Grundtypen:** 10 Hz, `Tick uint32`, Dauern in Ticks,
+   `XorShift128PlusV1` mit zwei `uint64`-Wörtern, Player/Team `uint8`,
+   `DefinitionId uint16` (`0` ungültig) sowie `EntityId uint32`: Bit 0–9
+   enthalten Index 0–1.023, Bit 10–31 eine Generation 1–4.194.303;
+   Rohwert 0 ist ungültig. Initialgeneration ist 1, freie Indizes werden in
+   aufsteigender Reihenfolge vergeben, Generationsüberlauf ist ein
+   deterministischer Fault. Allocator/Free-List/Generationen werden
+   serialisiert; Hashes sind `uint64`.
+3. **Ingress:** UI und KI erzeugen nur `CommandIntent`.
+   `MatchSession`/`CommandIngress` bindet Player, vergibt je Spieler
+   `Sequence` und setzt `TargetTick` über den fingerprinted
+   `InputDelayTicks` (MS-1 exakt 1). Sequenzen beginnen bei 1; 0 und
+   `uint32`-Überlauf sind ungültig. `LocalLoopbackTransport` nutzt
+   denselben Pfad; der Kernel akzeptiert nur versiegelte `CommandBatch`.
+4. **Envelope, Little Endian:** `RecordLength u16`, `EnqueueTick u32`,
+   `TargetTick u32`, `PlayerSlot u8`, `Sequence u32`, `CommandKind u16`,
+   `PayloadVersion u8`, `PayloadLength u16`, Payload. Keine Floats, Strings,
+   GUIDs oder Dictionaries im Payload. Der Header ist 20 Bytes,
+   `MaxRecordBytes=4096`, `MaxPayloadBytes=4076`,
+   `MaxBatchRecordsPerTick=256`, `MaxPendingRecords=1024` und
+   `MaxEntityIdsPerCommand=100`.
+5. **Ordnung/Fehler:** Sortierung nach
+   `(TargetTick, PlayerSlot, Sequence)`. Byteidentische Wiederholung wird
+   einmal angenommen, inhaltlicher Konflikt abgelehnt. Strukturell
+   Ungültiges erreicht den Strom nicht; zustandsabhängige Fehler bleiben mit
+   deterministischem `CommandResult` und ohne Mutation im Replay.
+   Schema v1 testet jedes aktivierte Command sowie invalid/unknown,
+   reordered, duplicate und backpressure.
+6. **State-Inventar:** Tick/Fingerprint/PRNG, Allocatoren,
+   Match/Player/Team/Entity, Orders, Movement, Combat, Projectiles, Economy,
+   Energy, Aetherium, Construction, Production, T2, FoW, Environment,
+   ausstehende Batches, Sequence/Dedupe sowie Path-/Deferred-Queues und jede
+   andere zukunftsrelevante Information. KI ist ein versionierter
+   Session-Sidecar für Save/Fortsetzung, keine `Nova.Simulation`-
+   Abhängigkeit. Abgeleitete Caches dürfen nur bei bewiesen identischem
+   Rebuild fehlen.
+7. **Hashes:** State-, Definitions-, File- und Replay-Chain-Domänen verwenden
+   XXH64 Seed 0 mit den ASCII-Präfixbytes `NOVA_STATE_V1\0`,
+   `NOVA_DEFINITIONS_V1\0`, `NOVA_FILE_V1\0` und
+   `NOVA_REPLAY_CHAIN_V1\0`.
+8. **Fingerprint:** alle Schemata, `NumericModelId=Q16_16_V1`, 10 Hz, PRNG,
+   `RulesHash64`, `DefinitionsHash64`, `MapHash64`, MatchConfig/Slots/Seed
+   und initialer State.
+9. **Persistence:** Snapshot-Roundtrip ist byteidentisch; Restore und
+   frischer Host setzen mindestens 1.000 Ticks einschließlich gequeuter
+   Commands identisch fort; jeder State-Block besitzt
+   Hashsensitivitätstests. Replay zeichnet alle akzeptierten Human-/KI-
+   Commands auf und instanziiert KI beim Playback nicht erneut; Shadow-
+   Validierung ist rein diagnostisch.
+10. **Kompatibilität:** einmaliger Pre-G1-Reset; Prototyp-Saves, -Replays,
+    -Pakete und -Fixtures sind unsupported. Kanonische Schemata beginnen
+    1.0. Nach G1: Replay nur bei exaktem Fingerprint; Save-Migration nur
+    explizit und getestet.
+11. **Parität:** SimRunner und Unity wahren Core/Simulation/AI-Grenzen und
+    kompilieren dieselben Quellen/Defines. Windows x64 und macOS arm64
+    müssen über 10.000 Ticks exakte Hashes und finale Bytes liefern. Der
+    Managed-Pfad shippt; Burst bleibt für MS-1 aus, bis exakte Feld-/Hash-/
+    Byteparität bewiesen ist.
+
+**Begründung:** Fixed-Point ab G1 entfernt eine spätere Kernmigration und macht
+Snapshots, Replays, Savegames und Cross-Plattform-Evidenz zu einem einzigen
+prüfbaren Vertrag. Quantisierung und Doppelpfade verschieben oder verdoppeln
+das Risiko.
+
+**Konsequenzen:** Q-039 ist geschlossen. Die Float-Zeitpunkt-Klausel aus D-033
+und die Toleranz-Hash-Klausel aus D-045 sind ersetzt. Numerische Toleranzen
+gelten nur für nicht autoritative Diagnostik, nie als Hashdistanz.
+
+### D-058 | verbindlich | Sprint 7 (MVP-Kapazität, Cache und FoW; Q-032)
+
+**Kontext:** Aktive Verträge mischten sechs und acht Spieler, 100, 500 und 600
+Einheiten, widersprüchliche Snapshotgrößen sowie LRU- und RefCount-Eviction.
+FoW hatte weder verbindlichen Takt noch einen gemeinsamen Konsumentenvertrag.
+
+**Alternativen:** (a) volle 6-/8-Spieler-Budgets jetzt; (b) dynamische,
+unbegrenzte Strukturen; (c) feste MS-1-Kappen mit reserviertem
+Kompatibilitätsschema.
+
+**Entscheidung:** (c):
+
+- Das Format reserviert acht Slots, MS-1 aktiviert exakt zwei.
+- Grid 128×128 bei 1 m.
+- Produktionseinheitenlimit 100 gesamt; 500-Agenten-Fixtures sind
+  synthetische Last, kein Content-Versprechen.
+- Entity Store 1.024.
+- unkomprimiertes Snapshotziel ≤4 MiB; Parser-Hardcap 64 MiB.
+- Flow-Field-Cache ≤32 Einträge und ≤8 MiB. Referenzierte Einträge werden
+  nie eviktiert; unter RefCount-null-Einträgen entscheidet deterministische
+  LRU. Zukunftsrelevante Request-/Eviction-Metadaten werden serialisiert.
+- FoW ist autoritativ pro Team, drei Zustände, Recompute auf jedem zweiten
+  Sim-Tick (5 Hz) nach Movement und vor Combat. Dieselbe committed Sicht
+  steuert Combat-Legalität, KI, Player-Snapshot und Rendering.
+- MS-1 nutzt nur Radien: keine Hindernisse, Höhe, Wetter, Tarnung oder
+  Detektion. Radar aktiviert Minimap/Signatur-Pings, aber kein Targeting.
+  Hidden-World-Metamorphic-Tests sind Pflicht.
+
+**Begründung:** Feste Kappen machen Speicher, Parser und Spike-Szenarien
+beweisbar, ohne das Dateiformat für spätere Slots neu zu brechen.
+
+**Konsequenzen:** Q-032 ist geschlossen; D-048 bleibt als Post-MVP-Historie,
+gilt nicht für MS-1. [../tech/MemoryBudget.md](../tech/MemoryBudget.md),
+[../tech/Pathfinding.md](../tech/Pathfinding.md) und
+[../tech/FogOfWar.md](../tech/FogOfWar.md) sind führend angeglichen.
+
+### D-059 | verbindlich | Sprint 7 (Branch-Modell; ersetzt D-050)
+
+**Kontext:** D-050 wollte mit Sprint 7 einen dauerhaften Integrationsbranch
+einführen, während Repository-Schutz, Beiträge und tatsächliche Arbeit PRs
+direkt nach `main` vorsehen.
+
+**Alternativen:** (a) GitFlow mit dauerhaftem Integrationsbranch; (b)
+geschütztes `main` plus kurze Topic-Branches; (c) direkte Trunk-Pushes; (d)
+langfristiger Recovery-Branch.
+
+**Entscheidung:** (b). `main` bleibt PR-only; es gibt keinen dauerhaften
+Integrationsbranch. Erlaubte kurze Präfixe sind `feat/`, `fix/`, `docs/`,
+`chore/`, `refactor/` und `codex/`. Merge erfolgt per Squash bei linearer
+History; Force-Push auf geteilte Branches ist verboten. Pflichtchecks:
+`docs-check` und, sobald G0 ihn real erzeugt, `quality-gate`.
+
+Unabhängiges read-only Review ersetzt in Solo-/KI-Arbeit die nicht mögliche
+Autoren-Selbstfreigabe. Sobald mindestens zwei aktive menschliche Maintainer
+existieren, ist eine zweite menschliche Freigabe Pflicht. Agenten committen
+oder pushen nur nach einer **expliziten Anfrage pro Aktion**.
+
+**Begründung:** Kurze Branches minimieren Drift und passen zur aktuellen
+Maintainerzahl, ohne Schutz oder unabhängige Prüfung zu schwächen.
+
+**Konsequenzen:** D-050 ist ersetzt. AGENTS.md, CONTRIBUTING.md,
+[../tech/Deployment.md](../tech/Deployment.md) und
+[../tech/Testing.md](../tech/Testing.md) verwenden ausschließlich dieses
+Modell.
+
+### D-060 | verbindlich | Sprint 7 (Engine-Pin; ersetzt D-006)
+
+**Kontext:** Das Repository ist bereits mit Unity `6000.5.4f1` importiert und
+gespeichert; ein Papier-Pin auf die ältere Linie würde einen riskanten
+Downgrade verlangen.
+
+**Alternativen:** (a) Downgrade auf `6000.3` LTS; (b) aktuellen exakten Editor
+`6000.5.4f1` pinnen; (c) automatisch der jeweils neuesten Update-Version
+folgen.
+
+**Entscheidung:** (b) – **Unity 6000.5.4f1, Revision `d550df8bd089`, URP**.
+Automatische Editor-Upgrades sind verboten.
+
+**Begründung:** Das Projekt liegt bereits in dieser Version vor. Unity
+bezeichnet Update-Releases als produktionsreif und als bevorzugte Wahl für
+neue beziehungsweise mittig im Zyklus befindliche Projekte; der Pin vermeidet
+einen unbewiesenen Downgrade. Offizielle Quellen:
+[Unity 6 Releases & Support](https://unity.com/releases/unity-6/support) und
+[What’s new in 6000.5.4f1](https://unity.com/releases/editor/whats-new/6000.5.4f1).
+
+**Konsequenzen:** D-006 ist ersetzt. Re-Evaluierung nur mit neuer D-ID nach G5
+oder bei einem belegten Engine-Blocker. README, Wiki, AGENTS und aktive
+Tech-Verträge verwenden den exakten Pin.
+
+### D-061 | verbindlich; ergänzt durch D-062/D-063 | Sprint 7 (Acceptance, Performance und Evidence; Q-033/Q-034)
+
+**Kontext:** Alte Gates akzeptierten Struktur statt Laufzeit, vermischten
+100-Einheiten-MVP und 500-Agenten-Spike, ließen Review- und
+Evidence-Fälschungslücken und enthielten tote TDD-Verweise.
+
+**Alternativen:** (a) alte Gates fortführen; (b) nur Berichte ohne harte
+Schwellen erzeugen; (c) ausführbare Gates mit unveränderlicher Evidenz und
+getrennten Produkt-/Skalierungslasten.
+
+**Entscheidung:** (c):
+
+1. Reihenfolge `G0 → G1 einschließlich V1–V5a → G2 → G3 → G4 → G5`.
+   V5a ist G2-Eintritt: repräsentative SpatialHash-, FoW-Filter- und
+   Command-Verarbeitung vor Combat plus 500-Agenten-Probes. V5b wiederholt
+   mit realem Combat/KI in G3. MS-0 = G0+G1+V1–V5a; MS-1 erst nach G5.
+2. 100 Einheiten sind Full-Content-MVP; 500 Agenten sind synthetische
+   Architekturreserve. `MVP_FULL_100`: Sim P95≤8/P99≤12 ms; Path≤4/6;
+   FoW≤1/1,5; Rest≤3/4,5; Sim-GC 0 B. CPU- und GPU-Frame jeweils
+   P95≤16,6/P99≤24,9; Rendering-CPU≤4, Animation≤1,5, GPU-Render≤8,
+   UI≤1 ms.
+3. D-052-Windows-Methode: Standalone IL2CPP Development, Managed/Burst aus,
+   2560×1440 `NovaReference`, VSync/Deep Profiling aus, fixes Replay, 30 s
+   Warmup +120 s Messung ×3, keine Ausreißerentfernung, Rohsamples. 500er
+   Fixtures: kein Crash/unbeschränktes Wachstum; Path P95≤4 und Pre-Combat-
+   Rest P95≤3 bleiben Architekturgate, Full-Content-500 ist Diagnose. Mac M2
+   funktional bei 1080p Medium: P95≤33,3/P99≤50 ms.
+4. Evidence folgt
+   [`GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
+   und liegt append-only unter
+   `quality/evidence/G<N>/<subjectSha>/<attempt>/GateEvidence.json`.
+   Exakter Commit/Tree, `dirty=false`, Vorgängerevidenz, SHA-256 der rohen
+   Content-/Scenario-Dateibytes, Toolchains, Umgebungen,
+   Befehle/Checks/Coverage, Rohmetriken/
+   Artefakthashes, CI, Reviewer, Kriterienmap und Urteil sind Pflicht.
+   Skip/Cancel/fehlendes Pflichtresultat = fail; relevante Änderungen machen
+   Evidenz stale. Reviewer ≠ Writer und reproduziert mindestens einen Clean-
+   Clone-Befehl. Keine Evidence-Platzhalter.
+5. Jeder PR führt das aggregierte `quality-gate`; Docs-only wird explizit
+   klassifiziert, nie übersprungen. Pflicht: Tests, Coverage, Architektur,
+   Golden und vier Headless-Matches. Nightly: zwei geordnete
+   Fraktionscluster ×20 gespiegelt =40; Weekly 2×200=400; G5 am selben SHA
+   drei Nightly-Matrizen=120. Ein Match gilt nur mit Hashes, monotonen Ticks,
+   gültigem Ergebnis, Core-Action-Trace und Checkpoint-Kette; Fehler bleiben
+   im Nenner.
+6. G1-Coverage: Simulation ≥80 %; Command/PRNG/Serializer/Hash/Replay je
+   ≥90 %; Command-Inventar 100 %.
+7. G0: exakter Engine/.NET-/Paket-Pin, versionierte getrennte SimRunner-
+   Projekte, asmdef-/Architekturcheck, saubere Win/Mac-Builds,
+   .NET+EditMode, Architektur- und Evidence-Validator-Negative-Control,
+   keine generierten Binärdateien getrackt.
+   G1: Fixed-Point/Commands/State/Snapshot/Replay/Cross-Plattform. G2:
+   Player-Kernloop via MatchSession, vollständiges Graybox-Aetherium, keine
+   Direktmutation. G3: KI nur gefilterte Ansicht/kanonische Intents,
+   Replay-/Save-Fortsetzung, FoW-Metamorphics, V5b. G4: exaktes
+   Produktionsmanifest, Glutrinne, HUD/Settings/Pause/Save/Load/
+   Accessibility/Provenienz/Usability. G5: eingefrorene Abnahme.
+8. G5: zwei manuelle UI-only-Matches, eines je Fraktion; drei neue
+   Task-Tester; Median 20–35 Minuten; jeder Fünf-Minuten-Autosave-Punkt von
+   Minute 5–45; null P0/P1; keine gatekritische Quarantäne.
+
+**Begründung:** Ausführbare, hashgebundene Nachweise trennen Requirements von
+Erfolg und verhindern, dass synthetische Skalierung als Contentzusage oder
+Dateianwesenheit als Gate ausgegeben wird.
+
+**Konsequenzen:** [MVPRecoveryPlan.md](MVPRecoveryPlan.md),
+[../tech/Testing.md](../tech/Testing.md),
+[../tech/PerformanceBudget.md](../tech/PerformanceBudget.md) und die drei
+Quality-Verträge sind führend. Die substanziellen TDDs
+[../tech/SimulationCore.md](../tech/SimulationCore.md),
+[../tech/Commands.md](../tech/Commands.md),
+[../tech/FogOfWar.md](../tech/FogOfWar.md) und
+[../tech/CameraSystem.md](../tech/CameraSystem.md) schließen zusammen mit
+bereinigten Links Q-033 und Q-034.
+
+### D-062 | teilweise ersetzt durch D-063 | Sprint 7 (Evidence-Semantik und Gate-Kette)
+
+**Kontext:** Ein Gegenbeispiel zeigte, dass bloße Szenarioreferenzen trotz
+überschrittener Performancegrenzen als `pass` gelten konnten. Content- und
+Szenariohashes wurden aus dem aktuellen Checkout statt aus dem deklarierten
+Subject-Commit berechnet; außerdem war ein isolierter G5-Pass ohne
+Vorgängergates maschinell möglich.
+
+**Alternativen:** (a) Reviewer prüfen diese Beziehungen ausschließlich
+manuell; (b) ein separater, späterer Gate-Aggregator wertet frei benannte
+Ergebnisdateien aus; (c) der bestehende Evidence-Vertrag bindet Szenarien,
+Rohmetriken, Subject-Blobs und die unmittelbare Gate-Kette vollständig und
+selbstprüfend.
+
+**Entscheidung:** (c):
+
+1. `gateUsage` und `gateProfiles.requiredScenarioIds` müssen für G0–G5 exakt
+   übereinstimmen. `MVP_FULL_100` und `MAC_M2_FUNCTIONAL` sind
+   G5-Abnahmeszenarien; G4 prüft Inhalt und Produktpfad ohne deren
+   Performancefreigabe.
+2. Ein Kriterium, das `scenario:<ID>` referenziert, bindet alle
+   Pflichtmetriken dieses Szenarios und mindestens einen ausgeführten
+   Command. Rohmetriken heißen
+   `scenario.<ID>.<metric>`; boolesche Assertions heißen
+   `scenario.<ID>.assertion.<assertion>`, verwenden `unit=bool` und exakt
+   `[1]`. Das zugehörige Rohartefakt ist striktes JSON mit exakt
+   `name`, `unit` und `samples`.
+3. P95/P99 werden ohne Interpolation per Nearest-Rank über alle unveränderten
+   Samples berechnet; Maxima, Minima und Gleichheit werden direkt aus diesen
+   Samples geprüft. Kein abgeleiteter Bericht darf Rohsamples ersetzen.
+4. Manifest- und Szenario-SHA-256 werden über die Git-Blobs
+   `<subjectSha>:<path>` berechnet, nicht über den aktuellen Working Tree.
+5. Jede Evidence ab G1 referenziert genau die unmittelbar vorherige
+   Gate-Evidence samt SHA-256. Diese muss rekursiv semantikvalide `pass`
+   liefern und exakt denselben Subject-Commit und Tree belegen. G0 besitzt
+   keine Vorgängergate-Referenz.
+6. Das Evidence-Schema ist `1.1.0`. Da noch keine reale Gate-Evidence
+   existiert, ist keine Migration und keine historische Umschreibung nötig.
+
+**Begründung:** Nur (c) macht Schwellen, Vertragsstand und Gate-Reihenfolge
+aus dem Evidence-Objekt selbst reproduzierbar. Die Same-Subject-Kette ist
+strenger als eine Änderungsheuristik, aber eindeutig und vor G5 bezahlbar.
+
+**Konsequenzen:** D-061 bleibt in Scope, Reihenfolge und Schwellen gültig;
+D-062 schließt seine maschinellen Durchsetzungslücken.
+[`GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json),
+[`mvp-v1.json`](../../quality/scenarios/mvp-v1.json) und
+[`validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
+sind gemeinsam führend.
+
+**Revision:** D-063 ersetzt ausschließlich Schema `1.1.0`, flache
+Performance-Samples und die selbstdeklarierte Command-/CI-/Reviewer-
+Vertrauenskette. Subject-Blob- und Same-Subject-Gate-Regeln bleiben gültig.
+
+### D-063 | teilweise ersetzt durch D-064 | Sprint 7 (Evidence-Authentizität und Messmethode)
+
+**Kontext:** Drei ausführbare Gegenbeispiele bestanden Schema 1.1 und den
+Semantikvalidator: Ein `true`-No-op konnte alle G0-Kriterien mit erfundenen
+Counts/CI-/Reviewer-Feldern belegen; Performancegrenzen akzeptierten eine
+negative Einzelprobe mit beliebiger Einheit statt `30 s + 120 s ×3`; und ein
+schemawidriger G0-Vorgänger bestand innerhalb einer G1-Kette, weil rekursiv
+nur Semantik geprüft wurde.
+
+**Alternativen:** (a) Schema 1.1 beibehalten und die drei Punkte ausschließlich
+dem Reviewer überlassen; (b) maschinenlesbare Gate-Evidence streichen und
+Gates nur per Bericht freigeben; (c) inkompatibles Schema 1.2 mit gepinntem
+Draft-2020-12-Validator, kanonischen kriterienspezifischen Checks,
+artefaktgebundenen Ausgaben, geschütztem externem Trust-Kontext und getrennten
+Performance-Läufen.
+
+**Entscheidung:** (c):
+
+1. Evidence und Szenariovertrag wechseln auf `1.2.0`. Da
+   `quality/evidence/` noch leer ist, gibt es keine Migration; ein vor Merge
+   doch erzeugter 1.1-Versuch wird nicht umgeschrieben, sondern neu
+   ausgeführt.
+2. Gepinntes Node/Ajv Draft 2020-12 plus `ajv-formats` validiert das aktuelle
+   Dokument und jeden Vorgänger fail-closed. Schema und Python-Validator sind
+   zusätzlich als SHA-256-gebundene Subject-Git-Blobs Teil der Evidence.
+3. Jedes Gate-Kriterium benötigt genau einen gleichnamigen, kanonisch über
+   `run_gate_check.py` aufgerufenen Implementation-Check. `stdout`, `stderr`
+   und maschinenlesbares Check-Ergebnis liegen gehasht im aktuellen
+   Attempt-Verzeichnis; ein `command:<id>` ohne `check:<criterionId>` genügt
+   nicht. Der unabhängige Reviewer wiederholt mindestens einen solchen Check
+   als separate Reviewer-Ausführung.
+4. Ein lokales Evidence-Dokument kann Integrität prüfen, aber keinen
+   `pass` autorisieren. Die öffentliche CLI verlangt dafür einen außerhalb
+   des Repos erzeugten Trust-Kontext aus dem unveränderten, geschützten
+   `quality-gate` auf `main`. Er bindet Evidence-Hash, Subject-Commit/-Tree,
+   CI-Attestierung und Reviewer-Attestierung; ohne passenden
+   GitHub-Actions-Kontext gilt `E_TRUST_CONTEXT`.
+5. Jede Schwelle nennt eine exakte Einheit und nichtnegative Domäne.
+   Performance-Metriken besitzen einen 30-s-Warmup und exakt drei getrennte
+   120-s-Läufe mit mindestens einer Rohprobe pro Sekunde. P95/P99, Minimum,
+   Maximum und Gleichheit müssen sowohl pro Lauf als auch über die
+   unveränderte Konkatenation bestehen. `SCALE_500_PRECOMBAT` und die
+   Mac-M2-Messung verwenden dieselbe Methode.
+6. Die gepinnten Quality-Abhängigkeiten und ihre Lockdatei sind Teil des
+   Repositorys. Der bestehende `docs-check` installiert sie und läuft auch
+   bei Änderungen unter `quality/`.
+
+**Begründung:** (a) lässt genau die reproduzierten False-Pass-Pfade offen;
+(b) verliert die maschinelle Reproduzierbarkeit. (c) trennt überprüfbare
+Integrität von externer Autorisierung und bindet jedes behauptete Ergebnis an
+einen konkreten Check, dessen Rohartefakte und die festgelegte Messmethode.
+
+**Konsequenzen:** G0 bleibt offen. Sprint 7 darf G0 implementieren, aber kein
+Gate darf vor dem realen `run_gate_check.py` und einem geschützten
+`quality-gate`-Trustpfad als bestanden gelten. D-064 sperrt nach dem
+Angriffstest zusätzlich jede Autorisierung durch Schema 1.2 und legt
+Schema 1.3 als Ziel fest. D-061-Scope/-Schwellen und
+D-062-Subject-/Gate-Kette bleiben ansonsten unverändert.
+
+### D-064 | verbindlich | Sprint 7 (Trusted-Gate-Bootstrap)
+
+**Kontext:** Der unabhängige Angriffstest gegen D-063 fand drei verbleibende
+False-Pass-Pfade: Ein Subject konnte sein eigenes Schema beziehungsweise den
+Ajv-Wrapper abschwächen; ein autorisiertes späteres Gate akzeptierte eine nur
+lokal erzeugte Vorgängergate-Evidence; und Performance-Messungen waren nicht
+an die vorgeschriebene Umgebung gebunden. Schema 1.2 darf deshalb nicht selbst
+die Autorität erzeugen, mit der es sich als bestanden erklärt.
+
+**Alternativen:** (a) Schema 1.2 trotz der Befunde autorisieren und die Lücken
+später schließen; (b) maschinenlesbare Evidence wieder entfernen und allein
+auf PR-Review vertrauen; (c) Autorisierung bis zu einem zweistufigen,
+subject-unabhängigen Bootstrap sperren und danach Schema 1.3 mit
+Trusted-Tool-, Ketten- und Umgebungsbindung verwenden.
+
+**Entscheidung:** (c):
+
+1. Schema 1.2 bleibt ein Integritätsprüfer, darf aber keinen Gate-Pass
+   autorisieren. Die CLI endet bei jedem Pass-Versuch zusätzlich mit
+   `E_AUTHORIZATION_BOOTSTRAP`, bis G0 den folgenden Vertrag vollständig
+   implementiert.
+2. Der geschützte Authorize-Job führt Python-Validator, Evidence-Schema,
+   Ajv-Wrapper und `npm ci --ignore-scripts` ausschließlich aus einem
+   separaten Trusted-Tool-Checkout aus, nie aus dem zu prüfenden Subject.
+   Evidence und externer Trust-Kontext binden mindestens Manifest,
+   Szenariovertrag, Schema, Python-Validator, Ajv-Wrapper, `package.json`,
+   Lockdatei, Gate-Runner und Authorize-Workflow per Subject-/Trusted-
+   Commit und SHA-256 sowie eine exakte Node-Version.
+3. Eine Änderung an diesem Trust-Bundle ist eine **Bootstrap-Änderung**:
+   Sie kann sich nicht selbst autorisieren, wird ohne Gate-Fortschritt per
+   geschütztem PR gemergt und gilt erst für einen nachfolgenden sauberen
+   Subject-Commit. Erst dieser Nachfolger darf G0-Evidence erzeugen.
+4. Ein Trust-Kontext enthält die vollständige, geordnete
+   `authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag
+   bindet Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie
+   CI- und Review-Attestierung. Der geschützte Job verifiziert jeden Eintrag
+   gegen GitHub; fehlende, zusätzliche, vertauschte oder nur lokal erzeugte
+   Vorgänger sind ungültig.
+5. Schema 1.3 verlangt `environmentId` an Command und Performance-Messung.
+   Beide müssen auf dieselbe deklarierte Umgebung zeigen. Windows-x64-
+   Referenzmessung und Mac-M2-Funktionsmessung erhalten getrennte
+   Methodenprofile; OS, Architektur, Hardware, Build, Managed/Burst,
+   Auflösung, Quality-Profil, VSync, Deep Profiling und Replay werden exakt
+   verglichen.
+6. Fehlender Node/Ajv-Stack und ein hängender Schema-Subprozess enden
+   kontrolliert und fail-closed. Negative Controls decken manipuliertes
+   Subject-Schema, Ajv-Wrapper/Lockfile, unvollständige Autorisierungsketten
+   und falsche beziehungsweise widersprüchliche Umgebungen ab.
+
+**Begründung:** (a) würde reproduzierte Falschfreigaben akzeptieren; (b)
+verliert die wegen der früheren Fertigmeldungen notwendige Reproduzierbarkeit.
+(c) schafft einen kleinen, ausdrücklich zu implementierenden Root of Trust
+und verhindert Selbstautorisierung, ohne Produktcode hinter weitere
+Planungsarbeit zu stellen.
+
+**Konsequenzen:** Sprint 7 ist weiterhin gestartet, aber seine erste
+Coding-Arbeit ist **G0-A Trusted-Gate-Bootstrap**. Danach folgt G0-B
+Plattform-/Build-Reproduzierbarkeit. Bis G0-A gemergt und an einem
+nachfolgenden sauberen Subject bewiesen ist, sind G0–G5 zwingend offen.
+D-064 ergänzt D-063 und ersetzt dessen Autorisierungsanspruch für Schema 1.2;
+alle übrigen D-063-Prüfungen bleiben verbindliche Vorstufe.
+
 ---
 
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
 - Q-018 (Preispunkt) und Q-019 (Telemetrie) bleiben offen; Sprint 6 hat dafür keine gültige D-ID erzeugt.
-- Q-038 (verbindlicher MVP-Zuschnitt) und Q-039 (Fixed-Point-Konflikt) blockieren die Recovery-Gates.
-- Fixed-Point-Migration (Beta): Phase-0-Spike-Scope erweitert (Fixed-Point-Pfad für ORCA/Flow-Field evaluieren, Bibliothekswahl, float-Direktfelder im GameState verbieten) – Review F-04 MP.
+- Q-031–Q-034 sowie Q-038/Q-039 sind durch D-056–D-061 geschlossen;
+  D-062–D-064 härten deren Evidence-Nachweis.
 - Sprint 5 (Asset Audit): D-053/D-054 ratifiziert; **Budget-Obergrenze ist mit 0 € geschlossen (Q-035, D-054)**; Seat-Planung (Q-036) entfällt/gegenstandslos; Bundle-Fenster-Monitoring (Q-037) entfällt zugunsten CC0/KI-Pipeline.
 
 ## Nächste Schritte
 
-- Recovery-Gate G0 herstellen und mit reproduzierbaren Nachweisen schließen.
-- Q-038 durch den Projektinhaber entscheiden und Q-039 vor Abschluss von G1 auflösen.
+- Zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis herstellen.
+- Entscheidungen D-056–D-064 über die Gates G0–G5 umsetzen, ohne Gate-Status
+  vorwegzunehmen.
 
 ## Änderungsverlauf
 
@@ -526,3 +1029,8 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 | 1.7.0 | 2026-07-22 | D-053: Asset-Beschaffungsstrategie B (Multi-Store-Mix mit Synty als Stil-Anker) ratifiziert – Sprint 5 (Asset Audit) | Producer / Lead Technical Director |
 | 1.8.0 | 2026-07-24 | D-054: 0 € Open-Source & KI-Asset-Pipeline (Inhaberentscheidung, Q-035 geschlossen) | Project Owner / Producer |
 | 1.9.0 | 2026-07-24 | D-055: unbelegte MS-0-/MVP-/Alpha-Status zurückgezogen; beweispflichtige Recovery-Gates verbindlich gemacht | Project Owner / Lead Technical Director |
+| 1.10.0 | 2026-07-24 | D-056–D-061: Closed-Core MS-1, kanonische Deterministik/Persistence, Kapazität/FoW, Branch-Modell, Engine-Pin und ausführbare Evidence-/Acceptance-Gates | Project Owner / Game Director / Lead Technical Director / Lead QA Engineer |
+| 1.11.0 | 2026-07-24 | D-062: Szenariometriken, Subject-Blobs und rekursive Same-Subject-Gate-Kette für Evidence verbindlich gemacht; D-009 für MS-1 teilersetzt | Project Owner / Lead Technical Director / Lead QA Engineer |
+| 1.11.1 | 2026-07-24 | D-039-Folgen an die MS-1-Begrenzung durch D-056/D-058 angeglichen | Project Owner / Lead Technical Director |
+| 1.12.0 | 2026-07-24 | D-063: Evidence-Schema 1.2, kanonische Check-Artefakte, geschützten Trust-Kontext, rekursive Draft-2020-12-Prüfung und Drei-Lauf-Messmethode entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
+| 1.13.0 | 2026-07-24 | D-064: Pass-Autorisierung bis zum subject-unabhängigen Trusted-Gate-Bootstrap gesperrt und Schema-1.3-Zielvertrag entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |

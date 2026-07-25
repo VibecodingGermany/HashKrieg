@@ -1,101 +1,94 @@
 # Sprint-6-Bericht – Produktionsplanung
 
-**Version:** 1.1.0 | **Status:** Abschluss widerrufen durch D-055 | **Verantwortungsbereich:** Executive Producer | **Sprint:** 6
+**Version:** 2.3.0 | **Status:** historischer Bericht – durch D-055 beendet/ersetzt | **Verantwortungsbereich:** Executive Producer | **Sprint:** 6
 
 ## Zweck
 
-Historischer Abschlussbericht von Sprint 6 (Produktionsplanung) gemäß Sprint-Ritual ([../SprintPlanning.md](../SprintPlanning.md)). Der ursprünglich verbindliche Abschluss wurde durch D-055 widerrufen; der Bericht dokumentiert weiterhin, welche Annahmen zu diesem Zeitpunkt getroffen wurden.
+Dokumentiert die Sprint-6-Planung und ihre nachträgliche Korrektur. Sprint 6
+ist kein offener Vorgängersprint mehr, sondern durch D-055 beendet und durch
+den Recovery-Plan ersetzt. Der Bericht ist keine Freigabe für MS-0, MS-1,
+Alpha oder einen Kalender. Führend sind
+D-055 bis D-064 und der
+[MVP-Recovery-Plan](../MVPRecoveryPlan.md).
 
 ## Abhängigkeiten
 
-- [../Milestones.md](../Milestones.md) – Meilenstein-Planung (MS-0 bis MS-4)
-- [../Roadmap.md](../Roadmap.md) – Zeit- und Aufwandsschätzung (445 PT), Phasenplan
-- [../RiskAnalysis.md](../RiskAnalysis.md) – Risikoanalyse
-- [../OpenQuestions.md](../OpenQuestions.md) – Fragenregister
-- [../SprintPlanning.md](../SprintPlanning.md) – Sprint-Definitionen und Recovery-Status
+- [../DecisionLog.md](../DecisionLog.md) – D-055 bis D-064
+- [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md)
+- [../MVPContentManifest.md](../MVPContentManifest.md)
+- [../Milestones.md](../Milestones.md)
+- [../Roadmap.md](../Roadmap.md)
+- [../ImplementationAudit_2026-07-24.md](../ImplementationAudit_2026-07-24.md)
 
-## Korrekturvermerk vom 2026-07-24
+## 1. Historisches Ergebnis
 
-Die Aussagen dieses Berichts zu vollständiger Konsistenz, erfüllten Exit-Kriterien, mitigiertem R-16, geschlossenen Q-018/Q-019 und dem pauschalen GO für Sprint 7 sind **widerrufen**. Der [Implementierungs-Audit](../ImplementationAudit_2026-07-24.md) belegt einen roten Test, einen nicht angeschlossenen Command-Pfad, fehlende spielbare Integration und nicht erfüllte MS-0-Nachweise. Die 445-PT-Schätzung ist unbelegt. Der historische Bericht bleibt zur Nachvollziehbarkeit erhalten; führend sind D-055 und der [MVP-Recovery-Plan](../MVPRecoveryPlan.md).
+Sprint 6 erzeugte die ersten Fassungen von Milestones und Roadmap sowie eine
+445-PT-/Kalenderannahme. Der damalige Bericht erklärte:
 
----
+- Sprint 6 für abgeschlossen,
+- R-16 für mitigiert,
+- Q-018/Q-019 ohne D-ID für geschlossen und
+- Sprint 7 pauschal für GO.
 
-## 1. Ergebnisse des Sprints
+Diese Aussagen waren nicht hinreichend belegt.
 
-1. **Zwei neue Kerndokumente im Wiki-Bereich [`docs/production/`](../) erstellt:**
-   * [Milestones.md](../Milestones.md): Definition von 5 Meilensteinen (**MS-0 Spike/Vertical Slice**, **MS-1 MVP**, **MS-2 Alpha**, **MS-3 Beta**, **MS-4 Release v1.0**) mit Akzeptanz-Gates und Feature-Matrix.
-   * [Roadmap.md](../Roadmap.md): Gesamtaufwandsschätzung über **445 Personentage (PT)**, Zeitablaufplan 2026–2028, Adressierung von **R-16** und **R-13**.
-2. **Zwei offene Fragen geschlossen:**
-   * **Q-018 (Preispunkt):** Geschlossen auf **29,99 € (Standard) / 39,99 € (Supporter Edition)** (Premium SP/Skirmish-first auf Steam).
-   * **Q-019 (Telemetrie):** Geschlossen auf **Opt-in Anonymized Telemetry** (DSGVO-konform, Crash- & Match-Balancing).
-3. **Risiko R-16 (Zeit-/Kapazitätsmodell) mitigiert:**
-   * Das unmitigierte Risiko R-16 wurde durch das konkrete PT-Aufwandsmodell in Roadmap.md vollständig beziffert und durch den Phasenplan strukturiert.
-4. **Aufhebung aller Blockaden für Sprint 7:**
-   * Damit sind alle Exit-Kriterien für Sprint 6 erfüllt. Der Weg für **Sprint 7 (Implementierung)** ist frei.
+## 2. Korrektur vom 2026-07-24
 
----
+Der Implementierungs-Audit und D-055 widerriefen Abschluss und GO. D-056–D-064
+ersetzen die fehlerhafte Planungsbasis:
 
-## 2. Konsistenzreview
+| Frühe Sprint-6-Annahme | Korrigierter Stand |
+|---|---|
+| Vollumfang als MVP | dependency-closed MS-1 aus D-056 |
+| Float bis Beta | kanonisches Q16.16 ab G1, D-057 |
+| unklare 6/8-Spieler- und Cachebudgets | feste MS-1-Kappen, D-058 |
+| Integrationsbranch ab Sprint 7 | geschütztes `main` + kurze Branches, D-059 |
+| ältere Engine-Linie | exakter Pin 6000.5.4f1, D-060 |
+| Berichte/Dateien als Fortschritt | ausführbare Gates und append-only Evidence, D-061 |
+| selbstdeklarierte/no-op Evidence | Schema 1.2 und kanonische Integritätschecks, aber keine Pass-Autorisierung, D-063/D-064 |
+| Subject autorisiert sein eigenes Tooling | zweistufiger subject-unabhängiger Schema-1.3-Trusted-Gate-Bootstrap, D-064 |
 
-* **GDD/TDD-Kohärenz:** Der Meilenstein-Scope deckt sich 1:1 mit den Scope-Entscheidungen aus Sprint 2 (D-007 bis D-032) und den Architektur-Vorgaben aus Sprint 3/4 (D-033 bis D-052).
-* **Asset-Pipeline-Integration:** Die 14 Eigenbau-Pakete aus [../../assets/BuildBacklog.md](../../assets/BuildBacklog.md) (~110–180 PT) sind vollständig in den Phasenplan (Phase 0 bis Phase 3) von Roadmap.md eingeflossen (D-054 0 € Asset-Pipeline).
-* **Keine Platzhalter:** Sämtliche Dokumente folgen dem [DocumentationStandard.md](../../meta/DocumentationStandard.md).
+MS-0 und MS-1 sind weiterhin nicht erreicht; G0 ist offen.
 
----
+## 3. Korrigierte Qualitätsbewertung
 
-## 3. Self Review
+| Bereich | Bewertung |
+|---|---|
+| ursprüngliche Scope-Kohärenz | unzureichend |
+| ursprüngliche Schätzbasis | unzureichend |
+| Entscheidungsdisziplin Q-018/Q-019 | unzureichend |
+| historische Nachvollziehbarkeit | erhalten |
+| Recovery-Vertrag | vollständig dokumentiert, noch nicht implementiert |
 
-* **Stärken:** Der Sprint schafft nach der reinen Entwurfs- und Review-Phase zum ersten Mal völlige Klarheit über die realen Aufwände (445 PT) und den Zeithorizont. Die Aufteilung in MS-0 (Phase-0-Spike) vor dem breiten MVP sichert ab, dass kritische Risiken (Fixed-Point-Determinismus ARM↔x86, Pathfinding) gemessen werden, bevor Code in der Breite entsteht.
-* **Schwächen:** Die PT-Zahlen sind vor den Phase-0-Spike-Messungen schätzungsbasierte Vorab-Werte; sie werden nach MS-0 (Vertical Slice) als v1.1.0-Kalibrierung nachjustiert.
+Das Vorliegen dieser Dokumente ist selbst kein Gate-Nachweis.
 
----
+## 4. Risiko- und Fragenstand
 
-## 4. Architecture Review
+- R-16 bleibt aktiv; Aufwandsspanne erst nach G2, Kalenderkorridor erst nach G4.
+- R-17 bleibt aktiv, bis G0-A ohne Selbstautorisierung gemergt und Schema 1.3
+  an einem nachfolgenden sauberen Subject real bewiesen ist.
+- Q-031–Q-034 und Q-038/Q-039 sind durch D-056–D-061 geschlossen.
+- Q-018 und Q-019 bleiben offen und blockieren MS-1 nicht.
 
-* **Prozessuale Bewertung:** Die Meilenstein-Abfolge stellt sicher, dass der deterministic Command-SimRunner (D-033), das Flow-Field-Pathfinding (D-034) und der URP-Material-Standard (D-053/D-054) in MS-0 gehärtet werden, bevor höherwertige Gameplay-Systeme (Doktrinen, Evolvierte-Einheiten, Telemetrie) implementiert werden.
+## 5. GO/NO-GO
 
----
+Sprint 7 ist gestartet. Die erste Coding-Arbeit ist G0-A
+Trusted-Gate-Bootstrap, danach folgt G0-B Plattformbasis. Die
+Trust-Bundle-Änderung selbst erzielt keinen Gate-Fortschritt; erst ein
+nachfolgender sauberer Subject-Commit darf G0 beweisen. Es gibt keine
+pauschale Freigabe für G1–G5.
 
-## 5. Risikoanalyse (Update)
+## Offene Punkte
 
-* **R-16 (Zeit-/Kapazitätsmodell) → mitigiert:** Aufwand (445 PT) und Kapazitätsmodell stehen.
-* **R-07 (Lizenz-/Kostenfallen) → mitigiert:** Durch D-054 (0 € Asset-Pipeline) weiter abgesichert.
-* **R-13 (Bus-Faktor) & R-14 (ARM↔x86 Determinismus):** Bleiben aktive Hauptbeobachtungspunkte für MS-0.
-
----
-
-## 6. Qualitätsbewertung
-
-| Kriterium | Bewertung | Anmerkung |
-|---|---|---|
-| Vollständigkeit (Roadmap & Milestones) | sehr gut | MS-0 bis MS-4 vollständig spezifiziert, 445 PT transparent aufgeschlüsselt |
-| Entscheidungsdisziplin | sehr gut | Q-018 und Q-019 ohne Restpunkte geschlossen |
-| Konsistenz | sehr gut | 100 % Konformität zu GDD, TDD, DecisionLog und BuildBacklog |
-| Umsetzungsreife für Sprint 7 | exzellent | Klare Arbeitsaufträge für Phase 0 Spike |
-
----
-
-## 7. Offene Punkte
-
-- **Q-034 (tote Doku-Verweise):** Wird als Refactoring-Task zu Beginn von Sprint 7 mitgeführt.
-- **Phase-0-Spike-Messungen (MS-0):** Fixed-Point Math ARM↔x86 und Flow-Field-Performance werden in Sprint 7 (MS-0) empirisch vermessen.
-
----
-
-## 8. Empfehlung für den nächsten Sprint
-
-**Empfehlung an den Projektinhaber: GO für Sprint 7 (Implementierung) – die finale Freigabe trifft der Mensch.**
-
-**Begründung:** Alle Exit-Kriterien für Sprint 6 sind erfüllt. Das Repository ist in einem vollkommen konsistenten Zustand (Wiki v0.7.0). Alle Planungs- und Architekturphasen (Sprint 0–6) sind abgeschlossen. Das Projekt ist bereit für die modulare Code-Implementierung!
-
----
+- Keine weiteren Sprint-6-Entscheidungen. Post-MVP-Preis und Telemetrie bleiben
+  Q-018/Q-019.
 
 ## Nächste Schritte
 
-1. Recovery-Gate G0 reproduzierbar schließen.
-2. Q-038 entscheiden und Q-039 vor G1-Abschluss auflösen.
-
----
+1. G0-A gemäß [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) ohne
+   Gate-Fortschritt herstellen; G0-B erst danach bearbeiten.
+2. Keine 445-PT- oder Kalenderzahl als aktive Planung weiterverwenden.
+3. Nach G2 Aufwandsspanne und nach G4 Kalenderkorridor neu erstellen.
 
 ## Änderungsverlauf
 
@@ -103,3 +96,8 @@ Die Aussagen dieses Berichts zu vollständiger Konsistenz, erfüllten Exit-Krite
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Sprint 6 (Produktionsplanung) abgeschlossen, GO für Sprint 7 (Implementierung) | Executive Producer |
 | 1.1.0 | 2026-07-24 | Abschluss und GO durch D-055 widerrufen; Bericht als historische, nicht führende Momentaufnahme markiert | Executive Producer |
+| 2.0.0 | 2026-07-24 | Historische Behauptungen gegen D-056–D-061 korrigiert und nächste Schritte auf G0/G2/G4 ausgerichtet | Executive Producer |
+| 2.0.1 | 2026-07-24 | Sprint 6 als beendet/ersetzt und den G0-begrenzten Start von Sprint 7 klargestellt | Executive Producer / Project Owner |
+| 2.1.0 | 2026-07-24 | D-062-Evidence-Härtung in die führende Recovery-Baseline aufgenommen | Executive Producer / Lead QA Engineer |
+| 2.2.0 | 2026-07-24 | D-063-Authentizitäts- und Drei-Lauf-Härtung in die Recovery-Baseline aufgenommen | Executive Producer / Lead QA Engineer |
+| 2.3.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung und G0-A-vor-G0-B-Reihenfolge in die führende Recovery-Baseline aufgenommen | Executive Producer / Lead QA Engineer |

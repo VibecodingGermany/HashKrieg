@@ -1,6 +1,6 @@
 # Open Questions
 
-**Version:** 1.9.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer | **Sprint:** 7
+**Version:** 1.10.2 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -10,56 +10,57 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 
 - [../analysis/Inconsistencies.md](../analysis/Inconsistencies.md) (Q-001–Q-012)
 - [../analysis/PriorityList.md](../analysis/PriorityList.md)
-- [DecisionLog.md](DecisionLog.md)
+- [DecisionLog.md](DecisionLog.md) – D-056 bis D-061 schließen die
+  Recovery-Fragen
 
 ## Offene Fragen
 
 | ID | Prio | Frage | Herkunft | Owner-Sprint | Status |
 |---|---|---|---|---|---|
-| Q-018 | P3 | Preispunkt: 29,99 / 34,99 / 39,99 €? Markt-Research deckt das nicht ab. | Sprint-2-Review | 6 | offen |
-| Q-019 | P2 | Telemetrie-Infrastruktur (Opt-in, ab Beta, für Balancing-Stufe 5): Pflicht-Feature mit eigenem Backend oder Streichung? D-007-Offline-Positionierung beachten. | Balancing.md-Review | 6 | offen (Vorhaltung: Compile-Schaltstelle in tech/Deployment.md) |
-| Q-031 | P1 | Fähigkeiten-/Status-Effekt-System (4 Status-Effekte, ~40 Fähigkeiten mit Cooldowns/Kanälen) hat kein Sim-Modul-Zuhause – `EffectState`/`AbilityState` fehlen in GameState.md, kein Modul in ModuleOverview.md. | Review_GDD-TDD-Konsistenz F-02 | 5 (vor Sprint-7-Start) | offen |
-| Q-032 | P2 | MemoryBudget-Abgleich: Snapshot-/Grid-Layer-Größe (Serialization.md 50–150 kB vs. GameState.md-Layer-Rechnung ~1–2 MB), Flow-Field-Eviction-Policy (LRU vs. RefCount widersprüchlich), native Speicher-Baseline (macOS 8 GB ungemessen), max. Spielerzahl (6 vs. 8 uneinheitlich). | Review_Skalierung_Systemgrenzen F-2/F-4/F-5/F-12/F-13, Review_Performance F-12 | 5 (vor Phase-0-Spike) | offen |
-| Q-033 | P1 | Phase-0-Spike-Erweiterung V5-Gate: Kampf-/KI-Kostenmodell (Zielsuche mit Spatial Hash, Projektil-/AoE-Kosten, KI-Command-Verarbeitung) für Rest-Sim-Unterbudget ≤3 ms – Gate durch D-044 beschlossen, Kampf-Subsystem-TDD mit Kostenmodell noch nicht geschrieben. | D-044, Review_Performance F-1/F-4/F-5 | Phase 0 (Pflicht vor Sprint-7-Kampfmodul-Start) | offen |
-| Q-034 | P3 | Tote interne Verweise auf nicht existierende Tech-Dokumente (FogOfWar.md, CameraSystem.md, Commands.md, SimulationCore.md) – FoW-TDD hat höchste fachliche Priorität. | Review_GDD-TDD-Konsistenz F-16 | 6 | offen (in Sprint 5 geprüft: TDD-Authoring, **kein** Asset-Audit-Thema; Owner auf Sprint 6 präzisiert) |
-| Q-038 | P0 | Welcher MVP-Zuschnitt wird verbindlich: (A) alter Vollumfang, (B) empfohlenes fokussiertes 2-Fraktionen-Skirmish oder (C) symmetrischer Technik-Demonstrator? | D-055, MVPRecoveryPlan.md | vor G4 | offen – Inhaberentscheidung |
-| Q-039 | P0 | Gilt Festkomma deterministisch im kanonischen GameState ab G1 oder erst zur Beta? D-033 und MS-0 verlangen Ersteres, D-045 beschreibt eine spätere Migration. | D-033, D-045, Audit F-004 | vor G1-Abschluss | offen |
+| Q-018 | P3 | Preispunkt: 29,99 / 34,99 / 39,99 €? Markt-Research deckt das nicht ab. | Sprint-2-Review | Post-MVP | offen – nicht MS-1-blockierend |
+| Q-019 | P2 | Telemetrie-Infrastruktur: eigenes Opt-in-Backend oder Streichung? D-007-Offline-Positionierung beachten. | Balancing.md-Review | Post-MVP | offen – in D-056 zurückgestellt |
 
 ## Geschlossene Fragen
 
 | ID | Entscheidung | Geschlossen |
 |---|---|---|
-| Q-001 | **D-008** – 12 Gebäudetypen/Fraktion (Verteidigung als Modulsystem, inkl. Mauer) | Sprint 2 |
-| Q-002 | **D-009** – Commander als Identitäts-Layer, keine Match-Mechanik im MVP | Sprint 2 |
+| Q-001 | **D-008** – 12 Gebäudetypen/Fraktion als Vollspiel-Ziel; **D-056** aktiviert 9 in MS-1 | Sprint 2 / Rebaseline |
+| Q-002 | **D-009**, für MS-1 teilweise ersetzt durch **D-056** – Commander-Identitätslayer ohne Match-Mechanik bleibt Vollspielziel; Portrait, Voice und Commander-Code sind Post-MVP | Sprint 2 / Rebaseline |
 | Q-003 | **D-013** – Marine gestrichen, Wasser nur Terrain-Feature | Sprint 2 |
-| Q-004 | **D-014** – 2–3 Support-Drohnen/Fraktion, Produktion in bestehenden Fabriken | Sprint 2 |
+| Q-004 | **D-014** – Drohnen als Post-MVP-Ziel; **D-056** deaktiviert sie in MS-1 | Sprint 2 / Rebaseline |
 | Q-005 | **D-010** – Aetherium-Hybrid: endlicher Mutterkristall + Nachwachsen + Ausbreitung + Überernte | Sprint 2 |
-| Q-006 | **D-015** – 1 Elite/Fraktion (MVP), 3 (Release), Tier 3, hartes Limit | Sprint 2 |
-| Q-007 | **D-016** – kein Handelssystem; Neutrale = Critters, Lager, capturebare Türme | Sprint 2 |
+| Q-006 | **D-015** – Eliten als Post-MVP-Ziel; **D-056** deaktiviert T3/Eliten in MS-1 | Sprint 2 / Rebaseline |
+| Q-007 | **D-016** – Vollspiel-Neutrale; **D-056** deaktiviert Neutrale/Capture in MS-1 | Sprint 2 / Rebaseline |
 | Q-008 | **D-019** – schräge Top-Down-Perspektive, "isometrisch" ersetzt | Sprint 2 |
 | Q-009 | **D-011** – Evolvierte: Keim→Reifung, Aetherium-Beschleunigung, Regeneration | Sprint 2 |
 | Q-010 | **D-017** – Biome als Themen, Karten-Roadmap 1/4/8/12, Größen S/M/L | Sprint 2 |
 | Q-011 | **D-018 + D-025** – Modi-Staffelung; Alpha-FFA lokal vs. KI, Online ab Beta | Sprint 2 |
 | Q-012 | **D-017 + D-028** – Wetter pro Biom; Mond Strahlung, Mars Staub | Sprint 2 |
-| Q-013 | **D-033 + D-037 + D-038** – determinismus-fähige Command-Simulation (5 Regeln), Lockstep über Command-Relay ab Beta; Burst/Managed-Doppelstruktur; Disconnect-Regel final | Sprint 3 |
+| Q-013 | **D-033 + D-057** – Command-Simulation; ab G1 kanonisches Fixed-Point, Managed-Pfad, exakte Plattformparität | Sprint 3 / Rebaseline |
 | Q-014 | **D-034** – Integer-Grid 1 m + Flow Fields + lokale Vermeidung (ORCA ab Alpha), Budget ≤4 ms | Sprint 3 |
 | Q-015 | **D-035** – MonoBehaviour-OOP + SO + Burst/Jobs-Hotspots, Unity-freie `Nova.Simulation`, kein Entities im MVP | Sprint 3 |
 | Q-016 | **D-007** – Premium SP/Skirmish-first, H1 C&C-Nostalgiker primär | Sprint 2 |
 | Q-017 | **D-012** – gezielte Zerstörbarkeit, keine Terrain-Deformation | Sprint 2 |
 | Q-020 | **D-036** – `Nova.SimRunner` (.NET-Konsole auf Nova.Simulation) für KI-vs-KI-CI-Läufe | Sprint 3 |
 | Q-021 | **D-043** – Kanonische Assembly-Topologie (Neusynthese `Nova.Core`/`Nova.Simulation`/`Nova.Simulation.Burst`/`Nova.AI`/`Nova.AI.Data`/…) statt drei konkurrierender Modelle | Sprint 4 |
-| Q-022 | **D-044** – Sim-Tick-Ausführungsmodell gestuft (MVP synchron, Worker-Tick ab Alpha bei P95 >6 ms) + Pflicht-Gate V5 (Kampf-/KI-Kostenmodell) | Sprint 4 |
-| Q-023 | **D-045** – Managed-first Auslieferungspfad bis Fixed-Point-Beta; Burst nur hinter Feature-Flag mit Toleranz-Parität (≤1e-4) | Sprint 4 |
+| Q-022 | **D-044, V5-Sequenz teilweise ersetzt durch D-061** – MS-1 synchron; V5a vor G2, V5b in G3 | Sprint 4 / Rebaseline |
+| Q-023 | **D-045, teilweise ersetzt durch D-057** – MS-1 shippt Managed; Burst aus, bis exakte Feld-/Hash-/Byteparität bewiesen ist | Sprint 4 / Rebaseline |
 | Q-024 | **D-046** – MP-Trust-Anchor: Post-Match-Re-Simulation + Hash-Kette für Reconnect + deterministische, tick-synchrone KI-Übernahme (kein SPOF) | Sprint 4 |
 | Q-025 | **D-047** – Reichweiten-Harmonisierung GDD↔TDD: 1 Tile = 1 m, Weapons.md führend, Vehicles.md/Aircraft.md angeglichen | Sprint 4 |
-| Q-026 | **D-048** – Skalierungs-Deckel: 600 Einheiten/Match global, Survival-Abflachung ab Welle 25, `AetheriumDensity` ≤1,5 bei 5–6 Spielern | Sprint 4 |
-| Q-027 | **D-049** – Test-/CI-Realismus (Shard-Modell SimRunner-Nightly), xxHash64 durchgängig, GameDatabase-Sharding pro Kategorie | Sprint 4 |
-| Q-028 | **D-050** – Branching-Modell gestuft: `main` + Kurz-Branches bis Sprint 6, TPD-§12-Vollmodell ab Sprint 7 | Sprint 4 |
+| Q-026 | **D-048** Post-MVP; **D-058** – MS-1-Produktion 100 Einheiten, 500 nur synthetische Architekturreserve | Sprint 4 / Rebaseline |
+| Q-027 | **D-049, Kadenz teilweise ersetzt durch D-061** – xxHash64 und Registry-Sharding bleiben; Nightly/Weekly folgen 40/400 | Sprint 4 / Rebaseline |
+| Q-028 | **D-059 ersetzt D-050** – geschütztes `main`, kurze Topic-Branches, Squash/linear, kein dauerhafter Integrationsbranch | Sprint 4 / Rebaseline |
 | Q-029 | **D-051** – Photon-Quantum-Fallback gestrichen; Beta-Fallback = reduzierter MP-Scope (4 Spieler/300 Einheiten/EU-only) | Sprint 4 |
 | Q-030 | **D-052** – Windows-Referenzhardware fixiert (Ryzen 5 5600/RTX 3060 = 60-FPS-Ziel; Ryzen 3 3100/GTX 1050 Ti = 30-FPS-Ziel; Mac-Baseline M2) | Sprint 4 |
 | Q-035 | **D-054** – Asset-Budget-Obergrenze 0 €; Open-Source-/KI-Pipeline | Sprint 5 |
 | Q-036 | Durch D-054 gegenstandslos: keine Seat-Lizenzen im 0-€-Beschaffungsmodell | Sprint 5 |
 | Q-037 | Durch D-054 gegenstandslos: keine Store-/Bundle-Käufe im 0-€-Beschaffungsmodell | Sprint 5 |
+| Q-031 | **D-056** – kein generisches Fähigkeiten-/Status-/Kanal-/Aura-System in MS-1; Identität lokal in Waffen/Wirtschaft | Sprint 7 |
+| Q-032 | **D-058** – feste Slots/Entity-/Snapshot-/Cache-Kappen und deterministische Eviction | Sprint 7 |
+| Q-033 | **D-061** – V5a vor G2 und V5b mit realem Combat/KI in G3; ausführbare Schwellen | Sprint 7 |
+| Q-034 | **D-061** – substantive Tech-Verträge `SimulationCore`, `Commands`, `FogOfWar`, `CameraSystem` und bereinigte Links | Sprint 7 |
+| Q-038 | **D-056** – dependency-closed Allianz-vs.-Legion-Skirmish auf Glutrinne | Sprint 7 |
+| Q-039 | **D-057** – kanonisches Q16.16-Fixed-Point und exakte Plattformparität ab G1 | Sprint 7 |
 
 ## Regeln
 
@@ -68,15 +69,15 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 
 ## Offene Punkte
 
-- **Q-018 und Q-019 bleiben offen:** Die Sprint-6-Dokumente behaupteten Entscheidungen, ohne sie mit einer D-ID und den vorgeschriebenen Alternativen zu protokollieren.
-- Neu aus dem Sprint-4-Korrekturlauf offen: Q-031 (Fähigkeiten-/Status-Effekt-System, vor Sprint 7), Q-032 (MemoryBudget-Abgleich, vor Phase-0-Spike), Q-033 (V5-Gate Kampf-/KI-Kostenmodell, Phase 0), Q-034 (tote Doku-Verweise – sequenziert für Sprint 7 Refactoring).
-- Recovery-Blocker: Q-038 legt den verbindlichen MVP-Zuschnitt fest; Q-039 löst den Festkomma-Widerspruch.
-- Aus Research hängen vier Pflicht-Validierungen am Phase-0-Spike (MS-0 in Sprint 7): Fixed-Point-Determinismus ARM↔x86, URP GPU Resident Drawer, Animator vs. Playables, Pathfinding-CPU-Budget.
+- **Q-018 und Q-019 bleiben offen:** Sie sind durch D-056 Post-MVP und
+  blockieren G0–G5 nicht.
+- Q-031–Q-034 und Q-038/Q-039 sind in D-056–D-061 geschlossen; ihre
+  Implementierung ist weiterhin über die Gates nachzuweisen.
 
 ## Nächste Schritte
 
-- Zuerst Gate G0 des [MVP-Recovery-Plans](MVPRecoveryPlan.md) schließen.
-- Danach Q-038 entscheiden und Q-039 vor Abschluss von G1 auflösen.
+- Gate G0 des [MVP-Recovery-Plans](MVPRecoveryPlan.md) herstellen.
+- Q-018/Q-019 erst nach MS-1 mit mindestens drei Alternativen entscheiden.
 
 ## Änderungsverlauf
 
@@ -92,3 +93,6 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 | 1.7.0 | 2026-07-24 | Q-035 geschlossen (Asset-Budget-Obergrenze = 0 €, D-054 Inhaberentscheidung) | Executive Producer |
 | 1.8.0 | 2026-07-24 | Q-018 (Preispunkt 29,99–39,99 €) und Q-019 (Opt-in Telemetrie) geschlossen – Sprint 6 | Executive Producer |
 | 1.9.0 | 2026-07-24 | Ungültige Schließung Q-018/Q-019 zurückgenommen; Q-038 MVP-Zuschnitt und Q-039 Fixed-Point-Konflikt eröffnet | Executive Producer |
+| 1.10.0 | 2026-07-24 | Q-031–Q-034 und Q-038/Q-039 durch D-056–D-061 geschlossen; Q-018/Q-019 als nicht MS-1-blockierend eingeordnet | Executive Producer |
+| 1.10.1 | 2026-07-24 | Teilersetzungen D-044/D-049 durch D-061 in den geschlossenen Fragen sichtbar gemacht | Executive Producer |
+| 1.10.2 | 2026-07-24 | Q-002 an die MS-1-Teilersetzung von D-009 durch D-056 angeglichen | Executive Producer |
