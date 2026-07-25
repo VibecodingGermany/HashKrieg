@@ -18,6 +18,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Vorarbeit Numerisches Modell (ohne Gate-Status):** `SimFixed`
+  (signed Q16.16 auf `int32`, `int64`-Zwischenprodukte, Rundung nearest
+  ties-to-even, `WorldToGrid` als floor auch für negative Werte) und
+  `SimAngle` (`uint16`, voller Kreis = 65536, definiertes Wraparound,
+  Grad-Mapping) in `Nova.Core` gemäß
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §1. Überlauf,
+  Division durch null und Bereichsverletzungen sind geprüfte Fehler
+  (`OverflowException`/`DivideByZeroException`); Sättigung und stilles
+  Wraparound sind nicht implementiert. `SimRandom` ist gegen
+  `XorShift128PlusV1` verifiziert (kanonischer xorshift128+ mit
+  (23, 17, 26)); Seeding (SplitMix64) und 32-bit-Ausgabereduktion sind als
+  spec-freie Implementierungsdetails dokumentiert. `SimMath` (Float-Prototyp)
+  bleibt bis zur G1-Integration bestehen (D-057).
+- **G1-Testsuiten Numerik/PRNG in beiden Lanes:** neue EditMode-Assembly
+  `Nova.Core.Tests` sowie `SimFixedTests`, `SimAngleTests` und
+  `SimRandomGoldenTests` in `tools/Nova.SimRunner.Tests` (Testing.md §3:
+  Q16.16-Grenzen, ties-to-even, negatives Welt→Grid-floor,
+  Overflow/Div-by-zero als Exceptions, SimAngle-Wrap, PRNG-Golden-Vektoren
+  für Seed 0/1 als regressions-gepinnter Golden-Master sowie
+  Snapshot-Fortsetzung per `Clone`).
 - **G0-B-.NET-Testlane:** `tools/Nova.SimRunner.Tests` (NUnit, net8.0)
   kompiliert dieselben Core-/Simulation-Quellen mit demselben
   `NOVA_FIXED_POINT`-Define wie Unity-Host und SimRunner; 4 Smoke-Tests
