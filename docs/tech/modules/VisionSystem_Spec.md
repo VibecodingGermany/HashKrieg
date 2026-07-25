@@ -1,6 +1,6 @@
 # Modulspezifikation – Fog of War & Sichtweiten-Grid (`Nova.Simulation.Vision`)
 
-**Version:** 1.1.0 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Lead Technical Director / Sim Engine Architect | **Sprint:** Phase 1 (Modul 12)
+**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Lead Technical Director / Sim Engine Architect | **Sprint:** Phase 1 (Modul 12)
 
 ## Zweck
 
@@ -44,7 +44,7 @@ Dieses Dokument beschreibt das deterministische **Fog of War & Sichtweiten-Syste
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`VisionSystemTests.cs`](../../../Assets/Tests/EditMode/Simulation/VisionSystemTests.cs) (Validierung der Zustandsübergänge `Unexplored` -> `Visible` -> `Explored` und Sichtradien-Abdeckung).
+* **Unit Tests:** [`FogOfWarSystemTests.cs`](../../../Assets/Tests/EditMode/Simulation/FogOfWarSystemTests.cs) (Validierung der Zustandsübergänge `Unexplored` -> `Visible` -> `Explored` und Sichtradien-Abdeckung; kanonische Nachfolge-Suite des mit dem Prototyp-Scaffolding ersetzten `VisionSystemTests.cs`).
 
 ## Offene Punkte
 
@@ -63,3 +63,4 @@ Dieses Dokument beschreibt das deterministische **Fog of War & Sichtweiten-Syste
 |---|---|---|---|
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
+| 1.1.1 | 2026-07-25 | Toten Test-Link auf die kanonische Nachfolge-Suite `FogOfWarSystemTests.cs` korrigiert (Prototyp-Scaffolding in G1 ersetzt) | Lead Technical Director |
