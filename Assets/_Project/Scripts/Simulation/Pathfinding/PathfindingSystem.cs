@@ -77,28 +77,29 @@ namespace Nova.Simulation.Pathfinding
         }
 
         /// <summary>
+        /// Fully validates a pathfinding block produced by
+        /// <see cref="WriteState"/> without touching the current fields.
+        /// </summary>
+        public bool TryValidateState(ReadOnlySpan<byte> blockContent)
+        {
+            return TryParseState(blockContent, out _, out _);
+        }
+
+        /// <summary>
         /// Restores the flow-field destination and deterministically rebuilds
         /// the derived fields from it. Malformed input returns false without
         /// touching the current fields.
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> blockContent)
         {
-            var reader = new Snapshots.SnapshotBlockReader(blockContent);
-            if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
-            if (!reader.TryReadUInt8(out byte hasField) || hasField > 1) return false;
-            if (!reader.TryReadUInt16(out ushort x)) return false;
-            if (!reader.TryReadUInt16(out ushort y)) return false;
-            if (reader.Remaining != 0) return false;
-
-            var destination = new GridPos2D(x, y);
-            if (hasField == 1 && (!destination.IsValid || x >= CostField.Width || y >= CostField.Height))
+            if (!TryParseState(blockContent, out bool hasField, out GridPos2D destination))
             {
                 return false;
             }
 
             // Commit: rebuild the derived cache from the canonical inputs so
             // the restored host continues with identical directions.
-            if (hasField == 1)
+            if (hasField)
             {
                 RequestFlowField(destination);
             }
@@ -107,6 +108,33 @@ namespace Nova.Simulation.Pathfinding
                 _flowFieldDestination = GridPos2D.Invalid;
                 _hasFlowField = false;
             }
+            return true;
+        }
+
+        /// <summary>
+        /// Parses and fully validates block content without mutating anything.
+        /// </summary>
+        private bool TryParseState(
+            ReadOnlySpan<byte> blockContent, out bool hasField, out GridPos2D destination)
+        {
+            hasField = false;
+            destination = GridPos2D.Invalid;
+
+            var reader = new Snapshots.SnapshotBlockReader(blockContent);
+            if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
+            if (!reader.TryReadUInt8(out byte hasFieldRaw) || hasFieldRaw > 1) return false;
+            if (!reader.TryReadUInt16(out ushort x)) return false;
+            if (!reader.TryReadUInt16(out ushort y)) return false;
+            if (reader.Remaining != 0) return false;
+
+            var parsed = new GridPos2D(x, y);
+            if (hasFieldRaw == 1 && (!parsed.IsValid || x >= CostField.Width || y >= CostField.Height))
+            {
+                return false;
+            }
+
+            hasField = hasFieldRaw == 1;
+            destination = parsed;
             return true;
         }
     }

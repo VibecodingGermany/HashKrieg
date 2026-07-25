@@ -46,15 +46,25 @@ namespace Nova.SimRunner.Tests
                 Ingress = ingress;
             }
 
-            public static TestHost Create(ulong seed, int capacity = 256, ushort width = 64, ushort height = 64)
+            public static TestHost Create(
+                ulong seed, int capacity = 256, ushort width = 64, ushort height = 64,
+                bool reverseOrder = false)
             {
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
-                kernel.RegisterSystem(pathfinding);
-                kernel.RegisterSystem(movement);
+                if (reverseOrder)
+                {
+                    kernel.RegisterSystem(movement);
+                    kernel.RegisterSystem(pathfinding);
+                }
+                else
+                {
+                    kernel.RegisterSystem(pathfinding);
+                    kernel.RegisterSystem(movement);
+                }
 
                 var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
                 var ingress = new CommandIngress(session);
@@ -344,6 +354,94 @@ namespace Nova.SimRunner.Tests
             var unbound = new SimulationKernel(new SimRandom(Seed));
             unbound.Start();
             Assert.Throws<System.InvalidOperationException>(() => unbound.SubmitBatch(batch));
+        }
+
+        [Test]
+        public void FailedRestore_LeavesHostCompletelyUnchanged()
+        {
+            // Atomic restore (Serialization.md section 5): when any block
+            // fails validation, the running host must stay bit-identical —
+            // no franken-state from already committed earlier blocks.
+            var source = TestHost.Create(Seed);
+            source.Entities.SpawnUnit(0, new Transform2D(10.5f, 10.5f), 5f);
+            source.StepTick();
+            byte[] snapshotBytes = source.Kernel.SaveSnapshot();
+
+            // Case 1: a semantically invalid block behind a VALID container
+            // hash (forged ActiveCount inside the entity store block). This
+            // is the case a sequential commit would half-apply.
+            Assert.That(SnapshotReader.TryRead(snapshotBytes, out SnapshotFile parsed, out _), Is.True);
+            var writer = new SnapshotWriter();
+            for (int i = 0; i < parsed.Blocks.Count; i++)
+            {
+                SnapshotBlock block = parsed.Blocks[i];
+                byte[] content = block.Content;
+                if (block.BlockId == SnapshotBlockIds.EntityStore)
+                {
+                    content = (byte[])block.Content.Clone();
+                    content[5] ^= 0xFF; // ActiveCount LSB: no longer matches the active flags
+                }
+                writer.AddBlock(block.BlockId, content);
+            }
+            byte[] forged = writer.ToArray();
+
+            var host = TestHost.Create(Seed);
+            host.Entities.SpawnUnit(0, new Transform2D(20.5f, 20.5f), 5f);
+            host.StepTick();
+            ulong hashBefore = host.Kernel.CalculateStateHash();
+            byte[] stateBefore = host.Kernel.SaveSnapshot();
+
+            Assert.That(host.Kernel.TryRestoreSnapshot(forged), Is.False);
+            Assert.That(host.Kernel.CalculateStateHash(), Is.EqualTo(hashBefore),
+                "a failed restore must not touch the state hash");
+            Assert.That(host.Kernel.SaveSnapshot(), Is.EqualTo(stateBefore),
+                "a failed restore must leave the full state byte-identical");
+
+            // Case 2: a valid snapshot that does not fit this host's entity
+            // capacity (foreign block) is rejected just as atomically.
+            var foreign = TestHost.Create(Seed, capacity: 128);
+            ulong foreignHashBefore = foreign.Kernel.CalculateStateHash();
+            byte[] foreignStateBefore = foreign.Kernel.SaveSnapshot();
+
+            Assert.That(foreign.Kernel.TryRestoreSnapshot(snapshotBytes), Is.False);
+            Assert.That(foreign.Kernel.CalculateStateHash(), Is.EqualTo(foreignHashBefore));
+            Assert.That(foreign.Kernel.SaveSnapshot(), Is.EqualTo(foreignStateBefore));
+        }
+
+        [Test]
+        public void Restore_IsBlockIdBased_IndependentOfRegistrationOrder()
+        {
+            // Blocks are matched by their registered BlockId, not by system
+            // registration order: a host with reversed registration restores
+            // the identical state and continues identically (Pathfinding's
+            // tick is currently empty, so the order swap is behaviorally
+            // neutral here).
+            var source = TestHost.Create(Seed);
+            var ids = new uint[4];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                EntityId id = source.Entities.SpawnUnit(0, new Transform2D(10.5f + i, 10.5f), 5f);
+                ids[i] = UnitCommandStateView.ToRawEntityId(id);
+            }
+            source.SubmitMove(ids, 40, 40);
+            for (int i = 0; i < 5; i++)
+            {
+                source.StepTick();
+            }
+            byte[] snapshotBytes = source.Kernel.SaveSnapshot();
+
+            var reversed = TestHost.Create(Seed, reverseOrder: true);
+            Assert.That(reversed.Kernel.TryRestoreSnapshot(snapshotBytes), Is.True);
+            Assert.That(reversed.Kernel.CalculateStateHash(), Is.EqualTo(source.Kernel.CalculateStateHash()),
+                "restore must map blocks by BlockId, not by registration order");
+
+            for (int i = 0; i < 10; i++)
+            {
+                source.StepTick();
+                reversed.StepTick();
+                Assert.That(reversed.Kernel.CalculateStateHash(), Is.EqualTo(source.Kernel.CalculateStateHash()),
+                    $"continuation diverged at tick {i + 1}");
+            }
         }
     }
 }

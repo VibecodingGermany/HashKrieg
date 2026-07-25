@@ -90,6 +90,16 @@ namespace Nova.Simulation
             _ingress = ingress;
         }
 
+        /// <summary>
+        /// Registers a system. Registration checklist: any system that holds
+        /// match-relevant state MUST implement <see cref="IStatefulSimSystem"/>
+        /// — otherwise its state is missing from the canonical state hash and
+        /// from snapshots, and restored hosts silently desync. The prototype
+        /// scaffolding systems (Combat, Economy, Production, Vision — with
+        /// known 20 Hz and float relics) deliberately do NOT satisfy this yet
+        /// and must be migrated in their domain slices BEFORE they may be
+        /// registered here.
+        /// </summary>
         public void RegisterSystem(ISimSystem system)
         {
             if (system == null) throw new ArgumentNullException(nameof(system));
@@ -240,13 +250,23 @@ namespace Nova.Simulation
         /// Requires a started kernel (systems initialized) with the same
         /// stateful system set: every file block must be claimed by the
         /// kernel or a registered stateful system and every stateful system
-        /// must find its block — a mismatch rejects the whole file. The
-        /// container itself is fully verified (lengths, block hashes, state
-        /// hash) by <see cref="SnapshotReader"/> before any state is touched,
-        /// so a corrupted or forged file can never cause a partial restore;
-        /// a semantically invalid block behind a valid hash is a writer-side
-        /// programming error. Returns false without state changes whenever a
-        /// block fails to parse.
+        /// must find its block — a mismatch rejects the whole file.
+        /// <para>
+        /// The restore is strictly two-phase (docs/tech/Serialization.md
+        /// section 5: no partial state). Phase A validates EVERYTHING without
+        /// mutating anything: the hardened container parse (lengths, block
+        /// hashes, state hash), the complete kernel block into locals, the
+        /// ingress state via <see cref="CommandIngress.TryValidateState"/> and
+        /// every system block via
+        /// <see cref="IStatefulSimSystem.TryValidateState"/>. Phase B commits
+        /// only after every validation passed. A failure anywhere in phase A
+        /// returns false and the running host is guaranteed unchanged — no
+        /// franken-state. A failure inside phase B is impossible by the
+        /// <see cref="IStatefulSimSystem"/> contract (commit of already
+        /// validated identical bytes) and is surfaced as an
+        /// <see cref="InvalidOperationException"/> (implementation bug, never
+        /// bad input).
+        /// </para>
         /// </summary>
         public bool TryRestoreSnapshot(byte[] snapshotBytes)
         {
@@ -255,6 +275,8 @@ namespace Nova.Simulation
             {
                 return false; // systems must be initialized to absorb state
             }
+
+            // ---- Phase A: validate everything, commit nothing. ----
             if (!SnapshotReader.TryRead(snapshotBytes, out SnapshotFile snapshot, out _))
             {
                 return false;
@@ -277,7 +299,7 @@ namespace Nova.Simulation
                 }
             }
 
-            // Parse and validate the kernel block completely before any commit.
+            // Parse and validate the kernel block completely into locals.
             if (!TryParseKernelBlock(kernelBlock, out Tick restoredTick,
                     out ulong prngS0, out ulong prngS1,
                     out byte[] ingressState, out List<CommandBatch> restoredBatches))
@@ -288,15 +310,31 @@ namespace Nova.Simulation
             {
                 return false; // degenerate xorshift128+ state
             }
-            if (ingressState.Length > 0)
+            if (ingressState.Length > 0
+                && (_ingress == null || !_ingress.TryValidateState(ingressState)))
             {
-                if (_ingress == null || !_ingress.TryRestoreState(ingressState))
+                return false;
+            }
+            for (int i = 0; i < _statefulSystems.Count; i++)
+            {
+                snapshot.TryGetBlock(_statefulSystems[i].StateBlockId, out byte[] block);
+                if (!_statefulSystems[i].TryValidateState(block))
                 {
                     return false;
                 }
             }
 
-            // Commit kernel state, then let each system absorb its block.
+            // ---- Phase B: everything validated; commit. ----
+            // The commit calls below re-validate the identical bytes that
+            // just passed phase A, so by contract they cannot fail; a false
+            // return is an implementation bug, not bad input.
+            if (ingressState.Length > 0 && !_ingress.TryRestoreState(ingressState))
+            {
+                throw new InvalidOperationException(
+                    "Ingress state failed to commit after a successful validation; " +
+                    "the CommandIngress two-phase contract is broken.");
+            }
+
             CurrentTick = restoredTick;
             Random.SetState(prngS0, prngS1);
             _pendingBatches.Clear();
@@ -308,7 +346,9 @@ namespace Nova.Simulation
                 snapshot.TryGetBlock(_statefulSystems[i].StateBlockId, out byte[] block);
                 if (!_statefulSystems[i].TryRestoreState(block))
                 {
-                    return false;
+                    throw new InvalidOperationException(
+                        $"System '{_statefulSystems[i].Name}' failed to commit a block it " +
+                        "successfully validated; the IStatefulSimSystem two-phase contract is broken.");
                 }
             }
 

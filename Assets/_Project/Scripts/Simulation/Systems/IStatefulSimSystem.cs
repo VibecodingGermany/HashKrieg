@@ -15,10 +15,16 @@ namespace Nova.Simulation
     /// NOVA_STATE_V1 state-hash input (SimulationCore.md sections 5 and 7).
     /// </para>
     /// <para>
-    /// <see cref="TryRestoreState"/> must validate every length before
-    /// allocating or mutating and must leave the system untouched on failure
-    /// (no partial state, SimulationCore.md section 7 point 4). A canonical
-    /// block is consumed exactly; trailing bytes are a parse failure.
+    /// Restore is two-phase so a kernel snapshot restore is atomic
+    /// (docs/tech/Serialization.md section 5: no partial state):
+    /// <see cref="TryValidateState"/> performs the complete parse and every
+    /// semantic check without mutating anything;
+    /// <see cref="TryRestoreState"/> validates and commits. The kernel calls
+    /// <see cref="TryRestoreState"/> only after EVERY block of the snapshot
+    /// passed validation, with the identical bytes — an implementation must
+    /// not fail in that situation; a failure there is a broken
+    /// implementation contract, not bad input. A canonical block is consumed
+    /// exactly; trailing bytes are a parse failure.
     /// </para>
     /// </summary>
     public interface IStatefulSimSystem : ISimSystem
@@ -30,8 +36,18 @@ namespace Nova.Simulation
         void WriteState(SnapshotBlockWriter writer);
 
         /// <summary>
-        /// Restores the state previously produced by <see cref="WriteState"/>.
-        /// Returns false on malformed input without mutating anything.
+        /// Fully parses and validates block content produced by
+        /// <see cref="WriteState"/> — every length, range and semantic
+        /// invariant — without mutating the system in any way. Returns false
+        /// on malformed input.
+        /// </summary>
+        bool TryValidateState(ReadOnlySpan<byte> blockContent);
+
+        /// <summary>
+        /// Validates and commits block content produced by
+        /// <see cref="WriteState"/>. Returns false on malformed input without
+        /// mutating anything. After a successful <see cref="TryValidateState"/>
+        /// of the identical bytes this call must succeed.
         /// </summary>
         bool TryRestoreState(ReadOnlySpan<byte> blockContent);
     }

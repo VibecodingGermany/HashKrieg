@@ -221,6 +221,16 @@ namespace Nova.Simulation.CommandsV1
         }
 
         /// <summary>
+        /// Fully parses and validates snapshot state bytes produced by
+        /// <see cref="SerializeState"/> without mutating this ingress
+        /// (two-phase kernel restore, docs/tech/Serialization.md section 5).
+        /// </summary>
+        public bool TryValidateState(ReadOnlySpan<byte> bytes)
+        {
+            return TryReadState(bytes, out _, out _);
+        }
+
+        /// <summary>
         /// Restores the ingress state from snapshot bytes. Lengths are checked
         /// before allocation; every pending record is revalidated structurally
         /// (docs/tech/Commands.md section 4), including that its player slot is
@@ -230,32 +240,54 @@ namespace Nova.Simulation.CommandsV1
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> bytes)
         {
+            if (!TryReadState(bytes, out CommandDedupeState restored,
+                    out List<SessionActionRequest> actions))
+            {
+                return false;
+            }
+
+            _dedupe = restored;
+            _pendingSessionActions.Clear();
+            _pendingSessionActions.AddRange(actions);
+            return true;
+        }
+
+        /// <summary>
+        /// Parses and fully validates snapshot state bytes into committed-ready
+        /// locals. Never mutates this ingress.
+        /// </summary>
+        private bool TryReadState(
+            ReadOnlySpan<byte> bytes, out CommandDedupeState restored,
+            out List<SessionActionRequest> actions)
+        {
+            restored = null;
+            actions = null;
+
             var reader = new CommandPayloadReader(bytes);
             if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
             if (!reader.TryReadUInt32(out uint dedupeLength)) return false;
             if (dedupeLength > int.MaxValue) return false;
             if (!reader.TryReadBytes((int)dedupeLength, out ReadOnlySpan<byte> dedupeBytes)) return false;
-            if (!CommandDedupeState.TryDeserialize(dedupeBytes, out CommandDedupeState restored)) return false;
+            if (!CommandDedupeState.TryDeserialize(dedupeBytes, out CommandDedupeState parsedDedupe)) return false;
 
             // Slot activity is session state: a snapshot carrying pending
             // records for a slot this session does not run is rejected whole.
-            if (!restored.AllPendingSlotsAre(_session.IsActiveSlot)) return false;
+            if (!parsedDedupe.AllPendingSlotsAre(_session.IsActiveSlot)) return false;
 
             if (!reader.TryReadUInt16(out ushort actionCount)) return false;
-            var actions = new List<SessionActionRequest>(actionCount);
+            var parsedActions = new List<SessionActionRequest>(actionCount);
             for (int i = 0; i < actionCount; i++)
             {
                 if (!reader.TryReadUInt32(out uint enqueueTick)) return false;
                 if (!reader.TryReadUInt16(out ushort kindValue)) return false;
                 var kind = (CommandKind)kindValue;
                 if (!CommandKindInfo.IsSessionAction(kind)) return false;
-                actions.Add(new SessionActionRequest(kind, enqueueTick));
+                parsedActions.Add(new SessionActionRequest(kind, enqueueTick));
             }
             if (reader.Remaining != 0) return false;
 
-            _dedupe = restored;
-            _pendingSessionActions.Clear();
-            _pendingSessionActions.AddRange(actions);
+            restored = parsedDedupe;
+            actions = parsedActions;
             return true;
         }
 

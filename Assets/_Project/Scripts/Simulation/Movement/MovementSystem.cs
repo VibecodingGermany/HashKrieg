@@ -10,6 +10,16 @@ namespace Nova.Simulation.Movement
     /// Combines Flow-Field direction vectors with O(N) spatial grid separation steering.
     /// Runs on the canonical fixed tick delta (<see cref="SimClock.TickDeltaSeconds"/> = 0.1 s, 10 Hz).
     /// <para>
+    /// Numerics caveat (Q-040(i)): movement still computes with IEEE-754
+    /// floats and <see cref="SimMath"/> transcendentals (Atan2/Sqrt) — the
+    /// serialized state is bit-stable per runtime, but these functions are
+    /// not guaranteed bit-identical across Mono/IL2CPP/.NET, a latent
+    /// cross-runtime desync risk under docs/tech/SimulationCore.md sections
+    /// 1 and 9. Declared as Q-040(i) with the provisional that the prototype
+    /// floats stay until the movement domain slice; to be decided by D-ID
+    /// before the G1 schema freeze.
+    /// </para>
+    /// <para>
     /// Stateful (<see cref="IStatefulSimSystem"/>): the movement system owns
     /// the authoritative entity store block in kernel snapshots — unit state,
     /// generations and the free list live in the injected
@@ -172,6 +182,12 @@ namespace Nova.Simulation.Movement
         public void WriteState(Snapshots.SnapshotBlockWriter writer)
         {
             _entityManager.WriteState(writer);
+        }
+
+        /// <summary>Fully validates an entity store block without mutating the manager.</summary>
+        public bool TryValidateState(ReadOnlySpan<byte> blockContent)
+        {
+            return _entityManager.TryValidateState(blockContent);
         }
 
         /// <summary>Restores the entity store; malformed input leaves the manager untouched.</summary>

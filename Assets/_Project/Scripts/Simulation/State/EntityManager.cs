@@ -173,6 +173,16 @@ namespace Nova.Simulation.State
         }
 
         /// <summary>
+        /// Fully parses and validates entity store block content produced by
+        /// <see cref="WriteState"/> — every length, index and store
+        /// invariant — without mutating this manager in any way.
+        /// </summary>
+        public bool TryValidateState(ReadOnlySpan<byte> content)
+        {
+            return TryParseState(content, out _);
+        }
+
+        /// <summary>
         /// Restores the entity store from block content produced by
         /// <see cref="WriteState"/>. Every length and index is validated
         /// before anything is allocated or mutated; the store invariants
@@ -183,6 +193,39 @@ namespace Nova.Simulation.State
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> content)
         {
+            if (!TryParseState(content, out ParsedEntityStore parsed)) return false;
+
+            // All checks passed; commit atomically.
+            Array.Copy(parsed.Units, _units, Capacity);
+            Array.Copy(parsed.Versions, _versions, Capacity);
+            _freeSlots.Clear();
+            // Serialized order is stack enumeration order (top first); pushing
+            // in reverse restores an identical stack, so the next id
+            // assignment sequence matches the serialized host exactly.
+            for (int i = parsed.FreeSlots.Length - 1; i >= 0; i--)
+            {
+                _freeSlots.Push(parsed.FreeSlots[i]);
+            }
+            ActiveCount = parsed.ActiveCount;
+            return true;
+        }
+
+        /// <summary>Validated intermediate of a parsed entity store block.</summary>
+        private sealed class ParsedEntityStore
+        {
+            public ushort[] Versions;
+            public int[] FreeSlots;
+            public UnitState[] Units;
+            public int ActiveCount;
+        }
+
+        /// <summary>
+        /// Parses and fully validates block content into a committed-ready
+        /// intermediate. Never mutates this manager.
+        /// </summary>
+        private bool TryParseState(ReadOnlySpan<byte> content, out ParsedEntityStore parsed)
+        {
+            parsed = null;
             var reader = new Snapshots.SnapshotBlockReader(content);
             if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
             if (!reader.TryReadUInt32(out uint capacity)) return false;
@@ -259,18 +302,13 @@ namespace Nova.Simulation.State
             if (observedActive != (int)activeCount) return false;
             if (reader.Remaining != 0) return false;
 
-            // All checks passed; commit atomically.
-            Array.Copy(units, _units, Capacity);
-            Array.Copy(versions, _versions, Capacity);
-            _freeSlots.Clear();
-            // Serialized order is stack enumeration order (top first); pushing
-            // in reverse restores an identical stack, so the next id
-            // assignment sequence matches the serialized host exactly.
-            for (int i = freeSlots.Length - 1; i >= 0; i--)
+            parsed = new ParsedEntityStore
             {
-                _freeSlots.Push(freeSlots[i]);
-            }
-            ActiveCount = observedActive;
+                Versions = versions,
+                FreeSlots = freeSlots,
+                Units = units,
+                ActiveCount = observedActive
+            };
             return true;
         }
     }
