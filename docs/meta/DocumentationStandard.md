@@ -1,62 +1,152 @@
 # Dokumentationsstandard
 
-**Version:** 1.1.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Writer | **Sprint:** 0
+**Version:** 1.6.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
 
 ## Zweck
 
-Definiert den verbindlichen Standard für alle Dokumente im Project-Nova-Wiki. Ziel: dauerhaft synchron gepflegte, verlinkbare, reviewbare Living Documents statt veralteter Monolithen.
-
-## Grundprinzipien
-
-1. **Klein und fokussiert:** Ein Dokument behandelt genau ein Thema. Wächst ein Dokument über seinen Zweck hinaus, wird es aufgeteilt.
-2. **Living Documents:** Jedes Dokument wird bei jeder relevanten Erkenntnis, Entscheidung oder Architekturänderung sofort aktualisiert und die Version erhöht. Dokumentation ist nie "fertig".
-3. **Verlinkung:** Dokumente verlinken ihre Abhängigkeiten und verwandte Dokumente relativ (`../production/DecisionLog.md`), damit das Wiki navigierbar bleibt.
-4. **Sprache:** Deutsch für alle Projektdokumente. Code, Identifier und Dateipfade bleiben englisch/technisch.
-5. **Keine Platzhalter:** Es werden keine leeren Dokumente für zukünftige Sprints angelegt (verhindert veraltete Leichen). Der Index ([../README.md](../README.md)) führt geplante Bereiche als "geplant".
-6. **Single Source of Truth für Werte:** Jeder Zahlenwert (Kosten, HP, DPS, Reichweiten, Raten, Energie u. ä.) existiert **genau einmal** im Wiki – im jeweils führenden Dokument. Alle anderen Dokumente **verweisen** auf das führende Dokument, statt den Wert zu wiederholen (Grundsatzregel gemäß [../production/DecisionLog.md](../production/DecisionLog.md), D-047). Bei Konflikten gilt das führende Dokument; doppelt gepflegte Werte gelten als Review-Befund und sind zu beseitigen.
-
-## Pflichtabschnitte jedes Dokuments
-
-Jedes Dokument enthält in dieser Reihenfolge:
-
-1. **Titel** (`# ...`)
-2. **Kopfzeile:** Version, Status, Verantwortungsbereich (Studio-Rolle), Sprint
-3. **Zweck** – wozu existiert dieses Dokument, für wen ist es verbindlich
-4. **Abhängigkeiten** – verlinkte Dokumente/Entscheidungen, auf denen der Inhalt aufbaut
-5. **Inhalt** – themenspezifisch
-6. **Offene Punkte** – mit Verweis auf [../production/OpenQuestions.md](../production/OpenQuestions.md), falls übertragen
-7. **Nächste Schritte**
-8. **Änderungsverlauf** – Tabelle: Version, Datum, Änderung, Autor (Studio-Rolle)
-
-## Versionierung
-
-- `0.x` – Entwurf, im jeweiligen Sprint in Arbeit
-- `1.0` – sprint-freigegeben (Inhalt des zugehörigen Sprint-Abschlussberichts)
-- Erhöhung der Minor-Version bei jeder inhaltlichen Änderung, Patch bei Korrekturen
-- Der Änderungsverlauf ist Pflicht; undokumentierte Änderungen gelten als nicht erfolgt
-
-## Entscheidungen
-
-- Jede Architektur- oder Design-Entscheidung wird mit mindestens **drei geprüften Alternativen** und Begründung in [../production/DecisionLog.md](../production/DecisionLog.md) eingetragen.
-- Entscheidungen erhalten fortlaufende IDs (`D-001`, `D-002`, …) und werden in Fachdokumenten per ID referenziert.
-- Wird eine Entscheidung revidiert, bleibt der alte Eintrag stehen (Status: "ersetzt durch D-xxx") – keine stillen Umschreibungen.
-
-## Review-Rhythmus
-
-- Am Ende jedes Sprints: Self Review + Architecture Review des Dokumentbestands, dokumentiert im Sprint-Bericht unter [../production/sprints/](../production/sprints/).
-- Inkonsistenzen zwischen Dokumenten werden in [../analysis/Inconsistencies.md](../analysis/Inconsistencies.md) bzw. nach Sprint 0 direkt in den betroffenen Dokumenten plus OpenQuestions erfasst.
+Definiert den verbindlichen Standard für reviewbare Living Documents und
+maschinenlesbare Quality-Verträge. Dokumentation beschreibt Anforderungen;
+Gate-Erfolg entsteht ausschließlich durch aktuelle, reproduzierbare Evidence.
 
 ## Abhängigkeiten
 
-- Keine (Basisdokument des Wikis).
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-001,
+  D-005, D-047, D-061 bis D-064
+- [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
+- [`../../quality/schemas/GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
+- [`../../quality/scripts/validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
+
+## 1. Grundprinzipien
+
+1. **Klein und fokussiert:** ein Dokument behandelt ein Thema.
+2. **Living Documents:** jede relevante Änderung erhöht die Version und ergänzt
+   den Änderungsverlauf.
+3. **Relative Links:** interne Abhängigkeiten werden relativ verlinkt.
+4. **Sprache:** deutsche Projektprosa; Code, Identifier und Pfade technisch/
+   englisch.
+5. **Keine Platzhalter:** weder leere Zukunftsdokumente noch Evidence-Dateien
+   ohne realen Lauf.
+6. **Single Source of Truth:** ein Zahlenwert hat genau eine führende Quelle;
+   andere Dokumente verweisen darauf.
+7. **Requirements ≠ Evidence:** Status, Plan, Datei- oder Typanwesenheit beweisen
+   kein Gate.
+8. **Maschinenlesbare Verträge:** JSON-Manifeste und Szenarien sind gemeinsam
+   mit ihrer Markdown-Erklärung zu ändern und müssen parsebar bleiben.
+
+## 2. Pflichtaufbau
+
+Jedes Wiki-Markdown-Dokument enthält in dieser Reihenfolge:
+
+1. Titel,
+2. Kopfzeile `Version | Status | Verantwortungsbereich | Sprint`,
+3. Zweck,
+4. Abhängigkeiten,
+5. thematischen Inhalt,
+6. Offene Punkte,
+7. Nächste Schritte,
+8. Änderungsverlauf mit Version, Datum, Änderung und Autor.
+
+Root-Governance-Dateien dürfen eine an ihr Format angepasste Kopfzeile nutzen,
+benötigen bei inhaltlicher Änderung aber ebenfalls einen datierten
+Änderungsverlauf.
+
+## 3. Versionierung
+
+- `0.x`: Entwurf,
+- `1.0`: verbindlicher Erstvertrag,
+- Minor-Bump für inhaltliche Erweiterung,
+- Patch-Bump für reine Korrektur,
+- Major-Bump für grundlegendes Rebaseline.
+
+Wiki-Versionen sind Dokumentationsstände und keine Game-Releases. Status- oder
+Strukturänderungen ziehen Wiki-Index, Root-README und `[Unreleased]` nach.
+
+## 4. Entscheidungen
+
+Architektur-, Design- und Prozessentscheidungen erhalten eine D-ID mit
+mindestens drei Alternativen, Begründung und Konsequenzen. Revidierte Einträge
+bleiben sichtbar und werden `ersetzt durch D-xxx` beziehungsweise
+`teilweise ersetzt` markiert.
+
+MS-1-Overrides dürfen ein Vollspiel-Zielbild zeitweise übersteuern, müssen
+Scope und Gültigkeitsphase explizit benennen.
+
+## 5. Evidence-Autorität
+
+Schema 1.2 ist ausschließlich eine Integritätsvorstufe. Evidence:
+
+- validiert mit gepinntem Ajv Draft 2020-12 gegen Subject-Schema `1.2.0`
+  [`GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json),
+- besteht im selben CLI-Lauf die Cross-Field-Prüfung durch
+  [`validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py),
+- liegt append-only unter
+  `quality/evidence/G<N>/<subjectSha>/<attempt>/GateEvidence.json`,
+- bindet Commit, Tree, Toolchain, SHA-256 der Content-/Scenario-/Schema-/
+  Validator-Git-Blobs am Subject-Commit und Rohartefakte,
+- referenziert ab G1 das rekursiv valide unmittelbare Vorgängergate am selben
+  Commit/Tree,
+- bindet jedes Kriterium an einen kanonischen gleichnamigen Check und jedes
+  geforderte Szenario an dessen Pflichtassertions, exakte Units sowie
+  Schwellenmetriken,
+- benennt Reviewer und Implementation Writer getrennt und belegt die
+  Reviewer-Wiederholung als eigene Artefaktausführung,
+- autorisiert keinen Pass; jeder Pass-Versuch endet zusätzlich mit
+  `E_AUTHORIZATION_BOOTSTRAP`,
+- wird bei relevanten Änderungen stale und
+- wertet Skip, Cancel oder fehlendes Pflichtresultat als Fail.
+
+Der Zielvertrag für Schema 1.3 wird in G0-A zweistufig hergestellt:
+
+- Der geschützte Authorize-Job bezieht Manifest, Szenariovertrag, Schema,
+  Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und
+  Authorize-Workflow ausschließlich aus einem subject-unabhängigen
+  Trusted-Tool-Checkout. Commit, SHA-256 und exakte Node-Version werden
+  gebunden.
+- Eine Änderung an diesem Trust-Bundle wird ohne Gate-Fortschritt über einen
+  geschützten PR gemergt und kann sich nicht selbst autorisieren. Erst ein
+  nachfolgender sauberer Subject-Commit darf damit G0-Evidence erzeugen.
+- Der externe Kontext enthält die vollständige geordnete
+  `authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag
+  bindet Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie
+  CI- und Review-Attestierung; fehlende, zusätzliche, vertauschte oder nur
+  lokale Einträge sind ungültig.
+- Command und Performance-Messung referenzieren dieselbe `environmentId`.
+  Windows-x64-Referenzmessung und Mac-M2-Funktionsmessung besitzen getrennte
+  Methodenprofile und binden OS, Architektur, Hardware, Build, Managed/Burst,
+  Auflösung, Quality-Profil, VSync, Deep Profiling und Replay exakt.
+- Fehlender Node-/Ajv-Stack oder ein hängender Schema-Subprozess bleibt
+  kontrolliert fail-closed. Negative Controls decken manipuliertes Subject-
+  Tooling, unvollständige Ketten und falsche Umgebungen ab.
+
+Dieses Repository legt Evidence-Verzeichnisse erst bei einem realen Versuch an.
+Beispiel- oder Platzhalter-Evidence ist verboten.
+
+## 6. Reviews und Links
+
+Jede Änderung prüft:
+
+- interne Links,
+- Version und History,
+- `[Unreleased]`,
+- D-ID- und Werteautorität,
+- JSON-Parsebarkeit bei Maschinenverträgen und
+- die Abwesenheit unbelegter Gate-/Meilensteinbehauptungen.
+
+Unabhängiges read-only Review ersetzt im Solo-/KI-Modus die
+Autoren-Selbstfreigabe. Eine zweite menschliche Freigabe wird ab mindestens
+zwei aktiven menschlichen Maintainers Pflicht.
 
 ## Offene Punkte
 
-- Keine.
+- Keine für den aktuellen Recovery-Vertrag.
 
 ## Nächste Schritte
 
-- Standard in Sprint 1 auf Research-Dokumente anwenden und ggf. nachschärfen.
+1. Standard bei der G0-A-Bootstrap-Änderung anwenden, ohne Gate-Fortschritt
+   zu behaupten.
+2. Schema 1.3 und das Trusted Tooling erst an einem nachfolgenden sauberen
+   Subject für reale G0-Evidence verwenden.
+3. Nach G5 Review-Rhythmus für Post-MVP neu bewerten.
 
 ## Änderungsverlauf
 
@@ -64,3 +154,8 @@ Jedes Dokument enthält in dieser Reihenfolge:
 |---|---|---|---|
 | 1.0.0 | 2026-07-21 | Initialer verbindlicher Standard (Sprint 0) | Technical Writer |
 | 1.1.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Grundprinzip 6 „Single Source of Truth für Werte" ergänzt (D-047) | Technical Writer |
+| 1.2.0 | 2026-07-24 | D-061-Evidence-Autorität, Requirements/Evidence-Trennung und Maschinenvertrag-Regeln ergänzt | Technical Writer |
+| 1.3.0 | 2026-07-24 | Schema- und Semantikprüfung sowie SHA-256-Dateibindung für Gate-Evidence verankert | Technical Writer |
+| 1.4.0 | 2026-07-24 | D-062-Subject-Blob-, Szenariometrik- und Same-Subject-Gate-Ketten-Regeln ergänzt | Technical Writer |
+| 1.5.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust-Autorität verankert | Technical Writer |
+| 1.6.0 | 2026-07-24 | D-064-Fail-Closed-Schema 1.2, subject-unabhängigen Schema-1.3-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Technical Writer |
