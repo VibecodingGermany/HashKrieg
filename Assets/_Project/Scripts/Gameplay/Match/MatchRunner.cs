@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -72,6 +73,9 @@ namespace Nova.Gameplay.Match
         /// <summary>The canonical Fog of War (single committed sight for Combat/AI/snapshot/rendering, D-058).</summary>
         public FogOfWarSystem FogOfWar { get; private set; }
 
+        /// <summary>The canonical FoW-gated hitscan combat (SimulationCore.md section 2, order step 8).</summary>
+        public CombatSystem Combat { get; private set; }
+
         /// <summary>Session authority binding the local player slot (MS-1: slot 0 of {0, 1}).</summary>
         public MatchSession Session { get; private set; }
 
@@ -95,12 +99,14 @@ namespace Nova.Gameplay.Match
             Pathfinding = new PathfindingSystem(_mapWidth, _mapHeight);
             Movement = new MovementSystem(Entities, Pathfinding);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
+            Combat = new CombatSystem(Entities, FogOfWar);
 
             // Canonical tick order (SimulationCore.md section 2): pathfinding/
-            // movement, then the FoW recompute, then (later slices) combat.
+            // movement, then the FoW recompute, then combat.
             Kernel.RegisterSystem(Pathfinding);
             Kernel.RegisterSystem(Movement);
             Kernel.RegisterSystem(FogOfWar);
+            Kernel.RegisterSystem(Combat);
 
             Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             Ingress = new CommandIngress(Session);

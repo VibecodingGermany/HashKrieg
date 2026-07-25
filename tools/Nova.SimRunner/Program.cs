@@ -1,6 +1,7 @@
 using System;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -70,11 +71,14 @@ namespace Nova.SimRunner
             var pathfinding = new PathfindingSystem(128, 128);
             var movement = new MovementSystem(entities, pathfinding);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
+            var combat = new CombatSystem(entities, fogOfWar);
 
-            // Canonical tick order: movement, then the 5 Hz FoW recompute (D-058).
+            // Canonical tick order (SimulationCore.md section 2): movement,
+            // then the 5 Hz FoW recompute, then combat.
             kernel.RegisterSystem(pathfinding);
             kernel.RegisterSystem(movement);
             kernel.RegisterSystem(fogOfWar);
+            kernel.RegisterSystem(combat);
 
             var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             var ingress = new CommandIngress(session);
