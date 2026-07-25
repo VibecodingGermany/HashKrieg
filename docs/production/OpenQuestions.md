@@ -1,6 +1,6 @@
 # Open Questions
 
-**Version:** 1.10.2 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer | **Sprint:** 7
+**Version:** 1.11.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -19,6 +19,7 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 |---|---|---|---|---|---|
 | Q-018 | P3 | Preispunkt: 29,99 / 34,99 / 39,99 €? Markt-Research deckt das nicht ab. | Sprint-2-Review | Post-MVP | offen – nicht MS-1-blockierend |
 | Q-019 | P2 | Telemetrie-Infrastruktur: eigenes Opt-in-Backend oder Streichung? D-007-Offline-Positionierung beachten. | Balancing.md-Review | Post-MVP | offen – in D-056 zurückgestellt |
+| Q-040 | P2 | G1-Numerik-Detailfragen, die SimulationCore.md nicht festlegt: (a) `SimFixed.ToInt()`-Rundung (Provisorium: Truncation Richtung 0), (b) `SimAngle`-Einheit (Provisorium: Grad, 360° = 65536), (c) PRNG-Seeding und 64→32-bit-Ausgabereduktion (Provisorium: SplitMix64 + High-32), (d) PRNG-State-Serialisierung im `ISimRandom`-Interface für §3-Snapshots. Vor dem G1-Schema-Freeze per D-ID zu ratifizieren. | G1-Vorarbeit Numerik-Kern | Sprint 7 (vor G1-Freeze) | offen – G1-blockierend, mit dokumentierten Provisorien |
 
 ## Geschlossene Fragen
 
@@ -71,6 +72,9 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 
 - **Q-018 und Q-019 bleiben offen:** Sie sind durch D-056 Post-MVP und
   blockieren G0–G5 nicht.
+- **Q-040 ist offen und G1-blockierend:** Die G1-Vorarbeit hat dokumentierte
+  Provisorien gesetzt (ToInt-Truncation, SimAngle-Grad, SplitMix64-Seeding);
+  vor dem G1-Schema-Freeze ist eine eigene Entscheidung (D-ID) fällig.
 - Q-031–Q-034 und Q-038/Q-039 sind in D-056–D-061 geschlossen; ihre
   Implementierung ist weiterhin über die Gates nachzuweisen.
 
@@ -96,3 +100,4 @@ Zentrales Register aller offenen Fragen mit Owner-Sprint und Priorität. Eine Fr
 | 1.10.0 | 2026-07-24 | Q-031–Q-034 und Q-038/Q-039 durch D-056–D-061 geschlossen; Q-018/Q-019 als nicht MS-1-blockierend eingeordnet | Executive Producer |
 | 1.10.1 | 2026-07-24 | Teilersetzungen D-044/D-049 durch D-061 in den geschlossenen Fragen sichtbar gemacht | Executive Producer |
 | 1.10.2 | 2026-07-24 | Q-002 an die MS-1-Teilersetzung von D-009 durch D-056 angeglichen | Executive Producer |
+| 1.11.0 | 2026-07-25 | Q-040 neu: G1-Numerik-Detailfragen (ToInt, SimAngle-Einheit, PRNG-Seeding/-Serialisierung) mit dokumentierten Provisorien, G1-blockierend | Executive Producer |

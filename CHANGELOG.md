@@ -18,6 +18,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Q-040 registriert:** G1-Numerik-Detailfragen, die
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) offenlässt
+  (`ToInt()`-Rundung, `SimAngle`-Einheit, PRNG-Seeding/-Serialisierung), mit
+  dokumentierten Provisorien; G1-blockierend, vor dem G1-Schema-Freeze per
+  D-ID zu ratifizieren ([docs/production/OpenQuestions.md](docs/production/OpenQuestions.md)
+  1.11.0).
 - **G1-Vorarbeit Numerisches Modell (ohne Gate-Status):** `SimFixed`
   (signed Q16.16 auf `int32`, `int64`-Zwischenprodukte, Rundung nearest
   ties-to-even, `WorldToGrid` als floor auch für negative Werte) und
