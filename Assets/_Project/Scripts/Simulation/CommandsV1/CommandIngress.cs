@@ -222,9 +222,11 @@ namespace Nova.Simulation.CommandsV1
 
         /// <summary>
         /// Restores the ingress state from snapshot bytes. Lengths are checked
-        /// before allocation; malformed input returns false without mutation.
-        /// Pending commands survive the restore with identical acceptance and
-        /// sealing behaviour.
+        /// before allocation; every pending record is revalidated structurally
+        /// (docs/tech/Commands.md section 4), including that its player slot is
+        /// an active slot of this session. Malformed input returns false
+        /// without mutation. Pending commands survive the restore with
+        /// identical acceptance and sealing behaviour.
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> bytes)
         {
@@ -234,6 +236,10 @@ namespace Nova.Simulation.CommandsV1
             if (dedupeLength > int.MaxValue) return false;
             if (!reader.TryReadBytes((int)dedupeLength, out ReadOnlySpan<byte> dedupeBytes)) return false;
             if (!CommandDedupeState.TryDeserialize(dedupeBytes, out CommandDedupeState restored)) return false;
+
+            // Slot activity is session state: a snapshot carrying pending
+            // records for a slot this session does not run is rejected whole.
+            if (!restored.AllPendingSlotsAre(_session.IsActiveSlot)) return false;
 
             if (!reader.TryReadUInt16(out ushort actionCount)) return false;
             var actions = new List<SessionActionRequest>(actionCount);
@@ -282,11 +288,18 @@ namespace Nova.Simulation.CommandsV1
         {
             reason = CommandRejectReason.None;
 
-            if (!CommandRecord.TryDeserialize(bytes, out CommandRecord record, out _))
+            if (!CommandRecord.TryDeserialize(bytes, out CommandRecord record, out int consumed))
             {
                 reason = bytes.Length >= 2
                     ? CommandRejectReason.RecordLengthInvalid
                     : CommandRejectReason.RecordTruncated;
+                return CommandIngressResult.Rejected;
+            }
+            if (consumed != bytes.Length)
+            {
+                // The intake accepts exactly one record per call; trailing
+                // bytes are a structural framing error, never silently ignored.
+                reason = CommandRejectReason.TrailingBytes;
                 return CommandIngressResult.Rejected;
             }
 

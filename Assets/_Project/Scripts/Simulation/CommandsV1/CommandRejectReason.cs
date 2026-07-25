@@ -42,6 +42,9 @@ namespace Nova.Simulation.CommandsV1
         // Backpressure, checked before sealing.
         PendingQueueFull = 18,
         BatchCapacityExceeded = 19,
+
+        // Bytes after a fully parsed record (the intake accepts exactly one).
+        TrailingBytes = 20,
     }
 
     /// <summary>Outcome of handing one record to the ingress.</summary>

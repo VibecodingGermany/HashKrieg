@@ -181,8 +181,12 @@ namespace Nova.Simulation.CommandsV1
 
         /// <summary>
         /// Restores a state previously produced by <see cref="Serialize"/>.
-        /// Every length is checked before allocation; malformed input returns
-        /// false without mutating anything.
+        /// Every length is checked before allocation and every pending record
+        /// is revalidated against the structural base rules of
+        /// docs/tech/Commands.md section 4 (full parse, slot/block consistency,
+        /// stream kind — never a session action, sequence ≠ 0, canonical
+        /// payload, unique pending key). Malformed or manipulated input returns
+        /// false without mutating anything; it never throws.
         /// </summary>
         public static bool TryDeserialize(ReadOnlySpan<byte> bytes, out CommandDedupeState state)
         {
@@ -205,11 +209,38 @@ namespace Nova.Simulation.CommandsV1
                     if (!reader.TryReadBytes(recordLength, out ReadOnlySpan<byte> recordBytes)) return false;
                     if (!CommandRecord.TryDeserialize(recordBytes, out CommandRecord record, out int consumed)) return false;
                     if (consumed != recordLength) return false;
+
+                    // Structural revalidation of snapshot content: a pending
+                    // record must belong to this slot's block, carry a usable
+                    // sequence and pass the same section-4 payload rules a live
+                    // record would.
+                    if (record.PlayerSlot != (byte)slot) return false;
+                    if (record.Sequence == 0) return false;
+                    if (!CommandPayloadValidation.TryValidateStreamPayload(
+                            record.Kind, record.PayloadVersion, record.Payload.Span, out _)) return false;
+                    if (restored._pending[slot].ContainsKey(record.Sequence)) return false;
                     restored._pending[slot].Add(record.Sequence, record);
                 }
             }
             if (reader.Remaining != 0) return false;
             state = restored;
+            return true;
+        }
+
+        /// <summary>
+        /// True when every pending record's player slot satisfies
+        /// <paramref name="isActiveSlot"/>. Used by the ingress on snapshot
+        /// restore: slot activity is session state and cannot be checked here.
+        /// </summary>
+        internal bool AllPendingSlotsAre(System.Func<byte, bool> isActiveSlot)
+        {
+            for (int slot = 0; slot < CommandLimits.ReservedPlayerSlots; slot++)
+            {
+                foreach (KeyValuePair<uint, CommandRecord> entry in _pending[slot])
+                {
+                    if (!isActiveSlot(entry.Value.PlayerSlot)) return false;
+                }
+            }
             return true;
         }
 
