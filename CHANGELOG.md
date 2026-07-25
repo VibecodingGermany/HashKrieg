@@ -18,6 +18,75 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Replay (ohne Gate-Status, ohne Evidence):** kanonische Replay-Schicht
+  in `Nova.Simulation.Replays` gemäß
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §6/§8 —
+  `MatchFingerprint` (State-/Command-/Payload-/Snapshot-/Sidecar-Schema-Versionen
+  als u16, `NumericModelId = Q16_16_V1`, 10 Hz, `XorShift128PlusV1`,
+  Rules-/Definitions-/MapHash64, 8 Slot-Belegungen, Start-Seed,
+  InitialStateHash und `InputDelayTicks` aus
+  [docs/tech/Commands.md](docs/tech/Commands.md) §1; kanonische
+  LE-Serialisierung, Wertgleichheit, `ComputeHash()` in der
+  NOVA_DEFINITIONS_V1-Domäne als dokumentierte Wahl, weil §5 keine eigene
+  Fingerprint-Domäne definiert — Q-040-Kandidat), `ReplayRecorder`
+  (zeichnet tickweise nur die akzeptierten Records der versiegelten Batches
+  samt ihrer `CommandResult`s auf; jeder Tick inklusive leerer, lückenlos),
+  Replay-Containerformat v1 (Magic ASCII `NOVAPLAY`, FormatVersion u16 = 1,
+  Fingerprint-Bytes, eingebetteter Init-Snapshot — die Hash-Referenz ist als
+  Alternative dokumentiert, aber nicht implementiert —, Tick-Frames mit
+  Tick u32, RecordCount u16, Records length-prefixed mit je ResultCode u16
+  und gespeichertem Kettenwert, Trailer mit End-State-Hash und finalem
+  Ketten-Hash), `ReplayFile` (gehärteter Parser: 64-MiB-Hardcap als
+  dokumentierte Eigenwahl, da die Spec kein Replay-Cap festlegt — Q-040-Kandidat;
+  Längen vor Allokation, strukturelle Revalidierung jeder Record —
+  strukturell ungültige Records lehnen das Replay ab —, kanonische
+  Record-Reihenfolge, lückenlose Ticks, inkrementelle Kettenverifikation,
+  Fingerprint↔Snapshot-Konsistenz) und `ReplayPlayer` (prüft exakte
+  Fingerprint-Gleichheit mit benanntem abweichendem Feld, stellt den
+  eingebetteten Snapshot in einem frischen Kernel wieder her, spielt die
+  Records über `TryAcceptHistoricalRecordBytes` und denselben versiegelten
+  Pfad ab — ohne die KI erneut zu instanziieren — und verifiziert pro Tick
+  die reproduzierten `CommandResult`s wertgleich sowie den End-State-Hash
+  gegen den Trailer). Hash-Kette in der NOVA_REPLAY_CHAIN_V1-Domäne:
+  Genesis bindet den Fingerprint, jeder Tick-Schritt bindet Vorgänger-Kette,
+  Tick und je Record dessen Bytes plus ResultCode, der Final-Schritt bindet
+  den End-State-Hash (exakte Konstruktion im Doc-Kommentar von
+  `ReplayFormat`). Damit der Playback den aufgezeichneten End-Hash
+  reproduziert, wurde der autoritative Sequenz-Floor des
+  `CommandDedupeState` stream-abgeleitet gemacht: jeder akzeptierte Record
+  (live wie historisch) hebt den Floor über seine Sequenz
+  (`RaiseSequenceFloor`) — dokumentierte Ausnahme: eine durch eine
+  abgelehnte lokale Einreichung verbrannte Sequenz kann der Strom nicht
+  rekonstruieren (Q-040-Kandidat). Testsuiten in beiden Lanes (Unity
+  EditMode + `tools/Nova.SimRunner.Tests`): Golden-Replay über das
+  Standard-50-Tick-Match (Human-Slot, aufgezeichnete KI-Records,
+  zustandsabhängig abgelehntes Command) mit identischem End-Hash und
+  identischer Result-Sequenz, Ketten-Manipulation mitten im Strom
+  (Record/Result/Tick) mit Erkennung an der manipulierten Position,
+  Fingerprint-Mismatch (Start-Seed, Slot-Belegung, Schema-Version) verweigert
+  den Start, Shadow-KI-Vergleich ohne KI-Doppelanwendung und
+  Parserhärtung inklusive Truncation-Schleife über jede Byteposition.
+  Q-040-Kandidaten: dokumentierte Stub-Content-Hashes
+  (`ComputeEmptyContentStubHash` über eine leere Liste in
+  NOVA_DEFINITIONS_V1), solange keine kanonischen Definitions-/Map-Quellen
+  existieren; fehlende Fingerprint-Hash-Domäne; Replay-Hardcap;
+  verbrannte Sequenzen.
+- **Art-Strang MS-1 (ohne Gate-Status, ohne Evidence — es existiert kein
+  einziges Art-Asset im Repository, die Referenz-PNGs sind Konzeptbilder,
+  keine Assets):** neue Dokumente
+  [docs/assets/ArtAssetStandard.md](docs/assets/ArtAssetStandard.md)
+  (Ordner, Namen, Import, Material, Masken),
+  [docs/assets/ArtManifest_MS1.md](docs/assets/ArtManifest_MS1.md) samt
+  [docs/assets/art-manifest-ms1.json](docs/assets/art-manifest-ms1.json)
+  (Spezifikationsblätter der 34 MS-1-Art-Assets),
+  [docs/assets/SourceCatalog_MS1.md](docs/assets/SourceCatalog_MS1.md)
+  (CC0-/KI-Beschaffungskatalog und Lizenzbefunde),
+  [docs/assets/Provenance.md](docs/assets/Provenance.md)
+  (Provenienz- und Lizenznachweisverfahren je Asset) sowie
+  [docs/assets/VerticalSlice_MS1.md](docs/assets/VerticalSlice_MS1.md)
+  (Vertical-Slice-Spezifikation der vier Erst-Assets: Allianz-HQ, Lynx,
+  Legion-HQ, Räuber) und orthographische Referenzblätter unter
+  `docs/assets/reference/` mit Provenienznachweis.
 - **G1-Kernel-Integration — kanonische Kernel-Bausteine (ohne Gate-Status,
   ohne Evidence):** Der umgebaute `SimulationKernel` akzeptiert als einzigen
   Command-Intake versiegelte `CommandBatch`-Objekte (`SubmitBatch`,
@@ -324,6 +393,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Live- wie auf dem Replay-Import-Pfad. Tests für alle Fälle in beiden Lanes.
 
 ### Entschieden
+- **D-066:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
+  B=TeamMask/A=Smoothness (URP-Lit-kompatibel).
+- **D-067:** 0-€-Beschaffungspfad für den Art-Strang mit Anbieter-Whitelist
+  (CC0-Quellen, Hunyuan3D 2.1 lokal, OpenAI Image API, Sketchfab per
+  Einzelfallprüfung) und Blacklist (Meshy/Tripo3D Free-Tier, Default-Deny).
+- **D-068:** Art-seitige Grid-Zellgröße 3,0 m und feste MS-1-Gebäude-
+  Footprints (Power 3×3, Refinery 4×4, Barracks 3×3, ResearchLab 3×3).
+- **D-069:** Fraktionspaletten Allianz (`#8A9199`/`#2C6E9E`/`#4FD8FF`) und
+  Legion (`#7A3524`/`#B08430`/`#2B2018`) für MS-1 verbindlich.
+- **D-070:** Sonniss-GDC-Bundle-Rohdateien werden gemäß restriktiver
+  Lizenzlesart nicht ins öffentliche Repository eingecheckt.
 - **D-065 (Authorize-Run-Bindung der Evidence-Kette):** Replay-/Reuse-
   Befund N-1 aus dem G0-A-Re-Review; entschieden wurde die Event-/Job-/
   Eindeutigkeits-Bindung gegen die Alternativen „Doku abschwächen" und
@@ -331,6 +411,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **Art-Strang MS-1, Folgeänderungen an bestehenden Dokumenten (ohne
+  Gate-Status, ohne Evidence):** Hunyuan3D-Lizenzangabe in
+  [docs/assets/Licenses.md](docs/assets/Licenses.md) nach Version
+  differenziert und um Anbieter-Whitelist/Blacklist ergänzt;
+  Sonniss-Weitergaberegel korrigiert (restriktive Lesart, D-070);
+  Synty-Zuordnungen in
+  [docs/assets/AssetRegister.md](docs/assets/AssetRegister.md) als durch
+  D-054 ersetzt markiert und um eine MS-1-Strategiespalte ergänzt;
+  Art-Namensebene in
+  [docs/tech/NamingConvention.md](docs/tech/NamingConvention.md) ergänzt.
 - **Float-/Double-Numerik im Movement-State als Risiko deklariert
   (Review-Auflage P1-2, Q-040(i)):**
   [docs/production/OpenQuestions.md](docs/production/OpenQuestions.md)
