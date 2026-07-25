@@ -18,6 +18,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G0-B-Buildbasis:** `Assets/_Project/Editor/BuildScript.cs` mit den
+  CLI-Build-Methoden `BuildWindows64`/`BuildMacOSArm64` (Szenenliste aus den
+  EditorBuildSettings, sauberes `companyName`/`productName`, fail-closed bei
+  leerer Szenenliste) sowie die minimale Bootstrap-Szene
+  `Assets/_Project/Scenes/Bootstrap.unity` (erzeugt über
+  `BootstrapSceneGenerator.CreateBootstrapScene`) als einzige aktivierte
+  Build-Szene. Echte Player-Builds bleiben ohne installierte Unity-
+  Build-Module ein dokumentierter Blocker.
 - `global.json` im Repo-Root mit exaktem .NET-SDK-Pin `8.0.318`
   (`rollForward: disable`), damit `dotnet`-Toolchain und Unity-Projekt
   reproduzierbar denselben SDK-Stand verwenden (G0-B).
@@ -68,6 +76,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **EditMode-Suite wieder grün (G0-B):**
+  `LockstepRelayBufferTests.CommandEnvelopeNetPacket_Serialization_PreservesValues`
+  erwartete ein veraltetes 41-Byte-Paket und der `Deserialize`-Guard
+  (`Length < 41`) lehnte die realen 34-Byte-Pakete der eigenen
+  `Serialize`-Ausgabe ab; Test und Guard sind auf das tatsächliche
+  34-Byte-Wire-Format (4+1+1+4+2+4+2+4+4+8) angeglichen. Hinweis: Die vom
+  Gate-Runner gemeldeten „7 Fehler" waren Zählartefakte aggregierter
+  NUnit-Suiten — real war genau dieser eine Test rot.
 - **G0-A-Härtung nach adversarialem Review:** Der Authorize-Job führt
   Validator und Ajv nun aus dem Trusted-Checkout aus und liest die Evidence
   über den neuen `--subject-root`-Parameter aus dem Subject-Checkout —

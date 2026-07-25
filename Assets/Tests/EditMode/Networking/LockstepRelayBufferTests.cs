@@ -23,7 +23,9 @@ namespace Nova.Networking.Tests
             );
 
             byte[] bytes = packet.Serialize();
-            Assert.AreEqual(41, bytes.Length);
+            // Wire format is 34 bytes (4+1+1+4+2+4+2+4+4+8); the historical
+            // module spec's 37-byte figure predates the current field layout.
+            Assert.AreEqual(34, bytes.Length);
 
             CommandEnvelopeNetPacket restored = CommandEnvelopeNetPacket.Deserialize(bytes);
 

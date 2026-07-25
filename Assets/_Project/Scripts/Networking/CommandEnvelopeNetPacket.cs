@@ -64,7 +64,7 @@ namespace Nova.Networking
 
         public byte[] Serialize()
         {
-            using (var ms = new MemoryStream(41))
+            using (var ms = new MemoryStream(34))
             using (var writer = new BinaryWriter(ms))
             {
                 writer.Write(TargetTick);
@@ -83,7 +83,8 @@ namespace Nova.Networking
 
         public static CommandEnvelopeNetPacket Deserialize(byte[] buffer)
         {
-            if (buffer == null || buffer.Length < 41)
+            // Wire layout: 4+1+1+4+2+4+2+4+4+8 = 34 bytes.
+            if (buffer == null || buffer.Length < 34)
                 throw new ArgumentException("Invalid network packet buffer size.", nameof(buffer));
 
             using (var ms = new MemoryStream(buffer))
