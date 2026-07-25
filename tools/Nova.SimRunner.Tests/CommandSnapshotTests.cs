@@ -119,5 +119,95 @@ namespace Nova.SimRunner.Tests
             Assert.That(victim.TryRestoreState(padded), Is.False);
             Assert.That(victim.TryRestoreState(new byte[] { 99, 0, 0 }), Is.False);
         }
+
+        /// <summary>
+        /// Crafts dedupe-state bytes (format of CommandDedupeState.Serialize)
+        /// with the given pending record bytes in exactly one slot's block;
+        /// next=1, watermark=0 everywhere.
+        /// </summary>
+        private static byte[] CraftDedupeState(int pendingSlot, params byte[][] pendingRecords)
+        {
+            var bytes = new System.Collections.Generic.List<byte> { CommandDedupeState.StateVersion };
+            for (int slot = 0; slot < CommandLimits.ReservedPlayerSlots; slot++)
+            {
+                byte[][] pending = slot == pendingSlot ? pendingRecords : null;
+                bytes.AddRange(System.BitConverter.GetBytes(1u));
+                bytes.AddRange(System.BitConverter.GetBytes(0u));
+                bytes.AddRange(System.BitConverter.GetBytes((ushort)(pending?.Length ?? 0)));
+                if (pending != null)
+                {
+                    foreach (byte[] recordBytes in pending)
+                    {
+                        bytes.AddRange(System.BitConverter.GetBytes((ushort)recordBytes.Length));
+                        bytes.AddRange(recordBytes);
+                    }
+                }
+            }
+            return bytes.ToArray();
+        }
+
+        private static byte[] WrapIngressState(byte[] dedupeBytes)
+        {
+            var bytes = new System.Collections.Generic.List<byte> { 1 };
+            bytes.AddRange(System.BitConverter.GetBytes((uint)dedupeBytes.Length));
+            bytes.AddRange(dedupeBytes);
+            bytes.AddRange(System.BitConverter.GetBytes((ushort)0)); // no session actions
+            return bytes.ToArray();
+        }
+
+        private static byte[] StopRecord(byte slot, uint sequence)
+        {
+            return CommandTestUtil.CraftRecord(
+                0, 1, slot, sequence, (ushort)CommandKind.Stop, 1,
+                CommandTestUtil.PayloadBytes(new StopPayload(new[] { CommandTestUtil.EntityId(1, 1) })));
+        }
+
+        [Test]
+        public void Restore_RejectsDuplicatePendingKey_WithoutThrowingOrMutating()
+        {
+            // Manipulated snapshot: the same (slot, sequence) pending key twice.
+            byte[] stateBytes = CraftDedupeState(0, StopRecord(0, 1), StopRecord(0, 1));
+            Assert.That(CommandDedupeState.TryDeserialize(stateBytes, out CommandDedupeState state), Is.False);
+            Assert.That(state, Is.Null, "no partial state escapes on failure");
+
+            var ingress = CommandTestUtil.CreateIngress();
+            Assert.That(ingress.TryRestoreState(WrapIngressState(stateBytes)), Is.False);
+            Assert.That(ingress.PendingCount, Is.EqualTo(0), "failed restore must not mutate");
+        }
+
+        [Test]
+        public void Restore_RevalidatesPendingRecordContent()
+        {
+            // Session action as pending stream record.
+            byte[] sessionKind = CommandTestUtil.CraftRecord(
+                0, 1, 0, 1, (ushort)CommandKind.PauseRequest, 1, System.Array.Empty<byte>());
+            Assert.That(
+                CommandDedupeState.TryDeserialize(CraftDedupeState(0, sessionKind), out _),
+                Is.False);
+
+            // Sequence 0 in a pending record.
+            Assert.That(
+                CommandDedupeState.TryDeserialize(CraftDedupeState(0, StopRecord(0, 0)), out _),
+                Is.False);
+
+            // Record stored in a slot block it does not belong to.
+            Assert.That(
+                CommandDedupeState.TryDeserialize(CraftDedupeState(1, StopRecord(0, 1)), out _),
+                Is.False);
+
+            // Pending record for a slot the restoring session does not run:
+            // structurally valid, but rejected by the ingress session binding.
+            byte[] foreignSlot = CraftDedupeState(5, StopRecord(5, 1));
+            Assert.That(CommandDedupeState.TryDeserialize(foreignSlot, out _), Is.True);
+            var ingress = CommandTestUtil.CreateIngress();
+            Assert.That(ingress.TryRestoreState(WrapIngressState(foreignSlot)), Is.False);
+            Assert.That(ingress.PendingCount, Is.EqualTo(0));
+
+            // A valid snapshot still restores cleanly.
+            CommandIngress original = BuildIngressWithPendingState();
+            var ok = CommandTestUtil.CreateIngress();
+            Assert.That(ok.TryRestoreState(original.SerializeState()), Is.True);
+            Assert.That(ok.PendingCount, Is.EqualTo(2));
+        }
     }
 }

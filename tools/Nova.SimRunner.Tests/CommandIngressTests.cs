@@ -235,6 +235,33 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void Accept_RejectsTrailingBytesAfterAValidRecord()
+        {
+            // The intake accepts exactly one record per call; trailing garbage
+            // is a structural framing error.
+            var ingress = CommandTestUtil.CreateIngress();
+            byte[] valid = StopRecord(slot: 0, sequence: 1);
+            var withGarbage = new byte[valid.Length + 1];
+            Array.Copy(valid, withGarbage, valid.Length);
+            withGarbage[valid.Length] = 0xAB;
+
+            Assert.That(
+                ingress.TryAcceptRecordBytes(withGarbage, out CommandRejectReason reason),
+                Is.EqualTo(CommandIngressResult.Rejected));
+            Assert.That(reason, Is.EqualTo(CommandRejectReason.TrailingBytes));
+            Assert.That(ingress.PendingCount, Is.EqualTo(0));
+
+            // Same rule on the replay import path.
+            Assert.That(
+                ingress.TryAcceptHistoricalRecordBytes(withGarbage, out CommandRejectReason historicalReason),
+                Is.EqualTo(CommandIngressResult.Rejected));
+            Assert.That(historicalReason, Is.EqualTo(CommandRejectReason.TrailingBytes));
+
+            // The exact record alone is still accepted.
+            Assert.That(ingress.TryAcceptRecordBytes(valid, out _), Is.EqualTo(CommandIngressResult.Accepted));
+        }
+
+        [Test]
         public void SessionActions_AreValidatedQueuedAndNeverSealedAsRecords()
         {
             var ingress = CommandTestUtil.CreateIngress();
