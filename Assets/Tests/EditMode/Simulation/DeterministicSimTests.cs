@@ -25,7 +25,7 @@ namespace Nova.Simulation.Tests
         public void SimulationKernel_MultiTickRun_IsDeterministic()
         {
             const ulong seed = 42UL;
-            
+
             var kernelA = new SimulationKernel(new SimRandom(seed));
             var kernelB = new SimulationKernel(new SimRandom(seed));
 
@@ -43,32 +43,23 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void CommandEnvelope_SubmissionAndProcessing_Succeeds()
+        public void SimulationKernel_RepeatedStateHash_IsStable_AndDoesNotConsumePrng()
         {
+            // F-005 regression: the canonical state hash is read-only. Two
+            // consecutive hashes are identical and the PRNG state words are
+            // untouched by hashing (the old hash consumed Random.NextUInt()).
             var kernel = new SimulationKernel(new SimRandom(100));
             kernel.Start();
+            kernel.StepTick();
 
-            var cmd = new CommandEnvelope(
-                type: CommandType.Move,
-                issuer: CommandIssuer.Human,
-                playerId: 1,
-                sequence: 1,
-                targetTick: new Tick(5),
-                entityId: new EntityId(10, 1),
-                targetPositionX: 100.5f,
-                targetPositionY: 0f,
-                targetPositionZ: 50.25f
-            );
+            kernel.Random.GetState(out ulong s0Before, out ulong s1Before);
+            ulong first = kernel.CalculateStateHash();
+            ulong second = kernel.CalculateStateHash();
+            kernel.Random.GetState(out ulong s0After, out ulong s1After);
 
-            bool submitted = kernel.SubmitCommand(cmd);
-            Assert.IsTrue(submitted);
-
-            for (int i = 0; i < 10; i++)
-            {
-                kernel.StepTick();
-            }
-
-            Assert.AreEqual(new Tick(10), kernel.CurrentTick);
+            Assert.AreEqual(first, second, "repeated state hash must be identical");
+            Assert.AreEqual(s0Before, s0After, "hashing must not touch PRNG word s0");
+            Assert.AreEqual(s1Before, s1After, "hashing must not touch PRNG word s1");
         }
     }
 }

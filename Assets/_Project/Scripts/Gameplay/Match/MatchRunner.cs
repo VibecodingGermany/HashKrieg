@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
@@ -37,12 +38,21 @@ namespace Nova.Gameplay.Match
 
     /// <summary>
     /// MonoBehaviour driving the deterministic C# SimulationKernel inside Unity.
-    /// Accumulates Time.deltaTime and steps the kernel at fixed 20 Ticks/sec (0.05s per tick).
+    /// Accumulates Time.deltaTime and steps the kernel at the canonical fixed
+    /// rate (<see cref="SimClock.TicksPerSecond"/> = 10 Hz, 0.1 s per tick).
+    /// <para>
+    /// Command flow (docs/tech/Commands.md section 1): UI/AI create only
+    /// <see cref="CommandIntent"/> values and hand them to the exposed
+    /// <see cref="Ingress"/>; per fixed tick the runner seals the due batch,
+    /// submits it to the kernel (the only intake) and steps. Systems never
+    /// see commands — the kernel applies them in tick phase 1.
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     public class MatchRunner : MonoBehaviour
     {
-        public const float TickDeltaTime = 0.05f; // 20 Ticks / sec
+        /// <summary>Canonical fixed tick delta (10 Hz, docs/tech/SimulationCore.md section 2).</summary>
+        public const float TickDeltaTime = SimClock.TickDeltaSeconds;
 
         [Header("Match Settings")]
         [SerializeField] private ulong _seed = 12345UL;
@@ -51,11 +61,18 @@ namespace Nova.Gameplay.Match
         [SerializeField] private int _maxUnits = 2048;
 
         private float _timeAccumulator;
+        private LocalLoopbackTransport _transport;
 
         public SimulationKernel Kernel { get; private set; }
         public EntityManager Entities { get; private set; }
         public PathfindingSystem Pathfinding { get; private set; }
         public MovementSystem Movement { get; private set; }
+
+        /// <summary>Session authority binding the local player slot (MS-1: slot 0 of {0, 1}).</summary>
+        public MatchSession Session { get; private set; }
+
+        /// <summary>The only command entry point for UI and AI (intent in, sealed batch out).</summary>
+        public CommandIngress Ingress { get; private set; }
 
         public bool IsRunning => Kernel != null && Kernel.IsRunning;
 
@@ -76,6 +93,11 @@ namespace Nova.Gameplay.Match
 
             Kernel.RegisterSystem(Pathfinding);
             Kernel.RegisterSystem(Movement);
+
+            Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
+            Ingress = new CommandIngress(Session);
+            _transport = new LocalLoopbackTransport(Ingress);
+            Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding), Ingress);
         }
 
         public void StartMatch()
@@ -103,12 +125,29 @@ namespace Nova.Gameplay.Match
 
             _timeAccumulator += Time.deltaTime;
 
-            // Step fixed 20-Hz simulation ticks
+            // Step fixed 10-Hz simulation ticks
             while (_timeAccumulator >= TickDeltaTime)
             {
-                Kernel.StepTick();
+                StepFixedTick();
                 _timeAccumulator -= TickDeltaTime;
             }
+        }
+
+        /// <summary>
+        /// One lockstep iteration: seal the batch due at the next tick
+        /// through the ingress, submit it to the kernel (the only intake),
+        /// step the kernel, then advance the session tick.
+        /// </summary>
+        private void StepFixedTick()
+        {
+            uint nextTick = Kernel.CurrentTick.Value + 1;
+            CommandBatch batch = Ingress.SealTickBatch(nextTick);
+            if (batch.Count > 0)
+            {
+                Kernel.SubmitBatch(batch);
+            }
+            Kernel.StepTick();
+            Session.AdvanceTick();
         }
 
         private void OnDestroy()

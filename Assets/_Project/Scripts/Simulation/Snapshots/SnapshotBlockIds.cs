@@ -1,0 +1,26 @@
+namespace Nova.Simulation.Snapshots
+{
+    /// <summary>
+    /// Registry of snapshot block ids used by the kernel-level snapshot
+    /// integration (docs/tech/SimulationCore.md section 7). The kernel owns
+    /// id 1; system state blocks (<see cref="IStatefulSimSystem"/>) are
+    /// assigned from 100 upward so kernel-reserved low ids and system blocks
+    /// can never collide. This assignment is provisional: the final block
+    /// registry is a Q-040 item and must be ratified by D-ID before the G1
+    /// schema freeze.
+    /// </summary>
+    public static class SnapshotBlockIds
+    {
+        /// <summary>Kernel block: tick, PRNG words, ingress/dedupe state, pending batches.</summary>
+        public const ushort Kernel = 1;
+
+        /// <summary>First block id available to stateful simulation systems.</summary>
+        public const ushort FirstSystemBlock = 100;
+
+        /// <summary>Entity store block (units, generations, free list), written by MovementSystem.</summary>
+        public const ushort EntityStore = FirstSystemBlock;
+
+        /// <summary>Pathfinding block (flow-field target; the field itself is rebuilt on restore).</summary>
+        public const ushort Pathfinding = FirstSystemBlock + 1;
+    }
+}

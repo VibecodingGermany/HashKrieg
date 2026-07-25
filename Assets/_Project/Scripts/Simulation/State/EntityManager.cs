@@ -112,5 +112,166 @@ namespace Nova.Simulation.State
                 _freeSlots.Push(i);
             }
         }
+
+        /// <summary>
+        /// Serialization version of the entity store snapshot block.
+        /// </summary>
+        public const byte StateVersion = 1;
+
+        /// <summary>
+        /// Writes the complete authoritative entity store state as canonical
+        /// little-endian block content (docs/tech/SimulationCore.md section 3:
+        /// entity allocator, free list, generations and unit state). Slot
+        /// order is ascending index; the free list is written in stack
+        /// enumeration order (top first) so a restore reproduces the exact
+        /// same future id assignment sequence.
+        /// <para>
+        /// Positions, speeds and radii are still IEEE-754 floats of the
+        /// prototype movement scaffolding; they serialize as their exact
+        /// little-endian bit patterns so hash and snapshot stay bit-exact
+        /// until the fixed-point migration replaces the storage type.
+        /// </para>
+        /// </summary>
+        public void WriteState(Snapshots.SnapshotBlockWriter writer)
+        {
+            writer.WriteUInt8(StateVersion);
+            writer.WriteUInt32(unchecked((uint)Capacity));
+            writer.WriteUInt32(unchecked((uint)ActiveCount));
+
+            for (int i = 0; i < Capacity; i++)
+            {
+                writer.WriteUInt16(_versions[i]);
+            }
+
+            writer.WriteUInt32(unchecked((uint)_freeSlots.Count));
+            foreach (int slot in _freeSlots)
+            {
+                writer.WriteInt32(slot);
+            }
+
+            for (int i = 0; i < Capacity; i++)
+            {
+                ref readonly UnitState u = ref _units[i];
+                writer.WriteUInt8(u.IsActive ? (byte)1 : (byte)0);
+                if (!u.IsActive) continue;
+
+                writer.WriteEntityId(u.Id);
+                writer.WriteUInt8(u.PlayerId);
+                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.PositionX));
+                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.PositionY));
+                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Transform.Rotation));
+                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.MoveSpeed));
+                writer.WriteUInt32(SimMath.SingleToUInt32Bits(u.Radius));
+                writer.WriteUInt16(u.TargetGridPos.X);
+                writer.WriteUInt16(u.TargetGridPos.Y);
+                writer.WriteInt32(u.CurrentHealth);
+                writer.WriteInt32(u.MaxHealth);
+                writer.WriteEntityId(u.AttackTarget);
+                writer.WriteInt32(u.WeaponCooldownTicks);
+                writer.WriteUInt8(u.IsMoving ? (byte)1 : (byte)0);
+            }
+        }
+
+        /// <summary>
+        /// Restores the entity store from block content produced by
+        /// <see cref="WriteState"/>. Every length and index is validated
+        /// before anything is allocated or mutated; the store invariants
+        /// (active count matches the active flags, the free list contains
+        /// exactly the inactive slots without duplicates, unit handles match
+        /// their slot and generation) are fully checked. Malformed input
+        /// returns false and leaves this manager untouched.
+        /// </summary>
+        public bool TryRestoreState(ReadOnlySpan<byte> content)
+        {
+            var reader = new Snapshots.SnapshotBlockReader(content);
+            if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
+            if (!reader.TryReadUInt32(out uint capacity)) return false;
+            if (capacity != (uint)Capacity) return false;
+            if (!reader.TryReadUInt32(out uint activeCount) || activeCount > capacity) return false;
+
+            var versions = new ushort[Capacity];
+            for (int i = 0; i < Capacity; i++)
+            {
+                if (!reader.TryReadUInt16(out versions[i])) return false;
+            }
+
+            if (!reader.TryReadUInt32(out uint freeCount) || freeCount > capacity) return false;
+            var freeSlots = new int[freeCount];
+            var seenFree = new bool[Capacity];
+            for (int i = 0; i < freeSlots.Length; i++)
+            {
+                if (!reader.TryReadInt32(out freeSlots[i])) return false;
+                if (freeSlots[i] < 0 || freeSlots[i] >= Capacity) return false;
+                if (seenFree[freeSlots[i]]) return false; // duplicate free-list entry
+                seenFree[freeSlots[i]] = true;
+            }
+
+            var units = new UnitState[Capacity];
+            int observedActive = 0;
+            for (int i = 0; i < Capacity; i++)
+            {
+                if (!reader.TryReadUInt8(out byte activeFlag) || activeFlag > 1) return false;
+                bool isActive = activeFlag == 1;
+
+                // Store invariant: the free list holds exactly the inactive slots.
+                if (isActive == seenFree[i]) return false;
+
+                if (!isActive) continue;
+                observedActive++;
+
+                if (!reader.TryReadEntityId(out EntityId id)) return false;
+                if (!reader.TryReadUInt8(out byte playerId)) return false;
+                if (!reader.TryReadUInt32(out uint posX)) return false;
+                if (!reader.TryReadUInt32(out uint posY)) return false;
+                if (!reader.TryReadUInt32(out uint rotation)) return false;
+                if (!reader.TryReadUInt32(out uint moveSpeed)) return false;
+                if (!reader.TryReadUInt32(out uint radius)) return false;
+                if (!reader.TryReadUInt16(out ushort targetX)) return false;
+                if (!reader.TryReadUInt16(out ushort targetY)) return false;
+                if (!reader.TryReadInt32(out int currentHealth)) return false;
+                if (!reader.TryReadInt32(out int maxHealth)) return false;
+                if (!reader.TryReadEntityId(out EntityId attackTarget)) return false;
+                if (!reader.TryReadInt32(out int weaponCooldown)) return false;
+                if (!reader.TryReadUInt8(out byte movingFlag) || movingFlag > 1) return false;
+
+                // The unit handle must match its slot and the slot generation.
+                if (id.Index != i || id.Version != versions[i] || versions[i] == 0) return false;
+
+                units[i] = new UnitState
+                {
+                    Id = id,
+                    PlayerId = playerId,
+                    Transform = new Transform2D(
+                        SimMath.UInt32BitsToSingle(posX),
+                        SimMath.UInt32BitsToSingle(posY),
+                        SimMath.UInt32BitsToSingle(rotation)),
+                    MoveSpeed = SimMath.UInt32BitsToSingle(moveSpeed),
+                    Radius = SimMath.UInt32BitsToSingle(radius),
+                    TargetGridPos = new Pathfinding.GridPos2D(targetX, targetY),
+                    CurrentHealth = currentHealth,
+                    MaxHealth = maxHealth,
+                    AttackTarget = attackTarget,
+                    WeaponCooldownTicks = weaponCooldown,
+                    IsActive = true,
+                    IsMoving = movingFlag == 1
+                };
+            }
+            if (observedActive != (int)activeCount) return false;
+            if (reader.Remaining != 0) return false;
+
+            // All checks passed; commit atomically.
+            Array.Copy(units, _units, Capacity);
+            Array.Copy(versions, _versions, Capacity);
+            _freeSlots.Clear();
+            // Serialized order is stack enumeration order (top first); pushing
+            // in reverse restores an identical stack, so the next id
+            // assignment sequence matches the serialized host exactly.
+            for (int i = freeSlots.Length - 1; i >= 0; i--)
+            {
+                _freeSlots.Push(freeSlots[i]);
+            }
+            ActiveCount = observedActive;
+            return true;
+        }
     }
 }

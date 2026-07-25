@@ -8,11 +8,20 @@ namespace Nova.Simulation.Movement
     /// <summary>
     /// Deterministic simulation system for unit movement and steering.
     /// Combines Flow-Field direction vectors with O(N) spatial grid separation steering.
-    /// Runs on fixed tick delta (0.05 seconds = 20 ticks/sec).
+    /// Runs on the canonical fixed tick delta (<see cref="SimClock.TickDeltaSeconds"/> = 0.1 s, 10 Hz).
+    /// <para>
+    /// Stateful (<see cref="IStatefulSimSystem"/>): the movement system owns
+    /// the authoritative entity store block in kernel snapshots — unit state,
+    /// generations and the free list live in the injected
+    /// <see cref="EntityManager"/>; this system only delegates the canonical
+    /// serialization. The spatial binning grids are per-tick scratch memory
+    /// rebuilt inside <see cref="ExecuteTick"/> and carry no state.
+    /// </para>
     /// </summary>
-    public sealed class MovementSystem : ISimSystem
+    public sealed class MovementSystem : IStatefulSimSystem
     {
-        public const float TickDeltaSeconds = 0.05f; // 20 Ticks / sec
+        /// <summary>Canonical tick delta in seconds (10 Hz, docs/tech/SimulationCore.md section 2).</summary>
+        public const float TickDeltaSeconds = SimClock.TickDeltaSeconds;
 
         private readonly EntityManager _entityManager;
         private readonly PathfindingSystem _pathfindingSystem;
@@ -154,6 +163,21 @@ namespace Nova.Simulation.Movement
 
         public void Shutdown()
         {
+        }
+
+        /// <summary>Snapshot block id of the entity store (registry: <see cref="Snapshots.SnapshotBlockIds"/>).</summary>
+        public ushort StateBlockId => Snapshots.SnapshotBlockIds.EntityStore;
+
+        /// <summary>Delegates the canonical entity store serialization to the owned <see cref="EntityManager"/>.</summary>
+        public void WriteState(Snapshots.SnapshotBlockWriter writer)
+        {
+            _entityManager.WriteState(writer);
+        }
+
+        /// <summary>Restores the entity store; malformed input leaves the manager untouched.</summary>
+        public bool TryRestoreState(ReadOnlySpan<byte> blockContent)
+        {
+            return _entityManager.TryRestoreState(blockContent);
         }
     }
 }

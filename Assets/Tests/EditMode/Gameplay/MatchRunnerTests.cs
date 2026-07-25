@@ -37,5 +37,15 @@ namespace Nova.Gameplay.Tests
 
             Object.DestroyImmediate(go);
         }
+
+        [Test]
+        public void MatchRunner_TickRate_IsCanonical10Hz()
+        {
+            // F-006 regression: the host tick delta is the canonical 10 Hz
+            // constant, not a local 20 Hz value.
+            Assert.AreEqual(10, SimClock.TicksPerSecond);
+            Assert.AreEqual(0.1f, SimClock.TickDeltaSeconds, 1e-7f);
+            Assert.AreEqual(SimClock.TickDeltaSeconds, MatchRunner.TickDeltaTime);
+        }
     }
 }
