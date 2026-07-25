@@ -18,6 +18,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Vorarbeit versiegelter Command-Pfad v1 (ohne Gate-Status, ohne
+  Evidence):** kanonische Command-Schicht in `Nova.Simulation.CommandsV1`
+  gemäß [docs/tech/Commands.md](docs/tech/Commands.md) — numerisch
+  eingefrorenes `CommandKind`-Register (13 Stream-Kinds plus Pause/Unpause/
+  Save/Load als Session-Aktionen außerhalb des Simulationsstroms), exaktes
+  Little-Endian-Record-Format (20-Byte-Header, Längenprüfung vor Allokation),
+  `CommandIntent` als einziges UI-/KI-seitiges Objekt, `MatchSession`/
+  `CommandIngress` als Autorität für Slot-Bindung, monotone Sequenz (Start 1,
+  kein Wrap) und `TargetTick = EnqueueTick + InputDelayTicks`,
+  `LocalLoopbackTransport` zurück an denselben validierenden Ingress,
+  unveränderlicher sortierter `CommandBatch` ((TargetTick, PlayerSlot,
+  Sequence)) als einzige Kernel-Eingabe, autoritativer serialisierbarer
+  `CommandDedupeState` (byteidentische Duplikate genau einmal, Konflikte
+  deterministisch abgelehnt, abgeschlossene Sequenzen umgehen Dedupe nicht),
+  Backpressure-Grenzen 4096/4076/256/1024/100 aus Commands.md §2 und
+  deterministisches `CommandResult` für zustandsabhängige Ablehnung ohne
+  Mutation (`CommandExecutor` gegen `ICommandStateView`). Alle neun
+  Pflichttestfälle aus Commands.md §6 in beiden Lanes (Unity EditMode +
+  `tools/Nova.SimRunner.Tests`), 100 % des aktivierten Inventars mit
+  Roundtrip- und Golden-Bytes-Tests (Hex-Master aus der kanonischen
+  Implementierung als Format-Freeze-Regression). Der defekte Prototyp-Pfad
+  (`Commands/`, `SimulationKernel.SubmitCommand`) bleibt unverändert bis zur
+  G1-Integration (D-057). Offene Q-040-Kandidaten: Harvest-`FieldId`-Modell,
+  Duplikat-Behandlung in Entity-Listen (als struktureller Fehler statt stiller
+  Dedupe gewählt), provisorische Obergrenze 64 für ausstehende
+  Session-Aktionen.
 - **G1-Vorarbeit Hash-Domänen (ohne Gate-Status, ohne Evidence):** kanonischer
   XXH64-Hasher in `Nova.Core` (`XxHash64` One-Shot, `XxHash64State`
   Streaming, safe-managed, explizite Little-Endian-Lanes) plus kanonischer
