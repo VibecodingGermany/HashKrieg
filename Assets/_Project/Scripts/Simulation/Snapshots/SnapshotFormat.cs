@@ -39,6 +39,16 @@ namespace Nova.Simulation.Snapshots
     /// - The on-disk table is canonical: strictly ascending BlockIds. A writer
     ///   emits ascending order regardless of insertion order, so serialize →
     ///   deserialize → serialize is byte-identical (SimulationCore.md 7.1).
+    /// <para>
+    /// Deliberate v1 deviations from Serialization.md, declared as Q-040
+    /// items (g) and (h), to be ratified by D-ID before the G1 schema freeze:
+    /// - No file hash: Serialization.md section 2 point 7 lists one, but the
+    ///   state hash plus the exact length arithmetic (header + table +
+    ///   payload must equal the file size) already cover integrity and
+    ///   truncation; a file hash would be redundant in container v1.
+    /// - Major-only FormatVersion u16 instead of Major u16 + Minor u16
+    ///   (Serialization.md section 1); v1 treats Minor as implicit 0.
+    /// </para>
     /// </para>
     /// </summary>
     public static class SnapshotFormat
