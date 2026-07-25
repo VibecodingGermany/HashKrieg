@@ -45,7 +45,7 @@ namespace Nova.Simulation.State
             return _versions[id.Index] == id.Version && _units[id.Index].IsActive;
         }
 
-        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, SimFixed moveSpeed, SimFixed? radius = null, int maxHealth = 100)
+        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, SimFixed moveSpeed, SimFixed? radius = null, int maxHealth = 100, SimFixed? sightRadius = null)
         {
             if (_freeSlots.Count == 0)
             {
@@ -56,7 +56,7 @@ namespace Nova.Simulation.State
             ushort version = _versions[index];
             var id = new EntityId(index, version);
 
-            _units[index] = new UnitState(id, playerId, initialTransform, moveSpeed, radius, maxHealth);
+            _units[index] = new UnitState(id, playerId, initialTransform, moveSpeed, radius, maxHealth, sightRadius);
             ActiveCount++;
 
             return id;
@@ -117,10 +117,12 @@ namespace Nova.Simulation.State
         /// Serialization version of the entity store snapshot block.
         /// v2 (Q-040(i) SimFixed migration): positions, speeds and radii are
         /// SimFixed raw int32, rotation is a SimAngle uint16 — replacing the
-        /// v1 IEEE-754 float bit patterns. v1 blocks are rejected (the
-        /// pre-G1 reset allows the hard cut; no migration path).
+        /// v1 IEEE-754 float bit patterns. v3 adds the authoritative
+        /// <see cref="UnitState.SightRadius"/> (SimFixed raw int32) for the
+        /// canonical Fog of War (docs/tech/FogOfWar.md). v1/v2 blocks are
+        /// rejected (the pre-G1 reset allows the hard cut; no migration path).
         /// </summary>
-        public const byte StateVersion = 2;
+        public const byte StateVersion = 3;
 
         /// <summary>
         /// Writes the complete authoritative entity store state as canonical
@@ -166,6 +168,7 @@ namespace Nova.Simulation.State
                 writer.WriteSimAngle(u.Transform.Rotation);
                 writer.WriteSimFixed(u.MoveSpeed);
                 writer.WriteSimFixed(u.Radius);
+                writer.WriteSimFixed(u.SightRadius);
                 writer.WriteUInt16(u.TargetGridPos.X);
                 writer.WriteUInt16(u.TargetGridPos.Y);
                 writer.WriteInt32(u.CurrentHealth);
@@ -273,6 +276,7 @@ namespace Nova.Simulation.State
                 if (!reader.TryReadUInt16(out ushort rotation)) return false;
                 if (!reader.TryReadInt32(out int moveSpeed)) return false;
                 if (!reader.TryReadInt32(out int radius)) return false;
+                if (!reader.TryReadInt32(out int sightRadius)) return false;
                 if (!reader.TryReadUInt16(out ushort targetX)) return false;
                 if (!reader.TryReadUInt16(out ushort targetY)) return false;
                 if (!reader.TryReadInt32(out int currentHealth)) return false;
@@ -294,6 +298,7 @@ namespace Nova.Simulation.State
                         SimAngle.FromRaw(rotation)),
                     MoveSpeed = SimFixed.FromRaw(moveSpeed),
                     Radius = SimFixed.FromRaw(radius),
+                    SightRadius = SimFixed.FromRaw(sightRadius),
                     TargetGridPos = new Pathfinding.GridPos2D(targetX, targetY),
                     CurrentHealth = currentHealth,
                     MaxHealth = maxHealth,

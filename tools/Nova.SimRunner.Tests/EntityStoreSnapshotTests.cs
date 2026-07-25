@@ -7,14 +7,16 @@ using Nova.Simulation.State;
 namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Entity store snapshot block v2 suite (.NET lane): the Q-040(i)
+    /// Entity store snapshot block v3 suite (.NET lane): the Q-040(i)
     /// SimFixed layout (SimFixed raw int32 positions/speeds/radii, SimAngle
-    /// uint16 rotation) roundtrips byte-exactly, v1 blocks are rejected and
-    /// the smallest fixed-point state mutation changes the state hash.
-    /// Mirror of the EditMode lane EntityStoreSnapshotV2Tests.
+    /// uint16 rotation) plus the authoritative SimFixed sight radius of the
+    /// canonical Fog of War roundtrips byte-exactly, v1/v2 blocks are
+    /// rejected and the smallest fixed-point state mutation changes the
+    /// block bytes.
+    /// Mirror of the EditMode lane EntityStoreSnapshotTests.
     /// </summary>
     [TestFixture]
-    public sealed class EntityStoreSnapshotV2Tests
+    public sealed class EntityStoreSnapshotTests
     {
         private static EntityManager CreateStoreWithUnits()
         {
@@ -24,7 +26,8 @@ namespace Nova.SimRunner.Tests
                 new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(-3.25f), SimAngle.FromRaw(8192)),
                 SimFixed.FromInt(5),
                 SimFixed.FromFloat(0.4f),
-                maxHealth: 80);
+                maxHealth: 80,
+                sightRadius: SimFixed.FromFloat(12.5f));
             store.SpawnUnit(
                 1,
                 new Transform2D(SimFixed.FromInt(127), SimFixed.FromInt(127), SimAngle.FromRaw(49152)),
@@ -40,7 +43,7 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void BlockV2_RoundtripsByteIdentical_AndRestoresExactState()
+        public void BlockV3_RoundtripsByteIdentical_AndRestoresExactState()
         {
             EntityManager store = CreateStoreWithUnits();
             byte[] bytes = Serialize(store);
@@ -50,40 +53,50 @@ namespace Nova.SimRunner.Tests
             Assert.That(restored.TryRestoreState(bytes), Is.True);
             Assert.That(Serialize(restored), Is.EqualTo(bytes), "restore -> serialize must be byte-identical");
 
-            // Field-level equality of the first unit, including the SimAngle heading.
+            // Field-level equality of the first unit, including the SimAngle
+            // heading and the authoritative sight radius.
             Assert.That(restored.TryGetUnit(new EntityId(0, 1), out UnitState unit), Is.True);
             Assert.That(unit.Transform.PositionX, Is.EqualTo(SimFixed.FromFloat(10.5f)));
             Assert.That(unit.Transform.PositionY, Is.EqualTo(SimFixed.FromFloat(-3.25f)));
             Assert.That(unit.Transform.Rotation, Is.EqualTo(SimAngle.FromRaw(8192)));
             Assert.That(unit.MoveSpeed, Is.EqualTo(SimFixed.FromInt(5)));
             Assert.That(unit.Radius, Is.EqualTo(SimFixed.FromFloat(0.4f)));
+            Assert.That(unit.SightRadius, Is.EqualTo(SimFixed.FromFloat(12.5f)));
+
+            // The second unit carries the documented default sight radius.
+            Assert.That(restored.TryGetUnit(new EntityId(1, 1), out UnitState second), Is.True);
+            Assert.That(second.SightRadius, Is.EqualTo(UnitState.DefaultSightRadius));
         }
 
         [Test]
-        public void BlockV1Bytes_AreRejected()
+        public void LegacyBlockVersionsV1AndV2_AreRejected()
         {
-            // A v1 block (float layout) is rejected at the version byte; the
-            // pre-G1 reset allows the hard cut without a migration path.
+            // v1 (float layout) and v2 (no sight radius) blocks are rejected
+            // at the version byte; the pre-G1 reset allows the hard cut
+            // without a migration path.
             EntityManager store = CreateStoreWithUnits();
-            byte[] v2 = Serialize(store);
+            byte[] v3 = Serialize(store);
 
-            var v1 = (byte[])v2.Clone();
-            v1[0] = 1; // former StateVersion
-            var victim = new EntityManager(64);
-            Assert.That(victim.TryValidateState(v1), Is.False);
-            Assert.That(victim.TryRestoreState(v1), Is.False);
-            Assert.That(victim.ActiveCount, Is.EqualTo(0), "a rejected restore must not mutate the store");
+            foreach (byte legacyVersion in new byte[] { 1, 2 })
+            {
+                var legacy = (byte[])v3.Clone();
+                legacy[0] = legacyVersion;
+                var victim = new EntityManager(64);
+                Assert.That(victim.TryValidateState(legacy), Is.False, $"v{legacyVersion} must fail validation");
+                Assert.That(victim.TryRestoreState(legacy), Is.False, $"v{legacyVersion} must fail restore");
+                Assert.That(victim.ActiveCount, Is.EqualTo(0), "a rejected restore must not mutate the store");
+            }
         }
 
         [Test]
-        public void HeaderVersion_IsTwo()
+        public void HeaderVersion_IsThree()
         {
-            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)2));
-            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)2));
+            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)3));
+            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)3));
         }
 
         [Test]
-        public void SingleRawUnitPositionChange_ChangesBlockBytesAndHash()
+        public void SingleRawUnitPositionChange_ChangesBlockBytes()
         {
             // Hash sensitivity at the fixed-point resolution: moving a unit
             // by exactly one Q16.16 raw unit changes the serialized block and
@@ -102,6 +115,24 @@ namespace Nova.SimRunner.Tests
 
             byte[] after = Serialize(host);
             Assert.That(after, Is.Not.EqualTo(before), "one raw unit must change the block bytes");
+        }
+
+        [Test]
+        public void SingleRawSightRadiusChange_ChangesBlockBytes()
+        {
+            // The sight radius is authoritative (it drives the FoW recompute),
+            // so one raw unit of change must move the serialized block.
+            var host = new EntityManager(64);
+            EntityId id = host.SpawnUnit(
+                0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+
+            byte[] before = Serialize(host);
+
+            ref UnitState unit = ref host.GetUnitRef(id);
+            unit.SightRadius = SimFixed.FromRaw(unit.SightRadius.RawValue + 1);
+
+            byte[] after = Serialize(host);
+            Assert.That(after, Is.Not.EqualTo(before), "one raw unit of sight radius must change the block bytes");
         }
     }
 }
