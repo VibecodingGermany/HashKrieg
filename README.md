@@ -1,96 +1,144 @@
 # Project Nova
 
-> Modernes Echtzeitstrategiespiel (RTS) mit Basisbau, drei Fraktionen und der lebendigen Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
+**Dokumentversion:** 0.11.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
-**Phase:** Implementierungs-Recovery · **Status:** Sprint 7, Gate G0 · **Repo:** öffentlich (Community-Projekt)
+> Modernes Echtzeitstrategiespiel mit Basisbau und der lebendigen
+> Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
 
----
+## Zweck
 
-## Worum es geht
+Diese Seite ist der Einstieg in Repository, Projektstatus und Dokumentation.
+Sie unterscheidet bewusst zwischen vorhandenem Prototypcode und bestandenen
+Gates.
 
-*Project Nova* ist ein Echtzeitstrategie- und Base-Building-Spiel im Geist klassischer RTS-Titel, technisch neu aufgesetzt auf **Unity 6.3 LTS (C#, URP)**. Kernelemente:
+## Abhängigkeiten
 
-- Große Karten mit schräger Top-Down-/Isometrie-Kamera
-- Basisbau, Ressourcenabbau und Produktionsketten rund um die Ressource **Aetherium**
-- Drei spielbare Fraktionen mit eigener Identität und Commander-System
-- Infanterie, Fahrzeuge, Luftfahrzeuge, Verteidigungsanlagen
-- KI-Gegner und Multiplayer, Gefechte mit vielen gleichzeitigen Einheiten
-
-> **Wichtig:** Das Repository enthält inzwischen Spielcode, dieser ist jedoch ein **unvollständig integrierter Prototyp**. Der Audit am Stand `460290e` setzt den Status zurück: MS-0 ist offen, das MVP ist nicht erreicht und Alpha hat nicht begonnen. Führend sind der [Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md) und der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md).
-
-## Einstieg in die Dokumentation
-
-Das gesamte Wissen ist ein **Wiki aus vielen kleinen, verlinkten Living Documents** (Prinzip statt Monolithen). Startpunkte:
-
-| Einstieg | Beschreibung |
-|---|---|
-| **[docs/README.md](docs/README.md)** | Zentraler Wiki-Index – von hier aus ist alles erreichbar |
-| [docs/meta/DocumentationStandard.md](docs/meta/DocumentationStandard.md) | Verbindlicher Dokumentationsstandard (Aufbau, Versionierung, Sprache) |
-| [docs/vision/Vision.md](docs/vision/Vision.md) | Leitbild, Design-Säulen, Anti-Ziele |
-| [docs/gamedesign/Factions.md](docs/gamedesign/Factions.md) | Fraktionen (Master-Dokument des Game Designs) |
-| [docs/production/DecisionLog.md](docs/production/DecisionLog.md) | Alle getroffenen Entscheidungen (D-001 ff.) mit Alternativen |
-| [docs/production/SprintPlanning.md](docs/production/SprintPlanning.md) | Sprint-Definitionen, Ziele und Exit-Kriterien |
-| [docs/production/ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) | Strenge Bestandsaufnahme des erzeugten Codes |
-| [docs/production/MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) | Gate-basierter Weg zum nachweisbaren MVP |
-
-## Repository-Struktur
-
-```
-Project Nova/
-├── README.md              ← diese Datei (GitHub-Startseite)
-├── AGENTS.md              ← Arbeitsregeln für KI-Agenten & Mitwirkende
-├── CHANGELOG.md           ← Änderungshistorie (Keep a Changelog)
-├── RTS_*.md               ← historische Quelldokumente (Ausgangsbasis)
-└── docs/
-    ├── README.md          ← Wiki-Index
-    ├── meta/              ← Dokumentationsstandard
-    ├── analysis/          ← Wissensbasis, Gap-/Inkonsistenzanalyse (Sprint 0)
-    ├── research/          ← Technologie- & Markt-Research (Sprint 1)
-    ├── vision/            ← Leitbild, USP, Zielgruppe, Game Loop (Sprint 2)
-    ├── gamedesign/        ← vollständiges GDD (Sprint 2)
-    ├── tech/              ← Technical Design (Sprint 3) + review/ (Architecture Review, Sprint 4)
-    ├── assets/            ← Asset Audit: Register, Strategie, Lizenzen, Build-Backlog (Sprint 5)
-    └── production/        ← Sprint-Planung, Entscheidungen, Risiken, Sprint-Berichte
-```
+- [AGENTS.md](AGENTS.md) – verbindliche Arbeitsregeln
+- [CONTRIBUTING.md](CONTRIBUTING.md) – Branch-, PR- und Review-Ablauf
+- [docs/README.md](docs/README.md) – vollständiger Wiki-Index
+- [docs/production/MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) –
+  Gates G0 bis G5
+- [docs/production/MVPContentManifest.md](docs/production/MVPContentManifest.md) –
+  exakter MS-1-Inhalt
+- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – D-064
+  zum Trusted-Gate-Bootstrap
 
 ## Projektstatus
 
-| Sprint | Thema | Status |
-|---|---|---|
-| 0 | Projektinitialisierung & Analyse | ✅ abgeschlossen |
-| 1 | Research | ✅ abgeschlossen |
-| 2 | Game Design (GDD) | ✅ abgeschlossen |
-| 3 | Technical Design | ✅ abgeschlossen |
-| 4 | Architecture Review | ✅ abgeschlossen |
-| 5 | Asset Audit | ✅ abgeschlossen |
-| 6 | Produktionsplanung | ⚠️ Abschluss zurückgezogen |
-| 7 | Implementierungs-Recovery | 🟡 aktiv – Gate G0 |
+**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7, G0-A offen ·
+**Wiki:** 0.11.0 unveröffentlicht
 
-Details und Exit-Kriterien: [docs/production/SprintPlanning.md](docs/production/SprintPlanning.md).
+| Ergebnisstufe | Status |
+|---|---|
+| Sprint 6 | durch D-055 beendet; Recovery-Rebaseline ersetzt die alte Planung |
+| Sprint 7 | gestartet; zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis |
+| G0 | offen |
+| MS-0 | nicht erreicht |
+| MS-1 / MVP | nicht erreicht |
+| Alpha | nicht begonnen |
 
-## Tech-Stack (geplant)
+Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
+Typen und isolierte Tests sind kein Fertignachweis. Führend sind der
+[Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md)
+und schema- sowie semantikvalide Gate-Evidence; in diesem Rebaseline werden keine
+Evidence-Platzhalter erzeugt.
 
-- **Engine:** Unity 6.3 LTS · **Sprache:** C# · **Render-Pipeline:** URP
-- **Architektur-Prämisse:** Vier-Säulen-Architektur mit Unity-freiem, deterministischem Simulationskern (`Nova.Simulation`)
-- **In Sprint 3 entschieden (D-033–D-042):** Multiplayer-Simulationsmodell, Pathfinding-Verfahren, ECS/DOTS-Frage
+Schema 1.2 prüft aktuell ausschließlich Integrität und autorisiert keinen
+Gate-Pass. Jeder Pass-Versuch endet fail-closed mit
+`E_AUTHORIZATION_BOOTSTRAP`. G0-A muss zuerst das subject-unabhängige Trusted
+Tooling und Schema 1.3 zweistufig etablieren; erst ein nachfolgender sauberer
+Subject-Commit darf damit G0 nachweisen.
+
+## Closed-Core MS-1
+
+D-056 begrenzt MS-1 auf:
+
+- Allianz gegen Legion, Mensch gegen KI;
+- Glutrinne, Wüste, S, 128×128, klares Wetter;
+- je neun Gebäude- und acht Einheitenrollen;
+- vollständiges Aetherium einschließlich endlicher Reserve, Nachwachsen,
+  Ausbreitung, permanenter Überernte und KI-Feldmanagement;
+- Pause, Save/Load/Recovery und das definierte Accessibility-Minimum.
+
+Evolvierte, Luft, T3, Zusatzkarten, Multiplayer, Kampagne, Telemetrie,
+Steam/Cloud und finale Art/Audio sind Post-MVP.
+
+## Tech-Stack
+
+- **Engine:** Unity `6000.5.4f1`, Revision `d550df8bd089`
+- **Rendering:** URP
+- **Sprache:** C#
+- **Simulation:** Unity-freier, autoritativer `Nova.Simulation`-Kern,
+  Q16.16-Fixed-Point ab G1
+- **Host:** Unity und `Nova.SimRunner` verwenden dieselben Core-/Sim-Quellen
+
+Automatische Editor-Upgrades sind verboten. Eine Re-Evaluierung benötigt nach
+G5 oder bei einem belegten Engine-Blocker eine neue D-ID.
+
+## Repository-Struktur
+
+```text
+Project Nova/
+├── Assets/                Unity-Projekt und Prototypcode
+├── docs/                  Living-Documents-Wiki
+│   ├── gamedesign/        Vollspiel-GDD mit MS-1-Overrides
+│   ├── tech/              technische Verträge
+│   └── production/        Entscheidungen, Gates, Risiken, Planung
+├── quality/
+│   ├── content/           maschinenlesbares MVP-Manifest
+│   ├── scenarios/         kanonische Abnahmeszenarien
+│   ├── schemas/           Evidence-Schema; keine Platzhalter-Evidence
+│   ├── scripts/           Schema-, Semantik- und Integritätsprüfung
+│   └── package-lock.json  gepinnte Ajv-Abhängigkeiten
+├── tools/                 unter anderem Nova.SimRunner
+├── AGENTS.md
+├── CONTRIBUTING.md
+└── CHANGELOG.md
+```
 
 ## Arbeitsweise
 
-Die Entwicklung läuft **KI-gestützt** über Coding-Agenten. Verbindliche Regeln für Commits, Branches, CHANGELOG-Pflege und Dokumentationsdisziplin stehen in **[AGENTS.md](AGENTS.md)** – jeder Agent und jede mitwirkende Person liest diese Datei zuerst. Alle Änderungen laufen über **Pull Requests** (kein direkter `main`-Push); der Team-Ablauf steht in **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+`main` ist PR-only. Arbeit erfolgt auf kurzen
+`feat/`, `fix/`, `docs/`, `chore/`, `refactor/` oder `codex/`-Branches,
+gefolgt von Squash-Merge und linearer Historie. Es gibt keinen dauerhaften
+Integrationsbranch. Agenten committen oder pushen nur nach ausdrücklicher
+Anfrage für die jeweilige Aktion.
 
-Grundprinzipien:
-- **Living Documents:** Jede Erkenntnis/Entscheidung wird sofort dokumentiert und versioniert – Doku ist nie „fertig".
-- **Entscheidungen mit Alternativen:** Jede relevante Entscheidung landet mit ≥3 geprüften Alternativen im [DecisionLog](docs/production/DecisionLog.md).
-- **Sprache:** Deutsch für Projektdokumente, Englisch für Code/Identifier/Pfade.
-
-## Änderungshistorie
-
-Siehe [CHANGELOG.md](CHANGELOG.md). Die Versionsnummern folgen dem Dokumentationsstand des Wikis (aktuell `0.7.1`, unveröffentlicht).
-
-## Mitmachen
-
-Öffentliches **Community-Projekt** der Organisation **VibecodingGermany**. Beiträge sind willkommen – bitte zuerst [CONTRIBUTING.md](CONTRIBUTING.md) und [AGENTS.md](AGENTS.md) lesen. Alle Änderungen laufen über Pull Requests.
+Pflichtchecks sind `docs-check` und – sobald G0 ihn real implementiert –
+`quality-gate`. Der aktuelle Rebaseline baut noch keinen Code-CI-Workflow; das
+ist zuerst G0-A- und danach G0-B-Arbeit. Eine Änderung am Trust-Bundle wird
+ohne Gate-Fortschritt gemergt und kann sich nicht selbst autorisieren.
 
 ## Lizenz
 
-© 2026 VibecodingGermany / Dennis Westermann. Eine formale Lizenz ist **noch festzulegen** (`LICENSE` folgt). Bis dahin: Ansehen und Mitwirken per Pull Request ausdrücklich erwünscht; keine Weiterverbreitung als eigenes Werk ohne Absprache.
+© 2026 VibecodingGermany / Dennis Westermann. Bis eine formale Lizenz
+vorliegt, sind Ansehen und Mitwirken per Pull Request erwünscht; eine
+Weiterverbreitung als eigenes Werk ist nicht freigegeben.
+
+## Offene Punkte
+
+- Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
+- Eine formale Lizenz ist noch festzulegen.
+
+## Nächste Schritte
+
+1. G0-A mit Schema 1.3, Trusted Tooling und Gate-Runner ohne Gate-Fortschritt
+   implementieren und geschützt mergen.
+2. Am nachfolgenden sauberen Subject G0-B herstellen und genau dort mit dem
+   bereits gemergten Trust-Bundle, der vollständigen geordneten
+   `authorizedEvidence`-Kette und der Umgebungsbindung G0 beweisen.
+3. G1 einschließlich V1–V5a erst nach bestandenem G0 beginnen.
+4. Gate-Status nur mit der subject-unabhängig autorisierten
+   Schema-1.3-Evidence ändern.
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
+| 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
+| 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |
+| 0.8.2 | 2026-07-24 | Sprint-6-Endstatus und auf G0 begrenzten Start von Sprint 7 eindeutig formuliert | Executive Producer / Technical Writer |
+| 0.9.0 | 2026-07-24 | D-062-Evidence-Kette sowie Victory-, MatchConfig- und Commander-MS-1-Overrides ergänzt | Executive Producer / Technical Writer / Lead QA Engineer |
+| 0.10.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trustpfad aufgenommen | Executive Producer / Technical Writer / Lead QA Engineer |
+| 0.11.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt, G0-A vor G0-B gestellt und subject-unabhängigen Schema-1.3-Bootstrap verankert | Executive Producer / Technical Writer / Lead QA Engineer |

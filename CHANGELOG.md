@@ -13,16 +13,103 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
+> **Dokumentationsstand 0.11.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
+> erzeugt; G0, MS-0 und MS-1 bleiben offen.
+
 ### Geändert
+- **Planung vollständig auf D-056–D-064 rebaselined:** Sprint 7 bleibt bei
+  offenem G0; MS-0 und MS-1 sind unerreicht. Milestones, SprintPlanning,
+  Roadmap, RiskAnalysis und Sprint06_Report verwenden dieselbe Gate- und
+  Evidence-Logik.
+- Sprint 6 ist eindeutig als durch D-055 beendet/ersetzt dokumentiert;
+  Sprint 7 ist gestartet, aber ausschließlich G0 ist zur Implementierung
+  freigegeben.
+- Aktive Technikverträge wurden auf Q16.16 ab G1, kanonische Commands/
+  Snapshots/Replays, XXH64 Seed 0, feste MS-1-Kapazitäten, committed FoW und
+  die getrennten 100-/500-Workloads angeglichen.
+- Branch-Governance auf geschütztes `main`, kurze Topic-Branches,
+  Squash/lineare Historie, kein dauerhafter Integrationsbranch und explizite
+  Agentenautorität pro Commit-/Push-Aktion vereinheitlicht.
+- Engine-Pin auf Unity `6000.5.4f1`, Revision `d550df8bd089`, URP korrigiert;
+  automatische Editor-Upgrades sind ausgeschlossen.
+- Sieg, Remis, 45-Minuten-Limit und Last-Unit-Reveal sind für MS-1 in D-056,
+  Inhaltsmanifest, State und maschinenlesbarem Contentvertrag geschlossen.
+- VictoryConditions und MultiplayerModes besitzen lokale, führende
+  MS-1-Overrides; Commander/Voice/Portrait/Doktrinen sind eindeutig Post-MVP
+  und D-009 ist für MS-1 teilersetzt.
+- Verbliebene Commander-/Audio-Altformulierungen in Vision, Asset-Register,
+  OpenQuestions und AudioArchitecture sind auf Post-MVP vereinheitlicht;
+  D-039 ist als vorhandene, durch D-056/D-058 begrenzte Entscheidung verankert.
+- Q16.16-Bereich, `DefinitionId`, `EntityId`-Bitlayout, Command-Kappen,
+  Schema-/Count-Breiten und nullterminierte XXH64-Domänen sind bytegenau
+  festgelegt; Pause/Save/Load sind eindeutig Session-Aktionen.
+- Alle 17 alten `docs/tech/modules/*_Spec.md` sind als historischer,
+  nicht verbindlicher Prototyp-/Scaffolding-Stand gemäß D-055 markiert.
+- V2 und V3 sind als eigene 500-Objekt-Szenarien ergänzt; Rendering,
+  Animation und FoW-Budget wurden an 128²/5 Hz sowie MG/Rocket-MS-1
+  angeglichen.
+- Historische Änderungsverläufe wurden unverändert wiederhergestellt;
+  `docs-check` erzwingt Kopfzeile, Pflichtabschnitte, terminale History,
+  fünf strikte Quality-JSONs, gepinntes Ajv und die
+  Evidence-Negativkontrollen; Änderungen unter `quality/**` lösen den
+  Workflow ebenfalls aus.
+- Roadmap enthält keine aktive 445-PT- oder Kalenderzusage mehr:
+  Aufwandsspanne frühestens nach G2, Kalenderkorridor frühestens nach G4.
 - **Recovery-Baseline nach strengem Implementierungs-Audit:** MS-0 ist offen, das MVP ist nicht erreicht und Alpha hat nicht begonnen. Die bisherigen Sprint-7-Einträge belegen nur vorhandene Prototyp-Struktur, nicht fertige oder integrierte Features.
 - [ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) dokumentiert Testfehler, Integrationslücken, fehlende Akzeptanznachweise und Planungswidersprüche am eingefrorenen Stand `460290e`.
 - [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) ersetzt pauschale Modul-Fertigmeldungen durch sequenzielle Gates G0–G5.
 - Sprint-6-Abschluss, Sprint-7-GO, 445-PT-Verbindlichkeit sowie die ungültigen Schließungen Q-018/Q-019 wurden durch D-055 zurückgezogen; R-16 wurde reaktiviert und R-17 ergänzt.
 
 ### Entschieden
+- **D-056:** Dependency-closed MS-1 mit Allianz/Legion, Glutrinne, neun
+  Gebäude- und acht Einheitenrollen je Fraktion, vollständigem D-010-
+  Aetherium und definiertem Produktminimum; Q-031/Q-038 geschlossen.
+- **D-057:** Kanonischer Q16.16-/Command-/State-/Persistence-Vertrag ab G1;
+  exakte Plattformparität, einmaliger Pre-G1-Formatreset; Q-039 geschlossen.
+- **D-058:** Feste MS-1-Slots, Entity-/Snapshot-/Flow-Cache-Kappen und
+  autoritatives 5-Hz-Team-FoW; Q-032 geschlossen.
+- **D-059:** Geschütztes `main` plus kurze Topic-Branches ersetzt D-050.
+- **D-060:** Exakter Unity-Pin `6000.5.4f1` ersetzt D-006.
+- **D-061:** Ausführbare G0–G5-Gates, unveränderliche Evidence, getrennte
+  Full-Content-/Scale-Workloads und feste Laufkadenz; Q-033/Q-034 geschlossen.
+- **D-062:** Szenarioassertions und -schwellen an artefaktgebundene
+  Rohsamples, Content/Scenario an Subject-Git-Blobs und G1–G5 an eine
+  rekursive Same-Subject-Vorgängergate-Kette gebunden.
+- **D-063:** Evidence-Schema 1.2 mit kanonischen kriterienspezifischen
+  Check-/Log-Artefakten, rekursivem Ajv, exakten Units, drei getrennten
+  Performance-Läufen und externem Protected-CI-Trust-Kontext; lokales
+  Evidence darf keinen Gate-Pass autorisieren.
+- **D-064:** Schema 1.2 bleibt eine fail-closed Integritätsvorstufe. G0-A
+  implementiert vor der Plattformarbeit einen subject-unabhängigen,
+  nicht selbstautorisierenden Trusted-Gate-Bootstrap; erst Schema 1.3 bindet
+  das Trust-Bundle, die vollständige Gate-Kette und exakte Messumgebungen.
 - **D-055:** Vorhandenen Code als Prototyp erhalten, Projektstatus auf Recovery zurücksetzen und Fortschritt ausschließlich über reproduzierbare Evidenz qualifizieren.
 
 ### Hinzugefügt
+- [MVPContentManifest.md](docs/production/MVPContentManifest.md) als
+  menschlich lesbare MS-1-Inhaltsgrenze.
+- Substantive Technikverträge
+  [SimulationCore.md](docs/tech/SimulationCore.md),
+  [Commands.md](docs/tech/Commands.md),
+  [FogOfWar.md](docs/tech/FogOfWar.md) und
+  [CameraSystem.md](docs/tech/CameraSystem.md).
+- Maschinenlesbare Verträge
+  [`quality/content/mvp-v1.json`](quality/content/mvp-v1.json),
+  [`quality/scenarios/mvp-v1.json`](quality/scenarios/mvp-v1.json) und
+  [`quality/schemas/GateEvidence.schema.json`](quality/schemas/GateEvidence.schema.json);
+  keine Evidence-Platzhalter.
+- [`quality/scripts/validate_gate_evidence.py`](quality/scripts/validate_gate_evidence.py)
+  für Cross-Field-, Subject-Blob-, Rohsample-/Schwellen-, Gate-Ketten-,
+  Artefakt-, Reviewer-, Kriterien- und Gate-Profil-Prüfung mit generierten
+  Negativkontrollen.
+- Gepinnte Draft-2020-12-Prüfung über
+  [`quality/scripts/validate_evidence_schema.mjs`](quality/scripts/validate_evidence_schema.mjs),
+  [`quality/package.json`](quality/package.json) und
+  [`quality/package-lock.json`](quality/package-lock.json).
+- Fail-closed `E_AUTHORIZATION_BOOTSTRAP`-Sperre für jeden
+  Schema-1.2-Pass-Versuch sowie R-18 für selbstautorisierende Prüftools und
+  ungebundene Messumgebungen.
 - **Sprint 7 (Implementierung / MS-0 Phase-0-Spike Kern-Simulation):**
   - **Assembly-Topologie & Engine-Entkopplung (`noEngineReferences: true`):** `Assets/_Project/Scripts/Core/Nova.Core.asmdef`, `Assets/_Project/Scripts/Simulation/Nova.Simulation.asmdef`, `Assets/_Project/Scripts/AI/Nova.AI.asmdef`.
   - **Core Simulation Types (`Nova.Core`):** `EntityId` (versioniertes Handle-Struct), `Tick` (Lockstep-Zähler), `INovaLogger` & `NullNovaLogger`, `SimRandom` (bit-genauer XorShift128+ PRNG).
@@ -46,7 +133,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   - **Command-Relay-Scaffolding (`Nova.Networking`):** Phase-2-Prototyp aus `CommandEnvelopeNetPacket` und In-Memory-`LockstepRelayBuffer`; aktuelle Serialisierung liefert 34 Bytes, während Test und Spezifikation 41 beziehungsweise 37 Bytes erwarten; kein UDP-Transport.
   - **Map- & Biom-Erweiterung (`Nova.Presentation.Maps`):** Phase 2 (Modul 19) - `MapBiomeType` Enum (`Desert`, `Snow`, `JungleIndustrial`) und `MapDefinitionSO` (ScriptableObject-Layouts für 1v1 / 2v2 Karten mit 2–4 Spawn-Punkten & Aetherium-Knoten).
   - **Headless SimRunner & Tests:** Standalone .NET 8 Konsolen-Executable `tools/Nova.SimRunner`, NUnit-EditMode-Testsuiten (`DeterministicSimTests`, `FlowFieldPathfindingTests`, `MovementSystemTests`, `MovementPerformanceTests`, `MatchRunnerTests`, `GameDatabaseTests`, `CommandSystemTests`, `CombatSystemTests`, `LockstepReplayTests`, `EconomySystemTests`, `ConstructionSystemTests`, `ProductionSystemTests`, `VisionSystemTests`, `SkirmishAiTests`, `SelectionManagerTests`, `AssetIntegrationTests`, `EvolvedFactionTests`, `CommanderSystemTests`, `LockstepRelayBufferTests`, `MapDefinitionTests`).
-  - **Modulspezifikationen:** `MovementSystem_Spec.md`, `GameplayBridge_Spec.md`, `GameDatabase_Spec.md`, `CommandSystem_Spec.md`, `CombatSystem_Spec.md`, `LockstepReplay_Spec.md`, `EconomySystem_Spec.md`, `ConstructionSystem_Spec.md`, `ProductionSystem_Spec.md`, `VisionSystem_Spec.md`, `SkirmishAi_Spec.md`, `RtsUi_Spec.md`, `AssetIntegration_Spec.md`, `EvolvedFaction_Spec.md`, `CommanderSystem_Spec.md`, `LockstepRelay_Spec.md` und `MapExpansion_Spec.md` unter `docs/tech/modules/`.
+  - **Historische, nicht freigegebene Modulspezifikationen:** `MovementSystem_Spec.md`, `GameplayBridge_Spec.md`, `GameDatabase_Spec.md`, `CommandSystem_Spec.md`, `CombatSystem_Spec.md`, `LockstepReplay_Spec.md`, `EconomySystem_Spec.md`, `ConstructionSystem_Spec.md`, `ProductionSystem_Spec.md`, `VisionSystem_Spec.md`, `SkirmishAi_Spec.md`, `RtsUi_Spec.md`, `AssetIntegration_Spec.md`, `EvolvedFaction_Spec.md`, `CommanderSystem_Spec.md`, `LockstepRelay_Spec.md` und `MapExpansion_Spec.md` unter `docs/tech/modules/`; ihr Inhalt ist forensisch, aktive Verträge führen.
+
+### Behoben
+
+- `HEADLESS_VALID_MATCH` weist G3 nun ausdrücklich als Nutzer aus und stimmt
+  damit mit dem verpflichtenden G3-Gate-Profil überein.
+- Evidence kann überschrittene Szenarioschwellen, Working-Tree-Digests oder
+  isolierte spätere Gates nicht mehr als `pass` akzeptieren.
+- No-op-Commands, falsche Units, negative/unterzählige Performance-Samples,
+  schemawidrige Vorgänger und lokale Pass-Dateien ohne externen Trust-Kontext
+  werden fail-closed abgelehnt.
+- Punkt- und Performance-Metrikartefakte im Recovery-Plan eindeutig auf
+  `samples` beziehungsweise `measurement` getrennt.
+- Aktiven Sprint-7-Scope in G0-A Trusted-Gate-Bootstrap und G0-B
+  Plattformbasis geteilt; erst ein nachfolgender sauberer Subject-Commit
+  darf G0 belegen.
+- Valide Evidence mit `verdict=fail` wird als `VALID NON-PASS EVIDENCE`
+  mit Exitcode ungleich null ausgegeben und kann nicht mehr als
+  `AUTHORIZED PASS` erscheinen.
 
 ## [0.7.0] – 2026-07-24 · Sprint 6: Produktionsplanung
 
@@ -194,11 +299,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - Übernahme der historischen Quelldokumente (`RTS_Game_Design_Outline.md`,
   `RTS_Technisches_Planungsdokument.md`, `RTS_Asset_Pipeline.md`).
 
-[Unreleased]: https://github.com/VibecodingGermany/Project_Nova/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.7.0
-[0.6.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.6.0
-[0.5.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.5.0
+[Unreleased]: https://github.com/VibecodingGermany/Project_Nova/compare/v0.4.0...HEAD
+[0.7.0]: https://github.com/VibecodingGermany/Project_Nova/commit/0baa304
+[0.6.0]: https://github.com/VibecodingGermany/Project_Nova/commit/af30ccd
+[0.5.0]: https://github.com/VibecodingGermany/Project_Nova/commit/b125229
 [0.4.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.4.0
-[0.3.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.3.0
-[0.2.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.2.0
-[0.1.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.1.0
+[0.3.0]: https://github.com/VibecodingGermany/Project_Nova/commit/2d2d021
+[0.2.0]: https://github.com/VibecodingGermany/Project_Nova/commit/2d2d021
+[0.1.0]: https://github.com/VibecodingGermany/Project_Nova/commit/2d2d021
