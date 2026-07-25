@@ -1,0 +1,117 @@
+name: Quality Gate
+
+# D-064 protected gate-evidence pipeline.
+#
+# Job `integrity` runs on every pull request and proves the integrity-only
+# part: pinned dependencies, validator self-test (negative controls), schema
+# validity and gate-runner CLI health. It never authorizes a gate pass.
+#
+# Job `gate-evidence-authorize` runs only via manual workflow_dispatch on
+# `main` (GITHUB_WORKFLOW_REF must point at refs/heads/main) behind the
+# protected `quality-gate` environment. It validates the subject evidence
+# with the D-064 trusted tools from a subject-independent checkout
+# (`trusted/` at the mandatory `trustedSha` input) and an externally
+# generated trust context. A gate pass can only be authorized here.
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      evidencePath:
+        description:
+          Repo-relative path of the GateEvidence.json to authorize
+          (quality/evidence/<gate>/<subjectSha>/<attempt>/GateEvidence.json)
+        required: true
+        type: string
+      trustedSha:
+        description:
+          Trusted tool commit SHA (earlier clean main state per D-064; must
+          not be the subject commit itself)
+        required: true
+        type: string
+      subjectSha:
+        description:
+          Subject commit SHA the evidence belongs to (defaults to the
+          dispatched ref, i.e. main HEAD)
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Must equal trustBundle.nodeVersion declared in the evidence.
+  NODE_VERSION: '24.4.1'
+
+jobs:
+  integrity:
+    name: integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install pinned evidence-validator dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix quality
+      - name: Evidence validator self-test (D-064 negative controls)
+        run: python3 quality/scripts/validate_gate_evidence.py --self-test
+      - name: Ajv schema self-check (schema must be valid Draft 2020-12)
+        working-directory: quality
+        run: |
+          node --input-type=module -e "
+          import fs from 'node:fs';
+          import Ajv2020 from 'ajv/dist/2020.js';
+          import addFormats from 'ajv-formats';
+          const ajv = new Ajv2020({allErrors: true, strict: true, validateFormats: true});
+          addFormats(ajv);
+          ajv.compile(JSON.parse(fs.readFileSync('schemas/GateEvidence.schema.json', 'utf8')));
+          console.log('GateEvidence.schema.json is valid Draft 2020-12');
+          "
+      - name: Gate runner CLI smoke test
+        run: python3 quality/scripts/run_gate_check.py --help
+
+  gate-evidence-authorize:
+    name: authorize
+    if: github.event_name == 'workflow_dispatch'
+    environment: quality-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.subjectSha || github.sha }}
+          fetch-depth: 0
+      - name: Checkout trusted tools (subject-independent, D-064)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.trustedSha }}
+          path: trusted
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install pinned dependencies for the trusted tools
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix trusted/quality
+      - name: Stage subject evidence into the trusted workspace
+        run: cp -R quality/evidence trusted/quality/
+      - name: Generate external trust context
+        run: |
+          CONTEXT="$RUNNER_TEMP/trust-context.json"
+          python3 trusted/.github/scripts/generate_trust_context.py \
+            --evidence "trusted/${{ inputs.evidencePath }}" \
+            --trusted-sha "${{ inputs.trustedSha }}" \
+            --output "$CONTEXT"
+          echo "NOVA_TRUST_CONTEXT_SHA256=$(shasum -a 256 "$CONTEXT" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          echo "TRUST_CONTEXT_PATH=$CONTEXT" >> "$GITHUB_ENV"
+      - name: Validate and authorize gate evidence
+        run: |
+          python3 trusted/quality/scripts/validate_gate_evidence.py \
+            --trusted-tool-checkout trusted \
+            --trust-context "$TRUST_CONTEXT_PATH" \
+            "trusted/${{ inputs.evidencePath }}"

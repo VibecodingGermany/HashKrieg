@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "scenarioSetId": "mvp-v1",
   "status": "binding-requirement",
   "decisionIds": [
@@ -10,15 +10,7 @@
     "D-063",
     "D-064"
   ],
-  "authorizationStatus": "integrity-only-bootstrap-blocked",
-  "authorizationTargetSchemaVersion": "1.3.0",
-  "requiredBootstrapControls": [
-    "subject-independent-trusted-tool-checkout",
-    "non-self-authorizing-two-step-bootstrap",
-    "complete-ordered-authorized-evidence-chain",
-    "command-and-measurement-environment-binding",
-    "separate-windows-reference-and-mac-m2-methods"
-  ],
+  "authorizationStatus": "trusted-tool-checkout-authorization",
   "contentManifest": "quality/content/mvp-v1.json",
   "validHeadlessMatchRequirements": [
     "state-hashes",
@@ -29,13 +21,34 @@
   ],
   "performanceMethod": {
     "referenceDecision": "D-052",
-    "platform": "Windows",
+    "os": "Windows",
     "architecture": "x64",
+    "hardware": "Ryzen 5 5600, RTX 3060, 16 GB RAM, NVMe",
     "build": "standalone-il2cpp-development",
     "executionPath": "managed",
     "burstEnabled": false,
     "resolution": "2560x1440",
     "qualityProfile": "NovaReference",
+    "vSyncEnabled": false,
+    "deepProfilingEnabled": false,
+    "replay": "fixed",
+    "warmupSeconds": 30,
+    "measurementSeconds": 120,
+    "repetitions": 3,
+    "minimumSamplesPerSecond": 1,
+    "outlierRemoval": false,
+    "rawSamplesRequired": true
+  },
+  "macM2FunctionalMethod": {
+    "referenceDecision": "D-064",
+    "os": "macOS",
+    "architecture": "arm64",
+    "hardware": "Apple M2",
+    "build": "standalone-il2cpp-development",
+    "executionPath": "managed",
+    "burstEnabled": false,
+    "resolution": "1920x1080",
+    "qualityProfile": "Medium",
     "vSyncEnabled": false,
     "deepProfilingEnabled": false,
     "replay": "fixed",
@@ -245,11 +258,7 @@
       ],
       "workloadClass": "functional-baseline",
       "description": "Funktionale Apple-M2-Baseline bei 1080p und Medium-Profil.",
-      "platform": "macOS",
-      "hardware": "Apple M2",
-      "resolution": "1920x1080",
-      "qualityProfile": "Medium",
-      "methodRef": "performanceMethod",
+      "methodRef": "macM2FunctionalMethod",
       "requiredAssertions": [
         "apple-m2-hardware",
         "macos-arm64-standalone",

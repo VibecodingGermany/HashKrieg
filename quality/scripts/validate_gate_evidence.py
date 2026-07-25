@@ -3,8 +3,10 @@
 
 JSON Schema remains the structural contract. This standard-library validator
 adds comparisons, reference resolution, repository checks and negative
-controls that Draft 2020-12 cannot express reliably. Per D-064, the current
-Schema 1.2 implementation is integrity-only and cannot authorize a gate pass.
+controls that Draft 2020-12 cannot express reliably. Per D-064, Schema 1.3
+authorizes a gate pass only from a subject-independent trusted tool checkout
+(`--trusted-tool-checkout`) with an externally generated trust context; local
+runs remain integrity-only and fail closed on any pass verdict.
 """
 
 from __future__ import annotations
@@ -26,12 +28,60 @@ ROOT = Path(__file__).resolve().parents[2]
 SCENARIO_CONTRACT = ROOT / "quality/scenarios/mvp-v1.json"
 EVIDENCE_SCHEMA = ROOT / "quality/schemas/GateEvidence.schema.json"
 SCHEMA_VALIDATOR = ROOT / "quality/scripts/validate_evidence_schema.mjs"
-SCHEMA_VERSION = "1.2.0"
-TRUST_CONTEXT_VERSION = "1.0.0"
-# D-064: Schema 1.2 is an integrity-checking precursor only. G0 must replace
-# this fail-closed bootstrap guard with the trusted-tool/authorization-chain
-# contract before any gate pass can be authorized.
-AUTHORIZATION_BOOTSTRAP_READY = False
+SCHEMA_VERSION = "1.3.0"
+TRUST_CONTEXT_VERSION = "2.0.0"
+SCENARIO_AUTHORIZATION_STATUS = "trusted-tool-checkout-authorization"
+# D-064: the trust bundle binds every tool/contract component per subject and
+# trusted commit plus SHA-256. Component ids are canonical; paths are
+# repository-relative and enforced semantically.
+TRUST_BUNDLE_COMPONENTS = {
+    "manifest": "quality/content/mvp-v1.json",
+    "scenarioContract": "quality/scenarios/mvp-v1.json",
+    "evidenceSchema": "quality/schemas/GateEvidence.schema.json",
+    "evidenceValidator": "quality/scripts/validate_gate_evidence.py",
+    "ajvWrapper": "quality/scripts/validate_evidence_schema.mjs",
+    "packageManifest": "quality/package.json",
+    "packageLock": "quality/package-lock.json",
+    "gateRunner": "quality/scripts/run_gate_check.py",
+    "authorizeWorkflow": ".github/workflows/quality-gate.yml",
+}
+CONTENT_COMPONENT_FIELDS = {
+    "manifest": ("manifestPath", "manifestSha256"),
+    "scenarioContract": ("scenarioPath", "scenarioSha256"),
+    "evidenceSchema": ("evidenceSchemaPath", "evidenceSchemaSha256"),
+    "evidenceValidator": ("evidenceValidatorPath", "evidenceValidatorSha256"),
+    "ajvWrapper": ("ajvWrapperPath", "ajvWrapperSha256"),
+    "packageManifest": ("packageManifestPath", "packageManifestSha256"),
+    "packageLock": ("packageLockPath", "packageLockSha256"),
+    "gateRunner": ("gateRunnerPath", "gateRunnerSha256"),
+    "authorizeWorkflow": ("authorizeWorkflowPath", "authorizeWorkflowSha256"),
+}
+# D-064: environment fields compared exactly against the method profiles of
+# the scenario contract (Windows-x64 reference vs. Mac M2 functional).
+ENVIRONMENT_FIELDS = (
+    "os",
+    "architecture",
+    "hardware",
+    "build",
+    "executionPath",
+    "burstEnabled",
+    "resolution",
+    "qualityProfile",
+    "vSyncEnabled",
+    "deepProfilingEnabled",
+    "replay",
+)
+AUTHORIZED_EVIDENCE_KEYS = {
+    "gateId",
+    "evidencePath",
+    "evidenceSha256",
+    "subjectCommitSha",
+    "subjectTreeSha",
+    "ciRunId",
+    "ciJobId",
+    "ciAttestationSha256",
+    "reviewArtifactSha256",
+}
 GATE_SEQUENCE = tuple(f"G{number}" for number in range(6))
 GATES = set(GATE_SEQUENCE)
 ATTEMPT_RE = re.compile(
@@ -95,11 +145,15 @@ def sha256_file(path: Path) -> str:
 def _schema_validation_errors(
     document: dict[str, Any],
     schema_bytes: bytes,
+    *,
+    validator_path: Path = SCHEMA_VALIDATOR,
+    working_directory: Path = ROOT,
+    timeout_seconds: float = 30,
 ) -> list[str]:
     """Validate one strict-loaded document with pinned Ajv Draft 2020-12."""
 
-    if not SCHEMA_VALIDATOR.is_file():
-        return [f"schema validator is missing: {SCHEMA_VALIDATOR}"]
+    if not validator_path.is_file():
+        return [f"schema validator is missing: {validator_path}"]
     try:
         schema_document = strict_load_bytes(schema_bytes)
     except StrictJsonError as error:
@@ -118,18 +172,20 @@ def _schema_validation_errors(
         )
         try:
             result = subprocess.run(
-                ["node", str(SCHEMA_VALIDATOR), str(schema_path), str(document_path)],
-                cwd=ROOT,
+                ["node", str(validator_path), str(schema_path), str(document_path)],
+                cwd=working_directory,
                 check=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                timeout=30,
+                timeout=timeout_seconds,
             )
         except OSError as error:
             return [f"schema validator unavailable: {error}"]
         except subprocess.TimeoutExpired:
-            return ["schema validator timed out after 30 seconds"]
+            return [
+                f"schema validator timed out after {timeout_seconds:g} seconds"
+            ]
     if result.returncode == 0:
         return []
     detail = result.stdout.strip() or f"schema validator exited {result.returncode}"
@@ -226,23 +282,10 @@ def _load_scenario_contract(
         raise StrictJsonError(
             f"scenario contract schemaVersion must be {SCHEMA_VERSION}"
         )
-    if contract.get("authorizationStatus") != "integrity-only-bootstrap-blocked":
+    if contract.get("authorizationStatus") != SCENARIO_AUTHORIZATION_STATUS:
         raise StrictJsonError(
-            "scenario contract must keep Schema 1.2 authorization blocked"
+            "scenario contract must declare trusted-tool-checkout authorization"
         )
-    if contract.get("authorizationTargetSchemaVersion") != "1.3.0":
-        raise StrictJsonError(
-            "scenario contract authorization target must be Schema 1.3.0"
-        )
-    expected_bootstrap_controls = [
-        "subject-independent-trusted-tool-checkout",
-        "non-self-authorizing-two-step-bootstrap",
-        "complete-ordered-authorized-evidence-chain",
-        "command-and-measurement-environment-binding",
-        "separate-windows-reference-and-mac-m2-methods",
-    ]
-    if contract.get("requiredBootstrapControls") != expected_bootstrap_controls:
-        raise StrictJsonError("scenario contract D-064 bootstrap controls differ")
     if not isinstance(profiles, dict) or not isinstance(scenarios, list):
         raise StrictJsonError("scenario contract lacks gateProfiles/scenarios")
     if set(profiles) != GATES:
@@ -257,10 +300,13 @@ def _load_scenario_contract(
         if identifier in scenario_map:
             raise StrictJsonError(f"duplicate scenario id: {identifier}")
         scenario_map[identifier] = scenario
-    performance_method = contract.get("performanceMethod")
-    if not isinstance(performance_method, dict):
-        raise StrictJsonError("scenario contract lacks performanceMethod")
-    return profiles, scenario_map, {"performanceMethod": performance_method}
+    methods: dict[str, dict[str, Any]] = {}
+    for method_name in ("performanceMethod", "macM2FunctionalMethod"):
+        method = contract.get(method_name)
+        if not isinstance(method, dict):
+            raise StrictJsonError(f"scenario contract lacks {method_name}")
+        methods[method_name] = method
+    return profiles, scenario_map, methods
 
 
 def _artifact_objects(document: dict[str, Any]) -> list[dict[str, Any]]:
@@ -303,24 +349,33 @@ def _validate_scenario_contract(
     methods: dict[str, dict[str, Any]],
     errors: list[tuple[str, str]],
 ) -> None:
-    performance_method = methods.get("performanceMethod")
-    if not isinstance(performance_method, dict):
-        errors.append(("E_PERFORMANCE_METHOD", "performanceMethod is missing"))
-    else:
-        expected_method = {
-            "warmupSeconds": 30,
-            "measurementSeconds": 120,
-            "repetitions": 3,
-            "minimumSamplesPerSecond": 1,
-            "outlierRemoval": False,
-            "rawSamplesRequired": True,
-        }
+    expected_method = {
+        "warmupSeconds": 30,
+        "measurementSeconds": 120,
+        "repetitions": 3,
+        "minimumSamplesPerSecond": 1,
+        "outlierRemoval": False,
+        "rawSamplesRequired": True,
+    }
+    for method_name, method in methods.items():
+        if not isinstance(method, dict):
+            errors.append(("E_PERFORMANCE_METHOD", f"{method_name} is missing"))
+            continue
         for field, expected in expected_method.items():
-            if performance_method.get(field) != expected:
+            if method.get(field) != expected:
                 errors.append(
                     (
                         "E_PERFORMANCE_METHOD",
-                        f"performanceMethod.{field} must equal {expected!r}",
+                        f"{method_name}.{field} must equal {expected!r}",
+                    )
+                )
+        for field in ENVIRONMENT_FIELDS:
+            value = method.get(field)
+            if value is None or (isinstance(value, str) and not value):
+                errors.append(
+                    (
+                        "E_PERFORMANCE_METHOD",
+                        f"{method_name}.{field} must be declared",
                     )
                 )
 
@@ -451,11 +506,11 @@ def _validate_scenario_contract(
                     f"{identifier}.methodRef is unknown: {method_ref!r}",
                 )
             )
-        if requires_performance_method and method_ref != "performanceMethod":
+        if requires_performance_method and method_ref not in methods:
             errors.append(
                 (
                     "E_PERFORMANCE_METHOD",
-                    f"{identifier} timing thresholds require performanceMethod",
+                    f"{identifier} timing thresholds require a declared method profile",
                 )
             )
 
@@ -478,6 +533,7 @@ def _numeric_sample_runs(
     metric: dict[str, Any] | None,
     metric_name: str,
     expected_unit: str,
+    method_ref: str | None,
     performance_method: dict[str, Any] | None,
     errors: list[tuple[str, str]],
 ) -> list[list[float]] | None:
@@ -515,11 +571,11 @@ def _numeric_sample_runs(
         expected_measurement = performance_method.get("measurementSeconds")
         expected_repetitions = performance_method.get("repetitions")
         minimum_rate = performance_method.get("minimumSamplesPerSecond")
-        if measurement.get("methodRef") != "performanceMethod":
+        if measurement.get("methodRef") != method_ref:
             errors.append(
                 (
                     "E_PERFORMANCE_METHOD",
-                    f"{metric_name}: methodRef must be 'performanceMethod'",
+                    f"{metric_name}: methodRef must be {method_ref!r}",
                 )
             )
         if measurement.get("warmupSeconds") != expected_warmup:
@@ -625,6 +681,7 @@ def _validate_scenario_results(
     criteria: dict[str, dict[str, Any]],
     implementation_checks: dict[str, dict[str, Any]],
     metrics: dict[str, dict[str, Any]],
+    environments: dict[str, dict[str, Any]],
     errors: list[tuple[str, str]],
 ) -> None:
     for scenario_id in required_scenario_ids:
@@ -671,6 +728,7 @@ def _validate_scenario_results(
                     repetitions
                 )
         scenario_bound = False
+        bound_environment_ids: set[str] = set()
         for check_id in bound_check_ids:
             command = implementation_checks.get(check_id)
             scenario_ids = (
@@ -678,6 +736,9 @@ def _validate_scenario_results(
             )
             if isinstance(scenario_ids, list) and scenario_id in scenario_ids:
                 scenario_bound = True
+                environment_id = command.get("environmentId")
+                if isinstance(environment_id, str):
+                    bound_environment_ids.add(environment_id)
                 duration = command.get("durationSeconds")
                 if (
                     expected_duration is not None
@@ -743,10 +804,53 @@ def _validate_scenario_results(
                 continue
             method_ref = scenario.get("methodRef")
             performance_method = methods.get(method_ref) if isinstance(method_ref, str) else None
+            metric = metrics.get(metric_name)
+            if performance_method is not None and isinstance(metric, dict):
+                measurement = metric.get("measurement")
+                if isinstance(measurement, dict):
+                    environment_id = measurement.get("environmentId")
+                    environment = (
+                        environments.get(environment_id)
+                        if isinstance(environment_id, str)
+                        else None
+                    )
+                    if environment is None:
+                        errors.append(
+                            (
+                                "E_ENVIRONMENT_REF",
+                                f"{metric_name}: unknown measurement environmentId: "
+                                f"{environment_id!r}",
+                            )
+                        )
+                    else:
+                        if bound_environment_ids and (
+                            environment_id not in bound_environment_ids
+                        ):
+                            errors.append(
+                                (
+                                    "E_ENVIRONMENT_MISMATCH",
+                                    f"{metric_name}: measurement environment "
+                                    f"{environment_id!r} differs from the bound "
+                                    f"command environment(s) "
+                                    f"{sorted(bound_environment_ids)}",
+                                )
+                            )
+                        for field in ENVIRONMENT_FIELDS:
+                            if environment.get(field) != performance_method.get(field):
+                                errors.append(
+                                    (
+                                        "E_ENVIRONMENT_PROFILE",
+                                        f"{metric_name}: environment {environment_id!r} "
+                                        f"field {field} must equal "
+                                        f"{method_ref!r} value "
+                                        f"{performance_method.get(field)!r}",
+                                    )
+                                )
             sample_runs = _numeric_sample_runs(
-                metrics.get(metric_name),
+                metric,
                 metric_name,
                 expected_unit,
+                method_ref if isinstance(method_ref, str) else None,
                 performance_method,
                 errors,
             )
@@ -833,6 +937,8 @@ def _validate_trust_context(
     evidence_path: Path,
     root: Path,
     errors: list[tuple[str, str]],
+    *,
+    gate_id: str,
 ) -> None:
     """Authorize a pass only inside the protected GitHub workflow."""
 
@@ -880,6 +986,8 @@ def _validate_trust_context(
         "ciAttestationSha256",
         "reviewerId",
         "reviewArtifactSha256",
+        "trustedToolCommitSha",
+        "authorizedEvidence",
     }
     if set(context) != expected_keys:
         errors.append(
@@ -934,6 +1042,187 @@ def _validate_trust_context(
                 )
             )
 
+    trust_bundle = document.get("trustBundle")
+    trusted_commit = (
+        trust_bundle.get("trustedCommitSha")
+        if isinstance(trust_bundle, dict)
+        else None
+    )
+    if context.get("trustedToolCommitSha") != trusted_commit:
+        errors.append(
+            (
+                "E_TRUST_CONTEXT",
+                "trustedToolCommitSha does not match evidence trustBundle: "
+                f"{context.get('trustedToolCommitSha')!r} != {trusted_commit!r}",
+            )
+        )
+
+    chain = context.get("authorizedEvidence")
+    if not isinstance(chain, list) or any(
+        not isinstance(entry, dict) for entry in chain
+    ):
+        errors.append(
+            (
+                "E_AUTHORIZATION_CHAIN",
+                "authorizedEvidence must be an array of objects",
+            )
+        )
+        return
+    expected_length = GATE_SEQUENCE.index(gate_id) + 1
+    if len(chain) != expected_length:
+        errors.append(
+            (
+                "E_AUTHORIZATION_CHAIN",
+                f"authorizedEvidence must contain exactly {expected_length} "
+                f"entries (G0..{gate_id}), got {len(chain)}",
+            )
+        )
+        return
+    for index, entry in enumerate(chain):
+        if set(entry) != AUTHORIZED_EVIDENCE_KEYS:
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"entry {index} fields differ: "
+                    f"{sorted(set(entry) ^ AUTHORIZED_EVIDENCE_KEYS)}",
+                )
+            )
+            return
+        if entry.get("gateId") != GATE_SEQUENCE[index]:
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"entry {index} must be {GATE_SEQUENCE[index]}, "
+                    f"got {entry.get('gateId')!r}",
+                )
+            )
+            return
+
+    current_entry = chain[-1]
+    current_expected = {
+        "evidencePath": attempt.get("evidencePath"),
+        "evidenceSha256": evidence_digest,
+        "subjectCommitSha": subject.get("commitSha"),
+        "subjectTreeSha": subject.get("treeSha"),
+        "ciRunId": ci.get("runId"),
+        "ciJobId": ci.get("jobId"),
+        "ciAttestationSha256": (
+            ci_artifact.get("sha256") if isinstance(ci_artifact, dict) else None
+        ),
+        "reviewArtifactSha256": (
+            review_artifact.get("sha256")
+            if isinstance(review_artifact, dict)
+            else None
+        ),
+    }
+    for field, expected in current_expected.items():
+        if current_entry.get(field) != expected:
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"current gate entry {field} does not match evidence: "
+                    f"{current_entry.get(field)!r} != {expected!r}",
+                )
+            )
+
+    for entry in chain[:-1]:
+        entry_gate = entry.get("gateId")
+        if (
+            entry.get("subjectCommitSha") != subject.get("commitSha")
+            or entry.get("subjectTreeSha") != subject.get("treeSha")
+        ):
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"{entry_gate}: prior entry must prove the same subject "
+                    "commit/tree",
+                )
+            )
+            continue
+        raw_prior_path = entry.get("evidencePath")
+        if not isinstance(raw_prior_path, str):
+            errors.append(
+                ("E_AUTHORIZATION_CHAIN", f"{entry_gate}: evidencePath missing")
+            )
+            continue
+        try:
+            prior_path = _safe_repo_path(root, raw_prior_path)
+        except ValueError as error:
+            errors.append(
+                ("E_AUTHORIZATION_CHAIN", f"{raw_prior_path}: {error}")
+            )
+            continue
+        if not prior_path.is_file():
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"authorized prior evidence missing: {raw_prior_path}",
+                )
+            )
+            continue
+        if sha256_file(prior_path) != entry.get("evidenceSha256"):
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"{raw_prior_path}: evidence SHA-256 mismatch",
+                )
+            )
+            continue
+        try:
+            prior_document = strict_load(prior_path)
+        except (OSError, StrictJsonError) as error:
+            errors.append(
+                ("E_AUTHORIZATION_CHAIN", f"{raw_prior_path}: {error}")
+            )
+            continue
+        prior_ci = prior_document.get("ci")
+        prior_ci_artifact = (
+            prior_ci.get("attestationArtifact")
+            if isinstance(prior_ci, dict)
+            else None
+        )
+        prior_reviewer = prior_document.get("reviewer")
+        prior_review_artifact = (
+            prior_reviewer.get("reviewArtifact")
+            if isinstance(prior_reviewer, dict)
+            else None
+        )
+        prior_verdict = prior_document.get("verdict")
+        prior_expected = {
+            "gateId": prior_document.get("gateId"),
+            "ciRunId": prior_ci.get("runId") if isinstance(prior_ci, dict) else None,
+            "ciJobId": prior_ci.get("jobId") if isinstance(prior_ci, dict) else None,
+            "ciAttestationSha256": (
+                prior_ci_artifact.get("sha256")
+                if isinstance(prior_ci_artifact, dict)
+                else None
+            ),
+            "reviewArtifactSha256": (
+                prior_review_artifact.get("sha256")
+                if isinstance(prior_review_artifact, dict)
+                else None
+            ),
+        }
+        if (
+            not isinstance(prior_verdict, dict)
+            or prior_verdict.get("result") != "pass"
+        ):
+            errors.append(
+                (
+                    "E_AUTHORIZATION_CHAIN",
+                    f"{raw_prior_path}: prior gate was not authorized as pass",
+                )
+            )
+        for field, actual in prior_expected.items():
+            if entry.get(field) != actual:
+                errors.append(
+                    (
+                        "E_AUTHORIZATION_CHAIN",
+                        f"{raw_prior_path}: chain entry {field} does not match "
+                        f"prior evidence: {entry.get(field)!r} != {actual!r}",
+                    )
+                )
+
     environment_values = {
         "GITHUB_ACTIONS": "true",
         "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
@@ -956,6 +1245,134 @@ def _validate_trust_context(
             )
 
 
+def _node_version() -> str | None:
+    try:
+        result = subprocess.run(
+            ["node", "--version"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _verify_trusted_tooling(
+    trusted_checkout: Path,
+    trust_bundle: dict[str, Any],
+    root: Path,
+    errors: list[tuple[str, str]],
+) -> None:
+    """Verify the subject-independent trusted tool checkout (D-064)."""
+
+    trusted_root = trusted_checkout.resolve()
+    if not trusted_root.is_dir():
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                f"trusted tool checkout is missing: {trusted_checkout}",
+            )
+        )
+        return
+    subject_root = root.resolve()
+    if (
+        trusted_root == subject_root
+        or trusted_root in subject_root.parents
+        or subject_root in trusted_root.parents
+    ):
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                "trusted tool checkout must be independent of the subject "
+                "repository",
+            )
+        )
+        return
+    try:
+        head = _git("rev-parse", "HEAD", root=trusted_root)
+        status = _git("status", "--porcelain", root=trusted_root)
+    except ValueError as error:
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                f"trusted tool checkout is not a git worktree: {error}",
+            )
+        )
+        return
+    if status:
+        errors.append(
+            ("E_TRUSTED_TOOL", "trusted tool checkout has uncommitted changes")
+        )
+    declared_commit = trust_bundle.get("trustedCommitSha")
+    if head != declared_commit:
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                f"trusted checkout HEAD {head} does not match declared "
+                f"trustedCommitSha {declared_commit!r}",
+            )
+        )
+    components = trust_bundle.get("components")
+    if not isinstance(components, dict):
+        errors.append(("E_TRUSTED_TOOL", "trustBundle.components must be an object"))
+        return
+    for component_id, canonical_path in TRUST_BUNDLE_COMPONENTS.items():
+        component = components.get(component_id)
+        if not isinstance(component, dict):
+            errors.append(
+                ("E_TRUSTED_TOOL", f"trustBundle component missing: {component_id}")
+            )
+            continue
+        if component.get("path") != canonical_path:
+            errors.append(
+                (
+                    "E_TRUSTED_TOOL",
+                    f"{component_id}: path must be {canonical_path!r}",
+                )
+            )
+            continue
+        candidate = trusted_root / Path(*PurePosixPath(canonical_path).parts)
+        if not candidate.is_file():
+            errors.append(
+                ("E_TRUSTED_TOOL", f"trusted checkout lacks {canonical_path}")
+            )
+            continue
+        if sha256_file(candidate) != component.get("trustedSha256"):
+            errors.append(
+                (
+                    "E_TRUSTED_TOOL",
+                    f"{component_id}: trusted SHA-256 mismatch: {canonical_path}",
+                )
+            )
+    if not (trusted_root / "quality/node_modules/ajv/dist/2020.js").is_file():
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                "trusted checkout lacks pinned npm dependencies "
+                "(run npm ci --ignore-scripts)",
+            )
+        )
+    node_version = _node_version()
+    declared_node = trust_bundle.get("nodeVersion")
+    if node_version is None:
+        errors.append(
+            ("E_TRUSTED_TOOL", "node is unavailable for the trusted Ajv stack")
+        )
+    elif node_version != declared_node:
+        errors.append(
+            (
+                "E_TRUSTED_TOOL",
+                f"node version {node_version!r} does not match declared "
+                f"{declared_node!r}",
+            )
+        )
+
+
 def validate_document(
     document: Any,
     evidence_path: Path,
@@ -968,6 +1385,7 @@ def validate_document(
     scenario_methods: dict[str, dict[str, Any]] | None = None,
     evidence_schema_bytes: bytes | None = None,
     trust_context_path: Path | None = None,
+    trusted_checkout: Path | None = None,
     require_trust: bool = True,
     _validation_stack: set[str] | None = None,
 ) -> list[tuple[str, str]]:
@@ -988,9 +1406,23 @@ def validate_document(
         if isinstance(subject_candidate, dict)
         else None
     )
+    schema_validator_path = SCHEMA_VALIDATOR
+    schema_working_directory = ROOT
+    if trusted_checkout is not None:
+        trusted_root = trusted_checkout.resolve()
+        schema_validator_path = trusted_root / Path(
+            "quality/scripts/validate_evidence_schema.mjs"
+        )
+        schema_working_directory = trusted_root
     if evidence_schema_bytes is None:
         try:
-            if (
+            if trusted_checkout is not None:
+                # D-064: the schema comes from the subject-independent trusted
+                # tool checkout, never from the subject.
+                evidence_schema_bytes = (
+                    trusted_root / Path("quality/schemas/GateEvidence.schema.json")
+                ).read_bytes()
+            elif (
                 verify_git
                 and isinstance(commit_candidate, str)
                 and re.fullmatch(r"[0-9a-f]{40,64}", commit_candidate)
@@ -1005,9 +1437,17 @@ def validate_document(
             else:
                 evidence_schema_bytes = EVIDENCE_SCHEMA.read_bytes()
         except (OSError, ValueError) as error:
-            errors.append(("E_JSON_SCHEMA", f"cannot load subject schema: {error}"))
+            error_code = (
+                "E_TRUSTED_TOOL" if trusted_checkout is not None else "E_JSON_SCHEMA"
+            )
+            errors.append((error_code, f"cannot load evidence schema: {error}"))
     if evidence_schema_bytes is not None:
-        for message in _schema_validation_errors(data, evidence_schema_bytes):
+        for message in _schema_validation_errors(
+            data,
+            evidence_schema_bytes,
+            validator_path=schema_validator_path,
+            working_directory=schema_working_directory,
+        ):
             errors.append(("E_JSON_SCHEMA", message))
 
     required_objects = (
@@ -1015,6 +1455,7 @@ def validate_document(
         "attempt",
         "scope",
         "content",
+        "trustBundle",
         "toolchains",
         "coverage",
         "ci",
@@ -1052,6 +1493,7 @@ def validate_document(
     subject = objects["subject"]
     attempt = objects["attempt"]
     content = objects["content"]
+    trust_bundle = objects["trustBundle"]
     coverage = objects["coverage"]
     ci = objects["ci"]
     reviewer = objects["reviewer"]
@@ -1200,7 +1642,12 @@ def validate_document(
                 errors.append(("E_PRIOR_GATE", f"{raw_path}: root must be an object"))
                 continue
             prior_schema_messages = (
-                _schema_validation_errors(prior_document, evidence_schema_bytes)
+                _schema_validation_errors(
+                    prior_document,
+                    evidence_schema_bytes,
+                    validator_path=schema_validator_path,
+                    working_directory=schema_working_directory,
+                )
                 if evidence_schema_bytes is not None
                 else ["subject evidence schema is unavailable"]
             )
@@ -1251,6 +1698,7 @@ def validate_document(
                 scenario_definitions=scenario_definitions,
                 scenario_methods=scenario_methods,
                 evidence_schema_bytes=evidence_schema_bytes,
+                trusted_checkout=trusted_checkout,
                 require_trust=False,
                 _validation_stack=validation_stack,
             )
@@ -1262,12 +1710,39 @@ def validate_document(
                     )
                 )
 
-    for path_field, digest_field in (
-        ("manifestPath", "manifestSha256"),
-        ("scenarioPath", "scenarioSha256"),
-        ("evidenceSchemaPath", "evidenceSchemaSha256"),
-        ("evidenceValidatorPath", "evidenceValidatorSha256"),
-    ):
+    bundle_components = trust_bundle.get("components")
+    for component_id, (path_field, digest_field) in CONTENT_COMPONENT_FIELDS.items():
+        component = (
+            bundle_components.get(component_id)
+            if isinstance(bundle_components, dict)
+            else None
+        )
+        if not isinstance(component, dict):
+            errors.append(
+                ("E_TRUST_BUNDLE", f"trustBundle component missing: {component_id}")
+            )
+            continue
+        canonical_path = TRUST_BUNDLE_COMPONENTS[component_id]
+        if component.get("path") != canonical_path:
+            errors.append(
+                (
+                    "E_TRUST_BUNDLE",
+                    f"{component_id}: path must be {canonical_path!r}",
+                )
+            )
+        if component.get("subjectSha256") != content.get(digest_field):
+            errors.append(
+                (
+                    "E_TRUST_BUNDLE",
+                    f"{component_id}: subjectSha256 must equal "
+                    f"content.{digest_field}",
+                )
+            )
+
+    if trusted_checkout is not None:
+        _verify_trusted_tooling(trusted_checkout, trust_bundle, root, errors)
+
+    for path_field, digest_field in CONTENT_COMPONENT_FIELDS.values():
         raw_path = content.get(path_field)
         expected_digest = content.get(digest_field)
         if not isinstance(raw_path, str) or not isinstance(expected_digest, str):
@@ -1419,7 +1894,15 @@ def validate_document(
         "environment id",
         errors,
     )
-    del environments
+    for command_id, command in commands.items():
+        environment_id = command.get("environmentId")
+        if not isinstance(environment_id, str) or environment_id not in environments:
+            errors.append(
+                (
+                    "E_ENVIRONMENT_REF",
+                    f"{command_id}: unknown environmentId: {environment_id!r}",
+                )
+            )
     metrics = _unique_map(
         (item for item in arrays["rawMetrics"] if isinstance(item, dict)),
         lambda item: str(item.get("name")),
@@ -1872,6 +2355,7 @@ def validate_document(
             criteria,
             implementation_checks,
             metrics,
+            environments,
             errors,
         )
 
@@ -1951,12 +2435,13 @@ def validate_document(
                     ("E_PASS_CRITERION", f"{criterion_id}: pass requires criterion pass")
                 )
         if require_trust:
-            if not AUTHORIZATION_BOOTSTRAP_READY:
+            if trusted_checkout is None:
                 errors.append(
                     (
                         "E_AUTHORIZATION_BOOTSTRAP",
-                        "gate authorization is disabled until the D-064 "
-                        "trusted-tool bootstrap is implemented",
+                        "gate pass authorization requires "
+                        "--trusted-tool-checkout with the subject-independent "
+                        "D-064 trusted tools",
                     )
                 )
             _validate_trust_context(
@@ -1965,6 +2450,7 @@ def validate_document(
                 evidence_path,
                 root,
                 errors,
+                gate_id=gate_id,
             )
     elif verdict.get("result") != "fail":
         errors.append(("E_VERDICT", "verdict.result must be pass or fail"))
@@ -2047,6 +2533,7 @@ def _self_test_fixture() -> tuple[
             "executor": executor,
             "command": command,
             "workingDirectory": ".",
+            "environmentId": "test-env",
             "durationSeconds": 0.1,
             "exitCode": 0,
             "conclusion": "success",
@@ -2058,6 +2545,30 @@ def _self_test_fixture() -> tuple[
             "checks": [{"id": "G0-SELF-TEST", "result": "pass"}],
             "scenarioIds": ["SELF_TEST_SCENARIO"],
         }
+
+    content_digests = {
+        "manifest": "3" * 64,
+        "scenarioContract": "4" * 64,
+        "evidenceSchema": "5" * 64,
+        "evidenceValidator": "6" * 64,
+        "ajvWrapper": "f0" * 32,
+        "packageManifest": "f1" * 32,
+        "packageLock": "f2" * 32,
+        "gateRunner": "f3" * 32,
+        "authorizeWorkflow": "f4" * 32,
+    }
+    trusted_digests = {
+        component_id: "e" + f"{index:x}" + "e" * 62
+        for index, component_id in enumerate(content_digests)
+    }
+    trust_bundle_components = {
+        component_id: {
+            "path": TRUST_BUNDLE_COMPONENTS[component_id],
+            "subjectSha256": subject_digest,
+            "trustedSha256": trusted_digests[component_id],
+        }
+        for component_id, subject_digest in content_digests.items()
+    }
 
     fixture: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
@@ -2077,13 +2588,29 @@ def _self_test_fixture() -> tuple[
         },
         "content": {
             "manifestPath": "quality/content/mvp-v1.json",
-            "manifestSha256": "3" * 64,
+            "manifestSha256": content_digests["manifest"],
             "scenarioPath": "quality/scenarios/mvp-v1.json",
-            "scenarioSha256": "4" * 64,
+            "scenarioSha256": content_digests["scenarioContract"],
             "evidenceSchemaPath": "quality/schemas/GateEvidence.schema.json",
-            "evidenceSchemaSha256": "5" * 64,
+            "evidenceSchemaSha256": content_digests["evidenceSchema"],
             "evidenceValidatorPath": "quality/scripts/validate_gate_evidence.py",
-            "evidenceValidatorSha256": "6" * 64,
+            "evidenceValidatorSha256": content_digests["evidenceValidator"],
+            "ajvWrapperPath": "quality/scripts/validate_evidence_schema.mjs",
+            "ajvWrapperSha256": content_digests["ajvWrapper"],
+            "packageManifestPath": "quality/package.json",
+            "packageManifestSha256": content_digests["packageManifest"],
+            "packageLockPath": "quality/package-lock.json",
+            "packageLockSha256": content_digests["packageLock"],
+            "gateRunnerPath": "quality/scripts/run_gate_check.py",
+            "gateRunnerSha256": content_digests["gateRunner"],
+            "authorizeWorkflowPath": ".github/workflows/quality-gate.yml",
+            "authorizeWorkflowSha256": content_digests["authorizeWorkflow"],
+        },
+        "trustBundle": {
+            "trustedRepository": "VibecodingGermany/Project_Nova",
+            "trustedCommitSha": "9" * 40,
+            "nodeVersion": "v24.4.1",
+            "components": trust_bundle_components,
         },
         "toolchains": {
             "unity": {"version": "6000.5.4f1", "revision": "d550df8bd089"},
@@ -2092,11 +2619,18 @@ def _self_test_fixture() -> tuple[
         },
         "environments": [
             {
-                "id": "local",
-                "os": "test",
-                "architecture": "test",
-                "hardware": "test",
-                "configuration": {},
+                "id": "test-env",
+                "os": "Windows",
+                "architecture": "x64",
+                "hardware": "Ryzen 5 5600, RTX 3060, 16 GB RAM, NVMe",
+                "build": "standalone-il2cpp-development",
+                "executionPath": "managed",
+                "burstEnabled": False,
+                "resolution": "2560x1440",
+                "qualityProfile": "NovaReference",
+                "vSyncEnabled": False,
+                "deepProfilingEnabled": False,
+                "replay": "fixed",
             }
         ],
         "commands": [
@@ -2207,6 +2741,17 @@ def _self_test_fixture() -> tuple[
     }
     methods = {
         "performanceMethod": {
+            "os": "Windows",
+            "architecture": "x64",
+            "hardware": "Ryzen 5 5600, RTX 3060, 16 GB RAM, NVMe",
+            "build": "standalone-il2cpp-development",
+            "executionPath": "managed",
+            "burstEnabled": False,
+            "resolution": "2560x1440",
+            "qualityProfile": "NovaReference",
+            "vSyncEnabled": False,
+            "deepProfilingEnabled": False,
+            "replay": "fixed",
             "warmupSeconds": 30,
             "measurementSeconds": 120,
             "repetitions": 3,
@@ -2370,6 +2915,25 @@ def run_self_test() -> int:
             "E_SCENARIO_UNIT",
             lambda value: value["rawMetrics"][2].update(unit="seconds"),
         ),
+        (
+            "command-environment-ref",
+            "E_ENVIRONMENT_REF",
+            lambda value: value["commands"][0].update(environmentId="unknown-env"),
+        ),
+        (
+            "trust-bundle-path",
+            "E_TRUST_BUNDLE",
+            lambda value: value["trustBundle"]["components"]["manifest"].update(
+                path="quality/content/other.json"
+            ),
+        ),
+        (
+            "trust-bundle-subject-digest",
+            "E_TRUST_BUNDLE",
+            lambda value: value["trustBundle"]["components"]["manifest"].update(
+                subjectSha256="0" * 64
+            ),
+        ),
     ]
 
     base_errors = codes(copy.deepcopy(fixture))
@@ -2453,6 +3017,7 @@ def run_self_test() -> int:
     performance_metric.pop("samples")
     performance_metric["measurement"] = {
         "methodRef": "performanceMethod",
+        "environmentId": "test-env",
         "warmupSeconds": 30,
         "runs": [
             {
@@ -2517,6 +3082,30 @@ def run_self_test() -> int:
             lambda value: value["rawMetrics"][2]["measurement"]["runs"][0].update(
                 samples=([0.0] * 113) + ([2.0] * 7)
             ),
+        ),
+        (
+            "measurement-environment-ref",
+            "E_ENVIRONMENT_REF",
+            lambda value: value["rawMetrics"][2]["measurement"].update(
+                environmentId="unknown-env"
+            ),
+        ),
+        (
+            "measurement-environment-mismatch",
+            "E_ENVIRONMENT_MISMATCH",
+            lambda value: (
+                value["environments"].append(
+                    dict(value["environments"][0], id="other-env")
+                ),
+                value["rawMetrics"][2]["measurement"].update(
+                    environmentId="other-env"
+                ),
+            ),
+        ),
+        (
+            "environment-profile-drift",
+            "E_ENVIRONMENT_PROFILE",
+            lambda value: value["environments"][0].update(resolution="1920x1080"),
         ),
     ]
     for name, expected_code, mutate in performance_cases:
@@ -2598,17 +3187,19 @@ def run_self_test() -> int:
         (repo / "quality/schemas").mkdir(parents=True)
         (repo / "quality/scripts").mkdir(parents=True)
         (repo / ".github/workflows").mkdir(parents=True)
-        manifest_path = repo / "quality/content/mvp-v1.json"
-        scenario_path = repo / "quality/scenarios/mvp-v1.json"
-        schema_path = repo / "quality/schemas/GateEvidence.schema.json"
-        validator_path = repo / "quality/scripts/validate_gate_evidence.py"
-        manifest_path.write_bytes(b'{"subject":"manifest"}\\n')
-        scenario_path.write_bytes(b'{"subject":"scenarios"}\\n')
-        schema_path.write_bytes(EVIDENCE_SCHEMA.read_bytes())
-        validator_path.write_bytes(Path(__file__).read_bytes())
-        (repo / ".github/workflows/quality-gate.yml").write_text(
-            "name: quality-gate\n", encoding="utf-8"
-        )
+        component_bytes = {
+            "manifest": b'{"subject":"manifest"}\\n',
+            "scenarioContract": b'{"subject":"scenarios"}\\n',
+            "evidenceSchema": EVIDENCE_SCHEMA.read_bytes(),
+            "evidenceValidator": Path(__file__).read_bytes(),
+            "ajvWrapper": (ROOT / "quality/scripts/validate_evidence_schema.mjs").read_bytes(),
+            "packageManifest": b'{"name":"subject-quality"}\\n',
+            "packageLock": b'{"lockfileVersion":3}\\n',
+            "gateRunner": b"#!/usr/bin/env python3\\n",
+            "authorizeWorkflow": b"name: quality-gate\\n",
+        }
+        for component_id, raw_bytes in component_bytes.items():
+            (repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])).write_bytes(raw_bytes)
         for arguments in (
             ("init", "-q"),
             ("config", "user.email", "self-test@example.invalid"),
@@ -2641,12 +3232,12 @@ def run_self_test() -> int:
         subject_fixture["subject"].update(
             commitSha=subject_commit, treeSha=subject_tree
         )
-        subject_fixture["content"].update(
-            manifestSha256=sha256_file(manifest_path),
-            scenarioSha256=sha256_file(scenario_path),
-            evidenceSchemaSha256=sha256_file(schema_path),
-            evidenceValidatorSha256=sha256_file(validator_path),
-        )
+        for component_id, (path_field, digest_field) in CONTENT_COMPONENT_FIELDS.items():
+            digest = sha256_file(repo / Path(TRUST_BUNDLE_COMPONENTS[component_id]))
+            subject_fixture["content"][digest_field] = digest
+            subject_fixture["trustBundle"]["components"][component_id][
+                "subjectSha256"
+            ] = digest
         subject_errors = validate_document(
             subject_fixture,
             Path(subject_fixture["attempt"]["evidencePath"]),
@@ -2666,6 +3257,7 @@ def run_self_test() -> int:
                 f"{sorted({code for code, _ in subject_errors})}"
             )
             return 1
+        manifest_path = repo / Path(TRUST_BUNDLE_COMPONENTS["manifest"])
         manifest_path.write_bytes(b'{"worktree":"different"}\\n')
         subject_fixture["content"]["manifestSha256"] = sha256_file(manifest_path)
         subject_codes = {
@@ -2687,6 +3279,487 @@ def run_self_test() -> int:
         if "E_CONTENT_DIGEST" not in subject_codes:
             print("SELF-TEST FAIL: worktree digest replaced the subject-blob digest")
             return 1
+
+    def substitute(value: Any, old: str, new: str) -> Any:
+        if isinstance(value, str):
+            return value.replace(old, new)
+        if isinstance(value, list):
+            return [substitute(item, old, new) for item in value]
+        if isinstance(value, dict):
+            return {key: substitute(item, old, new) for key, item in value.items()}
+        return value
+
+    def build_trusted_harness(
+        harness_root: Path,
+        *,
+        weaken_subject_schema: bool = False,
+        document_mutation: Callable[[dict[str, Any]], None] | None = None,
+    ) -> tuple[dict[str, Any], Path, Path, Path, Path, bytes]:
+        """Create a subject repo, a trusted tool checkout and a trust context."""
+
+        subject_repo = harness_root / "subject"
+        trusted_repo = harness_root / "trusted"
+        external = harness_root / "external"
+        for repository in (subject_repo, trusted_repo):
+            (repository / "quality/content").mkdir(parents=True)
+            (repository / "quality/scenarios").mkdir(parents=True)
+            (repository / "quality/schemas").mkdir(parents=True)
+            (repository / "quality/scripts").mkdir(parents=True)
+            (repository / ".github/workflows").mkdir(parents=True)
+        external.mkdir(parents=True)
+        schema_bytes = EVIDENCE_SCHEMA.read_bytes()
+        subject_schema_bytes = (
+            b'{"type":"object"}\n' if weaken_subject_schema else schema_bytes
+        )
+        component_bytes = {
+            "manifest": b'{"subject":"manifest"}\n',
+            "scenarioContract": b'{"subject":"scenarios"}\n',
+            "evidenceSchema": subject_schema_bytes,
+            "evidenceValidator": Path(__file__).read_bytes(),
+            "ajvWrapper": (
+                ROOT / "quality/scripts/validate_evidence_schema.mjs"
+            ).read_bytes(),
+            "packageManifest": b'{"name":"harness-quality"}\n',
+            "packageLock": b'{"lockfileVersion":3}\n',
+            "gateRunner": b"#!/usr/bin/env python3\n",
+            "authorizeWorkflow": b"name: quality-gate\n",
+        }
+        trusted_component_bytes = dict(
+            component_bytes, evidenceSchema=schema_bytes
+        )
+        for component_id, raw_bytes in component_bytes.items():
+            target = subject_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+            target.write_bytes(raw_bytes)
+        for component_id, raw_bytes in trusted_component_bytes.items():
+            target = trusted_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+            target.write_bytes(raw_bytes)
+        (trusted_repo / ".gitignore").write_text(
+            "quality/node_modules/\n", encoding="utf-8"
+        )
+        (trusted_repo / "quality/node_modules").symlink_to(
+            ROOT / "quality/node_modules"
+        )
+        for repository in (subject_repo, trusted_repo):
+            for arguments in (
+                ("init", "-q"),
+                ("config", "user.email", "self-test@example.invalid"),
+                ("config", "user.name", "Evidence Self Test"),
+                ("add", "."),
+                ("commit", "-qm", "harness"),
+            ):
+                subprocess.run(
+                    ["git", *arguments],
+                    cwd=repository,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+        subject_commit = _git("rev-parse", "HEAD", root=subject_repo)
+        subject_tree = _git("rev-parse", "HEAD^{tree}", root=subject_repo)
+        trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
+        node_version = _node_version()
+        if node_version is None:
+            raise ValueError("node is unavailable for the trusted harness")
+
+        document = substitute(
+            copy.deepcopy(fixture), fixture["subject"]["commitSha"], subject_commit
+        )
+        document["subject"].update(
+            commitSha=subject_commit, treeSha=subject_tree
+        )
+        document["ci"]["headSha"] = subject_commit
+        for component_id, (_, digest_field) in CONTENT_COMPONENT_FIELDS.items():
+            subject_digest = sha256_bytes(component_bytes[component_id])
+            trusted_digest = sha256_bytes(trusted_component_bytes[component_id])
+            document["content"][digest_field] = subject_digest
+            component = document["trustBundle"]["components"][component_id]
+            component["subjectSha256"] = subject_digest
+            component["trustedSha256"] = trusted_digest
+        document["trustBundle"]["trustedCommitSha"] = trusted_commit
+        document["trustBundle"]["nodeVersion"] = node_version
+        if document_mutation is not None:
+            document_mutation(document)
+
+        payloads: dict[str, Any] = {}
+        for command in document["commands"]:
+            payloads[command["stdoutArtifact"]["path"]] = b"stdout\n"
+            payloads[command["stderrArtifact"]["path"]] = b""
+            payloads[command["checksArtifact"]["path"]] = {
+                "schemaVersion": "gate-check-result-v1",
+                "gateId": document["gateId"],
+                "subjectCommitSha": subject_commit,
+                "commandId": command["id"],
+                "executor": command["executor"],
+                "command": command["command"],
+                "workingDirectory": command["workingDirectory"],
+                "durationSeconds": command["durationSeconds"],
+                "exitCode": command["exitCode"],
+                "conclusion": command["conclusion"],
+                "checks": command["checks"],
+                "scenarioIds": command["scenarioIds"],
+            }
+        for metric in document["rawMetrics"]:
+            metric_payload: dict[str, Any] = {
+                "name": metric["name"],
+                "unit": metric["unit"],
+            }
+            if "samples" in metric:
+                metric_payload["samples"] = metric["samples"]
+            if "measurement" in metric:
+                metric_payload["measurement"] = metric["measurement"]
+            payloads[metric["rawArtifact"]["path"]] = metric_payload
+        ci_section = document["ci"]
+        payloads[ci_section["attestationArtifact"]["path"]] = {
+            "schemaVersion": "github-actions-attestation-v1",
+            "provider": ci_section["provider"],
+            "repository": ci_section["repository"],
+            "workflowPath": ci_section["workflowPath"],
+            "runId": ci_section["runId"],
+            "runAttempt": ci_section["runAttempt"],
+            "jobId": ci_section["jobId"],
+            "jobName": ci_section["jobName"],
+            "headSha": ci_section["headSha"],
+            "url": ci_section["url"],
+            "conclusion": ci_section["conclusion"],
+        }
+        reviewer_section = document["reviewer"]
+        payloads[reviewer_section["reviewArtifact"]["path"]] = {
+            "schemaVersion": "gate-review-v1",
+            "gateId": document["gateId"],
+            "subjectCommitSha": subject_commit,
+            "subjectTreeSha": subject_tree,
+            "reviewerId": reviewer_section["id"],
+            "implementationWriter": document["implementationWriter"],
+            "reproducedCommandId": reviewer_section["reproducedCommandId"],
+            "result": "approve",
+        }
+        for artifact in _artifact_objects(document):
+            payload = payloads[artifact["path"]]
+            raw = (
+                payload
+                if isinstance(payload, bytes)
+                else json.dumps(payload, indent=2).encode("utf-8")
+            )
+            artifact_path = subject_repo / Path(artifact["path"])
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_bytes(raw)
+            artifact["sha256"] = sha256_bytes(raw)
+            artifact["bytes"] = len(raw)
+
+        evidence_file = subject_repo / Path(document["attempt"]["evidencePath"])
+        evidence_file.parent.mkdir(parents=True, exist_ok=True)
+        evidence_raw = json.dumps(document, indent=2).encode("utf-8")
+        evidence_file.write_bytes(evidence_raw)
+        evidence_digest = sha256_bytes(evidence_raw)
+        chain_entry = {
+            "gateId": document["gateId"],
+            "evidencePath": document["attempt"]["evidencePath"],
+            "evidenceSha256": evidence_digest,
+            "subjectCommitSha": subject_commit,
+            "subjectTreeSha": subject_tree,
+            "ciRunId": ci_section["runId"],
+            "ciJobId": ci_section["jobId"],
+            "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
+            "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
+        }
+        context = {
+            "schemaVersion": TRUST_CONTEXT_VERSION,
+            "repository": "VibecodingGermany/Project_Nova",
+            "workflowPath": ".github/workflows/quality-gate.yml",
+            "authorizingRunId": "999",
+            "authorizingRunAttempt": 1,
+            "authorizingJob": "gate-evidence-authorize",
+            "subjectCommitSha": subject_commit,
+            "subjectTreeSha": subject_tree,
+            "evidencePath": document["attempt"]["evidencePath"],
+            "evidenceSha256": evidence_digest,
+            "evidenceCiRunId": ci_section["runId"],
+            "evidenceCiJobId": ci_section["jobId"],
+            "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
+            "reviewerId": reviewer_section["id"],
+            "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
+            "trustedToolCommitSha": trusted_commit,
+            "authorizedEvidence": [chain_entry],
+        }
+        context_path = external / "trust-context.json"
+        context_raw = json.dumps(context, indent=2).encode("utf-8")
+        context_path.write_bytes(context_raw)
+        return document, evidence_file, context_path, subject_repo, trusted_repo, context_raw
+
+    def harness_environment(context_raw: bytes) -> dict[str, str]:
+        return {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
+            "GITHUB_RUN_ID": "999",
+            "GITHUB_RUN_ATTEMPT": "1",
+            "GITHUB_JOB": "gate-evidence-authorize",
+            "GITHUB_WORKFLOW_REF": (
+                "VibecodingGermany/Project_Nova/"
+                ".github/workflows/quality-gate.yml@refs/heads/main"
+            ),
+            "NOVA_TRUST_CONTEXT_SHA256": sha256_bytes(context_raw),
+        }
+
+    environment_names = (
+        "GITHUB_ACTIONS",
+        "GITHUB_REPOSITORY",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+        "GITHUB_JOB",
+        "GITHUB_WORKFLOW_REF",
+        "NOVA_TRUST_CONTEXT_SHA256",
+        "PATH",
+    )
+    saved_environment = {name: os.environ.get(name) for name in environment_names}
+    try:
+        with tempfile.TemporaryDirectory() as temp:
+            try:
+                (
+                    trusted_document,
+                    trusted_evidence,
+                    trusted_context_path,
+                    subject_repo,
+                    trusted_repo,
+                    context_raw,
+                ) = build_trusted_harness(Path(temp))
+            except (OSError, ValueError) as error:
+                print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
+                return 1
+            os.environ.update(harness_environment(context_raw))
+
+            def trusted_codes(
+                candidate: dict[str, Any],
+                context_path: Path,
+                active_trusted_repo: Path = trusted_repo,
+            ) -> set[str]:
+                return {
+                    code
+                    for code, _ in validate_document(
+                        candidate,
+                        trusted_evidence,
+                        root=subject_repo,
+                        verify_files=True,
+                        verify_git=True,
+                        profiles=profiles,
+                        scenario_definitions=scenarios,
+                        scenario_methods=methods,
+                        trust_context_path=context_path,
+                        trusted_checkout=active_trusted_repo,
+                        require_trust=True,
+                    )
+                }
+
+            baseline_errors = trusted_codes(trusted_document, trusted_context_path)
+            checks += 1
+            if baseline_errors:
+                print(
+                    "SELF-TEST FAIL: trusted Schema 1.3 baseline was rejected: "
+                    f"{sorted(baseline_errors)}"
+                )
+                return 1
+            if not _is_authorized_pass(trusted_document, []):
+                print("SELF-TEST FAIL: trusted baseline was not an authorized pass")
+                return 1
+
+            lockfile_path = trusted_repo / "quality/package-lock.json"
+            lockfile_path.write_bytes(
+                b'{"lockfileVersion":3,"tampered":true}\n'
+            )
+            checks += 1
+            if "E_TRUSTED_TOOL" not in trusted_codes(
+                trusted_document, trusted_context_path
+            ):
+                print("SELF-TEST FAIL: tampered trusted lockfile was accepted")
+                return 1
+            wrapper_path = trusted_repo / Path(
+                "quality/scripts/validate_evidence_schema.mjs"
+            )
+            wrapper_path.write_bytes(
+                wrapper_path.read_bytes() + b"\n// tampered\n"
+            )
+            for arguments in (
+                ("add", "."),
+                ("commit", "-qm", "tamper wrapper"),
+            ):
+                subprocess.run(
+                    ["git", *arguments],
+                    cwd=trusted_repo,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            checks += 1
+            if "E_TRUSTED_TOOL" not in trusted_codes(
+                trusted_document, trusted_context_path
+            ):
+                print("SELF-TEST FAIL: tampered trusted Ajv wrapper was accepted")
+                return 1
+            subprocess.run(
+                ["git", "reset", "--hard", "-q", "HEAD~1"],
+                cwd=trusted_repo,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            external = Path(temp) / "external"
+            for name, chain in (
+                ("incomplete", []),
+                (
+                    "extra",
+                    [
+                        strict_load(trusted_context_path)["authorizedEvidence"][0],
+                        strict_load(trusted_context_path)["authorizedEvidence"][0],
+                    ],
+                ),
+            ):
+                mutated_context = strict_load(trusted_context_path)
+                mutated_context["authorizedEvidence"] = chain
+                mutated_path = external / f"trust-context-{name}.json"
+                mutated_raw = json.dumps(mutated_context).encode("utf-8")
+                mutated_path.write_bytes(mutated_raw)
+                os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(mutated_raw)
+                checks += 1
+                if "E_AUTHORIZATION_CHAIN" not in trusted_codes(
+                    trusted_document, mutated_path
+                ):
+                    print(
+                        f"SELF-TEST FAIL: {name} authorization chain was accepted"
+                    )
+                    return 1
+
+            swapped_context = strict_load(trusted_context_path)
+            base_entry = swapped_context["authorizedEvidence"][0]
+            swapped_context["authorizedEvidence"] = [
+                dict(base_entry, gateId="G1"),
+                base_entry,
+            ]
+            swapped_path = external / "trust-context-swapped.json"
+            swapped_raw = json.dumps(swapped_context).encode("utf-8")
+            swapped_path.write_bytes(swapped_raw)
+            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(swapped_raw)
+            swapped_document = copy.deepcopy(trusted_document)
+            swapped_document["gateId"] = "G1"
+            swapped_errors: list[tuple[str, str]] = []
+            _validate_trust_context(
+                swapped_path,
+                swapped_document,
+                trusted_evidence,
+                subject_repo,
+                swapped_errors,
+                gate_id="G1",
+            )
+            checks += 1
+            if "E_AUTHORIZATION_CHAIN" not in {
+                code for code, _ in swapped_errors
+            }:
+                print("SELF-TEST FAIL: swapped authorization chain was accepted")
+                return 1
+
+        with tempfile.TemporaryDirectory() as temp:
+            try:
+                (
+                    weakened_document,
+                    weakened_evidence,
+                    weakened_context_path,
+                    weakened_subject,
+                    weakened_trusted,
+                    weakened_context_raw,
+                ) = build_trusted_harness(
+                    Path(temp),
+                    weaken_subject_schema=True,
+                    document_mutation=lambda value: value.update(forbidden=True),
+                )
+            except (OSError, ValueError) as error:
+                print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
+                return 1
+            os.environ.update(harness_environment(weakened_context_raw))
+            weakened_codes = {
+                code
+                for code, _ in validate_document(
+                    weakened_document,
+                    weakened_evidence,
+                    root=weakened_subject,
+                    verify_files=True,
+                    verify_git=True,
+                    profiles=profiles,
+                    scenario_definitions=scenarios,
+                    scenario_methods=methods,
+                    trust_context_path=weakened_context_path,
+                    trusted_checkout=weakened_trusted,
+                    require_trust=True,
+                )
+            }
+            checks += 1
+            if "E_JSON_SCHEMA" not in weakened_codes:
+                print(
+                    "SELF-TEST FAIL: manipulated subject schema escaped the "
+                    "trusted schema"
+                )
+                return 1
+
+        missing_checkout_codes = {
+            code
+            for code, _ in validate_document(
+                copy.deepcopy(fixture),
+                evidence_path,
+                root=Path("/repo"),
+                verify_files=False,
+                verify_git=False,
+                profiles=profiles,
+                scenario_definitions=scenarios,
+                scenario_methods=methods,
+                evidence_schema_bytes=EVIDENCE_SCHEMA.read_bytes(),
+                trusted_checkout=Path("/nonexistent-nova-trusted-checkout"),
+                require_trust=False,
+            )
+        }
+        checks += 1
+        if "E_TRUSTED_TOOL" not in missing_checkout_codes:
+            print("SELF-TEST FAIL: missing trusted checkout was accepted")
+            return 1
+
+        os.environ["PATH"] = ""
+        try:
+            node_missing_errors = _schema_validation_errors(
+                copy.deepcopy(fixture), EVIDENCE_SCHEMA.read_bytes()
+            )
+        finally:
+            if saved_environment["PATH"] is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = saved_environment["PATH"]
+        checks += 1
+        if not node_missing_errors:
+            print("SELF-TEST FAIL: missing node was accepted fail-open")
+            return 1
+
+        with tempfile.TemporaryDirectory() as temp:
+            fake_node = Path(temp) / "node"
+            fake_node.write_text("#!/bin/sh\n/bin/sleep 5\n", encoding="utf-8")
+            fake_node.chmod(0o755)
+            os.environ["PATH"] = temp
+            try:
+                timeout_errors = _schema_validation_errors(
+                    copy.deepcopy(fixture),
+                    EVIDENCE_SCHEMA.read_bytes(),
+                    timeout_seconds=0.2,
+                )
+            finally:
+                if saved_environment["PATH"] is None:
+                    os.environ.pop("PATH", None)
+                else:
+                    os.environ["PATH"] = saved_environment["PATH"]
+        checks += 1
+        if not any("timed out" in message for message in timeout_errors):
+            print("SELF-TEST FAIL: hanging schema subprocess was accepted fail-open")
+            return 1
+    finally:
+        for name, previous in saved_environment.items():
+            if previous is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = previous
 
     with tempfile.TemporaryDirectory() as temp:
         duplicate_path = Path(temp) / "duplicate.json"
@@ -2734,6 +3807,14 @@ def main() -> int:
             "verdict=pass"
         ),
     )
+    parser.add_argument(
+        "--trusted-tool-checkout",
+        type=Path,
+        help=(
+            "subject-independent trusted tool checkout (schema, validators, "
+            "pinned npm dependencies); required to authorize verdict=pass"
+        ),
+    )
     arguments = parser.parse_args()
 
     if arguments.self_test:
@@ -2753,6 +3834,7 @@ def main() -> int:
             document,
             path,
             trust_context_path=arguments.trust_context,
+            trusted_checkout=arguments.trusted_tool_checkout,
         )
         if errors:
             failed = True

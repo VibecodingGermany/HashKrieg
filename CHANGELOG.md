@@ -17,7 +17,62 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **G0-A Trusted-Gate-Bootstrap (D-064) als Draft-Checkpoint angelegt:**
+  Evidence-Schema
+  `1.3.0` mit Pflicht-`environmentId` an jedem Command und jeder
+  Performance-Messung, strikten Umgebungsfeldern (OS, Architektur, Hardware,
+  Build, Managed/Burst, Auflösung, Quality-Profil, VSync, Deep Profiling,
+  Replay) sowie einer `trustBundle`-Sektion, die alle neun
+  Trust-Bundle-Komponenten (Manifest, Szenariovertrag, Schema,
+  Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner,
+  Authorize-Workflow) per Subject-/Trusted-Commit und SHA-256 plus exakter
+  Node-Version bindet.
+- `validate_gate_evidence.py` erhält den Trusted-Tool-Modus
+  (`--trusted-tool-checkout`): Schema, Ajv-Wrapper und Paketpins kommen
+  ausschließlich aus einem subject-unabhängigen, sauberen Checkout;
+  Umgebungsfelder werden exakt gegen das Methodenprofil verglichen, und der
+  Trust-Kontext `2.0.0` prüft die vollständige geordnete
+  `authorizedEvidence`-Kette G0→Gate (Reihenfolge, Vollständigkeit,
+  CI-/Review-Attestierung je Glied). Lokale Pass-Versuche bleiben fail-closed
+  (`E_AUTHORIZATION_BOOTSTRAP`/`E_TRUST_CONTEXT`); Self-Test um die
+  D-064-Angriffspfade (manipuliertes Subject-Schema, Ajv-Wrapper/Lockfile,
+  unvollständige/vertauschte Kette, widersprüchliche Umgebung, Missing-Tool
+  und Subprozess-Timeout) sowie eine positive Trusted-Baseline erweitert
+  (52 Kontrollen).
+- **Kanonischer Gate-Runner `quality/scripts/run_gate_check.py`:** führt pro
+  Aufruf genau einen Kriterien-Check (`--gate`/`--criterion`/`--subject`/
+  `--result`, Executor via `NOVA_GATE_EXECUTOR`) aus und schreibt das strikte
+  `gate-check-result-v1`-Artefakt, das der Validator Feld für Feld gegen die
+  Evidence abgleicht. Alle zehn G0-B-Kriterien (Engine-Pin, geteilte
+  SimRunner-Quellen, asmdef-Architekturgrenzen, Build-Voraussetzungen
+  Windows/macOS, .NET-/EditMode-Tests, Architektur-Negative-Control,
+  Evidence-Validator/Trustpfad, keine getrackten Binärdateien) sind
+  registriert; reale plattformspezifische Builds, der Authorize-Pfad und die
+  externe Attestierungsprüfung sind noch nicht abgenommen. Die registrierten
+  G1–G5-Kriterien enden fail-closed mit „criterion not implemented".
+- **Entwurf des geschützten Authorize-Workflows
+  `.github/workflows/quality-gate.yml` (D-064):** Job `integrity` (jeder PR)
+  prüft gepinnte Abhängigkeiten,
+  Validator-Self-Test, Ajv-Schema-Selbstcheck und Runner-CLI; Job
+  `gate-evidence-authorize` läuft nur per `workflow_dispatch` hinter der
+  geschützten Umgebung `quality-gate`, nutzt einen subject-unabhängigen
+  Trusted-Tool-Checkout (`trusted/`, Pflicht-Input `trustedSha`) und erzeugt
+  den externen Trust-Kontext `2.0.0` über
+  `.github/scripts/generate_trust_context.py` (17 Schlüssel, geordnete
+  `authorizedEvidence`-Kette, `NOVA_TRUST_CONTEXT_SHA256`-Bindung). Der
+  Authorize-Job bleibt bis zur Korrektur der Checkout-, Input- und
+  Attestierungsbindung nicht merge- oder autorisierungsfähig.
+
 ### Geändert
+- **Szenariovertrag `mvp-v1.json` auf `1.3.0`:** `authorizationStatus`
+  beschreibt den vorgesehenen
+  `trusted-tool-checkout-authorization`-Pfad; bis dessen geschützter Merge und
+  Abnahme bleiben G0 und jeder lokale/untrusted Pass gesperrt. Die
+  Windows-x64-Referenz (`performanceMethod`,
+  jetzt mit `os`/`hardware`) und die neue Mac-M2-Funktionsmethode
+  (`macM2FunctionalMethod`) sind getrennte Methodenprofile, und
+  `MAC_M2_FUNCTIONAL` referenziert letztere.
 - **Planung vollständig auf D-056–D-064 rebaselined:** Sprint 7 bleibt bei
   offenem G0; MS-0 und MS-1 sind unerreicht. Milestones, SprintPlanning,
   Roadmap, RiskAnalysis und Sprint06_Report verwenden dieselbe Gate- und
