@@ -395,6 +395,30 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **Movement-State auf SimFixed migriert (Q-040(i)-Auflösung implementiert,
+  Ratifizierung per D-ID ausstehend; ohne Gate-Status, ohne Evidence):**
+  `Transform2D` speichert Position als `SimFixed` (Q16.16) und Rotation als
+  `SimAngle` statt float-Radianten; `UnitState.MoveSpeed`/`Radius` sind
+  `SimFixed`; `MovementSystem` rechnet den gesamten Tick-Pfad (Flow-Steering,
+  Separation, Normalisierung, Integration, Heading) in kanonischem
+  Fixed-Point — Zielrichtung via `SimTrig.Atan2`, der Tick-Schritt als
+  exakte Division `MoveSpeed / 10` statt einer gerundeten
+  0.1-s-Q16.16-Konstanten. Neu in `Nova.Core`: `SimTrig` — rein ganzzahlige
+  CORDIC-Trigonometrie (`Sin`/`Cos` via CORDIC-generierte
+  Viertelwellen-Tabelle, `Atan2` via Vectoring-CORDIC, `Sqrt` via
+  Integer-Wurzel; gemessener Max-Fehler ≤ 0,5 Q16.16-Rohwerte bei Sin/Cos
+  und ≤ 0,5 Winkeleinheiten bei Atan2, Roundtrip exakt über alle 65536
+  Winkel; kein float/double im Pfad). `EntityManager`-Snapshot-Block auf
+  Version 2 gehoben (SimFixed-Rohwerte int32, SimAngle uint16 statt
+  Float-Bitmustern); v1-Blöcke werden abgelehnt (Pre-G1-Reset, kein
+  Migrationspfad). Boundary-Konvertierungen `SimFixed.FromFloat`/`ToFloat`
+  für Presentation und Prototyp-Scaffolding; `SimMath`-Float-Pfade haben
+  keine autoritativen Aufrufer mehr. Zwingende Aufrufer (Vision, Combat,
+  Commander, EvolvedFaction, Production, Selection, UnitView, Skirmish-AI,
+  SimRunner) und beide Test-Lanes angepasst; der kanonische State-Hash und
+  alle bewegungsabhängigen Golden-Werte ändern sich erwartbar durch die
+  Numerik-/Formatänderung (ehrlich neu erzeugt, kein Rückwärts-Glätten).
+  [docs/production/OpenQuestions.md](docs/production/OpenQuestions.md) Q-040(i).
 - **Art-Strang MS-1, Folgeänderungen an bestehenden Dokumenten (ohne
   Gate-Status, ohne Evidence):** Hunyuan3D-Lizenzangabe in
   [docs/assets/Licenses.md](docs/assets/Licenses.md) nach Version
