@@ -287,6 +287,10 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Attestierungsbindung nicht merge- oder autorisierungsfähig.
 
 ### Behoben
+- **EditMode-Testzählung im Gate-Runner:** `run_gate_check.py` zählte
+  `result="Passed"`-Vorkommen inklusive NUnit-Fixture-/Suite-Knoten und
+  überzählte damit systematisch (z. B. 274 statt echter 212 Testfälle).
+  Die Zählung wertet jetzt nur `test-case`-Knoten aus (Review-Befund).
 - **Atomarer Snapshot-Restore (Serialization.md §5, Review-Auflage P1-1):**
   `SimulationKernel.TryRestoreSnapshot` committete Ingress-, Tick-, PRNG- und
   System-Blöcke sequenziell — ein semantisch invalider späterer Block hinter

@@ -424,8 +424,11 @@ def check_test_editmode() -> tuple[bool, list[str]]:
                     f"{result.returncode}, see {log_path}"
                 ],
             )
-        failed = results_text.count('result="Failed"')
-        passed = results_text.count('result="Passed"')
+        # Count only test-case nodes: result="Passed"/"Failed" also appears on
+        # parent fixture/suite nodes, which inflated the numbers systematically
+        # (review finding; NUnit3 XML marks each test case individually).
+        failed = len(re.findall(r"<test-case\b[^>]*\bresult=\"Failed\"", results_text))
+        passed = len(re.findall(r"<test-case\b[^>]*\bresult=\"Passed\"", results_text))
         summary = f"{passed} passed, {failed} failed"
         if result.returncode != 0 or failed:
             return (
