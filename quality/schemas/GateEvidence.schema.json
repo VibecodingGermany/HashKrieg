@@ -1,0 +1,921 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/VibecodingGermany/Project_Nova/quality/schemas/GateEvidence.schema.json",
+  "title": "Project Nova Gate Evidence",
+  "description": "Integrity-only Schema 1.2 precursor for one append-only gate attempt. D-064 blocks pass authorization until the subject-independent Schema 1.3 bootstrap exists. Plans and file presence are not evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gateId",
+    "subject",
+    "attempt",
+    "priorGateEvidence",
+    "scope",
+    "content",
+    "toolchains",
+    "environments",
+    "commands",
+    "coverage",
+    "rawMetrics",
+    "artifacts",
+    "ci",
+    "implementationWriter",
+    "reviewer",
+    "criteria",
+    "verdict"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.2.0"
+    },
+    "gateId": {
+      "type": "string",
+      "pattern": "^G[0-5]$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitSha",
+        "treeSha",
+        "dirty"
+      ],
+      "properties": {
+        "commitSha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "treeSha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "dirty": {
+          "const": false
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "createdAtUtc",
+        "evidencePath",
+        "previousEvidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z-[a-z0-9-]+$"
+        },
+        "createdAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidencePath": {
+          "type": "string",
+          "pattern": "^quality/evidence/G[0-5]/[0-9a-f]{40,64}/[^/]+/GateEvidence\\.json$"
+        },
+        "previousEvidence": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^quality/evidence/G[0-5]/[0-9a-f]{40,64}/[^/]+/GateEvidence\\.json$"
+            }
+          ]
+        }
+      }
+    },
+    "priorGateEvidence": {
+      "type": "array",
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/priorGateEvidence"
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "changedPaths",
+        "relevantContracts"
+      ],
+      "properties": {
+        "classification": {
+          "enum": [
+            "docs-only",
+            "code",
+            "content",
+            "build",
+            "mixed"
+          ]
+        },
+        "changedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "relevantContracts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifestPath",
+        "manifestSha256",
+        "scenarioPath",
+        "scenarioSha256",
+        "evidenceSchemaPath",
+        "evidenceSchemaSha256",
+        "evidenceValidatorPath",
+        "evidenceValidatorSha256"
+      ],
+      "properties": {
+        "manifestPath": {
+          "const": "quality/content/mvp-v1.json"
+        },
+        "manifestSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scenarioPath": {
+          "const": "quality/scenarios/mvp-v1.json"
+        },
+        "scenarioSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidenceSchemaPath": {
+          "const": "quality/schemas/GateEvidence.schema.json"
+        },
+        "evidenceSchemaSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidenceValidatorPath": {
+          "const": "quality/scripts/validate_gate_evidence.py"
+        },
+        "evidenceValidatorSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "toolchains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unity",
+        "dotnetSdk",
+        "packages"
+      ],
+      "properties": {
+        "unity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "revision"
+          ],
+          "properties": {
+            "version": {
+              "const": "6000.5.4f1"
+            },
+            "revision": {
+              "const": "d550df8bd089"
+            }
+          }
+        },
+        "dotnetSdk": {
+          "type": "string",
+          "minLength": 1
+        },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "version"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "environments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "os",
+          "architecture",
+          "hardware",
+          "configuration"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "os": {
+            "type": "string",
+            "minLength": 1
+          },
+          "architecture": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hardware": {
+            "type": "string",
+            "minLength": 1
+          },
+          "configuration": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/commandResult"
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scopes",
+        "reportArtifact"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "measured",
+            "not-applicable"
+          ]
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "linePercent",
+              "requiredPercent"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "linePercent": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "requiredPercent": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        },
+        "reportArtifact": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/artifact"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "scopes": {
+                "type": "array",
+                "minItems": 1
+              },
+              "reportArtifact": {
+                "$ref": "#/$defs/artifact"
+              }
+            }
+          },
+          "else": {
+            "type": "object",
+            "properties": {
+              "scopes": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "reportArtifact": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rawMetrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "unit",
+          "rawArtifact"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "samples": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "measurement": {
+            "$ref": "#/$defs/performanceMeasurement"
+          },
+          "rawArtifact": {
+            "$ref": "#/$defs/artifact"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "samples": {}
+            },
+            "required": [
+              "samples"
+            ],
+            "not": {
+              "properties": {
+                "measurement": {}
+              },
+              "required": [
+                "measurement"
+              ]
+            }
+          },
+          {
+            "properties": {
+              "measurement": {}
+            },
+            "required": [
+              "measurement"
+            ],
+            "not": {
+              "properties": {
+                "samples": {}
+              },
+              "required": [
+                "samples"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "repository",
+        "workflowPath",
+        "runId",
+        "runAttempt",
+        "jobId",
+        "jobName",
+        "headSha",
+        "url",
+        "conclusion",
+        "attestationArtifact"
+      ],
+      "properties": {
+        "provider": {
+          "const": "github-actions"
+        },
+        "repository": {
+          "const": "VibecodingGermany/Project_Nova"
+        },
+        "workflowPath": {
+          "const": ".github/workflows/quality-gate.yml"
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "jobId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*$"
+        },
+        "jobName": {
+          "const": "quality-gate"
+        },
+        "headSha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "conclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "skipped"
+          ]
+        },
+        "attestationArtifact": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "implementationWriter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "independentFromImplementationWriter",
+        "cleanCloneCommand",
+        "reproducedCommandId",
+        "reviewArtifact"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independentFromImplementationWriter": {
+          "const": true
+        },
+        "cleanCloneCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reproducedCommandId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewArtifact": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "requirement",
+          "evidenceRefs",
+          "result"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(check|command|artifact|metric|coverage|ci|scenario):.+$"
+            }
+          },
+          "result": {
+            "enum": [
+              "pass",
+              "fail",
+              "missing",
+              "skipped",
+              "cancelled"
+            ]
+          }
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "rationale"
+      ],
+      "properties": {
+        "result": {
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "string",
+                "const": "pass"
+              }
+            },
+            "required": [
+              "result"
+            ]
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/commandResult"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "conclusion": {
+                      "type": "string",
+                      "const": "success"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "ci": {
+            "type": "object",
+            "properties": {
+              "conclusion": {
+                "type": "string",
+                "const": "success"
+              }
+            }
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "type": "string",
+                  "const": "pass"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "priorGateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gateId",
+        "evidencePath",
+        "sha256"
+      ],
+      "properties": {
+        "gateId": {
+          "type": "string",
+          "pattern": "^G[0-4]$"
+        },
+        "evidencePath": {
+          "type": "string",
+          "pattern": "^quality/evidence/G[0-4]/[0-9a-f]{40,64}/[^/]+/GateEvidence\\.json$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "checkResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "result"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^G[0-5]-[A-Z0-9-]+$"
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail",
+            "missing",
+            "skipped",
+            "cancelled"
+          ]
+        }
+      }
+    },
+    "performanceMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "methodRef",
+        "warmupSeconds",
+        "runs"
+      ],
+      "properties": {
+        "methodRef": {
+          "const": "performanceMethod"
+        },
+        "warmupSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "measurementSeconds",
+              "samples"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "measurementSeconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "samples": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "commandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "executor",
+        "command",
+        "workingDirectory",
+        "durationSeconds",
+        "exitCode",
+        "conclusion",
+        "checkCount",
+        "expectedCheckCount",
+        "stdoutArtifact",
+        "stderrArtifact",
+        "checksArtifact",
+        "checks",
+        "scenarioIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executor": {
+          "enum": [
+            "implementation",
+            "reviewer"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workingDirectory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "durationSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "exitCode": {
+          "type": "integer"
+        },
+        "conclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "skipped"
+          ]
+        },
+        "checkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expectedCheckCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stdoutArtifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "stderrArtifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "checksArtifact": {
+          "$ref": "#/$defs/artifact"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/checkResult"
+          }
+        },
+        "scenarioIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": {
+              "conclusion": {
+                "const": "success"
+              }
+            },
+            "required": [
+              "conclusion"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "exitCode": {
+                "type": "integer",
+                "const": 0
+              },
+              "checkCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "expectedCheckCount": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

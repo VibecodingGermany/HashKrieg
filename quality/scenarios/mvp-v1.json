@@ -1,0 +1,508 @@
+{
+  "schemaVersion": "1.2.0",
+  "scenarioSetId": "mvp-v1",
+  "status": "binding-requirement",
+  "decisionIds": [
+    "D-057",
+    "D-058",
+    "D-061",
+    "D-062",
+    "D-063",
+    "D-064"
+  ],
+  "authorizationStatus": "integrity-only-bootstrap-blocked",
+  "authorizationTargetSchemaVersion": "1.3.0",
+  "requiredBootstrapControls": [
+    "subject-independent-trusted-tool-checkout",
+    "non-self-authorizing-two-step-bootstrap",
+    "complete-ordered-authorized-evidence-chain",
+    "command-and-measurement-environment-binding",
+    "separate-windows-reference-and-mac-m2-methods"
+  ],
+  "contentManifest": "quality/content/mvp-v1.json",
+  "validHeadlessMatchRequirements": [
+    "state-hashes",
+    "monotonic-ticks",
+    "valid-result",
+    "core-action-trace",
+    "checkpoint-chain"
+  ],
+  "performanceMethod": {
+    "referenceDecision": "D-052",
+    "platform": "Windows",
+    "architecture": "x64",
+    "build": "standalone-il2cpp-development",
+    "executionPath": "managed",
+    "burstEnabled": false,
+    "resolution": "2560x1440",
+    "qualityProfile": "NovaReference",
+    "vSyncEnabled": false,
+    "deepProfilingEnabled": false,
+    "replay": "fixed",
+    "warmupSeconds": 30,
+    "measurementSeconds": 120,
+    "repetitions": 3,
+    "minimumSamplesPerSecond": 1,
+    "outlierRemoval": false,
+    "rawSamplesRequired": true
+  },
+  "scenarios": [
+    {
+      "id": "DETERMINISM_10000",
+      "gateUsage": [
+        "G1",
+        "V1"
+      ],
+      "workloadClass": "determinism",
+      "description": "Identischer kanonischer Replay-Strom auf Windows x64 und macOS arm64.",
+      "ticks": 10000,
+      "activeSlots": 2,
+      "requiredAssertions": [
+        "exact-state-hash-every-checkpoint",
+        "exact-final-snapshot-bytes",
+        "managed-path-only",
+        "same-sources-and-determinism-defines"
+      ]
+    },
+    {
+      "id": "SNAPSHOT_CONTINUATION_1000",
+      "gateUsage": [
+        "G1"
+      ],
+      "workloadClass": "persistence",
+      "description": "Roundtrip und Fortsetzung mit bereits gequeuten Commands.",
+      "continuationTicks": 1000,
+      "requiredAssertions": [
+        "serialize-deserialize-serialize-byte-identical",
+        "fresh-host-and-restored-host-hashes-identical",
+        "fresh-host-and-restored-host-final-bytes-identical",
+        "per-block-hash-sensitivity"
+      ]
+    },
+    {
+      "id": "SCALE_500_RENDERING",
+      "gateUsage": [
+        "G1",
+        "V2"
+      ],
+      "workloadClass": "synthetic-presentation-headroom",
+      "description": "500 sichtbare Proxy-Objekte im kanonischen URP-Renderingpfad.",
+      "objectCount": 500,
+      "contentPromise": false,
+      "methodRef": "performanceMethod",
+      "requiredAssertions": [
+        "urp-production-path",
+        "no-crash",
+        "all-raw-metrics-reported"
+      ],
+      "thresholds": {
+        "renderingCpuMs": {
+          "unit": "ms",
+          "p95Max": 4.0
+        }
+      }
+    },
+    {
+      "id": "SCALE_500_ANIMATION",
+      "gateUsage": [
+        "G1",
+        "V3"
+      ],
+      "workloadClass": "synthetic-presentation-headroom",
+      "description": "500 sichtbare animierte Proxy-Objekte im kanonischen Animationspfad.",
+      "objectCount": 500,
+      "contentPromise": false,
+      "methodRef": "performanceMethod",
+      "requiredAssertions": [
+        "production-animation-path",
+        "no-crash",
+        "all-raw-metrics-reported"
+      ],
+      "thresholds": {
+        "animationCpuMs": {
+          "unit": "ms",
+          "p95Max": 1.5
+        }
+      }
+    },
+    {
+      "id": "MVP_FULL_100",
+      "gateUsage": [
+        "G5"
+      ],
+      "workloadClass": "full-content",
+      "description": "Vollständiger MS-1-Inhalt mit insgesamt 100 Produktionseinheiten.",
+      "mapId": "glutrinne",
+      "unitCount": 100,
+      "methodRef": "performanceMethod",
+      "requiredAssertions": [
+        "exact-content-manifest-loaded",
+        "normal-product-path",
+        "no-crash",
+        "all-raw-metrics-reported"
+      ],
+      "thresholds": {
+        "simTotalMs": {
+          "unit": "ms",
+          "p95Max": 8.0,
+          "p99Max": 12.0
+        },
+        "pathfindingMs": {
+          "unit": "ms",
+          "p95Max": 4.0,
+          "p99Max": 6.0
+        },
+        "fogOfWarMs": {
+          "unit": "ms",
+          "p95Max": 1.0,
+          "p99Max": 1.5
+        },
+        "restSimulationMs": {
+          "unit": "ms",
+          "p95Max": 3.0,
+          "p99Max": 4.5
+        },
+        "simulationGcBytesPerTick": {
+          "unit": "bytes/tick",
+          "maximum": 0
+        },
+        "cpuFrameMs": {
+          "unit": "ms",
+          "p95Max": 16.6,
+          "p99Max": 24.9
+        },
+        "gpuFrameMs": {
+          "unit": "ms",
+          "p95Max": 16.6,
+          "p99Max": 24.9
+        },
+        "renderingCpuMs": {
+          "unit": "ms",
+          "p95Max": 4.0
+        },
+        "animationCpuMs": {
+          "unit": "ms",
+          "p95Max": 1.5
+        },
+        "gpuRenderMs": {
+          "unit": "ms",
+          "p95Max": 8.0
+        },
+        "uiCpuMs": {
+          "unit": "ms",
+          "p95Max": 1.0
+        }
+      }
+    },
+    {
+      "id": "SCALE_500_PRECOMBAT",
+      "gateUsage": [
+        "G1",
+        "V4",
+        "V5a"
+      ],
+      "workloadClass": "synthetic-architecture-headroom",
+      "description": "Repräsentative SpatialHash-, FoW-Filter-, Command- und Pathfinding-Last vor Combat.",
+      "agentCount": 500,
+      "contentPromise": false,
+      "methodRef": "performanceMethod",
+      "requiredAssertions": [
+        "no-crash",
+        "no-unbounded-memory-growth"
+      ],
+      "thresholds": {
+        "pathfindingMs": {
+          "unit": "ms",
+          "p95Max": 4.0
+        },
+        "precombatRestSimulationMs": {
+          "unit": "ms",
+          "p95Max": 3.0
+        }
+      }
+    },
+    {
+      "id": "SCALE_500_FULL_DIAGNOSTIC",
+      "gateUsage": [
+        "G3",
+        "V5b"
+      ],
+      "workloadClass": "synthetic-diagnostic",
+      "description": "Real Combat und reale KI bei 500 Agenten; Messwerte sind Diagnose, kein MS-1-Content-Gate.",
+      "agentCount": 500,
+      "contentPromise": false,
+      "requiredAssertions": [
+        "no-crash",
+        "no-unbounded-memory-growth",
+        "all-raw-metrics-reported"
+      ],
+      "thresholds": {}
+    },
+    {
+      "id": "MAC_M2_FUNCTIONAL",
+      "gateUsage": [
+        "G5"
+      ],
+      "workloadClass": "functional-baseline",
+      "description": "Funktionale Apple-M2-Baseline bei 1080p und Medium-Profil.",
+      "platform": "macOS",
+      "hardware": "Apple M2",
+      "resolution": "1920x1080",
+      "qualityProfile": "Medium",
+      "methodRef": "performanceMethod",
+      "requiredAssertions": [
+        "apple-m2-hardware",
+        "macos-arm64-standalone",
+        "medium-profile-1920x1080",
+        "functional-match-completed",
+        "all-raw-metrics-reported"
+      ],
+      "thresholds": {
+        "frameMs": {
+          "unit": "ms",
+          "p95Max": 33.3,
+          "p99Max": 50.0
+        }
+      }
+    },
+    {
+      "id": "HEADLESS_VALID_MATCH",
+      "gateUsage": [
+        "PR",
+        "nightly",
+        "weekly",
+        "G3",
+        "G5"
+      ],
+      "workloadClass": "headless-match",
+      "description": "Kanonisches Match für automatisierte Kadenz und Denominator-Regel.",
+      "requiredAssertions": [
+        "state-hashes",
+        "monotonic-ticks",
+        "valid-result",
+        "result-code-from-content-manifest",
+        "end-tick",
+        "winner-and-loser-or-null-for-draw",
+        "core-action-trace",
+        "checkpoint-chain"
+      ],
+      "failedRunsRemainInDenominator": true
+    },
+    {
+      "id": "G5_UI_ONLY",
+      "gateUsage": [
+        "G5"
+      ],
+      "workloadClass": "manual-acceptance",
+      "description": "Zwei normale UI-only-Matches, eines pro Fraktion, ohne Debug-Mutation.",
+      "requiredAssertions": [
+        "one-match-per-faction",
+        "normal-ui-only",
+        "no-debug-mutation",
+        "autosave-every-five-minutes",
+        "no-gate-critical-quarantine"
+      ],
+      "thresholds": {
+        "manualMatchCount": {
+          "unit": "matches",
+          "equals": 2
+        },
+        "freshPlayerTaskTesterCount": {
+          "unit": "testers",
+          "minimum": 3
+        },
+        "matchMedianMinutes": {
+          "unit": "minutes",
+          "minimum": 20,
+          "maximum": 35
+        },
+        "autosaveEarliestCoveredMinute": {
+          "unit": "minutes",
+          "equals": 5
+        },
+        "autosaveLatestCoveredMinute": {
+          "unit": "minutes",
+          "equals": 45
+        },
+        "p0DefectCount": {
+          "unit": "defects",
+          "maximum": 0
+        },
+        "p1DefectCount": {
+          "unit": "defects",
+          "maximum": 0
+        }
+      }
+    }
+  ],
+  "gateProfiles": {
+    "G0": {
+      "requiredPriorGateIds": [],
+      "requiredCriterionIds": [
+        "G0-ENGINE-PIN",
+        "G0-SHARED-SOURCES",
+        "G0-ARCHITECTURE",
+        "G0-BUILD-WINDOWS",
+        "G0-BUILD-MACOS",
+        "G0-TEST-DOTNET",
+        "G0-TEST-EDITMODE",
+        "G0-NEGATIVE-CONTROL",
+        "G0-EVIDENCE-VALIDATOR",
+        "G0-NO-TRACKED-BINARIES"
+      ],
+      "requiredScenarioIds": [],
+      "requiredCoverage": {}
+    },
+    "G1": {
+      "requiredPriorGateIds": [
+        "G0"
+      ],
+      "requiredCriterionIds": [
+        "G1-NUMERIC",
+        "G1-COMMANDS",
+        "G1-STATE",
+        "G1-HASHES",
+        "G1-SNAPSHOT",
+        "G1-REPLAY",
+        "G1-PARSER",
+        "G1-CROSS-PLATFORM",
+        "G1-COVERAGE",
+        "G1-FORMAT-RESET",
+        "G1-V1",
+        "G1-V2",
+        "G1-V3",
+        "G1-V4",
+        "G1-V5A"
+      ],
+      "requiredScenarioIds": [
+        "DETERMINISM_10000",
+        "SNAPSHOT_CONTINUATION_1000",
+        "SCALE_500_RENDERING",
+        "SCALE_500_ANIMATION",
+        "SCALE_500_PRECOMBAT"
+      ],
+      "requiredCoverage": {
+        "Nova.Simulation": 80,
+        "Command": 90,
+        "PRNG": 90,
+        "Serializer": 90,
+        "Hash": 90,
+        "Replay": 90,
+        "CommandInventoryCases": 100
+      }
+    },
+    "G2": {
+      "requiredPriorGateIds": [
+        "G1"
+      ],
+      "requiredCriterionIds": [
+        "G2-SESSION-PATH",
+        "G2-AETHERIUM",
+        "G2-GLUTRINNE",
+        "G2-FOW",
+        "G2-MUTATION-GUARD"
+      ],
+      "requiredScenarioIds": [],
+      "requiredCoverage": {}
+    },
+    "G3": {
+      "requiredPriorGateIds": [
+        "G2"
+      ],
+      "requiredCriterionIds": [
+        "G3-FILTERED-AI",
+        "G3-CANONICAL-INTENTS",
+        "G3-REPLAY",
+        "G3-SAVE-CONTINUATION",
+        "G3-HIDDEN-WORLD",
+        "G3-HEADLESS-VALIDITY",
+        "G3-V5B"
+      ],
+      "requiredScenarioIds": [
+        "SCALE_500_FULL_DIAGNOSTIC",
+        "HEADLESS_VALID_MATCH"
+      ],
+      "requiredCoverage": {}
+    },
+    "G4": {
+      "requiredPriorGateIds": [
+        "G3"
+      ],
+      "requiredCriterionIds": [
+        "G4-MANIFEST",
+        "G4-GLUTRINNE",
+        "G4-CONTENT",
+        "G4-VICTORY",
+        "G4-UX-PERSISTENCE",
+        "G4-ACCESSIBILITY",
+        "G4-UI-ONLY",
+        "G4-PROVENANCE",
+        "G4-USABILITY"
+      ],
+      "requiredScenarioIds": [],
+      "requiredCoverage": {}
+    },
+    "G5": {
+      "requiredPriorGateIds": [
+        "G4"
+      ],
+      "requiredCriterionIds": [
+        "G5-HEADLESS-120",
+        "G5-DENOMINATOR",
+        "G5-QUARANTINE",
+        "G5-MVP-FULL-100",
+        "G5-MAC-M2",
+        "G5-UI-ONLY",
+        "G5-TASK-TESTERS",
+        "G5-PACING",
+        "G5-AUTOSAVE",
+        "G5-DEFECTS",
+        "G5-INDEPENDENT-REVIEW"
+      ],
+      "requiredScenarioIds": [
+        "MVP_FULL_100",
+        "MAC_M2_FUNCTIONAL",
+        "HEADLESS_VALID_MATCH",
+        "G5_UI_ONLY"
+      ],
+      "requiredCoverage": {},
+      "requiredMetricMinimums": {
+        "valid-headless-match-count": {
+          "unit": "matches",
+          "minimum": 120
+        }
+      }
+    }
+  },
+  "cadence": {
+    "pullRequest": {
+      "aggregateCheck": "quality-gate",
+      "docsOnlyScopeMustBeExplicit": true,
+      "maySkip": false,
+      "requiredLanes": [
+        "tests",
+        "coverage",
+        "architecture",
+        "golden",
+        "four-headless-matches"
+      ],
+      "headlessMatchCount": 4
+    },
+    "nightly": {
+      "orderedFactionClusterCount": 2,
+      "matchesPerCluster": 20,
+      "mirrored": true,
+      "totalMatches": 40
+    },
+    "weekly": {
+      "matrixCount": 2,
+      "matchesPerMatrix": 200,
+      "totalMatches": 400
+    },
+    "g5": {
+      "sameSubjectSha": true,
+      "nightlyMatrixCount": 3,
+      "totalMatches": 120
+    }
+  }
+}

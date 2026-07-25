@@ -1,0 +1,421 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "mvp-v1",
+  "status": "binding-requirement",
+  "decisionIds": [
+    "D-056",
+    "D-058",
+    "D-061"
+  ],
+  "gateState": {
+    "currentGate": "G0",
+    "g0Passed": false,
+    "ms0Achieved": false,
+    "ms1Achieved": false
+  },
+  "mode": {
+    "id": "solo-human-vs-ai",
+    "activeSlotCount": 2,
+    "reservedSlotCount": 8,
+    "humanSlotCount": 1,
+    "aiSlotCount": 1,
+    "online": false,
+    "targetMatchMinutes": {
+      "minimum": 20,
+      "maximum": 35
+    }
+  },
+  "startStatePerPlayer": {
+    "aetheriumAE": 1000,
+    "completedBuildingRoles": [
+      "HQ",
+      "Refinery"
+    ],
+    "unitRoles": [
+      {
+        "role": "Builder",
+        "count": 1
+      },
+      {
+        "role": "Harvester",
+        "count": 2
+      }
+    ],
+    "onlyPrerequisiteException": "The starting completed Refinery does not require Power.",
+    "startingRefinerySpawnsAdditionalHarvester": false
+  },
+  "factions": [
+    {
+      "id": "alliance",
+      "displayName": "Allianz",
+      "identity": {
+        "costProfile": "high",
+        "productionProfile": "standard",
+        "weaponProfile": [
+          "precision",
+          "single-target"
+        ],
+        "harvesterCargoAE": 330,
+        "activeTogglesRequired": false
+      },
+      "buildings": [
+        {
+          "role": "HQ",
+          "displayName": "Kommandozentrale"
+        },
+        {
+          "role": "Power",
+          "displayName": "Fusionsreaktor"
+        },
+        {
+          "role": "Refinery",
+          "displayName": "Aetherium-Aufbereiter"
+        },
+        {
+          "role": "Storage",
+          "displayName": "Depot"
+        },
+        {
+          "role": "Barracks",
+          "displayName": "Ausbildungszentrum"
+        },
+        {
+          "role": "VehicleFactory",
+          "displayName": "Fahrzeugwerk"
+        },
+        {
+          "role": "ResearchLab",
+          "displayName": "Forschungslabor"
+        },
+        {
+          "role": "Radar",
+          "displayName": "Radarstation"
+        },
+        {
+          "role": "DefensePlatform",
+          "displayName": "Aegis-Plattform"
+        }
+      ],
+      "units": [
+        {
+          "role": "Builder",
+          "displayName": "Pionier \"Atlas\"",
+          "tier": 1
+        },
+        {
+          "role": "Harvester",
+          "displayName": "Sammler \"Demeter\"",
+          "tier": 1
+        },
+        {
+          "role": "BasicInfantry",
+          "displayName": "Rifleman",
+          "tier": 1
+        },
+        {
+          "role": "AntiArmorInfantry",
+          "displayName": "Rocket Soldier",
+          "tier": 2
+        },
+        {
+          "role": "ScoutVehicle",
+          "displayName": "Jackal-Aufklärer",
+          "tier": 1
+        },
+        {
+          "role": "LightTank",
+          "displayName": "Lynx",
+          "tier": 1
+        },
+        {
+          "role": "BattleTank",
+          "displayName": "Aegis",
+          "tier": 2
+        },
+        {
+          "role": "Artillery",
+          "displayName": "Longbow",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "legion",
+      "displayName": "Legion",
+      "identity": {
+        "costProfile": "low",
+        "productionProfile": "fast",
+        "weaponProfile": [
+          "salvo",
+          "splash"
+        ],
+        "harvesterCargoAE": 300,
+        "activeTogglesRequired": false
+      },
+      "buildings": [
+        {
+          "role": "HQ",
+          "displayName": "Gefechtsstand"
+        },
+        {
+          "role": "Power",
+          "displayName": "Schwerer Generator"
+        },
+        {
+          "role": "Refinery",
+          "displayName": "Schmelzofen"
+        },
+        {
+          "role": "Storage",
+          "displayName": "Bunkerdepot"
+        },
+        {
+          "role": "Barracks",
+          "displayName": "Rekrutenlager"
+        },
+        {
+          "role": "VehicleFactory",
+          "displayName": "Montagehalle"
+        },
+        {
+          "role": "ResearchLab",
+          "displayName": "Kriegslabor"
+        },
+        {
+          "role": "Radar",
+          "displayName": "Funkposten"
+        },
+        {
+          "role": "DefensePlatform",
+          "displayName": "Geschützstellung"
+        }
+      ],
+      "units": [
+        {
+          "role": "Builder",
+          "displayName": "Vorarbeiter",
+          "tier": 1
+        },
+        {
+          "role": "Harvester",
+          "displayName": "Schürfer",
+          "tier": 1
+        },
+        {
+          "role": "BasicInfantry",
+          "displayName": "Rekrut",
+          "tier": 1
+        },
+        {
+          "role": "AntiArmorInfantry",
+          "displayName": "Raketenschütze",
+          "tier": 2
+        },
+        {
+          "role": "ScoutVehicle",
+          "displayName": "Hyäne (Buggy)",
+          "tier": 1
+        },
+        {
+          "role": "LightTank",
+          "displayName": "Räuber",
+          "tier": 1
+        },
+        {
+          "role": "BattleTank",
+          "displayName": "Koloss",
+          "tier": 2
+        },
+        {
+          "role": "Artillery",
+          "displayName": "Donnerkanone",
+          "tier": 2
+        }
+      ]
+    }
+  ],
+  "technology": {
+    "researchLabCompletionUnlocksTier2": true,
+    "researchUpgradesEnabled": false,
+    "researchQueueEnabled": false,
+    "tier3Enabled": false
+  },
+  "defenseModules": [
+    {
+      "id": "MG",
+      "tier": 1,
+      "enabled": true
+    },
+    {
+      "id": "Rocket",
+      "tier": 2,
+      "enabled": true
+    },
+    {
+      "id": "Flak",
+      "enabled": false
+    }
+  ],
+  "abilityModel": {
+    "genericActiveAbilitiesEnabled": false,
+    "genericStatusesEnabled": false,
+    "genericChannelsEnabled": false,
+    "genericAurasEnabled": false,
+    "legacyUnitActivesEnabled": false
+  },
+  "map": {
+    "id": "glutrinne",
+    "displayName": "Glutrinne",
+    "biome": "desert",
+    "sizeClass": "S",
+    "widthCells": 128,
+    "heightCells": 128,
+    "metersPerCell": 1,
+    "weather": "clear",
+    "primaryRouteCount": 2,
+    "aetheriumFields": [
+      {
+        "id": "start-west",
+        "kind": "start",
+        "reserveAE": 9000
+      },
+      {
+        "id": "start-east",
+        "kind": "start",
+        "reserveAE": 9000
+      },
+      {
+        "id": "natural-west",
+        "kind": "natural",
+        "reserveAE": 9000
+      },
+      {
+        "id": "natural-east",
+        "kind": "natural",
+        "reserveAE": 9000
+      },
+      {
+        "id": "central",
+        "kind": "central",
+        "reserveAE": 15000
+      }
+    ],
+    "neutralEntitiesEnabled": false,
+    "bridgesEnabled": false,
+    "weatherEffectsEnabled": false,
+    "hazardsEnabled": false,
+    "environmentalDestruction": [
+      "aetherium"
+    ]
+  },
+  "aetherium": {
+    "decisionId": "D-010",
+    "finiteMotherReserve": true,
+    "regrowthConsumesReserve": true,
+    "spreadEnabled": true,
+    "terrainConsequenceEnabled": true,
+    "permanentOverharvestDamage": true,
+    "readableStateAndWarningRequired": true,
+    "aiManagementRequired": true,
+    "contestedExpansionRequired": true
+  },
+  "capacity": {
+    "productionUnitCapTotal": 100,
+    "syntheticScaleFixtureAgents": 500,
+    "entityStoreCap": 1024,
+    "uncompressedSnapshotTargetMiB": 4,
+    "parserHardCapMiB": 64,
+    "flowFieldCacheEntryCap": 32,
+    "flowFieldCacheMiBCap": 8
+  },
+  "persistence": {
+    "pauseRequired": true,
+    "manualSlotCount": 10,
+    "quicksaveRotation": [
+      "A",
+      "B"
+    ],
+    "autosaveSlotCount": 3,
+    "autosaveIntervalMinutes": 5,
+    "loadRequired": true,
+    "backupRecoveryRequired": true
+  },
+  "accessibility": {
+    "inputRebindingRequired": true,
+    "uiScalePercent": {
+      "minimum": 80,
+      "maximum": 150
+    },
+    "colorAndShapeRedundancyRequired": true,
+    "reducedShakeRequired": true,
+    "reducedFlashRequired": true,
+    "clientCommandFeedbackMaximumMs": 100
+  },
+  "victory": {
+    "evaluationPoint": "after-combat-end-of-tick",
+    "elimination": {
+      "requiresNoLivingUnits": true,
+      "requiresNoLivingBuildingsIncludingConstructionSites": true,
+      "resultCode": "Victory.Elimination"
+    },
+    "simultaneousEliminationResultCode": "Draw.MutualAnnihilation",
+    "timeLimitTicks": 27000,
+    "timeLimitMinutes": 45,
+    "timeLimitResultCode": "Draw.TimeLimit",
+    "lastUnitReveal": {
+      "requiresNoLivingBuildings": true,
+      "maximumLivingUnits": 3,
+      "continuousTicks": 600,
+      "visibleAndTargetable": true,
+      "resetWhenConditionEnds": true
+    },
+    "automaticAiSurrenderEnabled": false,
+    "playerSurrenderCommandEnabled": false,
+    "validResultCodes": [
+      "Victory.Elimination",
+      "Draw.MutualAnnihilation",
+      "Draw.TimeLimit"
+    ]
+  },
+  "acceptance": {
+    "normalMatchUiOnly": true,
+    "artilleryIsFinisher": true,
+    "finiteFieldsAreFinisher": true,
+    "fullContentAcceptanceUnits": 100,
+    "syntheticArchitectureHeadroomAgents": 500
+  },
+  "deferred": [
+    "evolved",
+    "air",
+    "flak",
+    "walls",
+    "tier3",
+    "elites",
+    "superweapons",
+    "drones",
+    "generic-abilities",
+    "generic-statuses",
+    "capture",
+    "neutrals",
+    "bridges",
+    "weather",
+    "hazards",
+    "additional-maps",
+    "additional-biomes",
+    "commanders",
+    "doctrines",
+    "voice-over",
+    "campaign",
+    "online",
+    "coop",
+    "ffa",
+    "survival",
+    "pvp",
+    "ranked",
+    "telemetry",
+    "steam",
+    "cloud-saves",
+    "final-art",
+    "final-audio"
+  ]
+}
