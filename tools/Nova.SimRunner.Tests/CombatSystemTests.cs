@@ -9,19 +9,19 @@ using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 
-namespace Nova.Simulation.Tests
+namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Canonical combat suite (EditMode lane, docs/tech/SimulationCore.md
+    /// Canonical combat suite (.NET lane, docs/tech/SimulationCore.md
     /// section 2 order step 8; docs/tech/FogOfWar.md sections 2 and 3):
     /// FoW-gated hitscan fire (Visible only — never Explored, never radar
     /// pings), the committed-view rule between recomputes, exact cooldown
     /// cadence, damage/death/order resolution, two-kernel determinism, hash
     /// sensitivity, replay playback and mid-combat snapshot continuation.
-    /// Mirror of the .NET lane CombatSystemTests with Unity Test Framework asserts.
+    /// Mirror of the EditMode lane CombatSystemTests.
     /// </summary>
     [TestFixture]
-    public class CombatSystemTests
+    public sealed class CombatSystemTests
     {
         private const ulong Seed = 0xC0BA7UL;
         private static readonly SimFixed HalfCell = SimFixed.FromRaw(SimFixed.OneRaw / 2);
