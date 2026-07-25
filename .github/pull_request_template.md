@@ -15,8 +15,8 @@
 - [ ] Bei Struktur-Änderung: [docs/README.md](../docs/README.md)-Index nachgezogen
 - [ ] Eintrag unter `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md) ergänzt
 - [ ] Entscheidungen (falls) mit ≥3 Alternativen im [DecisionLog](../docs/production/DecisionLog.md)
-- [ ] Conventional-Commit-Titel · CI `docs-check` grün · `quality-gate` nach G0 grün
-- [ ] Kein Gate-Status aus Schema 1.2 (dauerhaft integrity-only); aktuell endet jeder Pass-Versuch zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`; Docs-only-Scope explizit
+- [ ] Conventional-Commit-Titel · CI `docs-check` grün · `quality-gate`-Job `integrity` grün (läuft auf jedem PR)
+- [ ] Kein Gate-Status aus Schema 1.3 (Integritätsvorstufe, dauerhaft integrity-only); aktuell endet jeder Pass-Versuch zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`; Docs-only-Scope explizit
 - [ ] Trust-Bundle-Änderung ohne Gate-Fortschritt; Gate-Evidence erst an einem nachfolgenden sauberen Subject
 - [ ] Gate-Autorisierung: D-066-Receipt-Vertrag ist separat implementiert und real belegt (G0-A1 allein autorisiert keinen Pass)
 - [ ] Performance-Command und -Messung verwenden dieselbe `environmentId`; Windows-x64-/Mac-M2-Methoden sind getrennt

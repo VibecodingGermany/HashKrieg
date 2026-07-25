@@ -3,11 +3,11 @@
 
 JSON Schema remains the structural contract. This standard-library validator
 adds comparisons, reference resolution, repository checks and negative
-controls that Draft 2020-12 cannot express reliably. Per D-064, Schema 1.3
-authorizes a gate pass only from a subject-independent trusted tool checkout
-(`--trusted-tool-checkout`). D-066 removed the self-referential authorizer;
-all runs remain integrity-only and fail closed on any pass verdict until the
-separate two-phase receipt contract is implemented.
+controls that Draft 2020-12 cannot express reliably. D-064 envisioned a
+trusted tool checkout authorizer (`--trusted-tool-checkout`); D-066 removed
+that self-referential authorizer before any merge. All runs remain
+integrity-only and fail closed on any pass verdict until the separate
+two-phase receipt contract (G0-A2) is implemented.
 """
 
 from __future__ import annotations
@@ -4194,9 +4194,8 @@ def main() -> int:
         default=ROOT,
         help=(
             "subject repository root the evidence belongs to; defaults to "
-            "the repository containing this script. In the protected "
-            "workflow the script runs from the trusted checkout, so the "
-            "subject must be passed explicitly"
+            "the repository containing this script. Pass it explicitly when "
+            "this script runs from a checkout other than the subject"
         ),
     )
     arguments = parser.parse_args()
