@@ -138,6 +138,15 @@ namespace Nova.Simulation.Vision
         /// section 4): the team's own units always, foreign units only while
         /// their grid cell is <see cref="VisionState.Visible"/>. Appended in
         /// ascending entity-index order; returns the number appended.
+        /// <para>
+        /// Known MS-1 limitation (index side channel): own
+        /// <see cref="EntityId"/> values reveal the shared allocator's
+        /// assignment order, so an observer can infer rough spawn timing of
+        /// hidden enemy entities from id gaps. The privacy boundary of
+        /// FogOfWar.md section 4 sits at the view/filter level; id metadata
+        /// is not part of the MS-1 privacy model. Hardening (opaque or
+        /// per-team id mapping) is a post-MS-1 topic.
+        /// </para>
         /// </summary>
         public int GetVisibleEntities(byte team, List<EntityId> results)
         {
@@ -181,6 +190,14 @@ namespace Nova.Simulation.Vision
         /// grant no targeting permission. Deterministic: ascending entity
         /// index, one ping per cell. Derived view over committed sight and
         /// current positions; not part of the authoritative state.
+        /// <para>
+        /// Cadence (Q-040(j), provisional): pings derive from live 10 Hz
+        /// positions and can fire before the first committed view — FogOfWar.md
+        /// section 6.3 pins only the <see cref="VisionState.Visible"/> cadence
+        /// to the 5 Hz commit tick, not the radar cadence. Candidate under
+        /// review: bind pings to the same 5 Hz commit ticks. Until
+        /// ratification the provisional behavior is intentional.
+        /// </para>
         /// </summary>
         public int GetRadarSignatures(byte team, List<RadarSignature> results)
         {

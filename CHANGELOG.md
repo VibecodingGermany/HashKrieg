@@ -410,6 +410,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   `consumed == bytes.Length` — Trailing-Bytes hinter einem validen Record sind
   ein struktureller Framing-Fehler (neuer Grund `TrailingBytes`), auf dem
   Live- wie auf dem Replay-Import-Pfad. Tests für alle Fälle in beiden Lanes.
+- **EntityStore-Restore lehnt negative Geschwindigkeit/Radien ab
+  (Review-Befund P2-2):** `EntityManager.TryValidateState` deserialisierte
+  `MoveSpeed`, `Radius` und `SightRadius` ohne Vorzeichenprüfung — ein
+  manipulierter Snapshot hinter gültigen Container-Hashes konnte einen
+  negativen Sichtradius einschleusen, der den nächsten FoW-Recompute per
+  `InvalidOperationException` abbricht. Die Validate-Phase weist jetzt alle
+  drei Felder bei `RawValue < 0` zurück; der Host bleibt unverändert. Tests
+  in beiden Lanes (negierter MoveSpeed/Kollisionsradius/Sichtradius →
+  Validate und Restore false, Store unverändert; valider Block weiterhin ok).
 
 ### Entschieden
 - **D-066:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
@@ -584,6 +593,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Replay-Import festgehalten und die Zustellungsannahme der Watermark-Dedupe
   (zuverlässig geordnet je Spieler; Lücken-Fehlermodell als
   Post-MVP-Netzwerk-Anforderung) präzisiert.
+- **Q-040 um Radar-Kadenz erweitert (Review-Befund P2-1):**
+  [docs/production/OpenQuestions.md](docs/production/OpenQuestions.md)
+  (Version 1.11.5) deklariert als Punkt (j), dass FogOfWar.md §6.3 nur die
+  `Visible`-Kadenz an den 5-Hz-Commit-Tick bindet; Provisorium ist die
+  Ableitung der Radar-Pings aus 10-Hz-Live-Positionen (Pings feuern auch vor
+  dem ersten committed View), Kandidat ist die Bindung an die
+  5-Hz-Commit-Ticks — Ratifizierung per D-ID vor dem G1-Schema-Freeze. Der
+  `GetRadarSignatures`-Doc-Kommentar verweist auf Q-040(j).
+- **Index-Seitenkanal als MS-1-Einschränkung dokumentiert (Review-Befund
+  P2-3):** `GetVisibleEntities` vermerkt, dass eigene `EntityId`-Werte die
+  Allokationsreihenfolge des geteilten Allocators offenbaren; die
+  Datenschutzgrenze nach FogOfWar.md §4 liegt auf View-Ebene, ID-Metadaten
+  sind nicht Teil des MS-1-Datenschutzmodells (Härtung Post-MS-1).
 
 ### Entfernt
 - **Prototyp-Command-/Hash-/Replay-/Relay-Pfade (Pre-G1-Reset, D-057;
