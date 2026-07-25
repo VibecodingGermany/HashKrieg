@@ -13,6 +13,54 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
+### Geändert
+- **Recovery-Baseline nach strengem Implementierungs-Audit:** MS-0 ist offen, das MVP ist nicht erreicht und Alpha hat nicht begonnen. Die bisherigen Sprint-7-Einträge belegen nur vorhandene Prototyp-Struktur, nicht fertige oder integrierte Features.
+- [ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) dokumentiert Testfehler, Integrationslücken, fehlende Akzeptanznachweise und Planungswidersprüche am eingefrorenen Stand `460290e`.
+- [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) ersetzt pauschale Modul-Fertigmeldungen durch sequenzielle Gates G0–G5.
+- Sprint-6-Abschluss, Sprint-7-GO, 445-PT-Verbindlichkeit sowie die ungültigen Schließungen Q-018/Q-019 wurden durch D-055 zurückgezogen; R-16 wurde reaktiviert und R-17 ergänzt.
+
+### Entschieden
+- **D-055:** Vorhandenen Code als Prototyp erhalten, Projektstatus auf Recovery zurücksetzen und Fortschritt ausschließlich über reproduzierbare Evidenz qualifizieren.
+
+### Hinzugefügt
+- **Sprint 7 (Implementierung / MS-0 Phase-0-Spike Kern-Simulation):**
+  - **Assembly-Topologie & Engine-Entkopplung (`noEngineReferences: true`):** `Assets/_Project/Scripts/Core/Nova.Core.asmdef`, `Assets/_Project/Scripts/Simulation/Nova.Simulation.asmdef`, `Assets/_Project/Scripts/AI/Nova.AI.asmdef`.
+  - **Core Simulation Types (`Nova.Core`):** `EntityId` (versioniertes Handle-Struct), `Tick` (Lockstep-Zähler), `INovaLogger` & `NullNovaLogger`, `SimRandom` (bit-genauer XorShift128+ PRNG).
+  - **Simulations-Kernel (`Nova.Simulation`):** `CommandType`, `CommandEnvelope` (boxfreier Transport), `ICommandSink`, `ISimSystem`, `SimulationKernel` (Lockstep-Tick-Engine).
+  - **Flow-Field Pathfinding (`Nova.Simulation.Pathfinding`):** `GridPos2D`, `Direction2D`, `CostField` (Kosten-Grid), `IntegrationField` (allokationsfreie Dijkstra-Welle), `FlowField` (8-Wege-Vektor-Feld), `PathfindingSystem`.
+  - **Entitätsverwaltung & Bewegungs-System (`Nova.Simulation.State` & `Movement`):** `Transform2D`, `UnitState`, `EntityManager` (vorallokiertes Speicher-Array mit Index-Free-List-Recycling für 0-GC-Spawns), `MovementSystem` ($O(N)$ Spatial-Grid-Binning für flüssige Gruppen-Bewegung mit Sub-Millisekunden-Performanz).
+  - **Unity-Gameplay-Brücke (`Nova.Gameplay`):** `MatchRunner` (MonoBehaviour 20-Hz-Akkumulator), `UnitViewManager` (60-FPS-View-Interpolation), `PathfindingTestBootstrap` (500 Einheiten Test-Runner).
+  - **GameDatabase Sharding & Master Index (`Nova.Data` & `Nova.Editor`):** Category Sub-Registries (`UnitRegistrySO`, `BuildingRegistrySO`, `WeaponRegistrySO`), Aggregator `GameDatabaseMasterSO`, Editor Generator `GameDatabaseGenerator.cs` (Rebuild & Validierung) sowie Unity-freie `UnitDefinition` Structs für das Match-Setup gemäß D-049.
+  - **Command Bus & Order System (`Nova.Simulation.Commands`):** Unboxed Command Transport via `CommandEnvelope`, `CommandProcessorSystem` (`ISimSystem` für `Move`, `Stop`, `AttackTarget`).
+  - **Combat & Damage Pipeline (`Nova.Simulation.Combat`):** `WeaponDefinition`, `CombatSystem` (`ISimSystem` für Entfernungsprüfungen, Waffenfrequenzen, Schadensberechnungen und Entitäts-Zerstörung).
+  - **State-Hash-/Replay-/Debug-Prototypen (`Nova.Simulation.State`, `Nova.Simulation.Replays`, `Nova.Presentation`):** unvollständiger FNV-1a-Hash, `ReplayBuffer` nur zur Aufzeichnung ohne Playback sowie `FlowFieldDebugView` (Scene View Gizmos); nicht als Lockstep-/Desync-Nachweis abgenommen.
+  - **Wirtschafts- & Ressourcen-System (`Nova.Simulation.Economy`):** Phase 1 (Modul 9) - `PlayerEconomyState` Struct (16 Bytes, Aetherium-Guthaben & Energieraster), `ResourceHarvestingSystem` (Sammler-Entladung an Raffinerien) und `EnergyGridSystem` (Low-Power-Erkennung & -50 % Produktions-Strafen).
+  - **Basisbau- & Bauplatz-System (`Nova.Simulation.Construction`):** Phase 1 (Modul 10) - `BuildingDefinition` Struct, `ConstructionGrid` (Zellbelegungs- und Bauzonenraster) und `ConstructionSystem` (`ISimSystem` für Gebäudeplatzierung, Bauzeit-Timer und automatische Energienetz-Registrierung bei Fertigstellung).
+  - **Einheiten-Produktion & Tech-Tree (`Nova.Simulation.Production`):** Phase 1 (Modul 11) - `ProductionQueueSystem` (`ISimSystem` für Kasernen-/Fabrik-Queues, Bau-Timer & automatisches Spawnen im `EntityManager`) und `ResearchTreeSystem` (Tech-Tier-Freischaltungen [Tier 1, Tier 2] pro Spieler).
+  - **Fog of War & Sichtweiten-Grid (`Nova.Simulation.Vision`):** Phase 1 (Modul 12) - `VisionGrid` (Verwaltet 3 diskrete Sichtzustände: `Unexplored`, `Explored`, `Visible` pro Spieler) und `VisionSystem` (`ISimSystem` für periodische Sichtweiten-Aktualisierung um Einheiten und Gebäude).
+  - **Skirmish-KI Allianz & Legion (`Nova.AI`):** Phase 1 (Modul 13) - `AiFactionProfile` Struct (Prioritätsgewichtungen) und `SkirmishAiSystem` (`ISimSystem` in `Nova.AI` mit `noEngineReferences: true` für nutzenbasierte KI-Entscheidungen bzgl. Kraftwerksbau, Produktionsauslösung und Truppenbewegung).
+  - **RTS-UI & Command-Card (`Nova.Presentation.UI`):** Phase 1 (Modul 14) - `SelectionManager` (Rechtecks-Kollisionsprüfungen für Drag-Box-Mehrfachauswahlen), `CommandCardPresenter` (Koppelung ausgewählter Einheiten an HUD-Buttons) und `MinimapRenderer` (Welt-zu-Minimap-Transformation).
+  - **Asset-Integration MS-1 (`Nova.Data`):** Phase 1 (Modul 15) - `AssetMappingRegistrySO` (ScriptableObject-Mapping für 27 Einheiten- & 24 Gebäude-Assets aus Sprint 5 Audit) & GameDatabase-Lookup-Pipeline.
+  - **3. Fraktion: Die Evolvierten (`Nova.Simulation.Factions`):** Phase 2 (Modul 16) - `BiomassGrid` (Verwaltet organische Biomasse-Zellen) und `EvolvedFactionSystem` (`ISimSystem` für passive Einheiten-Lebenspunkte-Regeneration [+2 HP / 0,5s] auf Biomasse).
+  - **Commander- & Doktrinen-System (`Nova.Simulation.Commanders`):** Phase 2 (Modul 17) - `CommanderAbilityDefinition` Struct (Fähigkeiten-Parameter) und `CommanderSystem` (`ISimSystem` für passiven Energieaufbau [+1 Energy / 1,0s], Cooldowns & Bereichs-Effekte wie Orbital-Schläge).
+  - **Command-Relay-Scaffolding (`Nova.Networking`):** Phase-2-Prototyp aus `CommandEnvelopeNetPacket` und In-Memory-`LockstepRelayBuffer`; aktuelle Serialisierung liefert 34 Bytes, während Test und Spezifikation 41 beziehungsweise 37 Bytes erwarten; kein UDP-Transport.
+  - **Map- & Biom-Erweiterung (`Nova.Presentation.Maps`):** Phase 2 (Modul 19) - `MapBiomeType` Enum (`Desert`, `Snow`, `JungleIndustrial`) und `MapDefinitionSO` (ScriptableObject-Layouts für 1v1 / 2v2 Karten mit 2–4 Spawn-Punkten & Aetherium-Knoten).
+  - **Headless SimRunner & Tests:** Standalone .NET 8 Konsolen-Executable `tools/Nova.SimRunner`, NUnit-EditMode-Testsuiten (`DeterministicSimTests`, `FlowFieldPathfindingTests`, `MovementSystemTests`, `MovementPerformanceTests`, `MatchRunnerTests`, `GameDatabaseTests`, `CommandSystemTests`, `CombatSystemTests`, `LockstepReplayTests`, `EconomySystemTests`, `ConstructionSystemTests`, `ProductionSystemTests`, `VisionSystemTests`, `SkirmishAiTests`, `SelectionManagerTests`, `AssetIntegrationTests`, `EvolvedFactionTests`, `CommanderSystemTests`, `LockstepRelayBufferTests`, `MapDefinitionTests`).
+  - **Modulspezifikationen:** `MovementSystem_Spec.md`, `GameplayBridge_Spec.md`, `GameDatabase_Spec.md`, `CommandSystem_Spec.md`, `CombatSystem_Spec.md`, `LockstepReplay_Spec.md`, `EconomySystem_Spec.md`, `ConstructionSystem_Spec.md`, `ProductionSystem_Spec.md`, `VisionSystem_Spec.md`, `SkirmishAi_Spec.md`, `RtsUi_Spec.md`, `AssetIntegration_Spec.md`, `EvolvedFaction_Spec.md`, `CommanderSystem_Spec.md`, `LockstepRelay_Spec.md` und `MapExpansion_Spec.md` unter `docs/tech/modules/`.
+
+## [0.7.0] – 2026-07-24 · Sprint 6: Produktionsplanung
+
+### Hinzugefügt
+- **Produktionsdokumentation in `docs/production/`:**
+  [Milestones.md](docs/production/Milestones.md) (Meilensteine MS-0 bis MS-4 mit Qualitäts-Gates und Feature-Matrix) und [Roadmap.md](docs/production/Roadmap.md) (Produktions-Roadmap über 445 Personentage Gesamtaufwand, Phasenplan 2026–2028, Adressierung R-16 & R-13).
+- **Sprint-6-Abschlussbericht** [Sprint06_Report.md](docs/production/sprints/Sprint06_Report.md) mit Freigabe von **Sprint 7 (Implementierung)**.
+
+### Geändert
+- `RiskAnalysis.md` (1.6.0): **R-16 (Zeit-/Kapazitätsmodell)** auf „mitigiert" gesenkt.
+- `OpenQuestions.md` (1.8.0): **Q-018 (Preispunkt 29,99–39,99 €)** und **Q-019 (Opt-in Telemetrie)** geschlossen.
+- `SprintPlanning.md` (1.6.0): Sprint 6 **abgeschlossen**, Sprint 7 (Implementierung) **bereit (GO)**.
+- `docs/README.md` (0.7.0) und Root-`README.md` (Status-Board, Wiki-Version 0.7.0) nachgezogen.
+
 ## [0.6.0] – 2026-07-22 · Sprint 5: Asset Audit
 
 ### Hinzugefügt
@@ -146,7 +194,8 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - Übernahme der historischen Quelldokumente (`RTS_Game_Design_Outline.md`,
   `RTS_Technisches_Planungsdokument.md`, `RTS_Asset_Pipeline.md`).
 
-[Unreleased]: https://github.com/VibecodingGermany/Project_Nova/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/VibecodingGermany/Project_Nova/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.7.0
 [0.6.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.6.0
 [0.5.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.5.0
 [0.4.0]: https://github.com/VibecodingGermany/Project_Nova/releases/tag/v0.4.0

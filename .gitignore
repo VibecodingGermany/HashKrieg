@@ -47,6 +47,7 @@ sysinfo.txt
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.user
 *.userprefs
@@ -57,6 +58,11 @@ sysinfo.txt
 *.mdb
 *.opendb
 *.VC.db
+
+# Tools / SimRunner Build-Outputs
+tools/Nova.SimRunner/bin/
+tools/Nova.SimRunner/obj/
+tools/Nova.SimRunner/out/
 
 # Unity Asset Meta-Daten von ignorierten Ordnern
 /[Aa]ssets/[Aa]ssetStoreTools*

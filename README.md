@@ -2,7 +2,7 @@
 
 > Modernes Echtzeitstrategiespiel (RTS) mit Basisbau, drei Fraktionen und der lebendigen Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
 
-**Phase:** Konzeption & Produktionsvorbereitung · **Status:** Sprint 5 (Asset Audit) abgeschlossen · **Repo:** öffentlich (Community-Projekt)
+**Phase:** Implementierungs-Recovery · **Status:** Sprint 7, Gate G0 · **Repo:** öffentlich (Community-Projekt)
 
 ---
 
@@ -16,7 +16,7 @@
 - Infanterie, Fahrzeuge, Luftfahrzeuge, Verteidigungsanlagen
 - KI-Gegner und Multiplayer, Gefechte mit vielen gleichzeitigen Einheiten
 
-> **Wichtig:** Dieses Repository befindet sich in der **Design- und Planungsphase**. Es enthält **noch keinen Spielcode** – die Implementierung ist als Sprint 7 geplant. Der gesamte aktuelle Wert liegt in der strukturierten, konsistenten Dokumentation unter [`docs/`](docs/).
+> **Wichtig:** Das Repository enthält inzwischen Spielcode, dieser ist jedoch ein **unvollständig integrierter Prototyp**. Der Audit am Stand `460290e` setzt den Status zurück: MS-0 ist offen, das MVP ist nicht erreicht und Alpha hat nicht begonnen. Führend sind der [Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md) und der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md).
 
 ## Einstieg in die Dokumentation
 
@@ -30,6 +30,8 @@ Das gesamte Wissen ist ein **Wiki aus vielen kleinen, verlinkten Living Document
 | [docs/gamedesign/Factions.md](docs/gamedesign/Factions.md) | Fraktionen (Master-Dokument des Game Designs) |
 | [docs/production/DecisionLog.md](docs/production/DecisionLog.md) | Alle getroffenen Entscheidungen (D-001 ff.) mit Alternativen |
 | [docs/production/SprintPlanning.md](docs/production/SprintPlanning.md) | Sprint-Definitionen, Ziele und Exit-Kriterien |
+| [docs/production/ImplementationAudit_2026-07-24.md](docs/production/ImplementationAudit_2026-07-24.md) | Strenge Bestandsaufnahme des erzeugten Codes |
+| [docs/production/MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) | Gate-basierter Weg zum nachweisbaren MVP |
 
 ## Repository-Struktur
 
@@ -61,8 +63,8 @@ Project Nova/
 | 3 | Technical Design | ✅ abgeschlossen |
 | 4 | Architecture Review | ✅ abgeschlossen |
 | 5 | Asset Audit | ✅ abgeschlossen |
-| 6 | Produktionsplanung | 🟢 bereit (GO) |
-| 7 | Implementierung | ⛔ blockiert bis Sprint 6 |
+| 6 | Produktionsplanung | ⚠️ Abschluss zurückgezogen |
+| 7 | Implementierungs-Recovery | 🟡 aktiv – Gate G0 |
 
 Details und Exit-Kriterien: [docs/production/SprintPlanning.md](docs/production/SprintPlanning.md).
 
@@ -83,7 +85,7 @@ Grundprinzipien:
 
 ## Änderungshistorie
 
-Siehe [CHANGELOG.md](CHANGELOG.md). Die Versionsnummern folgen dem Dokumentationsstand des Wikis (aktuell `0.6.0`).
+Siehe [CHANGELOG.md](CHANGELOG.md). Die Versionsnummern folgen dem Dokumentationsstand des Wikis (aktuell `0.7.1`, unveröffentlicht).
 
 ## Mitmachen
 

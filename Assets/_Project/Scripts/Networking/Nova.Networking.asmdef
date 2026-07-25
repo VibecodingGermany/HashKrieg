@@ -1,0 +1,17 @@
+{
+    "name": "Nova.Networking",
+    "rootNamespace": "Nova.Networking",
+    "references": [
+        "Nova.Core",
+        "Nova.Simulation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

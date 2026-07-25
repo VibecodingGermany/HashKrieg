@@ -1,6 +1,6 @@
 # Risikoanalyse
 
-**Version:** 1.5.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer / Lead Technical Director | **Sprint:** 5
+**Version:** 1.7.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Executive Producer / Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
@@ -35,20 +35,19 @@ Wahrscheinlichkeit (W) und Auswirkung (A): niedrig / mittel / hoch. Risikowert =
 | R-13 | Schlüsselperson-/Bus-Faktor-Risiko | hoch | hoch | Das Projekt wird primär von einer Person zusammen mit KI-Coding-Agenten getragen – kein Team, keine personelle Redundanz in Fachwissen, Entscheidungsfindung oder Review-Kapazität. Ausfall/Verfügbarkeitslücke der Schlüsselperson träfe Planung, Freigaben und Qualitätssicherung gleichzeitig. | Living-Docs-Disziplin (DecisionLog, Wiki) als externalisiertes Wissen statt Kopfwissen; mehrere unabhängige Review-/Widerspruchs-Agenten (Sprint 4) als Teil-Substitut für Peer-Review; Kapazitäts-/Vertretungsplanung vor Produktionsstart (Sprint 6/7) nachholen. | neu, unmitigiert |
 | R-14 | Cross-Plattform-Determinismus-Annahme (ARM↔x86) scheitert im Phase-0-Spike | mittel | hoch | Die gesamte MP-Architektur (D-033 Lockstep/Command-Relay, D-037/D-045 Managed-Burst-Parität, D-046 Post-Match-Re-Sim & Trust-Anchor) setzt bit- bzw. toleranzgenauen Determinismus zwischen x86 (Windows-Referenzhardware, D-052) und Apple-Silicon-ARM (Mac-Baseline M2, D-052) voraus. Float-Determinismus über Prozessorarchitekturen hinweg (FMA-Instruktionen, Compiler-/JIT-Optimierungen, Rundungsdrift) ist ein historisch hartes Problem; ein Scheitern des Q-033/Phase-0-Spikes würde D-033/D-037/D-046 nachträglich in Frage stellen. | Phase-0-Spike-Pflichtvalidierung "Fixed-Point-Determinismus ARM↔x86" vor Sprint-7-Start (V1-Gate); D-045 (Managed-first, Toleranz-Parität ≤1e-4) begrenzt den Schaden vorläufig; bei Scheitern definierter Eskalationspfad nötig (Fixed-Point-Pfad vorziehen = Mehraufwand, oder Cross-Play/Ranked-Scope einschränken). | neu, Restrisiko hoch bis zur Spike-Messung |
 | R-15 | Fehlerhafter KI-generierter Code in der desync-kritischen Lockstep-Simulation | mittel | hoch | Die Implementierung erfolgt primär durch KI-Coding-Agenten; ein einzelner nicht-deterministischer Fehler im Sim-Kern (z. B. Dictionary-/Set-Iterationsreihenfolge, versehentliche Float- statt Fixed-Operation, unbeabsichtigte UnityEngine-API-Nutzung im Sim-Pfad, GC-Allokation im Tick) erzeugt stille, schwer reproduzierbare Desyncs, die oft erst spät (Multiplayer-Beta, Golden-Master-Langlauf) auffallen. | CI-Determinismus-Gates (V1-Gate, Golden-Master-Hashes, SimRunner-Nightlies mit Sharding, D-049); harte CodingGuidelines-Verbote (kein GC im Tick, keine UnityEngine-APIs im Sim-Pfad, `noEngineReferences`); Burst/Managed-Paritätstests (D-037/D-045); verbindliche Code-Review-Pflicht vor jedem Merge in `Nova.Simulation`. | neu, mitigiert durch Gates – Restrisiko bleibt wegen KI-Anteil an der Implementierung |
-| R-16 | Zeit-/Kapazitätsrisiko: kein Zeit- oder Aufwandsmodell | hoch | mittel | Weder PLAN.md/SprintPlanning.md noch TPD enthalten eine Aufwandsschätzung (Personentage, Kalenderzeit) für Phase 0 bis 3. Scope-Disziplin (R-01) und Bus-Faktor (R-13) laufen gegen ein unbeziffertes Zeitbudget – das Projekt kann formal "gut geplant", aber praktisch nicht terminierbar sein. | Aufwandsschätzung/Meilenstein-Zeitplan vor Sprint 6 (Produktionsplanung) nachholen; Phase-0-Spike-Ergebnisse (Performance, Determinismus) als Kalibrierungsbasis für realistische Restlaufzeiten nutzen. | neu, unmitigiert |
+| R-16 | Zeit-/Kapazitätsrisiko: keine belastbare Schätzbasis | hoch | hoch | Die Sprint-6-Schätzung von 445 PT wurde ohne gemessenen Durchsatz, validierten MVP-Scope oder belastbare Implementierungsbasis erstellt. | Roadmap durch D-055 entfristet; Aufwand erst nach Q-038 und gemessenen Recovery-Gates neu schätzen. | aktiv – Rebaseline erforderlich |
+| R-17 | Falsche Fertigmeldung durch strukturorientierte KI-Implementierung | hoch | hoch | Dateien, Typen und isolierte Tests wurden als fertige Module, MVP- oder Alpha-Fortschritt gewertet, obwohl Laufzeitintegration und Akzeptanznachweise fehlten. | D-055; [Implementierungs-Audit](ImplementationAudit_2026-07-24.md); Gates G0–G5 mit reproduzierbarer Evidenz und unabhängiger Prüfung. | aktiv |
 
 ## Offene Punkte
 
-- Neu eskaliert (Sprint-4-Korrekturlauf): R-13 (Bus-Faktor, hoch/hoch) und R-16 (Zeit-/Kapazitätsmodell, hoch/mittel) sind unmitigiert und benötigen menschliche Entscheidungen (Kapazitäts-/Zeitplanung), keine reine Doku-Anpassung.
-- R-14 (Cross-Plattform-Determinismus) und R-15 (KI-Code-Fehler in der Lockstep-Sim) sind neu, tragen aber bereits Gegenmaßnahmen (Phase-0-Spike-Gates bzw. CI-Determinismus-Gates); Restrisiko bleibt bis zur jeweiligen Messung/dauerhaften Bewährung bestehen.
-- R-02 bleibt entschärft (D-033), R-03 bleibt reduziert (D-034), R-12 bleibt mitigiert und ist durch D-045 (Toleranz-Parität) präzisiert.
-- **Sprint 5 (Asset Audit): R-04 und R-07 auf „mitigiert" gesenkt** – Beschaffungsstrategie B (D-053), einheitlicher URP-Material-Standard, BUILD-Klassifikation kohärenzkritischer Assets und das Lizenz-Register ([../assets/Licenses.md](../assets/Licenses.md)) stehen; Restrisiko liegt in der Umsetzungsdisziplin bei realem Kauf sowie in den offenen Inhaberentscheidungen Q-035 (Budget) / Q-036 (Seats).
-- Beobachtungspunkt (kein eigenes Risiko): Kristallsturm-Aetherium-Kopplung (D-027.1) – Balancing-Beobachtungspflicht im Balancing-Pass v0.2.
-- Verbleibende Hauptlast auf R-01 (Umsetzungs-Disziplin), R-10 (Geschäftsmodell-Disziplin SP-first), neu zusätzlich R-13/R-16 (Personal- und Zeitrealität).
+- R-16 ist wieder aktiv: Die 445-PT-Zahl ist keine belastbare Kapazitätsmitigation.
+- R-17 ist der unmittelbare Recovery-Auslöser; Status folgt künftig nur aus bestandenen Gates.
+- R-13 (Bus-Faktor) bleibt aktiv und wird durch die Open-Source Community- und Volunteer-Organisation in Phase 0/1 begleitet.
+- R-14 (Cross-Plattform-Determinismus) und R-15 (KI-Code-Fehler) werden in MS-0 (Phase 0 Spike) empirisch gemessen.
 
 ## Nächste Schritte
 
-- Sprint 5 (Asset Audit) hat R-04/R-07 gesenkt, war aber **nicht** der Phase-0-Spike: Die Re-Bewertung von R-03/R-14 (Determinismus/Performance-Messung) und die Kapazitäts-/Zeitplanungsschritte zu R-13/R-16 bleiben für Sprint 6 (Produktionsplanung, u. a. Aufwandsschätzung aus [../assets/BuildBacklog.md](../assets/BuildBacklog.md)) bzw. Phase 0 offen.
+- Gate G0 schließen; anschließend R-14 und R-03 innerhalb der Gates G1/G2 mit reproduzierbaren Laufzeitnachweisen messen.
 
 ## Änderungsverlauf
 
@@ -58,5 +57,7 @@ Wahrscheinlichkeit (W) und Auswirkung (A): niedrig / mittel / hoch. Risikowert =
 | 1.1.0 | 2026-07-21 | R-10, R-11 neu; R-09 teilentschärft; Fortschritt R-02/R-03 (Sprint 1) | Executive Producer |
 | 1.2.0 | 2026-07-21 | R-01 gesenkt (mittel/hoch), R-05 entschärft (Sprint-2-Scope-Entscheidungen D-007–D-032) | Executive Producer |
 | 1.3.0 | 2026-07-21 | R-02 entschärft (D-033), R-03 reduziert (D-034), R-12 neu (Burst/Managed-Parität, D-037) – Sprint 3 | Executive Producer |
-| 1.4.0 | 2026-07-21 | R-13 (Bus-Faktor), R-14 (Cross-Plattform-Determinismus ARM↔x86), R-15 (KI-generierter Code in Lockstep-Sim), R-16 (Zeit-/Kapazitätsrisiko) neu aufgenommen; R-12 durch D-045 präzisiert – Sprint-4-Korrekturlauf | Executive Producer |
-| 1.5.0 | 2026-07-22 | R-04 (visuelle Inkohärenz) und R-07 (Lizenz-/Kostenfallen) auf „mitigiert" gesenkt – Sprint 5 (Asset Audit): D-053, URP-Material-Standard, BUILD-Klassifikation, Licenses.md | Executive Producer |
+| 1.4.0 | 2026-07-21 | R-13, R-14, R-15, R-16 neu aufgenommen – Sprint-4-Korrekturlauf | Executive Producer |
+| 1.5.0 | 2026-07-22 | R-04 und R-07 auf „mitigiert" gesenkt – Sprint 5 (Asset Audit) | Executive Producer |
+| 1.6.0 | 2026-07-24 | R-16 (Zeit-/Kapazitätsrisiko) auf „mitigiert" gesenkt – Sprint 6 (Roadmap.md & Milestones.md, 445 PT) | Executive Producer |
+| 1.7.0 | 2026-07-24 | R-16 wegen unbelegter Schätzbasis reaktiviert; R-17 für KI-bedingte falsche Fertigmeldungen aufgenommen | Executive Producer / Lead Technical Director |

@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.8.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 5
+**Version:** 1.9.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -486,18 +486,28 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 **Begründung:** Beschluss des Project Owners. Ermöglicht volle Open-Source-Transparenz, schließt Lizenz- & Seat-Kosten aus und nutzt das Potenzial motivierter Community-Volunteers und moderner KI-Workflow-Tools.
 **Konsequenzen:** [OpenQuestions.md](OpenQuestions.md) Q-035 geschlossen; [ProcurementStrategy.md](../assets/ProcurementStrategy.md) auf Version 1.1.0 angepasst; KI-Drafting & CC0-Quellen in [AssetRegister.md](../assets/AssetRegister.md) verankert.
 
+### D-055 | verbindlich | Sprint 7 (Recovery-Baseline nach Implementierungs-Audit)
+
+**Kontext:** Der Stand `460290e` dokumentierte Fortschritt bis in MVP und Alpha, obwohl der unabhängige [Implementierungs-Audit](ImplementationAudit_2026-07-24.md) einen roten Test, einen nicht angeschlossenen Command-Pfad, fehlende spielbare Inhalte sowie unvollständige Hash-/Replay-Nachweise belegt. MS-0 wurde weder plattformübergreifend noch auf Referenzhardware nachgewiesen.
+**Alternativen:** (a) Bisherige Statusangaben beibehalten und Defekte parallel beheben – verworfen, weil Anwesenheit von Dateien keinen Meilenstein belegt; (b) Code als forensisch wertvollen Prototyp erhalten, unbelegte Statusangaben zurückziehen und jeden Fortschritt erneut über überprüfbare Gates qualifizieren; (c) sämtliche Implementierung verwerfen und auf Sprint 6 zurücksetzen – verworfen, weil brauchbare Prototypteile und Tests vorhanden sind.
+**Entscheidung:** (b) – **Recovery-Baseline mit beweispflichtigen Gates.** MS-0 ist offen, das MVP ist nicht erreicht und Alpha hat nicht begonnen. Die Module 1–19 gelten höchstens als Prototyp oder Scaffolding. Aktiver Arbeitsstand ist ausschließlich Gate G0 des [MVP-Recovery-Plans](MVPRecoveryPlan.md).
+**Begründung:** Diese Einstufung trennt überprüfbare Laufzeit-Evidenz von erzeugter Struktur und verhindert, dass weitere Planung auf falschen Fertigmeldungen aufbaut.
+**Konsequenzen:** Der Sprint-6-Abschluss und das Sprint-7-GO werden zurückgezogen. Roadmap und Meilensteine sind bis zur Neu-Schätzung nicht terminverbindlich. Alpha-Erweiterungen bleiben gesperrt, bis G5 bestanden ist. Der Projektinhaber entscheidet Q-038; Q-039 muss vor Abschluss von G1 technisch und dokumentarisch aufgelöst sein.
+
 ---
 
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
-- Q-018 (Preispunkt, Sprint 6), Q-019 (Telemetrie, Sprint 6) bleiben offen.
+- Q-018 (Preispunkt) und Q-019 (Telemetrie) bleiben offen; Sprint 6 hat dafür keine gültige D-ID erzeugt.
+- Q-038 (verbindlicher MVP-Zuschnitt) und Q-039 (Fixed-Point-Konflikt) blockieren die Recovery-Gates.
 - Fixed-Point-Migration (Beta): Phase-0-Spike-Scope erweitert (Fixed-Point-Pfad für ORCA/Flow-Field evaluieren, Bibliothekswahl, float-Direktfelder im GameState verbieten) – Review F-04 MP.
 - Sprint 5 (Asset Audit): D-053/D-054 ratifiziert; **Budget-Obergrenze ist mit 0 € geschlossen (Q-035, D-054)**; Seat-Planung (Q-036) entfällt/gegenstandslos; Bundle-Fenster-Monitoring (Q-037) entfällt zugunsten CC0/KI-Pipeline.
 
 ## Nächste Schritte
 
-- Sprint 6 (Produktionsplanung): 0 € Open-Source & KI-Pipeline in Roadmap und Aufwandsschätzung (R-16) übernehmen; BUILD-Backlog-Aufwand ([../assets/BuildBacklog.md](../assets/BuildBacklog.md)) als Community/KI-Kitbashing-Aufwand planen.
+- Recovery-Gate G0 herstellen und mit reproduzierbaren Nachweisen schließen.
+- Q-038 durch den Projektinhaber entscheiden und Q-039 vor Abschluss von G1 auflösen.
 
 ## Änderungsverlauf
 
@@ -515,3 +525,4 @@ Zentrales, unveränderliches Protokoll aller Architektur- und Design-Entscheidun
 | 1.6.1 | 2026-07-21 | Korrektur „Offene Punkte": Kritisch-Zähler auf 9 (statt 10) berichtigt; präzisiert, dass F-02 (GDD↔TDD) und F-2 (Architektur-Kohärenz) als Doku-Erweiterung in GameState.md gelöst wurden statt durch D-043–D-052, da reine Datenmodell-Ergänzungen ohne eigenen Entscheidungsbedarf | Lead Technical Director |
 | 1.7.0 | 2026-07-22 | D-053: Asset-Beschaffungsstrategie B (Multi-Store-Mix mit Synty als Stil-Anker) ratifiziert – Sprint 5 (Asset Audit) | Producer / Lead Technical Director |
 | 1.8.0 | 2026-07-24 | D-054: 0 € Open-Source & KI-Asset-Pipeline (Inhaberentscheidung, Q-035 geschlossen) | Project Owner / Producer |
+| 1.9.0 | 2026-07-24 | D-055: unbelegte MS-0-/MVP-/Alpha-Status zurückgezogen; beweispflichtige Recovery-Gates verbindlich gemacht | Project Owner / Lead Technical Director |

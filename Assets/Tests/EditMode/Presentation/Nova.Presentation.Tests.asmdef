@@ -1,0 +1,25 @@
+{
+    "name": "Nova.Presentation.Tests",
+    "rootNamespace": "Nova.Presentation.Tests",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Nova.Core",
+        "Nova.Simulation",
+        "Nova.Presentation.UI",
+        "Nova.Presentation.Maps"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

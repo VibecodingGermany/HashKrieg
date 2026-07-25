@@ -1,0 +1,17 @@
+{
+    "name": "Nova.Data",
+    "rootNamespace": "Nova.Data",
+    "references": [
+        "Nova.Core",
+        "Nova.Simulation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
