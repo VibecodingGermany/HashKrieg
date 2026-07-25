@@ -88,6 +88,17 @@ namespace Nova.Simulation.Replays
         /// false with a deterministic <paramref name="error"/> and a
         /// human-readable <paramref name="detail"/>.
         /// </summary>
+        /// <remarks>
+        /// Early refusals (parse, chain, fingerprint, restore) happen before
+        /// any mutation. A failure mid-playback (for example a result
+        /// mismatch) leaves the provided kernel/ingress advanced to the
+        /// failure point — callers must treat playback as single-use on a
+        /// freshly built host (the intended verifier flow, D-046).
+        /// The replay chain is unsigned: it detects corruption, not a fully
+        /// fabricated replay. The authenticity anchor is the caller-supplied
+        /// <paramref name="expectedFingerprint"/>, which must come from a
+        /// trusted source (registry/attestation, D-046).
+        /// </remarks>
         public static bool TryPlay(
             byte[] replayBytes,
             MatchFingerprint expectedFingerprint,

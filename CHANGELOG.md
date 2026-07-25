@@ -71,22 +71,6 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   NOVA_DEFINITIONS_V1), solange keine kanonischen Definitions-/Map-Quellen
   existieren; fehlende Fingerprint-Hash-Domäne; Replay-Hardcap;
   verbrannte Sequenzen.
-- **Art-Strang MS-1 (ohne Gate-Status, ohne Evidence — es existiert kein
-  einziges Art-Asset im Repository, die Referenz-PNGs sind Konzeptbilder,
-  keine Assets):** neue Dokumente
-  [docs/assets/ArtAssetStandard.md](docs/assets/ArtAssetStandard.md)
-  (Ordner, Namen, Import, Material, Masken),
-  [docs/assets/ArtManifest_MS1.md](docs/assets/ArtManifest_MS1.md) samt
-  [docs/assets/art-manifest-ms1.json](docs/assets/art-manifest-ms1.json)
-  (Spezifikationsblätter der 34 MS-1-Art-Assets),
-  [docs/assets/SourceCatalog_MS1.md](docs/assets/SourceCatalog_MS1.md)
-  (CC0-/KI-Beschaffungskatalog und Lizenzbefunde),
-  [docs/assets/Provenance.md](docs/assets/Provenance.md)
-  (Provenienz- und Lizenznachweisverfahren je Asset) sowie
-  [docs/assets/VerticalSlice_MS1.md](docs/assets/VerticalSlice_MS1.md)
-  (Vertical-Slice-Spezifikation der vier Erst-Assets: Allianz-HQ, Lynx,
-  Legion-HQ, Räuber) und orthographische Referenzblätter unter
-  `docs/assets/reference/` mit Provenienznachweis.
 - **G1-Kernel-Integration — kanonische Kernel-Bausteine (ohne Gate-Status,
   ohne Evidence):** Der umgebaute `SimulationKernel` akzeptiert als einzigen
   Command-Intake versiegelte `CommandBatch`-Objekte (`SubmitBatch`,

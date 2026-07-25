@@ -99,9 +99,6 @@ namespace Nova.Simulation.Replays
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
         public const int MaxIdentifierBytes = 64;
 
-        /// <summary>Serialization version of this fingerprint layout.</summary>
-        public const byte FormatVersion = 1;
-
         public ushort StateSchemaVersion { get; }
         public ushort CommandSchemaVersion { get; }
         public ushort PayloadSchemaVersion { get; }
