@@ -20,6 +20,8 @@
     <Compile Include="..\Nova.SimRunner\TimedSimSystem.cs" Link="SimRunner\TimedSimSystem.cs" />
     <Compile Include="..\Nova.SimRunner\TimedPathfindingSystem.cs" Link="SimRunner\TimedPathfindingSystem.cs" />
     <Compile Include="..\Nova.SimRunner\Scale500PrecombatScenario.cs" Link="SimRunner\Scale500PrecombatScenario.cs" />
+    <Compile Include="..\Nova.SimRunner\Determinism10000Scenario.cs" Link="SimRunner\Determinism10000Scenario.cs" />
+    <Compile Include="..\Nova.SimRunner\DeterminismArtifacts.cs" Link="SimRunner\DeterminismArtifacts.cs" />
   </ItemGroup>
 
   <ItemGroup>
