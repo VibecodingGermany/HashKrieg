@@ -33,7 +33,7 @@ namespace Nova.Simulation.Tests
             public ProductionSystem Production { get; }
             public SimulationKernel Kernel { get; }
 
-            public Fixture(long startingCredits = 1000, int capacity = 64)
+            public Fixture(long startingCredits = 1000, int capacity = 64, System.Action<EconomySystem> configure = null)
             {
                 Entities = new EntityManager(capacity);
                 Economy = new EconomySystem(Entities, startingCredits);
@@ -43,6 +43,9 @@ namespace Nova.Simulation.Tests
                 Kernel.RegisterSystem(Economy);
                 Kernel.RegisterSystem(Construction);
                 Kernel.RegisterSystem(Production);
+                // Pre-start configuration hook (e.g. slot factions): the
+                // SetSlotFaction guard locks the assignment at Kernel.Start().
+                configure?.Invoke(Economy);
                 Kernel.Start();
             }
 
@@ -358,8 +361,7 @@ namespace Nova.Simulation.Tests
         {
             // The definition id is faction-resolved: the Legion Rekrut
             // (def 29) costs 60 AE (Infantry.md), not the Alliance 120.
-            var f = new Fixture();
-            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
             uint barracks = f.SpawnBarracks(1);
 
             Assert.That(f.Production.ValidateQueueUnit(1, barracks, 29, 2), Is.EqualTo(CommandResultCode.Applied));
@@ -376,8 +378,7 @@ namespace Nova.Simulation.Tests
         [Test]
         public void QueueUnit_ForeignFactionDefinition_IsRejectedInvalidTarget()
         {
-            var f = new Fixture();
-            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
             uint barracksA = f.SpawnBarracks(0);
             // Slot 1's buildings stand at distinct cells (the fixture helper
             // uses fixed coordinates).

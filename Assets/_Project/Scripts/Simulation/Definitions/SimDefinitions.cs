@@ -238,11 +238,15 @@ namespace Nova.Simulation.Definitions
     /// <para>
     /// DERIVATION RULE where the GDDs name no concrete per-faction number
     /// (building HP — Buildings.md gives only armor-class bands, not hit
-    /// points — and the Legion per-shot damage of the vehicle weapons, which
-    /// Weapons.md does not list): integer-percent derivation from the
-    /// Alliance row, <c>(alliance * percent) / 100</c>, with
-    /// <see cref="LegionHealthPercent"/> for hit points and
-    /// <see cref="LegionDamagePercent"/> for base damage. Where Weapons.md
+    /// points — and the Legion Scout's per-shot damage): integer-percent
+    /// derivation from the Alliance row, <c>(alliance * percent) / 100</c>,
+    /// with <see cref="LegionHealthPercent"/> for hit points and
+    /// <see cref="LegionDamagePercent"/> for base damage. The concrete value
+    /// beats the derivation wherever a GDD names one (D-075): Vehicles.md
+    /// carries a concrete Legion damage line for the three combat vehicles —
+    /// Räuber 28, Koloss 50, Donnerkanone 60 — so those rows are authored
+    /// verbatim and NOT derived (the derivation would have produced 29/51/93).
+    /// Where Weapons.md
     /// publishes a band for BOTH factions (Panzerabwehrrakete/Raketenwerfer
     /// 40–60), the Alliance keeps the ratified table value and the Legion
     /// takes the band minimum — the documented pick, not an invented number.
@@ -377,8 +381,11 @@ namespace Nova.Simulation.Definitions
             // costs, build times, HP and ranges; weapon damage/range/cadence
             // from Weapons.md where a Legion line exists (Gewehr 6–10 dmg /
             // 6 m / 1.0 s; Raketenwerfer 40–60 dmg / 9–11 m / 2.5 s — band
-            // minimum, see class remarks), otherwise the integer-percent
-            // derivation from the Alliance row ((x * 85) / 100). Cooldowns
+            // minimum, see class remarks) and from Vehicles.md where it
+            // names a concrete Legion per-shot damage (Räuber 28, Koloss 50,
+            // Donnerkanone 60 — D-075: the concrete GDD value beats the
+            // derivation); the Scout alone keeps the integer-percent
+            // derivation ((12 * 85) / 100 = 10). Cooldowns
             // equal the Alliance cadence (no GDD source differentiates it).
             // Koloss HP 1250 EXCEEDS the Alliance Aegis (1100) on purpose —
             // Vehicles.md names that concrete value; the derivation only
@@ -388,9 +395,9 @@ namespace Nova.Simulation.Definitions
             new SimUnitDefinition(29, FactionId.Legion,   UnitRole.BasicInfantry,      costAE: 60,   buildTicks: 80,  tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 55,   moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 8,   attackRangeTiles: 6,  attackCooldownTicks: 10),
             new SimUnitDefinition(30, FactionId.Legion,   UnitRole.AntiArmorInfantry,  costAE: 200,  buildTicks: 120, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 90,   moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 40,  attackRangeTiles: 9,  attackCooldownTicks: 25), // 3.5
             new SimUnitDefinition(31, FactionId.Legion,   UnitRole.ScoutVehicle,       costAE: 220,  buildTicks: 90,  tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 180,  moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 10),
-            new SimUnitDefinition(32, FactionId.Legion,   UnitRole.LightTank,          costAE: 450,  buildTicks: 150, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 480,  moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Medium,   damageType: DamageType.Kinetic,    attackDamage: 29,  attackRangeTiles: 8,  attackCooldownTicks: 20),
-            new SimUnitDefinition(33, FactionId.Legion,   UnitRole.BattleTank,         costAE: 700,  buildTicks: 220, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 1250, moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Heavy,    damageType: DamageType.Explosive,  attackDamage: 51,  attackRangeTiles: 8,  attackCooldownTicks: 25),
-            new SimUnitDefinition(34, FactionId.Legion,   UnitRole.Artillery,          costAE: 800,  buildTicks: 260, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 320,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: DamageType.Explosive,  attackDamage: 93,  attackRangeTiles: 18, attackCooldownTicks: 70), // 2.5
+            new SimUnitDefinition(32, FactionId.Legion,   UnitRole.LightTank,          costAE: 450,  buildTicks: 150, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 480,  moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Medium,   damageType: DamageType.Kinetic,    attackDamage: 28,  attackRangeTiles: 8,  attackCooldownTicks: 20),
+            new SimUnitDefinition(33, FactionId.Legion,   UnitRole.BattleTank,         costAE: 700,  buildTicks: 220, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 1250, moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Heavy,    damageType: DamageType.Explosive,  attackDamage: 50,  attackRangeTiles: 8,  attackCooldownTicks: 25),
+            new SimUnitDefinition(34, FactionId.Legion,   UnitRole.Artillery,          costAE: 800,  buildTicks: 260, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 320,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: DamageType.Explosive,  attackDamage: 60,  attackRangeTiles: 18, attackCooldownTicks: 70), // 2.5
         };
 
         /// <summary>All building definitions (both factions), in table order. Read-only span over the static table.</summary>
@@ -498,6 +505,11 @@ namespace Nova.Simulation.Definitions
         /// not have hash as 0, so the layout is identical for every row and a
         /// value change anywhere — a weapon value included — moves the hash
         /// and therefore refuses replay start (SimulationCore.md section 6).
+        /// <see cref="UnitState.SightRadius"/> is deliberately NOT a
+        /// definition field today (it is a provisional per-entity default),
+        /// so it takes no part in this hash; a future faction-resolved sight
+        /// radius becomes definition content and then requires a NEW field
+        /// generation in this layout, not a silent reuse of an existing one.
         /// </summary>
         public static ulong ComputeDefinitionsHash64()
         {

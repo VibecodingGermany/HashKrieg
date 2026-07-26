@@ -42,16 +42,37 @@ namespace Nova.SimRunner.Tests
             new object[] { FactionId.Alliance, UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive, 110,  20, 70 },
             // Legion (Weapons.md Legion lines where they exist — Gewehr
             // 6–10/6 m/1.0 s, Raketenwerfer 40–60/9–11 m/2.5 s band minimum —
-            // otherwise the documented integer-percent derivation).
+            // the concrete Vehicles.md damage lines for the three combat
+            // vehicles (D-075), otherwise the documented integer-percent
+            // derivation).
             new object[] { FactionId.Legion,   UnitRole.Builder,           ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
             new object[] { FactionId.Legion,   UnitRole.Harvester,         ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
             new object[] { FactionId.Legion,   UnitRole.BasicInfantry,     ArmorClass.Infantry, DamageType.Kinetic,     8,   6, 10 },
             new object[] { FactionId.Legion,   UnitRole.AntiArmorInfantry, ArmorClass.Infantry, DamageType.Explosive,  40,   9, 25 },
             new object[] { FactionId.Legion,   UnitRole.ScoutVehicle,      ArmorClass.Light,    DamageType.Kinetic,    10,   7, 10 },
-            new object[] { FactionId.Legion,   UnitRole.LightTank,         ArmorClass.Medium,   DamageType.Kinetic,    29,   8, 20 },
-            new object[] { FactionId.Legion,   UnitRole.BattleTank,        ArmorClass.Heavy,    DamageType.Explosive,  51,   8, 25 },
-            new object[] { FactionId.Legion,   UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive,  93,  18, 70 },
+            new object[] { FactionId.Legion,   UnitRole.LightTank,         ArmorClass.Medium,   DamageType.Kinetic,    28,   8, 20 },
+            new object[] { FactionId.Legion,   UnitRole.BattleTank,        ArmorClass.Heavy,    DamageType.Explosive,  50,   8, 25 },
+            new object[] { FactionId.Legion,   UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive,  60,  18, 70 },
         };
+
+        [Test]
+        public void LegionVehicleDamage_UsesTheConcreteVehiclesMdValues_NotTheDerivation()
+        {
+            // D-075 (Teil-Entscheidung): where Vehicles.md names a concrete
+            // Legion per-shot damage, that value wins over the integer-percent
+            // derivation — the derivation would have produced 29/51/93 here.
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.LightTank, out SimUnitDefinition raeuber), Is.True);
+            Assert.That(raeuber.AttackDamage, Is.EqualTo(28), "Räuber: concrete Vehicles.md value, not (35 x 85) / 100 = 29");
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.BattleTank, out SimUnitDefinition koloss), Is.True);
+            Assert.That(koloss.AttackDamage, Is.EqualTo(50), "Koloss: concrete Vehicles.md value, not (60 x 85) / 100 = 51");
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.Artillery, out SimUnitDefinition donnerkanone), Is.True);
+            Assert.That(donnerkanone.AttackDamage, Is.EqualTo(60), "Donnerkanone: concrete Vehicles.md value, not (110 x 85) / 100 = 93");
+
+            // The derivation survives exactly where the GDDs are silent: the
+            // Scout keeps (12 x 85) / 100 = 10.
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.ScoutVehicle, out SimUnitDefinition hyaene), Is.True);
+            Assert.That(hyaene.AttackDamage, Is.EqualTo(10), "Scout: no concrete ruling — the derivation stands");
+        }
 
         [Test]
         public void UnitDefinitions_CarryTheAuthoredWeaponValues()
@@ -389,7 +410,7 @@ namespace Nova.SimRunner.Tests
         {
             // The attacker's slot faction selects the weapon row: a Legion
             // Rekrut deals 8 (not the Alliance rifleman's 10), a Legion
-            // Koloss deals 51 Explosive (1.00 vs the Medium LightTank).
+            // Koloss deals 50 Explosive (1.00 vs the Medium LightTank).
             var host = TestHost.Create();
             host.Factions.SetSlotFaction(0, FactionId.Legion);
             EntityId rekrut = Spawn(host, 0, UnitRole.BasicInfantry, 10, 10);
@@ -408,8 +429,8 @@ namespace Nova.SimRunner.Tests
             host2.Entities.GetUnitRef(koloss).AttackTarget = raeuber;
             int before2 = HealthOf(host2, raeuber);
             host2.Step(2);
-            Assert.That(before2 - HealthOf(host2, raeuber), Is.EqualTo(51),
-                "Legion Koloss fires 51 Explosive at 1.00 vs Medium");
+            Assert.That(before2 - HealthOf(host2, raeuber), Is.EqualTo(50),
+                "Legion Koloss fires 50 Explosive at 1.00 vs Medium");
 
             // Legion range is the Legion row's: 6 m does not reach 7 cells.
             var host3 = TestHost.Create();

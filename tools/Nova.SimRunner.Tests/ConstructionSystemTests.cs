@@ -30,7 +30,7 @@ namespace Nova.SimRunner.Tests
             public ConstructionSystem Construction { get; }
             public SimulationKernel Kernel { get; }
 
-            public Fixture(long startingCredits = 1000)
+            public Fixture(long startingCredits = 1000, System.Action<EconomySystem> configure = null)
             {
                 Entities = new EntityManager(64);
                 Economy = new EconomySystem(Entities, startingCredits);
@@ -38,6 +38,9 @@ namespace Nova.SimRunner.Tests
                 Kernel = new SimulationKernel(new SimRandom(42UL));
                 Kernel.RegisterSystem(Economy);
                 Kernel.RegisterSystem(Construction);
+                // Pre-start configuration hook (e.g. slot factions): the
+                // SetSlotFaction guard locks the assignment at Kernel.Start().
+                configure?.Invoke(Economy);
                 Kernel.Start();
             }
 
@@ -168,11 +171,12 @@ namespace Nova.SimRunner.Tests
                     Assert.That(l.CostAE, Is.LessThan(a.CostAE), $"{role}: Legion cost < Alliance cost");
                     Assert.That(l.BuildTicks, Is.LessThan(a.BuildTicks), $"{role}: Legion builds faster");
                     Assert.That(l.AttackRangeTiles, Is.LessThanOrEqualTo(a.AttackRangeTiles), $"{role}: Alliance range >= Legion range");
-                    // Vehicle damage where Weapons.md has no Legion line is
-                    // the documented derivation; infantry carries concrete
-                    // Weapons.md values instead (checked by WeaponValuesTests).
-                    if (role == UnitRole.ScoutVehicle || role == UnitRole.LightTank
-                        || role == UnitRole.BattleTank || role == UnitRole.Artillery)
+                    // The Scout's damage is the documented derivation
+                    // (Weapons.md has no Legion line for it); the three combat
+                    // vehicles carry the concrete Vehicles.md values (D-075,
+                    // pinned by WeaponValuesTests) and infantry carries
+                    // concrete Weapons.md values.
+                    if (role == UnitRole.ScoutVehicle)
                     {
                         Assert.That(l.AttackDamage, Is.EqualTo(a.AttackDamage * SimDefinitions.LegionDamagePercent / 100),
                             $"{role}: Legion damage == (Alliance damage x {SimDefinitions.LegionDamagePercent}) / 100, exact integer arithmetic");
@@ -188,8 +192,7 @@ namespace Nova.SimRunner.Tests
             // the Alliance Barracks (id 7), an Alliance slot cannot place the
             // Legion one (id 24) — a known id naming unbuildable content is an
             // invalid target, exactly like an unknown one.
-            var f = new Fixture();
-            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
             Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 40, 40).IsValid, Is.True,
                 "Legion power provider so the power rule does not mask the faction check");
             f.Step(1); // commit the balance
@@ -208,8 +211,7 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void PlaceBuilding_LegionSlot_ChargesLegionCost_AndBuildsFaster()
         {
-            var f = new Fixture();
-            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
             Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 40, 40).IsValid, Is.True, "Legion power provider");
             f.SpawnBuilder(1, 19, 20);
             f.Step(1); // commit the balance (Legion Power plant provides 80)

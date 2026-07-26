@@ -130,6 +130,12 @@ namespace Nova.Gameplay.Tests
             kernel.BindCommands(
                 new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
 
+            // Mirror of BuildHost's faction assignment (economy block v2):
+            // slot 0 Alliance, slot 1 Legion, set BEFORE Kernel.Start() —
+            // the SetSlotFaction guard forbids it once the kernel runs.
+            economy.SetSlotFaction(0, FactionId.Alliance);
+            economy.SetSlotFaction(1, FactionId.Legion);
+
             kernel.Start();
             return new ReferenceHost
             {
@@ -184,12 +190,9 @@ namespace Nova.Gameplay.Tests
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
-            // Mirror of SetupMatch's faction assignment (economy block v2):
-            // slot 0 Alliance, slot 1 Legion, set BEFORE the opening position
-            // so the faction bytes land in the hashed initial state.
-            host.Economy.SetSlotFaction(0, FactionId.Alliance);
-            host.Economy.SetSlotFaction(1, FactionId.Legion);
-
+            // The slot factions are already bound: BuildReferenceHost mirrors
+            // BuildHost, which assigns them before Kernel.Start() (the
+            // SetSlotFaction guard requires it).
             for (byte slot = 0; slot < 2; slot++)
             {
                 SlotLayout c = slot == 0 ? Slot0Layout : Slot1Layout;

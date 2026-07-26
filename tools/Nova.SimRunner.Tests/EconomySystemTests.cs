@@ -119,8 +119,8 @@ namespace Nova.SimRunner.Tests
             var kernel = new SimulationKernel(new SimRandom(42UL));
             var economy = new EconomySystem(entities);
             kernel.RegisterSystem(economy);
+            economy.SetSlotFaction(1, FactionId.Legion); // before Start — the guard requires it
             kernel.Start();
-            economy.SetSlotFaction(1, FactionId.Legion);
 
             entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(5), SimFixed.FromInt(5)), SimFixed.Zero, role: UnitRole.Power);
             entities.SpawnUnit(1, new Transform2D(SimFixed.FromInt(8), SimFixed.FromInt(5)), SimFixed.Zero, role: UnitRole.Power);
@@ -405,6 +405,33 @@ namespace Nova.SimRunner.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => economy.SetSlotFaction(8, FactionId.Legion));
             Assert.Throws<ArgumentOutOfRangeException>(() => economy.SetSlotFaction(0, (FactionId)2));
             Assert.Throws<ArgumentOutOfRangeException>(() => economy.GetSlotFaction(8));
+        }
+
+        [Test]
+        public void SetSlotFaction_AfterKernelStart_ThrowsAndLeavesStateUntouched()
+        {
+            // The faction is part of the hashed initial state and the match
+            // fingerprint: once the kernel this economy is registered with
+            // has started, the assignment window is closed for good.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities);
+            kernel.RegisterSystem(economy);
+
+            economy.SetSlotFaction(1, FactionId.Legion); // legal before Start
+            kernel.Start();
+
+            Assert.Throws<InvalidOperationException>(() => economy.SetSlotFaction(1, FactionId.Alliance),
+                "after Start the faction is locked, even at tick zero");
+            Assert.Throws<InvalidOperationException>(() => economy.SetSlotFaction(0, FactionId.Legion));
+            Assert.That(economy.GetSlotFaction(1), Is.EqualTo(FactionId.Legion),
+                "a rejected call mutates nothing");
+            Assert.That(economy.GetSlotFaction(0), Is.EqualTo(FactionId.Alliance));
+
+            kernel.StepTick();
+            Assert.Throws<InvalidOperationException>(() => economy.SetSlotFaction(1, FactionId.Alliance),
+                "and stays locked once ticks have run");
+            Assert.That(economy.GetSlotFaction(1), Is.EqualTo(FactionId.Legion));
         }
 
         [Test]

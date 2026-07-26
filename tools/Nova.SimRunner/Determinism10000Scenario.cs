@@ -776,17 +776,13 @@ namespace Nova.SimRunner
         /// the MS-1 manifest start state (completed HQ + Refinery, one
         /// Builder, two Harvesters, 1.000 AE economy default), one Aetherium
         /// field and the four-unit skirmish squad. Deterministic spawn order
-        /// means identical entity ids on every host and platform.
+        /// means identical entity ids on every host and platform. The slot
+        /// factions are already bound — <see cref="BuildHost"/> assigns them
+        /// before <c>Kernel.Start()</c>, which the
+        /// <see cref="EconomySystem.SetSlotFaction"/> guard requires.
         /// </summary>
         private static SlotState[] SetupMatch(Host host)
         {
-            // Faction assignment (economy block v2): slot 0 Alliance, slot 1
-            // Legion. Set BEFORE the opening position so the faction bytes are
-            // part of the hashed initial state — MatchBootstrap does the same,
-            // in the same order.
-            host.Economy.SetSlotFaction(HumanSlot, FactionId.Alliance);
-            host.Economy.SetSlotFaction(AiSlot, FactionId.Legion);
-
             var slots = new[] { new SlotState(), new SlotState() };
             for (byte slot = 0; slot < 2; slot++)
             {
@@ -866,6 +862,14 @@ namespace Nova.SimRunner
             _ = new LocalLoopbackTransport(ingress);
             kernel.BindCommands(
                 new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
+
+            // Faction assignment (economy block v2): slot 0 Alliance, slot 1
+            // Legion. Set BEFORE Kernel.Start() — the SetSlotFaction guard
+            // forbids any change once the kernel runs, because the faction
+            // bytes are part of the hashed initial state. MatchBootstrap does
+            // the same, in the same order.
+            economy.SetSlotFaction(HumanSlot, FactionId.Alliance);
+            economy.SetSlotFaction(AiSlot, FactionId.Legion);
 
             kernel.Start();
             return new Host

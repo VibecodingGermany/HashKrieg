@@ -120,6 +120,7 @@ namespace Nova.Simulation.Economy
         private readonly PlayerEconomyState[] _players;
         private readonly AetheriumField[] _fields;
         private int _fieldCount;
+        private SimulationKernel _kernel;
 
         public string Name => "EconomySystem";
 
@@ -141,6 +142,7 @@ namespace Nova.Simulation.Economy
 
         public void Initialize(SimulationKernel kernel)
         {
+            _kernel = kernel;
             kernel?.Logger.LogInfo(
                 $"[{Name}] Initialized canonical economy ({MaxPlayers} slots, harvest rate {HarvestRateAE} AE/tick).");
         }
@@ -214,6 +216,18 @@ namespace Nova.Simulation.Economy
         /// so the faction is bound into the hashed initial state and the match
         /// fingerprint. Values outside the declared <see cref="FactionId"/>
         /// range are rejected.
+        /// <para>
+        /// GUARD: once this system is registered with a kernel, the
+        /// assignment is legal only while that kernel has never started —
+        /// <c>CurrentTick == Tick.Zero &amp;&amp; !IsRunning</c>. A faction
+        /// change after <c>Start()</c> would rewrite hashed state the match
+        /// fingerprint was already computed from (and combat/economy have
+        /// already resolved against), so it throws
+        /// <see cref="InvalidOperationException"/> and leaves the state
+        /// untouched. An economy that was never registered with a kernel has
+        /// no tick stream to protect and is therefore unguarded (isolated
+        /// test harnesses drive it directly).
+        /// </para>
         /// </summary>
         public void SetSlotFaction(byte playerId, FactionId faction)
         {
@@ -224,6 +238,13 @@ namespace Nova.Simulation.Economy
             if (faction != FactionId.Alliance && faction != FactionId.Legion)
             {
                 throw new ArgumentOutOfRangeException(nameof(faction), faction, "unknown faction");
+            }
+            if (_kernel != null && (_kernel.IsRunning || _kernel.CurrentTick != Tick.Zero))
+            {
+                throw new InvalidOperationException(
+                    $"[{Name}] SetSlotFaction is legal only before Kernel.Start() " +
+                    $"(CurrentTick {_kernel.CurrentTick}, IsRunning {_kernel.IsRunning}): the faction " +
+                    "is part of the hashed initial state and the match fingerprint.");
             }
             _players[playerId].Faction = faction;
         }
