@@ -9,10 +9,10 @@ using Nova.Simulation.Production;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
-namespace Nova.Simulation.Tests
+namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Canonical production suite (EditMode lane): QueueUnit cost and validation
+    /// Canonical production suite (.NET lane): QueueUnit cost and validation
     /// (producer assignment, T2 gating, queue capacity, count-scaled
     /// affordability), exact Q16.16 progress with the low-power halving,
     /// deterministic rally-point spawning, CancelProduction refunds, the
@@ -20,10 +20,10 @@ namespace Nova.Simulation.Tests
     /// values are documented Q-040 provisionals of SimDefinitions. MS-1 has
     /// no research tree: the retired ResearchTreeSystem scaffolding is
     /// deliberately gone (mvp-v1.json technology model).
-    /// Mirror of the .NET lane ProductionSystemTests.
+    /// Mirror of the EditMode lane ProductionSystemTests.
     /// </summary>
     [TestFixture]
-    public class ProductionSystemTests
+    public sealed class ProductionSystemTests
     {
         private sealed class Fixture
         {

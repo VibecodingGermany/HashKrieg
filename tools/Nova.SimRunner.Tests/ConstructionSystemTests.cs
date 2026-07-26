@@ -8,20 +8,20 @@ using Nova.Simulation.Economy;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
-namespace Nova.Simulation.Tests
+namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Canonical construction suite (EditMode lane): the MS-1 definition table,
+    /// Canonical construction suite (.NET lane): the MS-1 definition table,
     /// placement validation (cost, occupancy, prerequisite, power rule and
     /// the manifest start-refinery exception), builder-driven progress with
     /// the exact Q16.16 low-power halving, completion into role entities,
     /// the ResearchLab T2 unlock, cancel/sell refund rules, repair orders
     /// and the snapshot block 105 v1 contract. All values are documented
     /// Q-040 provisionals of SimDefinitions.
-    /// Mirror of the .NET lane ConstructionSystemTests.
+    /// Mirror of the EditMode lane ConstructionSystemTests.
     /// </summary>
     [TestFixture]
-    public class ConstructionSystemTests
+    public sealed class ConstructionSystemTests
     {
         private sealed class Fixture
         {
