@@ -360,6 +360,52 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   300 Ticks mit Gefecht, Hash-Sensitivität auf Health-Änderung, Replay-
   Aufzeichnung/-Playback mit End-Hash-Verifikation, Mid-Combat-Snapshot-
   Restore mit identischer Fortsetzung.
+- **G1-Economy kanonisch (ohne Gate-Status, ohne Evidence):** kanonische
+  Economy-Domain in `Nova.Simulation.Economy` gemäß
+  [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §2 (Phasen 2/3)
+  und §3 — `PlayerEconomyState` pro Slot mit `AetheriumCredits` (`int64`,
+  Start 1000 AE nach `quality/content/mvp-v1.json`, nie negativ —
+  `TrySpendCredits` ist die erzwingende Primitive, Ausgaben-Checks bleiben
+  Command-/Construction-/Production-Sache), `PowerProvided`/`PowerRequired`
+  (`int32`) und `ProductionSpeedMultiplierQ16` als `SimFixed` (Low-Power-Faktor
+  exakt 0,5 = Raw 32768, das float-Relikt des Prototyps ist ersetzt);
+  `AetheriumField` mit fester Grid-Position und endlichem `RemainingAE`
+  (`int64`, kein Nachwachsen — der volle D-010-Loop mit Mutterreserve,
+  Regrowth, Spread, Überernte-Schaden und Warnung ist ausdrücklich G2);
+  `EconomySystem : ISimSystem, IStatefulSimSystem` mit eigenem Snapshot-Block
+  **104 v1** (pro Slot Credits/Power, pro Feld Id/Position/Reserve; Block 103
+  ist für den G2-Aetherium-Block reserviert). Gebäude sind in dieser Scheibe
+  Entities mit provisorischem Rollen-Enum `UnitRole` {Unit, Builder,
+  Harvester, HQ, Refinery, Power} (minimales Gebäude-Modell, Q-040-Kandidat);
+  die Power-Bilanz wird jeden Tick aus den lebenden Rollen-Entities neu
+  berechnet (HQ liefert 30, Power-Plant 100, Refinery braucht 20 — provisorische
+  Werte, Q-040-Kandidaten), sodass eine durch Combat despwante Power-Plant
+  deterministisch in Low-Power kippt. Harvest-Kreislauf: Harvester (nur Rolle
+  Harvester) mit `HarvestFieldId`-Order sammelt in Reichweite (gleiche Zelle
+  oder angrenzend, Chebyshev ≤ 1 — dokumentierte Regel) exakt 2 AE/Tick
+  (provisorisch, Q-040-Kandidat) bis `DefaultCargoCapacityAE` 330
+  (Fraktions-Split 330/300 noch nicht modelliert — Q-040-Kandidat) oder
+  Felderschöpfung; die Order resolved zu Idle (kein Auto-Return, Q-040-Kandidat),
+  `ReturnCargo` liefert bei eigener Refinery in Reichweite exakt das Cargo in
+  die Credits. Cargo und Harvest-Orders liegen im `UnitState` (EntityStore-
+  Block 100 **v4**, harter Schnitt wie bei v3), nicht doppelt im Economy-Block.
+  `UnitCommandStateView` verdrahtet `Harvest`/`ReturnCargo` (unbekannte
+  FieldId = dokumentierter No-op, Q-040-Kandidat) und räumt Economy-Orders
+  bei `Stop` ab. Registrierung in `MatchRunner` und `Nova.SimRunner`:
+  Economy VOR Pathfinding/Movement (§2 Phasen 2/3 vor 6) — ein Harvester am
+  Feld sammelt, bevor Movement desselben Ticks läuft (dokumentiert); der
+  SimRunner-End-Hash ändert sich dadurch erwartungsgemäß (ehrlich neu
+  erzeugt: `0xA19C77092F1B3FBD`). Prototyp-Scaffolding (`EnergyGridSystem`,
+  `ResourceHarvestingSystem`) entfernt; `ConstructionSystem`,
+  `ProductionQueueSystem` und `SkirmishAiSystem` minimal auf die neue API
+  umgestellt (kein Float-Multiplikator mehr). Tests in beiden Lanes
+  (`EconomySystemTests`, `EconomyIntegrationTests`): kompletter Harvest-
+  Kreislauf mit exakten Raten, endliches Feld (Rest < Rate, Order-Resolve,
+  kein Regrowth), Capacity-Stop, Startbedingungen (1000 AE, Credits nie
+  negativ), Low-Power mit exakt 32768 Raw inkl. Combat-Kill-Integration,
+  Zwei-Kernel-Determinismus 300 Ticks, Hash-Sensitivität auf Credits,
+  Snapshot-Roundtrip + 300-Tick-Fortsetzung, Replay mit Harvest-/Return-
+  Intents und End-Hash-Verifikation.
 
 ### Behoben
 - **EditMode-Testzählung im Gate-Runner:** `run_gate_check.py` zählte
