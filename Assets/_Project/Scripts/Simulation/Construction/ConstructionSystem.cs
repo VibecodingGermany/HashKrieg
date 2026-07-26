@@ -49,6 +49,24 @@ namespace Nova.Simulation.Construction
     /// Q-040) and the power rule.
     /// </para>
     /// <para>
+    /// Same-tick power stacking (documented, same precedent as the combat
+    /// duel asymmetry): the power rule reads the owner's last COMMITTED
+    /// balance (previous tick's phase-2 recompute), so several power-drawing
+    /// placements applied in the same tick can collectively oversubscribe
+    /// the grid — each one validates against the same stale balance. The
+    /// overshoot is deterministic and self-punishing via the low-power
+    /// multiplier from the next recompute on; a per-tick placement limit is
+    /// a registered Q-040 candidate.
+    /// </para>
+    /// <para>
+    /// Footprint sweep timing (documented, Q-040 candidate): the footprint
+    /// of a combat-destroyed placement is freed by this system's sweep in
+    /// the NEXT tick (phase 8 combat runs after phase 4), so a PlaceBuilding
+    /// applied in the tick immediately after the destruction can still find
+    /// the cell occupied — deterministic, and it resolves itself one tick
+    /// later.
+    /// </para>
+    /// <para>
     /// Sites: a site is a live entity carrying role
     /// <see cref="UnitRole.Unit"/> (so the economy's power recompute
     /// ignores it) at the footprint center with 1 HP of its definition's
