@@ -205,6 +205,7 @@ namespace Nova.Simulation.Production
 
         /// <summary>
         /// QueueUnit legality in fixed order: unknown definition and
+        /// foreign-faction definition, then
         /// building-not-an-own-completed-producer (RejectedInvalidTarget),
         /// then T2 gating and queue/producer capacity
         /// (RejectedPrerequisitesNotMet), then affordability of CostAE x
@@ -214,6 +215,12 @@ namespace Nova.Simulation.Production
         {
             if (!SimDefinitions.TryGetUnit(unitDefId, out SimUnitDefinition def))
             {
+                return CommandResultCode.RejectedInvalidTarget;
+            }
+            if (def.Faction != _economy.GetSlotFaction(playerSlot))
+            {
+                // Definition ids are faction-resolved: a slot may only
+                // produce its own faction's rows (same rule as placement).
                 return CommandResultCode.RejectedInvalidTarget;
             }
             if (!IsOwnedCompletedProducer(playerSlot, buildingRaw, def.ProducerRole))

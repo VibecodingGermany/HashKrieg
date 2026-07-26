@@ -370,7 +370,7 @@ namespace Nova.SimRunner
             var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
             var production = new Nova.Simulation.Production.ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
-            var combat = new CombatSystem(entities, fogOfWar);
+            var combat = new CombatSystem(entities, fogOfWar, economy);
 
             // Canonical tick order (SimulationCore.md section 2): economy
             // (phases 2/3), construction and production (phases 4/5) BEFORE

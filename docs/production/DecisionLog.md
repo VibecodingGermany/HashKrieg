@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.18.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.19.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -1529,6 +1529,103 @@ Tabelle teuer ist und das Mitführen nichts kostet.
   Rollenzuordnung Datenänderungen; die Tabellenform, die Prozentdarstellung und
   die Aufrufstelle in `CombatSystem` bleiben davon unberührt.
 
+### D-075 | in Kraft — vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden | Sprint 7 (Fraktions-Strang, Fraktions-Achse in der kanonischen Simulation)
+
+**Status:** In Kraft, aber **nicht vom Inhaber selbst getroffen** — gleiche
+Delegationslage wie D-074: der Inhaber **Dennis Westermann** hat den
+Fraktions-Strang in der Sprint-Sitzung vom 2026-07-26 ausdrücklich an den
+ausführenden Agenten delegiert (die Teil-Entscheidung zur
+Legion-Schadensprovenienz hat er per Sprint-Briefing selbst vorgegeben). Der
+Agent hat entschieden und implementiert. **Der Inhaber kann diese Entscheidung
+jederzeit umstoßen.** Bis dahin ist sie verbindlich, weil Code und Tests sie
+bereits tragen.
+
+**Kontext:** Das Manifest ([../../quality/content/mvp-v1.json](../../quality/content/mvp-v1.json))
+modelliert zwei Fraktionen mit eigenen Kosten, Bauzeiten, Energie- und
+Identitätswerten; die kanonische Simulation kannte bis dahin **eine** flache,
+geteilte Definitionstabelle — beide Slots bauten und kämpften mit denselben
+Zahlen, „Fraktion" war reiner Manifestinhalt ohne Simulationswirklichkeit.
+Für MS-1 muss die Fraktionszugehörigkeit Kosten, Bauzeiten, Energiebilanz,
+Waffenwerte und Harvester-Ladekapazität bestimmen, ohne das
+Befehls-Wire-Format (Commands.md Schema v1) zu brechen und ohne eine zweite,
+driftende Zahlenquelle zu schaffen.
+
+**Alternativen:** (a) die flache geteilte Tabelle beibehalten und Fraktion nur
+kosmetisch umsetzen (Farben, Namen) — minimaler Eingriff, erfüllt aber die
+Manifest-Kostenasymmetrie nicht und wäre keine Fraktionsidentität; (b) die
+Fraktions-Achse in `SimDefinitions` selbst: 34 Definitionen (17 Rollen × 2
+Fraktionen), die Allianz-Id IST der `UnitRole`-Wire-Wert (1..17), die
+Legion-Id addiert 17 (18..34), Auflösung über `ToDefinitionId(faction, role)`
+und die Slot-Fraktion aus dem Economy-Zustand; (c) komplett getrennte
+Definitions-Assemblies je Fraktion (zwei Tabellen, zwei Hash-Domänen, zwei
+Wire-Namensräume) — maximale Trennung, verdoppelt aber Befehls-Payloads,
+Snapshot-Blöcke und jede künftige Wertpflege und macht fraktionsübergreifende
+Vergleiche (Konter, Balance) zu einem Cross-Assembly-Problem.
+
+**Entscheidung:** (b) — die Fraktions-Achse lebt in der einen kanonischen
+Definitionstabelle. Ergänzend ratifiziert: die Slot-Fraktion ist
+Economy-Zustand (Snapshotblock v2, achtes Fingerprint-Array), wird vor
+`Kernel.Start()` gebunden und ist danach gesperrt
+(`SetSlotFaction`-Guard), und die Harvester-Ladekapazität ist
+Definitionsinhalt (`SimUnitDefinition.CargoCapacityAE`, Allianz 330 /
+Legion 300) statt eines flachen Provisoriums.
+
+**Begründung:** Drei Gründe. Erstens **Wire-Kompatibilität**: die Id-Regel
+hält jede Definitions-Id global eindeutig und ungleich 0, sodass
+`CommandIds.IsValidDefinitionId` (`!= 0`) und alle Payload-Layouts unverändert
+bleiben — eine Legion-Id ist für Alt-Code schlicht eine weitere gültige Id.
+Zweitens ist das **offene Pre-G1-Formatfenster** (D-068, Entwurf) der
+eine billige Moment für den Reset: keine Evidence bindet die alten Ids, die
+Pre-Fraktions-Ids (überlappende Gebäude- 1–9 und Einheiten- 1–8) konnten
+ohne Migrationspfad aus dem Verkehr gezogen werden. Drittens verlangt die
+**D-068-Kostenasymmetrie** (Legion baut billiger und schneller) eine
+datengetriebene Achse — Kosmetik (a) kann sie nicht tragen, und getrennte
+Assemblies (c) kaufen dieselbe Datenmenge zum Preis dauerhafter
+Doppelpflege, ohne einen Wire- oder Determinismusvorteil.
+
+**Teil-Entscheidung (Provenienz des Legion-Fahrzeugschadens):** Woher kommt
+der Projektilschaden der drei Legion-Kampffahrzeuge, für die Weapons.md
+keine Legion-Zeile führt? **Alternativen:** (i) durchgehend die
+85-%-Ableitung aus der Allianz-Zeile — einheitlich, überschreibt aber die
+konkreten Vehicles.md-Zahlen (die Ableitung produzierte 29/51/93 gegen die
+dortigen 28/50/60); (ii) **der konkrete GDD-Wert schlägt die Ableitung**, wo
+[../gamedesign/Vehicles.md](../gamedesign/Vehicles.md) eine konkrete
+Legion-Schadenszeile nennt; die Ableitung gilt nur, wo die GDDs wirklich
+schweigen; (iii) Vehicles.md durchgehend führend für Fahrzeugschaden, auch
+auf der Allianz-Seite — verworfen, weil D-047 Weapons.md für Waffenwerte
+führend macht und Vehicles.md diese Regel selbst trägt. **Entscheidung:**
+(ii), vom Inhaber per Sprint-Briefing vorgegeben: Räuber 28, Koloss 50,
+Donnerkanone 60; der Scout bleibt abgeleitet (10).
+
+**Konsequenzen:**
+- `SimDefinitions` trägt 34 Definitionen mit dokumentierter Id-Regel;
+  `ComputeDefinitionsHash64` hasht die gesamte Tabelle (21-Felder-Layout inkl.
+  `cargoCapacityAE`), sodass jede Wertänderung den Replay-Start verweigert.
+- Die Ableitungsregel (85 %, Ganzzahl-Prozent) gilt nur noch für Gebäude-HP
+  und den Scout-Schaden; die drei Fahrzeugwerte sind authored, nicht
+  abgeleitet. Ein Test in beiden Lanes pinnt 28/50/60 ausdrücklich gegen die
+  Ableitungsergebnisse 29/51/93.
+- **Bekannte verbleibende Spannung:** Vehicles.md nennt in der
+  Hyäne-Zeile (Legion Scout) eine konkrete Schadenszahl, die von der
+  abgeleiteten 10 abweicht; das Sprint-Briefing hat nur die drei
+  Kampffahrzeuge vorgegeben. Der Scout bleibt bis zur Inhaberentscheidung
+  abgeleitet — registriert in den Offenen Punkten dieses Protokolls.
+- Economy-Snapshotblock v2 (Slot-Fraktion) lehnt v1 ab; der
+  `SetSlotFaction`-Guard sperrt die Zuweisung nach `Kernel.Start()`;
+  `MatchBootstrap` und `Determinism10000Scenario.BuildHost` weisen die
+  Fraktionen vor dem Start zu.
+- Die Entity-Store-Snapshotvalidierung deckelt Cargo auf das
+  fraktionsübergreifende Maximum (330) und bietet die pro-Entity-
+  Fraktionsgrenze als Überladung für Hosts, die die Slot-Fraktionen kennen —
+  die kanonische Zwei-Phasen-Wiederherstellung hat zur Validierungszeit
+  keine blockübergreifende Fraktionssicht.
+- Die Graybox macht die Achse sichtbar: Fraktion bestimmt die Farbe
+  (D-072-Paletten), die Rolle weiterhin die Form; das Debug-HUD zeigt die
+  Slot-Fraktionen und die Fraktion der Auswahl.
+- Sollte der Inhaber (a) oder (c) vorziehen, ist die Achse eine
+  Daten-/Strukturänderung an `SimDefinitions` und den Auflöse-Stellen; das
+  Id-Schema und die Guard-Semantik sind davon unberührt.
+
 ---
 
 ## Offene Punkte
@@ -1559,11 +1656,18 @@ Tabelle teuer ist und das Mitführen nichts kostet.
   [ScopeLedger](ScopeLedger.md) registrierte Dokumentationsschuld ist offen
   ausgewiesen, nicht erlassen.
 - **D-074 ist in Kraft, aber vom Agenten unter Delegation entschieden** — der
-  einzige Eintrag dieses Protokolls, bei dem der Inhaber die Wahl zwischen
+  erste Eintrag dieses Protokolls, bei dem der Inhaber die Wahl zwischen
   echten Design-Alternativen ausdrücklich abgegeben hat, statt sie selbst zu
   treffen. Der Inhaber möge die Matrixautorität bestätigen oder überstimmen;
   eine Umkehr ist eine Datenänderung, keine Strukturänderung. Bis dahin gilt
   D-074, weil Code, Tests und die bereinigten Fachdokumente sie tragen.
+- **D-075 steht in derselben Delegationslage** (Fraktions-Achse in
+  `SimDefinitions`, Variante (b)); die Teil-Entscheidung zur
+  Legion-Schadensprovenienz hat der Inhaber per Sprint-Briefing selbst
+  vorgegeben. **Offen darin:** Vehicles.md nennt in der Hyäne-Zeile (Legion
+  Scout) eine konkrete Schadenszahl, die von der abgeleiteten 10 abweicht —
+  das Briefing umfasste nur die drei Kampffahrzeuge (28/50/60). Der Scout
+  bleibt abgeleitet, bis der Inhaber die Hyäne-Zeile entscheidet.
 
 ## Nächste Schritte
 
@@ -1598,3 +1702,4 @@ Tabelle teuer ist und das Mitführen nichts kostet.
 | 1.16.0 | 2026-07-26 | D-067 und D-068 als **Entwürfe** aufgenommen (Graybox-Spur ohne Gate-Autorität mit befristetem Dokumentationsschuld-Modus; Sim-Korrekturen im offenen Pre-G1-Formatfenster) – nicht in Kraft, Inhaberentscheidung ausstehend | Technical Writer (Entwurf) / Entscheid: Dennis Westermann |
 | 1.17.0 | 2026-07-26 | Art-Strang MS-1 aus PR #8 aufgenommen (Art-Mask-Kanalbelegung, 0-€-Beschaffungspfad mit Whitelist/Blacklist, Grid-Zellgröße 3,0 m mit Gebäude-Footprints, Fraktionspaletten Allianz/Legion, restriktive Sonniss-Weitergaberegel). Beim Merge kollidierten die dort unabhängig vergebenen IDs D-066–D-070 mit D-066/D-067/D-068; der Art-Strang wurde inhaltsgleich auf **D-069–D-073** verschoben, siehe „Offene Punkte" | Technical Art / Producer / Project Owner |
 | 1.18.0 | 2026-07-26 | D-074 aufgenommen: [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md) als alleinige Autorität der Schaden-gegen-Panzerung-Matrix (6 × 6, ganzzahlige Prozentdarstellung), widersprechende Lokaltabellen in Infantry.md/Vehicles.md aufgehoben, „Kristall" und die unbespielte `Heavy`-Spalte in den ScopeLedger verschoben. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst** — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
+| 1.19.0 | 2026-07-26 | D-075 aufgenommen: Fraktions-Achse in der kanonischen Simulation (34 Definitionen in `SimDefinitions`, Id-Regel 1..17/18..34, Slot-Fraktion im Economy-Block v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Harvester-Ladekapazität); Teil-Entscheidung Legion-Fahrzeugschaden: konkrete Vehicles.md-Werte 28/50/60 schlagen die 85-%-Ableitung, Ableitung nur wo die GDDs schweigen. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden** (Teil-Entscheidung per Inhaber-Sprint-Briefing vorgegeben) — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |

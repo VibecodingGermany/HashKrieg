@@ -169,6 +169,15 @@ namespace Nova.SimRunner.Tests
             return slots;
         }
 
+        /// <summary>The faction assignment of the standard scenario: slot 0 Alliance, slot 1 Legion, free slots Alliance.</summary>
+        internal static byte[] StandardFactions()
+        {
+            var factions = new byte[CommandLimits.ReservedPlayerSlots];
+            factions[HumanSlot] = (byte)FactionId.Alliance;
+            factions[AiSlot] = (byte)FactionId.Legion;
+            return factions;
+        }
+
         /// <summary>Builds the standard fingerprint over a host's current (initial) state.</summary>
         internal static MatchFingerprint CreateFingerprint(TestHost host, ulong seed, byte[] slots = null)
         {
@@ -177,6 +186,7 @@ namespace Nova.SimRunner.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots ?? StandardSlots(),
+                StandardFactions(),
                 seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);
@@ -308,7 +318,8 @@ namespace Nova.SimRunner.Tests
             offset += 2; // ticks per second
             offset += 4 + fingerprint.PrngId.Length;
             offset += 3 * 8; // content hashes
-            offset += CommandLimits.ReservedPlayerSlots;
+            offset += CommandLimits.ReservedPlayerSlots; // slot occupancies
+            offset += CommandLimits.ReservedPlayerSlots; // slot factions
             offset += 8; // start seed
             return offset;
         }

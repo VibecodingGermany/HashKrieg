@@ -3,8 +3,10 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
+using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 
@@ -13,9 +15,11 @@ namespace Nova.Simulation.Tests
     /// <summary>
     /// Per-role weapon values (EditMode lane): pins the authored numbers from
     /// docs/gamedesign/Weapons.md (führend per D-047) against the definition
-    /// tables, proves the role table is complete, and drives a live kernel to
-    /// show the values really reach the tick path — including that unarmed
-    /// roles never take a point of health off anything.
+    /// tables OF BOTH FACTIONS, proves the faction-by-role table is complete,
+    /// pins the canonical DefinitionsHash64 (the real content hash behind the
+    /// match fingerprint), and drives a live kernel to show the values really
+    /// reach the tick path — including that unarmed roles never take a point
+    /// of health off anything.
     /// Mirror of the .NET lane WeaponValuesTests.
     /// </summary>
     [TestFixture]
@@ -24,122 +28,167 @@ namespace Nova.Simulation.Tests
         private const ulong Seed = 0xC0BA7UL;
         private static readonly SimFixed HalfCell = SimFixed.FromRaw(SimFixed.OneRaw / 2);
 
-        /// <summary>The ruling's per-role table, restated independently of the production definitions.</summary>
+        /// <summary>The ruling's per-faction per-role table, restated independently of the production definitions.</summary>
         private static readonly object[] AuthoredUnitValues =
         {
-            //          role,                       armor,                damage type,             dmg, range, cooldown
-            new object[] { UnitRole.Builder,           ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
-            new object[] { UnitRole.Harvester,         ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
-            new object[] { UnitRole.BasicInfantry,     ArmorClass.Infantry, DamageType.Kinetic,    10,   7,  9 },
-            new object[] { UnitRole.AntiArmorInfantry, ArmorClass.Infantry, DamageType.Explosive,  50,  10, 25 },
-            new object[] { UnitRole.ScoutVehicle,      ArmorClass.Light,    DamageType.Kinetic,    12,   8, 10 },
-            new object[] { UnitRole.LightTank,         ArmorClass.Medium,   DamageType.Kinetic,    35,   9, 20 },
-            new object[] { UnitRole.BattleTank,        ArmorClass.Heavy,    DamageType.Kinetic,    60,  10, 25 },
-            new object[] { UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive, 110,  20, 70 },
+            //          faction,            role,                       armor,                damage type,             dmg, range, cooldown
+            new object[] { FactionId.Alliance, UnitRole.Builder,           ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
+            new object[] { FactionId.Alliance, UnitRole.Harvester,         ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
+            new object[] { FactionId.Alliance, UnitRole.BasicInfantry,     ArmorClass.Infantry, DamageType.Kinetic,    10,   7,  9 },
+            new object[] { FactionId.Alliance, UnitRole.AntiArmorInfantry, ArmorClass.Infantry, DamageType.Explosive,  50,  10, 25 },
+            new object[] { FactionId.Alliance, UnitRole.ScoutVehicle,      ArmorClass.Light,    DamageType.Kinetic,    12,   8, 10 },
+            new object[] { FactionId.Alliance, UnitRole.LightTank,         ArmorClass.Medium,   DamageType.Kinetic,    35,   9, 20 },
+            new object[] { FactionId.Alliance, UnitRole.BattleTank,        ArmorClass.Heavy,    DamageType.Kinetic,    60,  10, 25 },
+            new object[] { FactionId.Alliance, UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive, 110,  20, 70 },
+            // Legion (Weapons.md Legion lines where they exist — Gewehr
+            // 6–10/6 m/1.0 s, Raketenwerfer 40–60/9–11 m/2.5 s band minimum —
+            // the concrete Vehicles.md damage lines for the three combat
+            // vehicles (D-075), otherwise the documented integer-percent
+            // derivation).
+            new object[] { FactionId.Legion,   UnitRole.Builder,           ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
+            new object[] { FactionId.Legion,   UnitRole.Harvester,         ArmorClass.Light,    DamageType.Kinetic,     0,   0,  0 },
+            new object[] { FactionId.Legion,   UnitRole.BasicInfantry,     ArmorClass.Infantry, DamageType.Kinetic,     8,   6, 10 },
+            new object[] { FactionId.Legion,   UnitRole.AntiArmorInfantry, ArmorClass.Infantry, DamageType.Explosive,  40,   9, 25 },
+            new object[] { FactionId.Legion,   UnitRole.ScoutVehicle,      ArmorClass.Light,    DamageType.Kinetic,    10,   7, 10 },
+            new object[] { FactionId.Legion,   UnitRole.LightTank,         ArmorClass.Medium,   DamageType.Kinetic,    28,   8, 20 },
+            new object[] { FactionId.Legion,   UnitRole.BattleTank,        ArmorClass.Heavy,    DamageType.Explosive,  50,   8, 25 },
+            new object[] { FactionId.Legion,   UnitRole.Artillery,         ArmorClass.Light,    DamageType.Explosive,  60,  18, 70 },
         };
+
+        [Test]
+        public void LegionVehicleDamage_UsesTheConcreteVehiclesMdValues_NotTheDerivation()
+        {
+            // D-075 (Teil-Entscheidung): where Vehicles.md names a concrete
+            // Legion per-shot damage, that value wins over the integer-percent
+            // derivation — the derivation would have produced 29/51/93 here.
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.LightTank, out SimUnitDefinition raeuber), Is.True);
+            Assert.That(raeuber.AttackDamage, Is.EqualTo(28), "Räuber: concrete Vehicles.md value, not (35 x 85) / 100 = 29");
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.BattleTank, out SimUnitDefinition koloss), Is.True);
+            Assert.That(koloss.AttackDamage, Is.EqualTo(50), "Koloss: concrete Vehicles.md value, not (60 x 85) / 100 = 51");
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.Artillery, out SimUnitDefinition donnerkanone), Is.True);
+            Assert.That(donnerkanone.AttackDamage, Is.EqualTo(60), "Donnerkanone: concrete Vehicles.md value, not (110 x 85) / 100 = 93");
+
+            // The derivation survives exactly where the GDDs are silent: the
+            // Scout keeps (12 x 85) / 100 = 10.
+            Assert.That(SimDefinitions.TryGetUnit(FactionId.Legion, UnitRole.ScoutVehicle, out SimUnitDefinition hyaene), Is.True);
+            Assert.That(hyaene.AttackDamage, Is.EqualTo(10), "Scout: no concrete ruling — the derivation stands");
+        }
 
         [Test]
         public void UnitDefinitions_CarryTheAuthoredWeaponValues()
         {
-            Assert.That(AuthoredUnitValues.Length, Is.EqualTo(SimDefinitions.UnitCount),
-                "every MS-1 unit role is covered by the authored table");
+            Assert.That(AuthoredUnitValues.Length, Is.EqualTo(2 * SimDefinitions.UnitsPerFaction),
+                "every MS-1 unit role is covered for BOTH factions");
 
             foreach (object entry in AuthoredUnitValues)
             {
                 var row = (object[])entry;
-                var role = (UnitRole)row[0];
-                Assert.That(SimDefinitions.TryGetUnit(role, out SimUnitDefinition def), Is.True, $"{role} has a definition");
+                var faction = (FactionId)row[0];
+                var role = (UnitRole)row[1];
+                Assert.That(SimDefinitions.TryGetUnit(faction, role, out SimUnitDefinition def), Is.True,
+                    $"{faction} {role} has a definition");
+                Assert.That(def.Faction, Is.EqualTo(faction));
 
-                Assert.That(def.ArmorClass, Is.EqualTo((ArmorClass)row[1]), $"{role} armor class");
-                Assert.That(def.AttackDamage, Is.EqualTo((int)row[3]), $"{role} base damage");
-                Assert.That(def.AttackRangeTiles, Is.EqualTo((int)row[4]), $"{role} range in tiles");
-                Assert.That(def.AttackCooldownTicks, Is.EqualTo((int)row[5]), $"{role} cooldown in ticks");
+                Assert.That(def.ArmorClass, Is.EqualTo((ArmorClass)row[2]), $"{faction} {role} armor class");
+                Assert.That(def.AttackDamage, Is.EqualTo((int)row[4]), $"{faction} {role} base damage");
+                Assert.That(def.AttackRangeTiles, Is.EqualTo((int)row[5]), $"{faction} {role} range in tiles");
+                Assert.That(def.AttackCooldownTicks, Is.EqualTo((int)row[6]), $"{faction} {role} cooldown in ticks");
                 if (def.AttackDamage > 0)
                 {
-                    Assert.That(def.DamageType, Is.EqualTo((DamageType)row[2]), $"{role} damage type");
+                    Assert.That(def.DamageType, Is.EqualTo((DamageType)row[3]), $"{faction} {role} damage type");
                 }
             }
         }
 
         [Test]
-        public void BuildingDefinitions_OnlyTheDefensePlatformIsArmed()
+        public void BuildingDefinitions_OnlyTheDefensePlatformIsArmed_InBothFactions()
         {
-            for (ushort id = 1; id <= SimDefinitions.BuildingCount; id++)
+            int count = 0;
+            foreach (SimBuildingDefinition def in SimDefinitions.AllBuildings)
             {
-                Assert.That(SimDefinitions.TryGetBuilding(id, out SimBuildingDefinition def), Is.True);
-                Assert.That(def.ArmorClass, Is.EqualTo(ArmorClass.Building), $"{def.Role} is armor class Building");
+                count++;
+                Assert.That(def.ArmorClass, Is.EqualTo(ArmorClass.Building), $"{def.Faction} {def.Role} is armor class Building");
 
                 if (def.Role == UnitRole.DefensePlatform)
                 {
-                    // Buildings CAN shoot — the DefensePlatform does.
+                    // Buildings CAN shoot — the DefensePlatform does. The
+                    // platform modules are faction-neutral content
+                    // (Buildings.md section 3): identical weapon both sides.
                     Assert.That(def.DamageType, Is.EqualTo(DamageType.Kinetic));
-                    Assert.That(def.AttackDamage, Is.EqualTo(20));
-                    Assert.That(def.AttackRangeTiles, Is.EqualTo(10));
-                    Assert.That(def.AttackCooldownTicks, Is.EqualTo(10));
+                    Assert.That(def.AttackDamage, Is.EqualTo(20), $"{def.Faction} DefensePlatform damage");
+                    Assert.That(def.AttackRangeTiles, Is.EqualTo(10), $"{def.Faction} DefensePlatform range");
+                    Assert.That(def.AttackCooldownTicks, Is.EqualTo(10), $"{def.Faction} DefensePlatform cadence");
                 }
                 else
                 {
-                    Assert.That(def.AttackDamage, Is.EqualTo(0), $"{def.Role} is unarmed");
-                    Assert.That(def.AttackRangeTiles, Is.EqualTo(0), $"{def.Role} has no weapon range");
-                    Assert.That(def.AttackCooldownTicks, Is.EqualTo(0), $"{def.Role} has no firing cadence");
+                    Assert.That(def.AttackDamage, Is.EqualTo(0), $"{def.Faction} {def.Role} is unarmed");
+                    Assert.That(def.AttackRangeTiles, Is.EqualTo(0), $"{def.Faction} {def.Role} has no weapon range");
+                    Assert.That(def.AttackCooldownTicks, Is.EqualTo(0), $"{def.Faction} {def.Role} has no firing cadence");
                 }
             }
+            Assert.That(count, Is.EqualTo(2 * SimDefinitions.BuildingsPerFaction),
+                "every MS-1 building role is covered for BOTH factions");
         }
 
         [Test]
-        public void RoleTable_IsCompleteAndMirrorsTheDefinitions()
+        public void RoleTable_IsCompleteAndMirrorsTheDefinitions_ForBothFactions()
         {
-            for (int index = 0; index < WeaponProfiles.RoleCount; index++)
+            for (int factionIndex = 0; factionIndex < WeaponProfiles.FactionCount; factionIndex++)
             {
-                var role = (UnitRole)index;
-                WeaponProfile profile = WeaponProfiles.Get(role);
+                var faction = (FactionId)factionIndex;
+                for (int index = 0; index < WeaponProfiles.RoleCount; index++)
+                {
+                    var role = (UnitRole)index;
+                    WeaponProfile profile = WeaponProfiles.Get(faction, role);
 
-                if (role == UnitRole.Unit)
-                {
-                    // The generic fallback: kept armed on purpose, and scored
-                    // at exactly 1.00 against itself so a roleless engagement
-                    // applies its base damage unscaled.
-                    Assert.That(profile.AttackDamage, Is.EqualTo(WeaponProfiles.FallbackAttackDamage));
-                    Assert.That(profile.AttackCooldownTicks, Is.EqualTo(WeaponProfiles.FallbackAttackCooldownTicks));
-                    Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(WeaponProfiles.FallbackAttackRangeTiles)));
-                    Assert.That(
-                        DamageMatrix.GetMultiplierPercent(profile.DamageType, profile.ArmorClass),
-                        Is.EqualTo(DamageMatrix.NeutralPercent),
-                        "the fallback must stay neutral against itself, or roleless combat silently rescales");
-                    continue;
-                }
+                    if (role == UnitRole.Unit)
+                    {
+                        // The generic fallback: kept armed on purpose, faction-
+                        // independent, and scored at exactly 1.00 against
+                        // itself so a roleless engagement applies its base
+                        // damage unscaled.
+                        Assert.That(profile.AttackDamage, Is.EqualTo(WeaponProfiles.FallbackAttackDamage));
+                        Assert.That(profile.AttackCooldownTicks, Is.EqualTo(WeaponProfiles.FallbackAttackCooldownTicks));
+                        Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(WeaponProfiles.FallbackAttackRangeTiles)));
+                        Assert.That(
+                            DamageMatrix.GetMultiplierPercent(profile.DamageType, profile.ArmorClass),
+                            Is.EqualTo(DamageMatrix.NeutralPercent),
+                            "the fallback must stay neutral against itself, or roleless combat silently rescales");
+                        continue;
+                    }
 
-                if (SimDefinitions.TryGetBuilding(role, out SimBuildingDefinition building))
-                {
-                    Assert.That(profile.ArmorClass, Is.EqualTo(building.ArmorClass));
-                    Assert.That(profile.AttackDamage, Is.EqualTo(building.AttackDamage));
-                    Assert.That(profile.AttackCooldownTicks, Is.EqualTo(building.AttackCooldownTicks));
-                    Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(building.AttackRangeTiles)));
-                }
-                else
-                {
-                    Assert.That(SimDefinitions.TryGetUnit(role, out SimUnitDefinition unit), Is.True,
-                        $"{role} must resolve to a definition or the weapon table is incomplete");
-                    Assert.That(profile.ArmorClass, Is.EqualTo(unit.ArmorClass));
-                    Assert.That(profile.AttackDamage, Is.EqualTo(unit.AttackDamage));
-                    Assert.That(profile.AttackCooldownTicks, Is.EqualTo(unit.AttackCooldownTicks));
-                    Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(unit.AttackRangeTiles)));
-                }
+                    if (SimDefinitions.TryGetBuilding(faction, role, out SimBuildingDefinition building))
+                    {
+                        Assert.That(profile.ArmorClass, Is.EqualTo(building.ArmorClass));
+                        Assert.That(profile.AttackDamage, Is.EqualTo(building.AttackDamage));
+                        Assert.That(profile.AttackCooldownTicks, Is.EqualTo(building.AttackCooldownTicks));
+                        Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(building.AttackRangeTiles)));
+                    }
+                    else
+                    {
+                        Assert.That(SimDefinitions.TryGetUnit(faction, role, out SimUnitDefinition unit), Is.True,
+                            $"{faction} {role} must resolve to a definition or the weapon table is incomplete");
+                        Assert.That(profile.ArmorClass, Is.EqualTo(unit.ArmorClass));
+                        Assert.That(profile.AttackDamage, Is.EqualTo(unit.AttackDamage));
+                        Assert.That(profile.AttackCooldownTicks, Is.EqualTo(unit.AttackCooldownTicks));
+                        Assert.That(profile.AttackRange, Is.EqualTo(SimFixed.FromInt(unit.AttackRangeTiles)));
+                    }
 
-                // 1 tile == 1 m (D-034/D-047): the conversion is the identity.
-                Assert.That(profile.IsArmed, Is.EqualTo(profile.AttackDamage > 0),
-                    "armed is defined by base damage and nothing else");
-                if (profile.IsArmed)
-                {
-                    Assert.That(profile.AttackCooldownTicks, Is.GreaterThan(0),
-                        "an armed role needs a positive cadence or it would fire every tick");
-                    Assert.That(profile.AttackRange.RawValue, Is.GreaterThan(0), "an armed role needs reach");
+                    // 1 tile == 1 m (D-034/D-047): the conversion is the identity.
+                    Assert.That(profile.IsArmed, Is.EqualTo(profile.AttackDamage > 0),
+                        "armed is defined by base damage and nothing else");
+                    if (profile.IsArmed)
+                    {
+                        Assert.That(profile.AttackCooldownTicks, Is.GreaterThan(0),
+                            "an armed role needs a positive cadence or it would fire every tick");
+                        Assert.That(profile.AttackRange.RawValue, Is.GreaterThan(0), "an armed role needs reach");
+                    }
                 }
             }
         }
 
         [Test]
-        public void UnarmedRoles_AreExactlyBuilderHarvesterAndTheEightPassiveBuildings()
+        public void UnarmedRoles_AreExactlyBuilderHarvesterAndTheEightPassiveBuildings_InBothFactions()
         {
             var expectedUnarmed = new[]
             {
@@ -148,12 +197,105 @@ namespace Nova.Simulation.Tests
                 UnitRole.Barracks, UnitRole.VehicleFactory, UnitRole.ResearchLab, UnitRole.Radar,
             };
 
-            for (int index = 0; index < WeaponProfiles.RoleCount; index++)
+            for (int factionIndex = 0; factionIndex < WeaponProfiles.FactionCount; factionIndex++)
             {
-                var role = (UnitRole)index;
-                bool shouldBeUnarmed = System.Array.IndexOf(expectedUnarmed, role) >= 0;
-                Assert.That(WeaponProfiles.Get(role).IsArmed, Is.EqualTo(!shouldBeUnarmed), $"{role} armed state");
+                var faction = (FactionId)factionIndex;
+                for (int index = 0; index < WeaponProfiles.RoleCount; index++)
+                {
+                    var role = (UnitRole)index;
+                    bool shouldBeUnarmed = System.Array.IndexOf(expectedUnarmed, role) >= 0;
+                    Assert.That(WeaponProfiles.Get(faction, role).IsArmed, Is.EqualTo(!shouldBeUnarmed),
+                        $"{faction} {role} armed state");
+                }
             }
+        }
+
+        // ---------- canonical definitions content hash (DefinitionsHash64) ----------
+
+        [Test]
+        public void DefinitionsHash64_IsStable_CoversBothFactions_AndIsNotAStub()
+        {
+            ulong hash = SimDefinitions.ComputeDefinitionsHash64();
+            Assert.That(SimDefinitions.ComputeDefinitionsHash64(), Is.EqualTo(hash),
+                "the same table must hash identically every time");
+            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions)),
+                "the real table hash replaces the empty-content stub");
+            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules)));
+            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map)));
+
+            // Row coverage: mutating ANY single row — first Alliance, first
+            // Legion, last Legion — moves the hash, so no row is skipped.
+            Assert.That(HashWithMutatedBuilding(0), Is.Not.EqualTo(hash), "an Alliance building row is covered");
+            Assert.That(HashWithMutatedBuilding(SimDefinitions.BuildingsPerFaction), Is.Not.EqualTo(hash),
+                "a Legion building row is covered");
+            Assert.That(HashWithMutatedUnit(2 * SimDefinitions.UnitsPerFaction - 1), Is.Not.EqualTo(hash),
+                "the last Legion unit row is covered");
+        }
+
+        [Test]
+        public void DefinitionsHash64_ChangesWhenAnyWeaponValueChanges()
+        {
+            // The fingerprint contract (SimulationCore.md section 6): a replay
+            // recorded against other weapon values must hash differently.
+            ulong canonical = SimDefinitions.ComputeDefinitionsHash64();
+
+            // Mutate the Legion Rekrut's base damage (8 -> 9) in a table copy.
+            var units = SimDefinitions.AllUnits.ToArray();
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i].Faction == FactionId.Legion && units[i].Role == UnitRole.BasicInfantry)
+                {
+                    units[i] = new SimUnitDefinition(
+                        units[i].DefinitionId, units[i].Faction, units[i].Role, units[i].CostAE, units[i].BuildTicks,
+                        units[i].Tier, units[i].ProducerRole, units[i].MaxHealth, units[i].MoveSpeed,
+                        units[i].ArmorClass, units[i].DamageType,
+                        attackDamage: units[i].AttackDamage + 1, units[i].AttackRangeTiles, units[i].AttackCooldownTicks);
+                }
+            }
+            Assert.That(SimDefinitions.ComputeDefinitionsHash64(SimDefinitions.AllBuildings, units),
+                Is.Not.EqualTo(canonical), "a mutated weapon damage must move the definitions hash");
+
+            // Mutate the DefensePlatform weapon (20 -> 21) in a table copy.
+            var buildings = SimDefinitions.AllBuildings.ToArray();
+            for (int i = 0; i < buildings.Length; i++)
+            {
+                if (buildings[i].Role == UnitRole.DefensePlatform && buildings[i].Faction == FactionId.Alliance)
+                {
+                    buildings[i] = new SimBuildingDefinition(
+                        buildings[i].DefinitionId, buildings[i].Faction, buildings[i].Role,
+                        buildings[i].CostAE, buildings[i].BuildTicks, buildings[i].PowerProvided, buildings[i].PowerRequired,
+                        buildings[i].HasPrerequisite, buildings[i].PrerequisiteRole, buildings[i].MaxHealth,
+                        buildings[i].ArmorClass, buildings[i].DamageType,
+                        attackDamage: buildings[i].AttackDamage + 1, buildings[i].AttackRangeTiles, buildings[i].AttackCooldownTicks);
+                }
+            }
+            Assert.That(SimDefinitions.ComputeDefinitionsHash64(buildings, SimDefinitions.AllUnits),
+                Is.Not.EqualTo(canonical), "a mutated platform weapon must move the definitions hash");
+        }
+
+        private static ulong HashWithMutatedBuilding(int index)
+        {
+            var buildings = SimDefinitions.AllBuildings.ToArray();
+            buildings[index] = new SimBuildingDefinition(
+                buildings[index].DefinitionId, buildings[index].Faction, buildings[index].Role,
+                costAE: buildings[index].CostAE + 1, buildings[index].BuildTicks,
+                buildings[index].PowerProvided, buildings[index].PowerRequired,
+                buildings[index].HasPrerequisite, buildings[index].PrerequisiteRole, buildings[index].MaxHealth,
+                buildings[index].ArmorClass, buildings[index].DamageType,
+                buildings[index].AttackDamage, buildings[index].AttackRangeTiles, buildings[index].AttackCooldownTicks);
+            return SimDefinitions.ComputeDefinitionsHash64(buildings, SimDefinitions.AllUnits);
+        }
+
+        private static ulong HashWithMutatedUnit(int index)
+        {
+            var units = SimDefinitions.AllUnits.ToArray();
+            units[index] = new SimUnitDefinition(
+                units[index].DefinitionId, units[index].Faction, units[index].Role,
+                costAE: units[index].CostAE + 1, units[index].BuildTicks,
+                units[index].Tier, units[index].ProducerRole, units[index].MaxHealth, units[index].MoveSpeed,
+                units[index].ArmorClass, units[index].DamageType,
+                units[index].AttackDamage, units[index].AttackRangeTiles, units[index].AttackCooldownTicks);
+            return SimDefinitions.ComputeDefinitionsHash64(SimDefinitions.AllBuildings, units);
         }
 
         // ---------- live kernel: the values actually reach the tick path ----------
@@ -162,11 +304,13 @@ namespace Nova.Simulation.Tests
         {
             public SimulationKernel Kernel { get; }
             public EntityManager Entities { get; }
+            public EconomySystem Factions { get; }
 
-            private TestHost(SimulationKernel kernel, EntityManager entities)
+            private TestHost(SimulationKernel kernel, EntityManager entities, EconomySystem factions)
             {
                 Kernel = kernel;
                 Entities = entities;
+                Factions = factions;
             }
 
             public static TestHost Create()
@@ -175,7 +319,10 @@ namespace Nova.Simulation.Tests
                 var pathfinding = new PathfindingSystem(64, 64);
                 var movement = new MovementSystem(entities, pathfinding);
                 var fog = new FogOfWarSystem(entities, teamCount: 2, 64, 64);
-                var combat = new CombatSystem(entities, fog);
+                // Faction source for the combat weapon table: an unregistered
+                // economy state (all slots default to Alliance).
+                var factions = new EconomySystem(entities);
+                var combat = new CombatSystem(entities, fog, factions);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(pathfinding);
@@ -183,7 +330,7 @@ namespace Nova.Simulation.Tests
                 kernel.RegisterSystem(fog);
                 kernel.RegisterSystem(combat);
                 kernel.Start();
-                return new TestHost(kernel, entities);
+                return new TestHost(kernel, entities, factions);
             }
 
             public void Step(int count = 1)
@@ -256,6 +403,45 @@ namespace Nova.Simulation.Tests
 
             // A building that shoots (DefensePlatform, 20 Kinetic, range 10).
             Assert.That(DamageDealt(UnitRole.DefensePlatform, UnitRole.BasicInfantry, 8, 2), Is.EqualTo(20));
+        }
+
+        [Test]
+        public void LiveKernel_LegionProfiles_ReachTheTickPath()
+        {
+            // The attacker's slot faction selects the weapon row: a Legion
+            // Rekrut deals 8 (not the Alliance rifleman's 10), a Legion
+            // Koloss deals 50 Explosive (1.00 vs the Medium LightTank).
+            var host = TestHost.Create();
+            host.Factions.SetSlotFaction(0, FactionId.Legion);
+            EntityId rekrut = Spawn(host, 0, UnitRole.BasicInfantry, 10, 10);
+            EntityId target = Spawn(host, 1, UnitRole.BasicInfantry, 13, 10);
+            host.Entities.GetUnitRef(rekrut).AttackTarget = target;
+            int before = HealthOf(host, target);
+            host.Step(2);
+            Assert.That(before - HealthOf(host, target), Is.EqualTo(8),
+                "Legion BasicInfantry fires the Legion row (8 Kinetic)");
+
+            var host2 = TestHost.Create();
+            host2.Factions.SetSlotFaction(0, FactionId.Legion);
+            host2.Factions.SetSlotFaction(1, FactionId.Legion);
+            EntityId koloss = Spawn(host2, 0, UnitRole.BattleTank, 10, 10);
+            EntityId raeuber = Spawn(host2, 1, UnitRole.LightTank, 13, 10);
+            host2.Entities.GetUnitRef(koloss).AttackTarget = raeuber;
+            int before2 = HealthOf(host2, raeuber);
+            host2.Step(2);
+            Assert.That(before2 - HealthOf(host2, raeuber), Is.EqualTo(50),
+                "Legion Koloss fires 50 Explosive at 1.00 vs Medium");
+
+            // Legion range is the Legion row's: 6 m does not reach 7 cells.
+            var host3 = TestHost.Create();
+            host3.Factions.SetSlotFaction(0, FactionId.Legion);
+            EntityId rekrut3 = Spawn(host3, 0, UnitRole.BasicInfantry, 10, 10);
+            EntityId target3 = Spawn(host3, 1, UnitRole.BasicInfantry, 17, 10);
+            host3.Entities.GetUnitRef(rekrut3).AttackTarget = target3;
+            int before3 = HealthOf(host3, target3);
+            host3.Step(60);
+            Assert.That(before3 - HealthOf(host3, target3), Is.EqualTo(0),
+                "the Legion rifle (6 m) cannot reach 7 m, however long it waits");
         }
 
         [Test]

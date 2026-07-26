@@ -16,9 +16,9 @@ namespace Nova.Simulation.Tests
     {
         private static int PerShot(UnitRole attacker, UnitRole target)
         {
-            WeaponProfile weapon = WeaponProfiles.Get(attacker);
+            WeaponProfile weapon = WeaponProfiles.Get(FactionId.Alliance, attacker);
             return DamageMatrix.Resolve(
-                weapon.AttackDamage, weapon.DamageType, WeaponProfiles.GetArmorClass(target));
+                weapon.AttackDamage, weapon.DamageType, WeaponProfiles.GetArmorClass(FactionId.Alliance, target));
         }
 
         [Test]
@@ -26,20 +26,20 @@ namespace Nova.Simulation.Tests
         {
             // ArmorSystem.md is authoritative over the drifted Infantry.md /
             // Vehicles.md summaries; these are its assignments.
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.BasicInfantry), Is.EqualTo(ArmorClass.Infantry));
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.AntiArmorInfantry), Is.EqualTo(ArmorClass.Infantry));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.BasicInfantry), Is.EqualTo(ArmorClass.Infantry));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.AntiArmorInfantry), Is.EqualTo(ArmorClass.Infantry));
 
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.Builder), Is.EqualTo(ArmorClass.Light));
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.Harvester), Is.EqualTo(ArmorClass.Light));
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.ScoutVehicle), Is.EqualTo(ArmorClass.Light));
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.Artillery), Is.EqualTo(ArmorClass.Light));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.Builder), Is.EqualTo(ArmorClass.Light));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.Harvester), Is.EqualTo(ArmorClass.Light));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.ScoutVehicle), Is.EqualTo(ArmorClass.Light));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.Artillery), Is.EqualTo(ArmorClass.Light));
 
             // ArmorSystem.md puts BOTH tanks in Medium and reserves Heavy for
             // the (non-MS-1) Heavy Tank. The owner overrode that for the
             // BattleTank so the Heavy column is actually exercised in MS-1 and
             // the "Kinetic 0.25 vs Heavy forces rockets" counter can play.
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.LightTank), Is.EqualTo(ArmorClass.Medium));
-            Assert.That(WeaponProfiles.GetArmorClass(UnitRole.BattleTank), Is.EqualTo(ArmorClass.Heavy));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.LightTank), Is.EqualTo(ArmorClass.Medium));
+            Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, UnitRole.BattleTank), Is.EqualTo(ArmorClass.Heavy));
 
             foreach (UnitRole role in new[]
                      {
@@ -47,7 +47,7 @@ namespace Nova.Simulation.Tests
                          UnitRole.VehicleFactory, UnitRole.ResearchLab, UnitRole.Radar, UnitRole.DefensePlatform,
                      })
             {
-                Assert.That(WeaponProfiles.GetArmorClass(role), Is.EqualTo(ArmorClass.Building),
+                Assert.That(WeaponProfiles.GetArmorClass(FactionId.Alliance, role), Is.EqualTo(ArmorClass.Building),
                     $"{role} is a building and every building type is class Building");
             }
         }
@@ -64,7 +64,7 @@ namespace Nova.Simulation.Tests
             bool anyHeavy = false;
             for (int index = 0; index < WeaponProfiles.RoleCount; index++)
             {
-                ArmorClass armor = WeaponProfiles.GetArmorClass((UnitRole)index);
+                ArmorClass armor = WeaponProfiles.GetArmorClass(FactionId.Alliance, (UnitRole)index);
                 Assert.That(armor, Is.Not.EqualTo(ArmorClass.Air), $"no MS-1 role is Air (role {(UnitRole)index})");
                 anyHeavy |= armor == ArmorClass.Heavy;
             }

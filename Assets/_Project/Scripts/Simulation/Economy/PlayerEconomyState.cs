@@ -1,5 +1,6 @@
 using System;
 using Nova.Core;
+using Nova.Simulation.State;
 
 namespace Nova.Simulation.Economy
 {
@@ -34,6 +35,14 @@ namespace Nova.Simulation.Economy
 
         public byte PlayerId { get; }
 
+        /// <summary>
+        /// The faction this slot plays (stable wire value, economy block v2).
+        /// Defaults to <see cref="FactionId.Alliance"/>; match setup assigns
+        /// the real factions before the first tick, so the value is part of
+        /// the hashed initial state.
+        /// </summary>
+        public FactionId Faction;
+
         /// <summary>Aetherium balance in AE; never negative (invariant, enforced by <see cref="TrySpendCredits"/>).</summary>
         public long AetheriumCredits;
 
@@ -49,13 +58,14 @@ namespace Nova.Simulation.Economy
         /// <summary>Production speed factor as exact Q16.16: 0.5 (raw 32768) under low power, 1.0 otherwise.</summary>
         public SimFixed ProductionSpeedMultiplierQ16 => IsLowPower ? LowPowerMultiplier : SimFixed.One;
 
-        public PlayerEconomyState(byte playerId, long startingCredits = 1000)
+        public PlayerEconomyState(byte playerId, long startingCredits = 1000, FactionId faction = FactionId.Alliance)
         {
             if (startingCredits < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(startingCredits), "Starting credits must not be negative.");
             }
             PlayerId = playerId;
+            Faction = faction;
             AetheriumCredits = startingCredits;
             PowerProvided = 0;
             PowerRequired = 0;
@@ -83,6 +93,7 @@ namespace Nova.Simulation.Economy
 
         public bool Equals(PlayerEconomyState other) =>
             PlayerId == other.PlayerId
+            && Faction == other.Faction
             && AetheriumCredits == other.AetheriumCredits
             && PowerProvided == other.PowerProvided
             && PowerRequired == other.PowerRequired;
@@ -90,7 +101,7 @@ namespace Nova.Simulation.Economy
         public override bool Equals(object obj) => obj is PlayerEconomyState other && Equals(other);
 
         public override int GetHashCode() =>
-            (PlayerId << 24) ^ AetheriumCredits.GetHashCode() ^ (PowerProvided << 8) ^ PowerRequired;
+            (PlayerId << 24) ^ ((int)Faction << 16) ^ AetheriumCredits.GetHashCode() ^ (PowerProvided << 8) ^ PowerRequired;
 
         public static bool operator ==(PlayerEconomyState left, PlayerEconomyState right) => left.Equals(right);
         public static bool operator !=(PlayerEconomyState left, PlayerEconomyState right) => !left.Equals(right);

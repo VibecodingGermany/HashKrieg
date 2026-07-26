@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Replays;
+using Nova.Simulation.State;
 
 namespace Nova.SimRunner.Tests
 {
@@ -21,9 +22,19 @@ namespace Nova.SimRunner.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 ReplayTestUtil.StandardSlots(),
+                ReplayTestUtil.StandardFactions(),
                 startSeed: 0x5EED42UL,
                 initialStateHash: 0xDEADBEEFCAFEF00DUL,
                 inputDelayTicks: 1);
+        }
+
+        [Test]
+        public void FactionId_WireValues_AreTheManifestIndexes()
+        {
+            // The byte on the wire IS the manifest index: factions[0] is the
+            // Alliance, factions[1] the Legion (quality/content/mvp-v1.json).
+            Assert.That((byte)FactionId.Alliance, Is.EqualTo((byte)0));
+            Assert.That((byte)FactionId.Legion, Is.EqualTo((byte)1));
         }
 
         [Test]
@@ -43,6 +54,9 @@ namespace Nova.SimRunner.Tests
                     : slot == 1 ? PlayerSlotOccupancy.AI
                     : PlayerSlotOccupancy.Free;
                 Assert.That(parsed.GetSlotOccupancy(slot), Is.EqualTo(expected));
+
+                FactionId expectedFaction = slot == 1 ? FactionId.Legion : FactionId.Alliance;
+                Assert.That(parsed.GetSlotFaction(slot), Is.EqualTo(expectedFaction));
             }
         }
 
@@ -75,35 +89,39 @@ namespace Nova.SimRunner.Tests
                     standard.SnapshotSchemaVersion, standard.SidecarSchemaVersion,
                     standard.NumericModelId, standard.TicksPerSecond, standard.PrngId,
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64 ^ 1, standard.DefinitionsHash64, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64 ^ 1, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64 ^ 1,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
-                    new byte[] { 1, 1, 0, 0, 0, 0, 0, 0 }, standard.StartSeed,
+                    new byte[] { 1, 1, 0, 0, 0, 0, 0, 0 }, standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed + 1,
+                    standard.GetSlotOccupancyCopy(), new byte[] { 1, 0, 0, 0, 0, 0, 0, 0 }, standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed + 1,
+                    standard.InitialStateHash, standard.InputDelayTicks),
+                MatchFingerprint.CreateCurrent(
+                    standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash ^ 1, standard.InputDelayTicks),
                 MatchFingerprint.CreateCurrent(
                     standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
-                    standard.GetSlotOccupancyCopy(), standard.StartSeed,
+                    standard.GetSlotOccupancyCopy(), standard.GetSlotFactionCopy(), standard.StartSeed,
                     standard.InitialStateHash, standard.InputDelayTicks + 1),
             };
 
@@ -114,6 +132,28 @@ namespace Nova.SimRunner.Tests
                 Assert.That(standard.FindFirstDifference(variants[i]), Is.Not.Null, $"variant {i} difference");
             }
             Assert.That(standard.FindFirstDifference(CreateStandard()), Is.Null);
+        }
+
+        [Test]
+        public void ComputeHash_NamesTheFactionField_WhenOnlyTheFactionDiffers()
+        {
+            // The faction assignment is match identity: swapping the two
+            // active slots' factions must change the fingerprint hash AND be
+            // named as the first difference — a Legion-vs-Legion replay must
+            // never start against an Alliance-vs-Legion fingerprint.
+            MatchFingerprint standard = CreateStandard();
+            byte[] swapped = standard.GetSlotFactionCopy();
+            swapped[0] = (byte)FactionId.Legion;
+            swapped[1] = (byte)FactionId.Alliance;
+
+            MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
+                standard.RulesHash64, standard.DefinitionsHash64, standard.MapHash64,
+                standard.GetSlotOccupancyCopy(), swapped, standard.StartSeed,
+                standard.InitialStateHash, standard.InputDelayTicks);
+
+            Assert.That(foreign, Is.Not.EqualTo(standard));
+            Assert.That(foreign.ComputeHash(), Is.Not.EqualTo(standard.ComputeHash()));
+            Assert.That(standard.FindFirstDifference(foreign), Is.EqualTo("SlotFaction[0]"));
         }
 
         [Test]
@@ -146,6 +186,12 @@ namespace Nova.SimRunner.Tests
             badSlot[slotOffset] = 3;
             Assert.That(MatchFingerprint.TryParse(badSlot, out _), Is.False);
 
+            // Undefined slot faction value (the faction array follows the
+            // eight occupancy bytes directly).
+            var badFaction = (byte[])bytes.Clone();
+            badFaction[slotOffset + CommandLimits.ReservedPlayerSlots] = 2;
+            Assert.That(MatchFingerprint.TryParse(badFaction, out _), Is.False);
+
             // Non-printable-ASCII identifier byte (inside the numeric model id).
             var badIdentifier = (byte[])bytes.Clone();
             badIdentifier[5 * 2 + 4] = 0x07;
@@ -158,12 +204,20 @@ namespace Nova.SimRunner.Tests
             MatchFingerprint fingerprint = CreateStandard();
             Assert.Throws<ArgumentOutOfRangeException>(() => fingerprint.GetSlotOccupancy(-1));
             Assert.Throws<ArgumentOutOfRangeException>(() => fingerprint.GetSlotOccupancy(8));
+            Assert.Throws<ArgumentOutOfRangeException>(() => fingerprint.GetSlotFaction(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => fingerprint.GetSlotFaction(8));
             Assert.Throws<ArgumentException>(() => MatchFingerprint.CreateCurrent(
-                0, 0, 0, new byte[7], 0, 0, 1));
+                0, 0, 0, new byte[7], new byte[8], 0, 0, 1));
             Assert.Throws<ArgumentException>(() => MatchFingerprint.CreateCurrent(
-                0, 0, 0, new byte[] { 0, 0, 0, 0, 0, 0, 0, 9 }, 0, 0, 1));
+                0, 0, 0, new byte[] { 0, 0, 0, 0, 0, 0, 0, 9 }, new byte[8], 0, 0, 1));
+            Assert.Throws<ArgumentException>(() => MatchFingerprint.CreateCurrent(
+                0, 0, 0, new byte[8], new byte[7], 0, 0, 1));
+            Assert.Throws<ArgumentException>(() => MatchFingerprint.CreateCurrent(
+                0, 0, 0, new byte[8], new byte[] { 0, 0, 0, 0, 0, 0, 0, 2 }, 0, 0, 1));
             Assert.Throws<ArgumentNullException>(() => MatchFingerprint.CreateCurrent(
-                0, 0, 0, null, 0, 0, 1));
+                0, 0, 0, null, new byte[8], 0, 0, 1));
+            Assert.Throws<ArgumentNullException>(() => MatchFingerprint.CreateCurrent(
+                0, 0, 0, new byte[8], null, 0, 0, 1));
         }
     }
 }

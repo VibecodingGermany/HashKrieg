@@ -30,8 +30,8 @@ namespace Nova.Simulation.Tests
         private const ushort MapSize = 64;
 
         /// <summary>Power plant / Barracks definition ids (SimDefinitions MS-1 table).</summary>
-        private const ushort DefPower = 2;
-        private const ushort DefBarracks = 5;
+        private const ushort DefPower = 5;
+        private const ushort DefBarracks = 7;
 
         /// <summary>
         /// Minimal canonical host: the systems the victory contract actually

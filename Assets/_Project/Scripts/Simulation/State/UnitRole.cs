@@ -24,6 +24,12 @@ namespace Nova.Simulation.State
     /// <see cref="Unit"/> stays the generic fallback role and the role of an
     /// unfinished construction site.
     /// </para>
+    /// <para>
+    /// The seventeen content roles are deliberately numbered 1..17: the
+    /// definition id rule of the faction slice builds on it — an Alliance
+    /// definition id IS this wire value, the Legion id adds 17
+    /// (<see cref="Nova.Simulation.Definitions.SimDefinitions"/>).
+    /// </para>
     /// </summary>
     public enum UnitRole : byte
     {

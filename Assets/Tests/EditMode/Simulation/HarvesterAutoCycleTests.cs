@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
@@ -58,16 +59,16 @@ namespace Nova.Simulation.Tests
             SpawnRefinery(entities, 0, 11, 10);
             entities.GetUnitRef(harvester).HarvestFieldId = 1;
 
-            const int Capacity = UnitState.DefaultCargoCapacityAE;
-            const int FillTicks = Capacity / EconomySystem.HarvestRateAE; // 165
-            const int CycleTicks = FillTicks + 1;                         // + the deposit tick
-            const int Ticks = (CycleTicks * 2) + 8;                       // two cycles plus slack
+            int capacity = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance);
+            int fillTicks = capacity / EconomySystem.HarvestRateAE; // 165
+            int cycleTicks = fillTicks + 1;                       // + the deposit tick
+            int ticks = (cycleTicks * 2) + 8;                     // two cycles plus slack
 
             long previous = economy.GetPlayerEconomy(0).AetheriumCredits;
             Assert.That(previous, Is.EqualTo(1000L), "manifest start credits");
 
             var depositTicks = new List<int>();
-            for (int t = 1; t <= Ticks; t++)
+            for (int t = 1; t <= ticks; t++)
             {
                 kernel.StepTick();
                 long credits = economy.GetPlayerEconomy(0).AetheriumCredits;
@@ -82,11 +83,11 @@ namespace Nova.Simulation.Tests
 
             Assert.That(depositTicks.Count, Is.EqualTo(2),
                 "exactly two full harvest->return->harvest cycles complete unaided in this window");
-            Assert.That(depositTicks[0], Is.EqualTo(CycleTicks),
+            Assert.That(depositTicks[0], Is.EqualTo(cycleTicks),
                 "the load is banked one tick after the cargo fills");
-            Assert.That(depositTicks[1], Is.EqualTo(CycleTicks * 2),
+            Assert.That(depositTicks[1], Is.EqualTo(cycleTicks * 2),
                 "the cycle repeats with a stable period — no command in between");
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L + (2L * Capacity)),
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L + (2L * capacity)),
                 "each cycle banks exactly one full cargo");
 
             ref UnitState unit = ref entities.GetUnitRef(harvester);
@@ -97,7 +98,7 @@ namespace Nova.Simulation.Tests
                 "gathering resumed on its own after the second deposit");
 
             Assert.That(economy.TryGetField(1, out AetheriumField field), Is.True);
-            Assert.That(field.RemainingAE, Is.EqualTo(5000L - (2L * Capacity) - unit.CargoAE),
+            Assert.That(field.RemainingAE, Is.EqualTo(5000L - (2L * capacity) - unit.CargoAE),
                 "every AE that left the field is either banked or still in cargo");
         }
 
@@ -114,11 +115,11 @@ namespace Nova.Simulation.Tests
             EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
             ref UnitState unit = ref entities.GetUnitRef(harvester);
             unit.HarvestFieldId = 1;
-            unit.CargoAE = UnitState.DefaultCargoCapacityAE - 1; // 329 of 330
+            unit.CargoAE = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance) - 1; // 329 of 330
 
             kernel.StepTick();
             unit = ref entities.GetUnitRef(harvester);
-            Assert.That(unit.CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
+            Assert.That(unit.CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
                 "only the free cargo space is gathered");
             Assert.That(unit.IsReturningCargo, Is.True, "a full cargo starts the return leg");
             Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)1),
@@ -132,7 +133,7 @@ namespace Nova.Simulation.Tests
             }
 
             unit = ref entities.GetUnitRef(harvester);
-            Assert.That(unit.CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
+            Assert.That(unit.CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
                 "the load is held — neither banked nor gathered further");
             Assert.That(unit.IsReturningCargo, Is.True, "an out-of-reach return order is held, not dropped");
             Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L),

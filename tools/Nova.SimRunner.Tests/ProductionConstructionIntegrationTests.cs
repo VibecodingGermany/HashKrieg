@@ -63,7 +63,7 @@ namespace Nova.SimRunner.Tests
                 var construction = new ConstructionSystem(entities, economy);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar);
+                var combat = new CombatSystem(entities, fogOfWar, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -119,8 +119,8 @@ namespace Nova.SimRunner.Tests
             /// </summary>
             public EntityId SpawnStartState(byte slot, int baseX, int baseY)
             {
-                Assert.That(Construction.PlaceCompletedBuilding(slot, 1, baseX, baseY).IsValid, Is.True, "HQ");
-                Assert.That(Construction.PlaceCompletedBuilding(slot, 3, baseX + 4, baseY).IsValid, Is.True,
+                Assert.That(Construction.PlaceCompletedBuilding(slot, 3, baseX, baseY).IsValid, Is.True, "HQ");
+                Assert.That(Construction.PlaceCompletedBuilding(slot, 4, baseX + 4, baseY).IsValid, Is.True,
                     "start Refinery — placed completed, bypassing its regular Power prerequisite");
                 EntityId builder = Entities.SpawnUnit(
                     slot,
@@ -190,31 +190,34 @@ namespace Nova.SimRunner.Tests
             EntityId builder = host.SpawnStartState(0, 4, 4);
             host.StepTick(); // commit the start balance (30 provided / 20 required)
 
-            // Legal: Barracks (def 5, 500 AE) at (20,20).
-            host.Submit(new PlaceBuildingPayload(5, 20, 20));
-            // Insufficient funds: HQ (def 1, 2000 AE) at (30,20).
-            host.Submit(new PlaceBuildingPayload(1, 30, 20));
+            // Legal: Storage (def 6, 300 AE) at (20,20) — the start grid
+            // (30 provided, 20 required) powers its 5, not the Barracks' 15:
+            // the Alliance must build a Power plant before its Barracks
+            // (Buildings.md power figures).
+            host.Submit(new PlaceBuildingPayload(6, 20, 20));
+            // Insufficient funds: HQ (def 3, 2500 AE) at (30,20).
+            host.Submit(new PlaceBuildingPayload(3, 30, 20));
             host.StepTick();
 
             Assert.That(host.Kernel.LastTickResults.Count, Is.EqualTo(2));
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
             Assert.That(host.Kernel.LastTickResults[1].Code, Is.EqualTo(CommandResultCode.RejectedInsufficientResources));
-            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(500L),
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(700L),
                 "exactly one placement was charged");
             Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
 
             // Occupied: the HQ footprint at (4,4).
-            host.Submit(new PlaceBuildingPayload(4, 4, 4));
+            host.Submit(new PlaceBuildingPayload(6, 4, 4));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedInvalidTarget));
 
-            // Prerequisite: the DefensePlatform (def 9, 400 AE) needs a
+            // Prerequisite: the DefensePlatform (def 11, 400 AE) needs a
             // completed Power plant — cheap enough that the generic cost
             // check passes and the domain check decides.
-            host.Submit(new PlaceBuildingPayload(9, 30, 30));
+            host.Submit(new PlaceBuildingPayload(11, 30, 30));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
-            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(500L),
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(700L),
                 "every rejection charged nothing");
             Assert.That(host.Entities.IsValid(builder), Is.True);
         }
@@ -224,28 +227,28 @@ namespace Nova.SimRunner.Tests
         {
             var host = ProdHost.Create(Seed);
             host.SpawnStartState(0, 4, 4);
-            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 5, 20, 20);
+            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint barracksRaw = UnitCommandStateView.ToRawEntityId(barracks);
 
-            // T2 gated: AntiArmorInfantry (def 4) before the ResearchLab.
-            host.Submit(new QueueUnitPayload(barracksRaw, 4, 1));
+            // T2 gated: AntiArmorInfantry (def 13) before the ResearchLab.
+            host.Submit(new QueueUnitPayload(barracksRaw, 13, 1));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
             Assert.That(host.Production.TotalQueuedUnits, Is.EqualTo(0));
 
-            // T1 works: BasicInfantry (def 3).
-            host.Submit(new QueueUnitPayload(barracksRaw, 3, 2));
+            // T1 works: BasicInfantry (def 12).
+            host.Submit(new QueueUnitPayload(barracksRaw, 12, 2));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
-            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(800L));
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(760L));
             Assert.That(host.Production.TotalQueuedUnits, Is.EqualTo(2));
 
             // After the ResearchLab the same T2 command applies.
-            Assert.That(host.Construction.PlaceCompletedBuilding(0, 7, 30, 30).IsValid, Is.True);
-            host.Submit(new QueueUnitPayload(barracksRaw, 4, 1));
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 9, 30, 30).IsValid, Is.True);
+            host.Submit(new QueueUnitPayload(barracksRaw, 13, 1));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
-            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(500L));
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(510L));
         }
 
         [Test]
@@ -253,18 +256,23 @@ namespace Nova.SimRunner.Tests
         {
             var host = ProdHost.Create(Seed);
             EntityId builder = host.SpawnStartState(0, 4, 4);
+            // The start grid (30 provided, 20 required) cannot power the
+            // Barracks' 15 — the Alliance builds its Power plant first
+            // (Buildings.md); placed completed here, the test is about the
+            // build/queue/spawn loop, not the power rule.
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
             host.StepTick(); // commit the start balance
 
             // The auto-assigned fixture builder walks nowhere in this test —
             // teleport it into reach of the site (movement is not under test).
-            host.Submit(new PlaceBuildingPayload(5, 20, 20));
+            host.Submit(new PlaceBuildingPayload(7, 20, 20));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
             host.Entities.GetUnitRef(builder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
 
             for (int i = 0; i < 250; i++) host.StepTick();
             Assert.That(host.CountRole(0, UnitRole.Barracks), Is.EqualTo(1),
-                "the Barracks completes after 250 full-power ticks and becomes a role entity");
+                "the Barracks completes (180 full-power ticks, Buildings.md) and becomes a role entity");
 
             uint barracksRaw = 0;
             UnitState[] units = host.Entities.RawUnits;
@@ -278,10 +286,10 @@ namespace Nova.SimRunner.Tests
 
             // Rally point east of the building, then one infantry.
             host.Submit(new SetRallyPointPayload(barracksRaw, SimFixed.FromInt(30), SimFixed.FromInt(30)));
-            host.Submit(new QueueUnitPayload(barracksRaw, 3, 1));
+            host.Submit(new QueueUnitPayload(barracksRaw, 12, 1));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[1].Code, Is.EqualTo(CommandResultCode.Applied));
-            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(400L), "1000 - 500 - 100");
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(380L), "1000 - 500 - 120");
 
             for (int i = 0; i < 100; i++) host.StepTick();
             Assert.That(host.CountRole(0, UnitRole.BasicInfantry), Is.EqualTo(1));
@@ -297,6 +305,8 @@ namespace Nova.SimRunner.Tests
             var hostB = ProdHost.Create(Seed);
             EntityId builderA = hostA.SpawnStartState(0, 4, 4);
             EntityId builderB = hostB.SpawnStartState(0, 4, 4);
+            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
+            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
             hostA.StepTick(); // commit the start balance on both kernels
             hostB.StepTick();
 
@@ -304,8 +314,8 @@ namespace Nova.SimRunner.Tests
             {
                 if (tick == 1)
                 {
-                    hostA.Submit(new PlaceBuildingPayload(5, 20, 20));
-                    hostB.Submit(new PlaceBuildingPayload(5, 20, 20));
+                    hostA.Submit(new PlaceBuildingPayload(7, 20, 20));
+                    hostB.Submit(new PlaceBuildingPayload(7, 20, 20));
                     // Identical direct setup mutation on both hosts: the
                     // builder stands in reach of the site from tick 1 on.
                     hostA.Entities.GetUnitRef(builderA).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
@@ -316,8 +326,8 @@ namespace Nova.SimRunner.Tests
                     uint rawA = BarracksRaw(hostA);
                     uint rawB = BarracksRaw(hostB);
                     Assert.That(rawA, Is.EqualTo(rawB), "identical entity assignment on both kernels");
-                    hostA.Submit(new QueueUnitPayload(rawA, 3, 2));
-                    hostB.Submit(new QueueUnitPayload(rawB, 3, 2));
+                    hostA.Submit(new QueueUnitPayload(rawA, 12, 2));
+                    hostB.Submit(new QueueUnitPayload(rawB, 12, 2));
                 }
                 if (tick == 262)
                 {
@@ -355,17 +365,17 @@ namespace Nova.SimRunner.Tests
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.EqualTo(hostA.Kernel.CalculateStateHash()));
 
             // A new placement moves the hash (block 105 is hash-covered).
-            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 2, 20, 20).IsValid, Is.True);
+            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 5, 20, 20).IsValid, Is.True);
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.Not.EqualTo(hostA.Kernel.CalculateStateHash()));
 
-            hostA.Construction.PlaceCompletedBuilding(0, 2, 20, 20);
+            hostA.Construction.PlaceCompletedBuilding(0, 5, 20, 20);
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.EqualTo(hostA.Kernel.CalculateStateHash()));
 
             // A queued unit moves the hash (block 106 is hash-covered).
-            EntityId barracksA = hostA.Construction.PlaceCompletedBuilding(0, 5, 30, 30);
-            EntityId barracksB = hostB.Construction.PlaceCompletedBuilding(0, 5, 30, 30);
+            EntityId barracksA = hostA.Construction.PlaceCompletedBuilding(0, 7, 30, 30);
+            EntityId barracksB = hostB.Construction.PlaceCompletedBuilding(0, 7, 30, 30);
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.EqualTo(hostA.Kernel.CalculateStateHash()));
-            Assert.That(hostB.Production.TryQueueUnit(0, UnitCommandStateView.ToRawEntityId(barracksB), 3, 1), Is.True);
+            Assert.That(hostB.Production.TryQueueUnit(0, UnitCommandStateView.ToRawEntityId(barracksB), 12, 1), Is.True);
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.Not.EqualTo(hostA.Kernel.CalculateStateHash()));
         }
 
@@ -374,8 +384,10 @@ namespace Nova.SimRunner.Tests
         {
             var hostA = ProdHost.Create(Seed);
             EntityId builder = hostA.SpawnStartState(0, 4, 4);
+            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+                "Power first — the start grid cannot power the Barracks (Buildings.md)");
             hostA.StepTick(); // commit the start balance
-            hostA.Submit(new PlaceBuildingPayload(5, 20, 20));
+            hostA.Submit(new PlaceBuildingPayload(7, 20, 20));
             hostA.StepTick();
             hostA.Entities.GetUnitRef(builder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
             for (int i = 0; i < 100; i++) hostA.StepTick(); // site mid-progress
@@ -400,8 +412,8 @@ namespace Nova.SimRunner.Tests
                     uint rawB = BarracksRaw(hostB);
                     Assert.That(rawA, Is.Not.EqualTo(0u), "the restored site must complete like the live one");
                     Assert.That(rawB, Is.EqualTo(rawA));
-                    hostA.Submit(new QueueUnitPayload(rawA, 3, 1));
-                    hostB.Submit(new QueueUnitPayload(rawB, 3, 1));
+                    hostA.Submit(new QueueUnitPayload(rawA, 12, 1));
+                    hostB.Submit(new QueueUnitPayload(rawB, 12, 1));
                 }
                 hostA.StepTick();
                 hostB.StepTick();
@@ -422,6 +434,8 @@ namespace Nova.SimRunner.Tests
             // (and therefore the playback) starts with the builder already
             // in reach of the future site — replay only replays commands.
             host.Entities.GetUnitRef(builder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+                "Power first — the start grid cannot power the Barracks (Buildings.md)");
             host.StepTick(); // commit the start balance before recording
 
             var slots = new byte[CommandLimits.ReservedPlayerSlots];
@@ -432,6 +446,7 @@ namespace Nova.SimRunner.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
+                new byte[CommandLimits.ReservedPlayerSlots],
                 Seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);
@@ -441,12 +456,12 @@ namespace Nova.SimRunner.Tests
             {
                 if (tick == 1)
                 {
-                    host.Submit(new PlaceBuildingPayload(5, 20, 20));
+                    host.Submit(new PlaceBuildingPayload(7, 20, 20));
                 }
                 if (tick == 260)
                 {
                     uint raw = BarracksRaw(host);
-                    host.Submit(new QueueUnitPayload(raw, 3, 1));
+                    host.Submit(new QueueUnitPayload(raw, 12, 1));
                 }
                 if (tick == 262)
                 {
@@ -477,8 +492,10 @@ namespace Nova.SimRunner.Tests
         {
             var host = ProdHost.Create(Seed);
             host.SpawnStartState(0, 4, 4);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+                "Power first — a low-power grid would double the production time under test");
             host.StepTick(); // commit the start balance
-            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 5, 20, 20);
+            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint barracksRaw = UnitCommandStateView.ToRawEntityId(barracks);
 
             // Off-map rally through the sealed intake: rejected
@@ -491,7 +508,7 @@ namespace Nova.SimRunner.Tests
 
             // Production continues normally: queue applies and the unit
             // spawns at the DEFAULT rally (two cells east of the center).
-            host.Submit(new QueueUnitPayload(barracksRaw, 3, 1));
+            host.Submit(new QueueUnitPayload(barracksRaw, 12, 1));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
             for (int i = 0; i < 100; i++) host.StepTick();

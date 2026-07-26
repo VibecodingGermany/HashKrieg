@@ -1,6 +1,6 @@
 # Scope-Ledger der Graybox-Spur
 
-**Version:** 0.2.0 | **Status:** Entwurf – Register (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.3.0 | **Status:** Entwurf – Register (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -43,9 +43,9 @@ funktionalen Anteil, das genannte Gate den vollständigen Inhalt.
 | `map.id`, `map.biome` | unbenannte flache Ebene ohne Terrain, Biom oder Hindernisse; nur die Kantenlänge stimmt | G4 (G2: technisch korrektes Testlayout) | D-067 K1, K2 |
 | `map.aetheriumFields` | zwei Felder an festen Zellen nahe den Startbasen statt der im Manifest festgelegten Feldliste | G4 (G2) | D-067 K1, K2 |
 | `map.primaryRouteCount` | keine Routenführung; die Ebene ist überall passierbar | G4 (G2) | D-067 K1, K2 |
-| `factions[1]` | keine Fraktionsidentität; beide Slots benutzen dieselbe Definitionstabelle, Slot 1 stellt nur eine Startbasis | G4 | D-067 K1, K2 |
-| `factions[1].identity.harvesterCargoAE` | jeder Harvester benutzt die eine Vorgabe-Ladekapazität aus `UnitState`; im Code als Q-040-Kandidat vermerkt | G4 | D-067 K1, K2 |
-| `factions[0].identity.weaponProfile`, `factions[1].identity.weaponProfile` | Rüstungsklassen und Schadensarten existieren seit D-074 (36-Werte-Matrix, `CombatSystem` löst je Angriff darüber auf), aber weiterhin **keine Fraktionsidentität**: beide Slots teilen eine rollenbasierte Waffentabelle. `precision`/`single-target` (Allianz) ist durch Hitscan ohne Flugzeit zufällig erfüllt, `salvo`/`splash` (Legion) fehlt vollständig – es gibt keine Salven- und keine Flächenwirkung | G4 (G2: Kampf über den normalen Pfad) | D-067 K1, K2 |
+| `factions[1]` | seit dieser Sitzung Simulationswirklichkeit: 34 fraktionsaufgelöste Definitionen (`SimDefinitions`, Id-Regel und Provenienz per D-075), Slot-Fraktion im Economy-Snapshotblock v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Kosten/Bauzeiten/Energie/Waffenwerte, Graybox-Farben aus den D-072-Paletten im `UnitViewManager` und Slot-Fraktionen im Debug-HUD. Verbleibend: das `weaponProfile` der Identität (eigene Zeile) und der untätige KI-Slot (eigene Zeile). Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
+| `factions[1].identity.harvesterCargoAE` | seit dieser Sitzung im Code erfüllt: die Kapazität lebt in der Harvester-Definitionszeile (`SimUnitDefinition.CargoCapacityAE`), das `EconomySystem` klammert die Ernte fraktionsaufgelöst; die Entity-Store-Snapshotvalidierung deckelt auf das fraktionsübergreifende Maximum und bietet die pro-Entity-Fraktionsgrenze als Überladung. Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
+| `factions[0].identity.weaponProfile`, `factions[1].identity.weaponProfile` | Waffentabelle ist seit dieser Sitzung fraktionsaufgelöst (34 Definitionen, `WeaponProfiles` je Fraktion und Rolle, konkrete Vehicles.md-Schadenswerte der drei Legion-Kampffahrzeuge per D-075); `precision`/`single-target` (Allianz) ist durch Hitscan ohne Flugzeit zufällig erfüllt, `salvo`/`splash` (Legion) fehlt weiterhin vollständig — es gibt keine Salven- und keine Flächenwirkung. **Bewusster Konflikt, nicht implementiert** (Splash/Projektile sind nicht Teil dieses Strangs) | G4 (G2: Kampf über den normalen Pfad) | D-067 K1, K2 |
 | `mode.aiSlotCount` | Slot 1 erhält keine Befehle und bleibt untätig; die Ingress stempelt nur den lokalen Slot | G3 | D-067 K1, K2 |
 | `victory.evaluationPoint`, `victory.validResultCodes`, `victory.timeLimitTicks` | seit dieser Sitzung in der Simulation erfüllt (`VictorySystem`, achtes und letztes System, alle drei Ergebniscodes, Tick 27.000, Snapshotblock 107). Offen bleibt die **Auswertung außerhalb der Simulation**: der Host tickt nach der Entscheidung unverändert weiter, es gibt keinen Ergebnisbildschirm, und das Ergebnis erscheint nur als Zeile im Debug-HUD. Kein Gate-Nachweis – die Zeile bleibt bis zur auflösenden Evidence stehen | G2 | D-067 K1, K2 |
 | `victory.lastUnitReveal.visibleAndTargetable` | der 600-Tick-Zähler nach D-056 ist implementiert, serialisiert und korrekt (`VictorySystem.IsRevealed`), aber **nichts konsumiert ihn**: die enthüllten Einheiten werden weder sichtbar noch zielbar, weil dafür `FogOfWarSystem` (Maskenüberschreibung) und/oder die Zielerfassung des `CombatSystem` das Flag lesen müssten | G2 | D-067 K1, K2 |
@@ -65,12 +65,13 @@ funktionalen Anteil, das genannte Gate den vollständigen Inhalt.
 ### Anhang: Verschiebungen ohne Manifest-Schlüsselpfad (D-074)
 
 Das Manifest modelliert Schadensarten und Panzerungsklassen **nicht** – es
-kennt nur Rollen und Fraktionen. Die folgenden Verschiebungen entstehen deshalb
-aus [`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) über D-074
-und können auf keinen Schlüsselpfad zeigen. Sie stehen getrennt, damit die
-„Zeigen statt kopieren"-Regel des Hauptregisters unangetastet bleibt. Die
-Spalte „Quelle" nennt das führende Fachdokument an Stelle des Schlüsselpfads;
-Werte stehen auch hier nicht.
+kennt nur Rollen und Fraktionen. Die folgenden Verschiebungen können deshalb
+auf keinen Schlüsselpfad zeigen: sie entstehen aus den Fachdokumenten, aus
+[`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) über D-074
+sowie aus den Einheiten- und Waffentabellen über D-047/D-075. Sie stehen
+getrennt, damit die „Zeigen statt kopieren"-Regel des Hauptregisters
+unangetastet bleibt. Die Spalte „Quelle" nennt das führende Fachdokument an
+Stelle des Schlüsselpfads; Werte stehen auch hier nicht.
 
 | Gegenstand | Quelle | Substitut / Stand | Rückkehr-Gate | D-ID |
 |---|---|---|---|---|
@@ -78,6 +79,9 @@ Werte stehen auch hier nicht.
 | Panzerungsklasse `Heavy` | [`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) | Spalte ist vollständig implementiert, hat aber **keinen Träger in MS-1**: ArmorSystem.md ordnet Leichten und Kampfpanzer beide `Medium` zu und reserviert `Heavy` für den Heavy Tank, der nicht im MS-1-Roster steht. Die Spalte wird in keinem Match ausgewertet | Post-MVP (mit dem Heavy Tank / Eliten) | D-074 |
 | Panzerungsklasse `Air` | [`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) | Spalte implementiert, kein Träger: MS-1 hat kein Luftroster und keine Zielklassen-Trennung Boden/Luft | Post-MVP (mit [`../gamedesign/Aircraft.md`](../gamedesign/Aircraft.md)) | D-074 |
 | Schadensarten Feuer, Bio, Strahlung | [`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) | drei der sechs Matrixzeilen sind implementiert, aber unbespielt: das MS-1-Roster führt ausschließlich Kinetisch und Explosiv. Bewusst mitgeführt statt herausgeschnitten – ein späteres Nachschneiden der Tabelle wäre teuer, das Mitführen kostet nichts | Post-MVP | D-074 |
+| Tempo-Umrechnung m/s ↔ m/tick | [`../gamedesign/Vehicles.md`](../gamedesign/Vehicles.md), [`../gamedesign/Infantry.md`](../gamedesign/Infantry.md) (m/s-Tabellen) | die GDDs führen Tempo in m/s, die Simulation rechnet m/tick; die Umrechnung ist unratifiziert, deshalb tragen beide Fraktionen die provisorischen m/tick-Bestandswerte — die Fraktionsachse (D-075) differenziert Tempo bewusst nicht | G4 | offen (keine D-ID) |
+| Harvester-Panzerungsklasse | [`../gamedesign/Vehicles.md`](../gamedesign/Vehicles.md) (Fahrzeugtabelle) vs. [`../gamedesign/ArmorSystem.md`](../gamedesign/ArmorSystem.md) | die Fahrzeugtabelle stuft den Harvester höher ein als die Simulation (`ArmorClass.Light`); ArmorSystem.md nennt den Harvester gar nicht. Konflikt registriert, nicht entschieden | G4 | D-074 (Autorität), Zuordnung offen |
+| Allianz-Schadenstyp der Fahrzeugwaffen | [`../gamedesign/Vehicles.md`](../gamedesign/Vehicles.md) / [`../gamedesign/Infantry.md`](../gamedesign/Infantry.md) (Tabellen nennen Energie) vs. [`../gamedesign/Weapons.md`](../gamedesign/Weapons.md) | die Simulation führt die Allianz-Fahrzeugwaffen als Kinetisch — Weapons.md ist per D-047 führend für Waffenwerte und gewinnt derzeit; die Energie-Zeilen der Einheitentabellen stehen als registrierter Konflikt | G4 | D-047 |
 
 Bewusst **nicht** registriert: die Post-MVP-Anteile von
 [`../gamedesign/VictoryConditions.md`](../gamedesign/VictoryConditions.md)
@@ -118,3 +122,4 @@ außerhalb davon. Dieses Register führt nur Rückstände gegenüber MS-1.
 |---|---|---|---|
 | 0.1.0 | 2026-07-26 | Erstfassung mit 21 Registerzeilen aus Sitzung GB-001 | Technical Writer |
 | 0.2.0 | 2026-07-26 | Sitzung GB-002: Zeile `victory.lastUnitReveal.visibleAndTargetable` ergänzt; die Zeilen zu `victory.*` und `weaponProfile` auf den durch Kampf- und Siegsystem veränderten Stand fortgeschrieben (nicht entfernt – es gibt keinen auflösenden Gate-Nachweis); Anhang mit vier Zeilen ohne Manifest-Schlüsselpfad aus D-074 („Kristall", `Heavy`, `Air`, Feuer/Bio/Strahlung) | Technical Writer |
+| 0.3.0 | 2026-07-26 | Fraktions-Sitzung: Zeilen `factions[1]`, `factions[1].identity.harvesterCargoAE` und `weaponProfile` auf den Stand der Fraktions-Achse (D-075) fortgeschrieben — Cargo und Waffentabelle sind implementiert, `salvo`/`splash` bleibt als bewusster Konflikt registriert; drei Anhang-Zeilen ergänzt (Tempo-Umrechnung m/s ↔ m/tick, Harvester-Panzerungsklasse Vehicles vs. Simulationszuordnung, Allianz-Schadenstyp Energie vs. Kinetisch — D-047 gewinnt derzeit); Anhang-Einleitung über D-074 hinaus auf D-047/D-075 verbreitert | Technical Writer |

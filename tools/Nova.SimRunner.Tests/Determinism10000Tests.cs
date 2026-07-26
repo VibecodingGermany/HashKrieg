@@ -4,7 +4,9 @@ using System.IO;
 using System.Text.Json;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Replays;
+using Nova.Simulation.State;
 using Nova.SimRunner;
 using NUnit.Framework;
 
@@ -109,6 +111,22 @@ namespace Nova.SimRunner.Tests
                 { CommandKind.Harvest, CommandKind.Move, CommandKind.AttackTarget, CommandKind.PlaceBuilding }),
                 "the opening window already drives economy, movement, combat and construction");
             Assert.That(applied, Is.GreaterThan(0), "the stream carries applied commands, not only rejections");
+        }
+
+        [Test]
+        public void ShortRun_Fingerprint_BindsTheRealDefinitionsHash_AndFactionAssignment()
+        {
+            byte[] replayBytes = Determinism10000Scenario.GenerateReplay(
+                ShortOptions(), NullNovaLogger.Instance, out _, out _);
+            Assert.That(ReplayFile.TryParse(replayBytes, out ReplayFile replay, out ReplayReadError readError),
+                Is.True, () => $"parse failed: {readError}");
+
+            Assert.That(replay.Fingerprint.DefinitionsHash64, Is.EqualTo(SimDefinitions.ComputeDefinitionsHash64()),
+                "the scenario fingerprint binds the canonical 34-row table, not the retired stub");
+            Assert.That(replay.Fingerprint.DefinitionsHash64,
+                Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions)));
+            Assert.That(replay.Fingerprint.GetSlotFaction(0), Is.EqualTo(FactionId.Alliance));
+            Assert.That(replay.Fingerprint.GetSlotFaction(1), Is.EqualTo(FactionId.Legion));
         }
 
         // ----------------------------------------------------------

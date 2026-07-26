@@ -25,9 +25,9 @@ namespace Nova.Simulation.Economy
     /// Phase 2 (economy and power): provided/required are recomputed from
     /// the living building-role entities in strict ascending entity-index
     /// order. The per-role power figures come from the canonical definition
-    /// table <see cref="Definitions.SimDefinitions"/> (provisional Q-040
-    /// values, not ratified balancing): HQ provides 30, a Power plant
-    /// provides 100, a Refinery requires 20; mobile roles draw nothing.
+    /// table <see cref="Definitions.SimDefinitions"/>, resolved through the
+    /// owner slot's faction (Buildings.md section 2: an Alliance Power plant
+    /// provides 100, a Legion one 80; the HQ provides 30 for both).
     /// Buildings-as-role-entities is the documented minimal building model
     /// of this slice; construction output becomes a building-role entity on
     /// completion (construction domain, phase 4).
@@ -77,25 +77,35 @@ namespace Nova.Simulation.Economy
     /// <para>
     /// Scope (G2 reservation, D-010): fields are finite and never regrow,
     /// spread or take overharvest damage; there is no mother node and no
-    /// depletion warning. Faction differences are not modeled: every
-    /// harvester uses <see cref="UnitState.DefaultCargoCapacityAE"/> (330;
-    /// the Legion value 300 of quality/content/mvp-v1.json awaits the
-    /// faction slice — Q-040 candidate).
+    /// depletion warning. The slot faction (<see cref="PlayerEconomyState.Faction"/>)
+    /// IS modeled — it selects the definition row behind every cost, build
+    /// time, power figure and weapon profile, AND the harvester cargo
+    /// capacity: gathering clamps at the owner faction's
+    /// <see cref="Definitions.SimUnitDefinition.CargoCapacityAE"/> (Allianz
+    /// 330, Legion 300 — quality/content/mvp-v1.json
+    /// factions[i].identity.harvesterCargoAE).
     /// </para>
     /// <para>
-    /// State (snapshot block <see cref="SnapshotBlockIds.Economy"/>, v1):
-    /// per slot credits/provided/required plus every field's id, position and
-    /// remaining reserve. Cargo and harvest orders live with the entities
+    /// State (snapshot block <see cref="SnapshotBlockIds.Economy"/>, v2):
+    /// per slot credits/provided/required plus the slot faction, plus every
+    /// field's id, position and remaining reserve. Cargo and harvest orders
+    /// live with the entities
     /// (entity store block, v4) — exactly one home per value, nothing
     /// duplicated. Hash-sensitive by construction; restore is two-phase and
-    /// validates credits &gt;= 0, reserves &gt;= 0 and unique nonzero field
+    /// validates credits &gt;= 0, reserves &gt;= 0, declared faction values
+    /// and unique nonzero field
     /// ids (entity-side cargo bounds are validated by the entity store).
     /// </para>
     /// </summary>
-    public sealed class EconomySystem : IStatefulSimSystem
+    public sealed class EconomySystem : IStatefulSimSystem, ISlotFactionLookup
     {
-        /// <summary>Serialization version of the economy snapshot block.</summary>
-        public const byte StateVersion = 1;
+        /// <summary>
+        /// Serialization version of the economy snapshot block. v2 adds the
+        /// per-slot <see cref="FactionId"/> byte (faction identity slice);
+        /// v1 blocks are rejected, not migrated — the pre-G1 format reset is
+        /// deliberate and free of evidence.
+        /// </summary>
+        public const byte StateVersion = 2;
 
         /// <summary>Player slots (D-058 reserves eight; MS-1 activates two).</summary>
         public const int MaxPlayers = 8;
@@ -106,10 +116,25 @@ namespace Nova.Simulation.Economy
         /// <summary>Provisional harvest rate in AE per tick per harvester (Q-040 candidate).</summary>
         public const int HarvestRateAE = 2;
 
+        /// <summary>
+        /// Faction-resolved harvester cargo capacities, indexed by raw
+        /// <see cref="FactionId"/> and resolved once from
+        /// <see cref="Definitions.SimDefinitions"/>: the tick path never
+        /// re-scans the definition table, and a slot's faction cannot change
+        /// after kernel start (the <see cref="SetSlotFaction"/> guard), so a
+        /// static cache cannot go stale.
+        /// </summary>
+        private static readonly int[] CargoCapacityByFaction =
+        {
+            Definitions.SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance),
+            Definitions.SimDefinitions.HarvesterCargoCapacityAE(FactionId.Legion),
+        };
+
         private readonly EntityManager _entityManager;
         private readonly PlayerEconomyState[] _players;
         private readonly AetheriumField[] _fields;
         private int _fieldCount;
+        private SimulationKernel _kernel;
 
         public string Name => "EconomySystem";
 
@@ -131,6 +156,7 @@ namespace Nova.Simulation.Economy
 
         public void Initialize(SimulationKernel kernel)
         {
+            _kernel = kernel;
             kernel?.Logger.LogInfo(
                 $"[{Name}] Initialized canonical economy ({MaxPlayers} slots, harvest rate {HarvestRateAE} AE/tick).");
         }
@@ -184,6 +210,60 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
+        /// The faction one slot plays (economy block v2). Part of the hashed
+        /// state, so every consumer of faction-differentiated content —
+        /// power figures, build costs, weapon profiles — reads it here rather
+        /// than carrying a second copy.
+        /// </summary>
+        public FactionId GetSlotFaction(byte playerId)
+        {
+            if (playerId >= MaxPlayers)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playerId), $"PlayerId must be between 0 and {MaxPlayers - 1}.");
+            }
+            return _players[playerId].Faction;
+        }
+
+        /// <summary>
+        /// Assigns a slot's faction at match setup (host content wiring, same
+        /// contract as <see cref="TryAddField"/>): call before the first tick,
+        /// so the faction is bound into the hashed initial state and the match
+        /// fingerprint. Values outside the declared <see cref="FactionId"/>
+        /// range are rejected.
+        /// <para>
+        /// GUARD: once this system is registered with a kernel, the
+        /// assignment is legal only while that kernel has never started —
+        /// <c>CurrentTick == Tick.Zero &amp;&amp; !IsRunning</c>. A faction
+        /// change after <c>Start()</c> would rewrite hashed state the match
+        /// fingerprint was already computed from (and combat/economy have
+        /// already resolved against), so it throws
+        /// <see cref="InvalidOperationException"/> and leaves the state
+        /// untouched. An economy that was never registered with a kernel has
+        /// no tick stream to protect and is therefore unguarded (isolated
+        /// test harnesses drive it directly).
+        /// </para>
+        /// </summary>
+        public void SetSlotFaction(byte playerId, FactionId faction)
+        {
+            if (playerId >= MaxPlayers)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playerId), $"PlayerId must be between 0 and {MaxPlayers - 1}.");
+            }
+            if (faction != FactionId.Alliance && faction != FactionId.Legion)
+            {
+                throw new ArgumentOutOfRangeException(nameof(faction), faction, "unknown faction");
+            }
+            if (_kernel != null && (_kernel.IsRunning || _kernel.CurrentTick != Tick.Zero))
+            {
+                throw new InvalidOperationException(
+                    $"[{Name}] SetSlotFaction is legal only before Kernel.Start() " +
+                    $"(CurrentTick {_kernel.CurrentTick}, IsRunning {_kernel.IsRunning}): the faction " +
+                    "is part of the hashed initial state and the match fingerprint.");
+            }
+            _players[playerId].Faction = faction;
+        }
+
+        /// <summary>
         /// Phases 2 and 3 of the canonical tick (SimulationCore.md section
         /// 2): power recompute, then the harvest cycle — both in strict
         /// ascending entity-index order, before movement runs (registration
@@ -201,10 +281,12 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Phase 2: provided/required per slot from the living building-role
-        /// entities (ascending index; provisional values, see class remarks).
-        /// The power figures come from the canonical definition table
-        /// (<see cref="Definitions.SimDefinitions"/>); mobile roles and
-        /// construction sites (role <see cref="UnitRole.Unit"/>) draw nothing.
+        /// entities (ascending index). The power figures come from the
+        /// canonical definition table (<see cref="Definitions.SimDefinitions"/>)
+        /// and are FACTION-RESOLVED: the entity's owner slot selects the row
+        /// (a Legion Schwerer Generator feeds 80, an Alliance Fusionsreaktor
+        /// 100). Mobile roles and construction sites (role
+        /// <see cref="UnitRole.Unit"/>) draw nothing.
         /// </summary>
         private void RecomputePower()
         {
@@ -221,7 +303,8 @@ namespace Nova.Simulation.Economy
                 ref readonly UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.PlayerId >= MaxPlayers) continue;
 
-                if (Definitions.SimDefinitions.TryGetBuilding(unit.Role, out Definitions.SimBuildingDefinition building))
+                if (Definitions.SimDefinitions.TryGetBuilding(
+                        _players[unit.PlayerId].Faction, unit.Role, out Definitions.SimBuildingDefinition building))
                 {
                     _players[unit.PlayerId].PowerProvided += building.PowerProvided;
                     _players[unit.PlayerId].PowerRequired += building.PowerRequired;
@@ -243,7 +326,10 @@ namespace Nova.Simulation.Economy
             for (int i = 0; i < capacity; i++)
             {
                 ref UnitState unit = ref units[i];
-                if (!unit.IsActive || unit.Role != UnitRole.Harvester) continue;
+                // PlayerId bounds: the cargo ceiling and the deposit both
+                // index the per-slot state, so an out-of-range owner harvests
+                // nothing (same guard as RecomputePower).
+                if (!unit.IsActive || unit.Role != UnitRole.Harvester || unit.PlayerId >= MaxPlayers) continue;
 
                 // The return leg wins the dispatch: during an auto-cycle the
                 // harvester carries BOTH a returning flag and its retained
@@ -287,7 +373,10 @@ namespace Nova.Simulation.Economy
 
             if (!IsInReach(in unit, field.GridPos)) return; // held, not dropped
 
-            long freeCargo = UnitState.DefaultCargoCapacityAE - unit.CargoAE;
+            // The cargo ceiling is the OWNER FACTION's, not a flat constant:
+            // an Alliance harvester loads 330, a Legion one 300.
+            int cargoCapacity = CargoCapacityByFaction[(int)_players[unit.PlayerId].Faction];
+            long freeCargo = cargoCapacity - unit.CargoAE;
             long gathered = Math.Min(HarvestRateAE, Math.Min(field.RemainingAE, freeCargo));
             if (gathered <= 0)
             {
@@ -301,7 +390,7 @@ namespace Nova.Simulation.Economy
             unit.CargoAE += (int)gathered;
             field.RemainingAE -= gathered;
 
-            if (unit.CargoAE >= UnitState.DefaultCargoCapacityAE)
+            if (unit.CargoAE >= cargoCapacity)
             {
                 // Full cargo: return first, then auto-resume THIS field. The
                 // retained field id is the entire auto-cycle mechanism — it
@@ -387,12 +476,14 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
-        /// Block content v1: version, then per slot (ascending) credits
-        /// int64, power provided/required int32, then the field count and per
-        /// field (ascending registration order) id uint16, grid x/y uint16
-        /// and remaining reserve int64. Hash-sensitive by construction: any
-        /// credit, power or reserve change moves the block bytes and
-        /// therefore the canonical state hash.
+        /// Block content v2: version, then per slot (ascending) credits
+        /// int64, power provided/required int32 and the faction uint8, then
+        /// the field count and per field (ascending registration order) id
+        /// uint16, grid x/y uint16 and remaining reserve int64. Hash-sensitive
+        /// by construction: any credit, power, faction or reserve change moves
+        /// the block bytes and therefore the canonical state hash — the
+        /// faction assignment is part of the initial state hash by exactly
+        /// this mechanism.
         /// </summary>
         public void WriteState(SnapshotBlockWriter writer)
         {
@@ -402,6 +493,7 @@ namespace Nova.Simulation.Economy
                 writer.WriteInt64(_players[p].AetheriumCredits);
                 writer.WriteInt32(_players[p].PowerProvided);
                 writer.WriteInt32(_players[p].PowerRequired);
+                writer.WriteUInt8((byte)_players[p].Faction);
             }
             writer.WriteUInt16(unchecked((ushort)_fieldCount));
             for (int i = 0; i < _fieldCount; i++)
@@ -444,7 +536,8 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Parses and fully validates block content — exact lengths, slot
-        /// invariants (credits &gt;= 0, power values &gt;= 0) and field
+        /// invariants (credits &gt;= 0, power values &gt;= 0, faction a
+        /// declared <see cref="FactionId"/>) and field
         /// invariants (nonzero unique ids, valid positions, reserves
         /// &gt;= 0) — into a commit-ready intermediate. Never mutates this
         /// system.
@@ -461,7 +554,8 @@ namespace Nova.Simulation.Economy
                 if (!reader.TryReadInt64(out long credits) || credits < 0) return false;
                 if (!reader.TryReadInt32(out int provided) || provided < 0) return false;
                 if (!reader.TryReadInt32(out int required) || required < 0) return false;
-                players[p] = new PlayerEconomyState((byte)p, credits)
+                if (!reader.TryReadUInt8(out byte factionRaw) || factionRaw > (byte)FactionId.Legion) return false;
+                players[p] = new PlayerEconomyState((byte)p, credits, (FactionId)factionRaw)
                 {
                     PowerProvided = provided,
                     PowerRequired = required,

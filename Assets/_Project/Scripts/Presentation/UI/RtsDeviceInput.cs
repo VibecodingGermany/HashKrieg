@@ -48,15 +48,15 @@ namespace Nova.Presentation.UI
         [Tooltip("Click-select radius in world units (= cells).")]
         [SerializeField] private float _pickRadiusWorld = 1.5f;
 
-        [Header("Definition ids (verified against SimDefinitions)")]
-        [Tooltip("B: Power — defId 2, 300 AE, prerequisite-free.")]
-        [SerializeField] private ushort _buildingDefId = 2;
-        [Tooltip("Shift+B: Barracks — defId 5, 500 AE, prerequisite-free.")]
-        [SerializeField] private ushort _altBuildingDefId = 5;
-        [Tooltip("Q: Harvester — defId 2, tier 1, produced by the HQ that exists from tick 0.")]
+        [Header("Definition ids (verified against SimDefinitions; local slot 0 plays Alliance)")]
+        [Tooltip("B: Power — Alliance defId 5, 450 AE, prerequisite-free.")]
+        [SerializeField] private ushort _buildingDefId = 5;
+        [Tooltip("Shift+B: Barracks — Alliance defId 7, 500 AE, prerequisite-free.")]
+        [SerializeField] private ushort _altBuildingDefId = 7;
+        [Tooltip("Q: Harvester — Alliance defId 2, tier 1, produced by the HQ that exists from tick 0.")]
         [SerializeField] private ushort _unitDefId = 2;
-        [Tooltip("Shift+Q: BasicInfantry — defId 3, tier 1, produced by a Barracks you build with Shift+B.")]
-        [SerializeField] private ushort _altUnitDefId = 3;
+        [Tooltip("Shift+Q: BasicInfantry — Alliance defId 12, tier 1, produced by a Barracks you build with Shift+B.")]
+        [SerializeField] private ushort _altUnitDefId = 12;
 
         private readonly SelectionManager _selection = new SelectionManager();
         private RtsIntentDispatcher _dispatcher;

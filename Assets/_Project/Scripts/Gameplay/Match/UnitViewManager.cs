@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 using EntityId = Nova.Core.EntityId;
@@ -26,11 +27,12 @@ namespace Nova.Gameplay.Match
     /// </para>
     /// <para>
     /// Graybox readability: shape encodes the <see cref="UnitRole"/> and colour
-    /// encodes the owning player slot. Both channels carry the same distinction
-    /// twice, which is the shape/colour redundancy the accessibility baseline
-    /// requires; it is intentionally a switch plus a two-entry colour array and
-    /// no asset, registry or material, so it deletes in one commit once real
-    /// art lands.
+    /// encodes the owning slot's FACTION (<see cref="FactionTint"/>, D-072
+    /// palettes) — no longer the raw player slot. Both channels still carry
+    /// the distinction twice, which is the shape/colour redundancy the
+    /// accessibility baseline requires; it is intentionally a switch plus two
+    /// colour constants and no asset, registry or material, so it deletes in
+    /// one commit once real art lands.
     /// </para>
     /// <para>
     /// Health readout: brightness of that same tint carries the health
@@ -63,9 +65,6 @@ namespace Nova.Gameplay.Match
         /// <summary>Render height of a prefab view; the prefab owns its own pivot and scale.</summary>
         private const float PrefabGroundOffset = 0.5f;
 
-        private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
-        private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
-
         [Header("References")]
         [SerializeField] private MatchRunner _matchRunner;
         [SerializeField] private GameObject _unitPrefab;
@@ -75,16 +74,8 @@ namespace Nova.Gameplay.Match
         [Tooltip("Team slot whose committed Fog-of-War view is rendered. -1 follows MatchRunner.Session.LocalSlot.")]
         [SerializeField] private int _viewerTeamOverride = -1;
 
-        [Header("Graybox Player Colours")]
-        [Tooltip("Tint per owning player slot. Index 0 is the local MS-1 slot, index 1 the opponent.")]
-        [SerializeField]
-        private Color[] _playerColors =
-        {
-            new Color(0.20f, 0.55f, 0.95f, 1f),
-            new Color(0.95f, 0.35f, 0.15f, 1f)
-        };
-
-        [Tooltip("Tint for owners outside the configured colour array.")]
+        [Header("Graybox Faction Colours")]
+        [Tooltip("Tint for owners whose faction cannot be resolved (no economy on the runner or a slot outside the declared range).")]
         [SerializeField] private Color _unknownPlayerColor = new Color(0.62f, 0.62f, 0.62f, 1f);
 
         [Header("Graybox Health Readout")]
@@ -471,8 +462,7 @@ namespace Nova.Gameplay.Match
             // Built-in RP reads _Color, URP/HDRP read _BaseColor. Setting both
             // keeps the graybox tinted through the pipeline migration instead
             // of falling back to magenta / untinted white.
-            _propertyBlock.SetColor(ColorPropertyId, color);
-            _propertyBlock.SetColor(BaseColorPropertyId, color);
+            FactionTint.ApplyToPropertyBlock(_propertyBlock, color);
             renderer.SetPropertyBlock(_propertyBlock);
         }
 
@@ -486,7 +476,7 @@ namespace Nova.Gameplay.Match
         /// </summary>
         private Color TintFor(byte playerId, int healthStep)
         {
-            Color owner = ColorForPlayer(playerId);
+            Color owner = ColorForOwner(playerId);
             if (healthStep >= HealthTintSteps) return owner;
 
             float fraction = (float)healthStep / HealthTintSteps;
@@ -512,11 +502,19 @@ namespace Nova.Gameplay.Match
             return step < 1 ? 1 : step;
         }
 
-        private Color ColorForPlayer(byte playerId)
+        /// <summary>
+        /// Owner colour: the FACTION of the owning slot, read from the
+        /// economy state (the single authoritative faction source — the same
+        /// lookup combat and economy resolve through). Unresolvable owners
+        /// (no economy wired, slot outside the declared range) fall back to
+        /// <see cref="_unknownPlayerColor"/> instead of throwing.
+        /// </summary>
+        private Color ColorForOwner(byte playerId)
         {
-            if (_playerColors != null && playerId < _playerColors.Length)
+            EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
+            if (economy != null && playerId < EconomySystem.MaxPlayers)
             {
-                return _playerColors[playerId];
+                return FactionTint.BaseColor(economy.GetSlotFaction(playerId));
             }
             return _unknownPlayerColor;
         }

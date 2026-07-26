@@ -57,7 +57,7 @@ namespace Nova.SimRunner.Tests
                 var movement = new MovementSystem(entities, pathfinding);
                 var economy = new EconomySystem(entities);
                 var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, width, height);
-                var combat = new CombatSystem(entities, fogOfWar);
+                var combat = new CombatSystem(entities, fogOfWar, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -265,6 +265,7 @@ namespace Nova.SimRunner.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
+                new byte[CommandLimits.ReservedPlayerSlots],
                 Seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);
@@ -429,6 +430,7 @@ namespace Nova.SimRunner.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
+                new byte[CommandLimits.ReservedPlayerSlots],
                 Seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);

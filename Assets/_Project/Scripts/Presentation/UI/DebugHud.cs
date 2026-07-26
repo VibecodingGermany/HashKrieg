@@ -67,7 +67,7 @@ namespace Nova.Presentation.UI
         /// the two cannot drift. The profiles are immutable static content, so
         /// each role is formatted at most once per component instance.
         /// </summary>
-        private readonly string[] _profileCache = new string[WeaponProfiles.RoleCount];
+        private readonly string[] _profileCache = new string[WeaponProfiles.FactionCount * WeaponProfiles.RoleCount];
 
         private GUIStyle _labelStyle;
         private GUIStyle _outcomeStyle;
@@ -208,8 +208,19 @@ namespace Nova.Presentation.UI
             PlayerEconomyState economy = _runner.Economy.GetPlayerEconomy(slot);
             string power = economy.IsLowPower ? "LOW POWER" : "ok";
             GUILayout.Label(
-                $"Slot {slot}: {economy.AetheriumCredits} AE | power {economy.PowerProvided}/{economy.PowerRequired} ({power})",
+                $"Slot {slot} ({economy.Faction}): {economy.AetheriumCredits} AE | power {economy.PowerProvided}/{economy.PowerRequired} ({power})",
                 _labelStyle);
+
+            // Both slot factions at a glance: with the faction axis live the
+            // same role plays differently per side, so the assignment must be
+            // visible without selecting anything first.
+            _builder.Clear();
+            _builder.Append("Factions:");
+            for (byte s = 0; s < CensusSlots; s++)
+            {
+                _builder.Append("  slot ").Append(s).Append(' ').Append(_runner.Economy.GetSlotFaction(s).ToString());
+            }
+            GUILayout.Label(_builder.ToString(), _labelStyle);
         }
 
         /// <summary>
@@ -288,14 +299,19 @@ namespace Nova.Presentation.UI
                 return;
             }
 
+            FactionId leadFaction = _runner.Economy != null
+                ? _runner.Economy.GetSlotFaction(lead.PlayerId)
+                : FactionId.Alliance;
+
             _builder.Clear();
-            _builder.Append("  lead: ").Append(lead.Role.ToString());
+            _builder.Append("  lead: ").Append(lead.Role.ToString())
+                .Append(" (").Append(leadFaction.ToString()).Append(')');
             if (selected.Length > 1) _builder.Append(" (+").Append(selected.Length - 1).Append(" more selected)");
             _builder.Append("   hp ").Append(lead.CurrentHealth).Append('/').Append(lead.MaxHealth);
             if (lead.WeaponCooldownTicks > 0) _builder.Append("   reloading ").Append(lead.WeaponCooldownTicks).Append('t');
             GUILayout.Label(_builder.ToString(), _labelStyle);
 
-            GUILayout.Label(ProfileTextFor(lead.Role), _labelStyle);
+            GUILayout.Label(ProfileTextFor(leadFaction, lead.Role), _labelStyle);
         }
 
         /// <summary>
@@ -329,19 +345,21 @@ namespace Nova.Presentation.UI
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// Combat profile lines of a role. The profiles are immutable static
-        /// content, so each role is formatted at most once for the lifetime of
-        /// the component instead of once per OnGUI pass. A role outside the
-        /// weapon table is simply uncached — <see cref="BuildProfileText"/>
-        /// still answers it, without indexing past the array.
+        /// Combat profile lines of one faction's role. The profiles are
+        /// immutable static content, so each (faction, role) pair is formatted
+        /// at most once for the lifetime of the component instead of once per
+        /// OnGUI pass. A role outside the weapon table is simply uncached —
+        /// <see cref="BuildProfileText"/> still answers it, without indexing
+        /// past the array.
         /// </summary>
-        private string ProfileTextFor(UnitRole role)
+        private string ProfileTextFor(FactionId faction, UnitRole role)
         {
-            int index = (int)role;
-            bool cacheable = index >= 0 && index < _profileCache.Length;
+            int index = (int)faction * WeaponProfiles.RoleCount + (int)role;
+            bool cacheable = (int)faction >= 0 && (int)faction < WeaponProfiles.FactionCount
+                && index >= 0 && index < _profileCache.Length;
             if (cacheable && _profileCache[index] != null) return _profileCache[index];
 
-            string text = BuildProfileText(role);
+            string text = BuildProfileText(faction, role);
             if (cacheable) _profileCache[index] = text;
             return text;
         }
@@ -370,17 +388,19 @@ namespace Nova.Presentation.UI
         /// 60 kinetic lands as 60 on infantry and 18 on a building.
         /// </para>
         /// </summary>
-        private static string BuildProfileText(UnitRole role)
+        private string BuildProfileText(FactionId faction, UnitRole role)
         {
-            // WeaponProfiles.Get throws on an unknown role by design; a HUD
-            // must never be the thing that throws out of OnGUI.
+            // WeaponProfiles.Get throws on an unknown faction or role by
+            // design; a HUD must never be the thing that throws out of OnGUI.
+            int factionIndex = (int)faction;
             int index = (int)role;
-            if (index < 0 || index >= WeaponProfiles.RoleCount)
+            if (factionIndex < 0 || factionIndex >= WeaponProfiles.FactionCount
+                || index < 0 || index >= WeaponProfiles.RoleCount)
             {
                 return "  profile: role outside the weapon table";
             }
 
-            WeaponProfile profile = WeaponProfiles.Get(role);
+            WeaponProfile profile = WeaponProfiles.Get(faction, role);
 
             // The two-space indent is baked into the cached string so the
             // per-frame path concatenates nothing.

@@ -16,7 +16,7 @@ namespace Nova.AI.Tests
         public void SkirmishAiSystem_ExecutesDecisionLoop_TriggersProduction()
         {
             var entities = new EntityManager(100);
-            var economy = new EconomySystem(entities, startingCredits: 500);
+            var economy = new EconomySystem(entities, startingCredits: 2000);
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
 
@@ -34,7 +34,7 @@ namespace Nova.AI.Tests
             // entities: a completed HQ gives the AI slot exactly the target
             // margin (provisional 30), so the decision loop skips the
             // power-plant branch and goes straight to production.
-            Assert.IsTrue(construction.PlaceCompletedBuilding(1, 1, 30, 30).IsValid, "completed HQ");
+            Assert.IsTrue(construction.PlaceCompletedBuilding(1, 3, 30, 30).IsValid, "completed HQ");
 
             Assert.AreEqual(0, production.TotalQueuedUnits);
 
@@ -45,9 +45,9 @@ namespace Nova.AI.Tests
             }
 
             // The AI queued a Builder (definition id 1) at its HQ through the
-            // canonical production domain; 100 AE were charged at enqueue.
+            // canonical production domain; 800 AE were charged at enqueue.
             Assert.Greater(production.TotalQueuedUnits, 0);
-            Assert.AreEqual(400L, economy.GetPlayerEconomy(1).AetheriumCredits);
+            Assert.AreEqual(1200L, economy.GetPlayerEconomy(1).AetheriumCredits);
         }
     }
 }

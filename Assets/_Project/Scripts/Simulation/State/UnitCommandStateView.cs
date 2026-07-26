@@ -135,14 +135,21 @@ namespace Nova.Simulation.State
         /// full price; InstallDefenseModule stays free until the G2/G4
         /// module slice wires module costs. Unknown definition ids report
         /// true here and fail as RejectedInvalidTarget in the domain check
-        /// (see class remarks). QueueUnit is deliberately NOT consulted by
-        /// the executor — its count-scaled cost is a domain check.
+        /// (see class remarks) — and so do FOREIGN-FACTION ids: the cost
+        /// question is meaningless for content the slot cannot build, so the
+        /// deterministic rejection stays with the domain check. QueueUnit is
+        /// deliberately NOT consulted by the executor — its count-scaled cost
+        /// is a domain check.
         /// </summary>
         public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId)
         {
             if (kind == CommandKind.PlaceBuilding
                 && SimDefinitions.TryGetBuilding(definitionId, out SimBuildingDefinition building))
             {
+                if (building.Faction != _economySystem.GetSlotFaction(playerSlot))
+                {
+                    return true; // foreign faction: the domain check rejects as invalid target
+                }
                 return _economySystem.GetPlayerEconomy(playerSlot).AetheriumCredits >= building.CostAE;
             }
             return true;

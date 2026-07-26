@@ -1,7 +1,9 @@
 using System;
 using NUnit.Framework;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Replays;
+using Nova.Simulation.State;
 
 namespace Nova.SimRunner.Tests
 {
@@ -159,7 +161,7 @@ namespace Nova.SimRunner.Tests
             ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
             MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
                 live.Fingerprint.RulesHash64, live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
-                live.Fingerprint.GetSlotOccupancyCopy(),
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
                 live.Fingerprint.StartSeed + 1,
                 live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
 
@@ -183,7 +185,7 @@ namespace Nova.SimRunner.Tests
             slots[ReplayTestUtil.AiSlot] = (byte)PlayerSlotOccupancy.Human; // AI slot relabeled
             MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
                 live.Fingerprint.RulesHash64, live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
-                slots, live.Fingerprint.StartSeed,
+                slots, live.Fingerprint.GetSlotFactionCopy(), live.Fingerprint.StartSeed,
                 live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
 
             ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
@@ -197,6 +199,69 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void FingerprintMismatch_DifferentSlotFaction_RefusesPlayback()
+        {
+            // The faction assignment is bound into the fingerprint: a replay
+            // recorded Alliance-vs-Legion must refuse to start against a
+            // fingerprint that plays the AI slot as Alliance.
+            ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
+            byte[] factions = live.Fingerprint.GetSlotFactionCopy();
+            factions[ReplayTestUtil.AiSlot] = (byte)FactionId.Alliance;
+            MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
+                live.Fingerprint.RulesHash64, live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), factions, live.Fingerprint.StartSeed,
+                live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
+
+            ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
+            Assert.That(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, foreign, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.False);
+            Assert.That(error, Is.EqualTo(ReplayPlaybackError.FingerprintMismatch));
+            Assert.That(detail, Does.Contain("SlotFaction"));
+        }
+
+        [Test]
+        public void FingerprintMismatch_MutatedDefinitionsTable_RefusesPlayback()
+        {
+            // The definitions content hash is a REAL table hash now: a replay
+            // must refuse to start against a fingerprint whose table differs
+            // by a single weapon value — a changed Legion rifle damage is a
+            // different game.
+            ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
+            var units = SimDefinitions.AllUnits.ToArray();
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i].Faction == FactionId.Legion && units[i].Role == UnitRole.BasicInfantry)
+                {
+                    units[i] = new SimUnitDefinition(
+                        units[i].DefinitionId, units[i].Faction, units[i].Role, units[i].CostAE, units[i].BuildTicks,
+                        units[i].Tier, units[i].ProducerRole, units[i].MaxHealth, units[i].MoveSpeed,
+                        units[i].ArmorClass, units[i].DamageType,
+                        attackDamage: units[i].AttackDamage + 1, units[i].AttackRangeTiles, units[i].AttackCooldownTicks);
+                }
+            }
+            ulong mutatedHash = SimDefinitions.ComputeDefinitionsHash64(SimDefinitions.AllBuildings, units);
+            Assert.That(mutatedHash, Is.Not.EqualTo(SimDefinitions.ComputeDefinitionsHash64()));
+
+            MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
+                live.Fingerprint.RulesHash64, mutatedHash, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
+                live.Fingerprint.StartSeed,
+                live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
+
+            ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
+            Assert.That(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, foreign, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.False);
+            Assert.That(error, Is.EqualTo(ReplayPlaybackError.FingerprintMismatch));
+            Assert.That(detail, Does.Contain("DefinitionsHash64"));
+        }
+
+        [Test]
         public void FingerprintMismatch_DifferentSchemaVersion_RefusesPlayback()
         {
             ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
@@ -206,7 +271,7 @@ namespace Nova.SimRunner.Tests
                 live.Fingerprint.SnapshotSchemaVersion, live.Fingerprint.SidecarSchemaVersion,
                 live.Fingerprint.NumericModelId, live.Fingerprint.TicksPerSecond, live.Fingerprint.PrngId,
                 live.Fingerprint.RulesHash64, live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
-                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.StartSeed,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(), live.Fingerprint.StartSeed,
                 live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
 
             ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
@@ -345,7 +410,7 @@ namespace Nova.SimRunner.Tests
             // A fingerprint/snapshot inconsistency can never be recorded.
             MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
                 fingerprint.RulesHash64, fingerprint.DefinitionsHash64, fingerprint.MapHash64,
-                fingerprint.GetSlotOccupancyCopy(), fingerprint.StartSeed,
+                fingerprint.GetSlotOccupancyCopy(), fingerprint.GetSlotFactionCopy(), fingerprint.StartSeed,
                 fingerprint.InitialStateHash ^ 1, fingerprint.InputDelayTicks);
             Assert.Throws<ArgumentException>(() => new ReplayRecorder(foreign, snapshot));
 

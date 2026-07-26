@@ -18,6 +18,80 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Fraktionswirtschaft und Sichtbarkeit der Fraktionsachse (Paket 3+4 der
+  Fraktions-Sitzung, Diagnosestand, ohne Gate-Status, ohne Evidence):**
+  Erstens ist die Harvester-Ladekapazität kein flaches Provisorium mehr:
+  `UnitState.DefaultCargoCapacityAE` ist als einzige Quelle entfallen, die
+  Kapazität lebt als `SimUnitDefinition.CargoCapacityAE` in der
+  Harvester-Definitionszeile je Fraktion (Allianz 330, Legion 300 —
+  `factions[i].identity.harvesterCargoAE` des Manifests) und ist das 21.
+  Feld des kanonischen Definitions-Hash-Layouts. Das `EconomySystem`
+  klammert die Ernte an der Fraktion des Besitzer-Slots: der
+  Legion-Harvester stoppt bei 300, der Allianz-Harvester bei 330. Die
+  Entity-Store-Snapshotvalidierung deckelt Cargo auf das
+  fraktionsübergreifende Maximum (`MaxHarvesterCargoCapacityAE` = 330),
+  weil ein Block beide Fraktionen enthalten kann; Überladungen mit
+  `ISlotFactionLookup` prüfen zusätzlich die pro-Entity-Fraktionsgrenze
+  (Legion-Cargo 320 wird abgelehnt, Allianz-Cargo 320 nicht) — die
+  kanonische Zwei-Phasen-Wiederherstellung bleibt bewusst auf der
+  Hartgrenze, weil sie zur Validierungszeit keine blockübergreifende
+  Fraktionssicht hat. Zweitens ist die Achse sichtbar: im `UnitViewManager`
+  bestimmt jetzt die **Fraktion** die Farbe (D-072-Grundtöne über den neuen
+  `FactionTint`-Helper, Tint per `MaterialPropertyBlock` mit beiden
+  Properties `_BaseColor` und `_Color` — keine ScriptableObjects, keine
+  Assets, keine Materialien), die Rolle weiterhin die Form; das Debug-HUD
+  zeigt die Fraktion des lokalen Slots, beider Slots und der aktuellen
+  Auswahl. Verifiziert: 406/406 .NET-Tests, 405/405 EditMode-Tests
+  (handgespiegelt; die Farbtests laufen nur EditMode-seitig).
+- **Fraktionsidentität ist Simulationswirklichkeit: Allianz und Legion spielen
+  sich unterschiedlich (Diagnosestand, ohne Gate-Status, ohne Evidence):**
+  `EconomySystem` modellierte bis dahin ausdrücklich „no faction differences" —
+  beide Slots bauten aus derselben flachen Tabelle. Neu ist erstens die
+  Fraktionsachse im Zustand: `FactionId : byte` (`Alliance = 0`, `Legion = 1`,
+  der Wire-Wert IST der Manifestindex in `quality/content/mvp-v1.json`) wird je
+  Spieler-Slot im Economy-Snapshotblock v2 serialisiert (v1 wird im offenen
+  Pre-G1-Formatfenster abgelehnt, nicht migriert), geht als zweites 8-Byte-
+  Slot-Array in den `MatchFingerprint` ein und wird von beiden kanonischen
+  Setup-Pfaden (`MatchBootstrap` wie `Determinism10000Scenario.SetupMatch`)
+  identisch gesetzt — Slot 0 Allianz, Slot 1 Legion —, sodass der
+  InitialStateHash-Paritätstest beider Lanes unverändert grün bleibt. Zweitens
+  trägt `SimDefinitions` jetzt 34 Definitionen (17 Rollen × 2 Fraktionen) mit
+  der dokumentierten Id-Regel: die Allianz-Id IST der `UnitRole`-Wire-Wert
+  (1..17), die Legion-Id addiert 17 (18..34) — jede Id ist global eindeutig,
+  `CommandIds.IsValidDefinitionId` bleibt wire-kompatibel (`!= 0`). Die Werte
+  kommen aus den GDDs (Buildings.md für Kosten/Bauzeit/Energie, Vehicles.md und
+  Infantry.md für Einheiten, Weapons.md führend per D-047 für Waffen): Legion
+  baut billiger und schneller, die Allianz reicht weiter; wo die GDDs keine
+  konkrete Zahl nennen (Gebäude-HP, Fahrzeug-Projektilschaden der Legion),
+  gilt die dokumentierte Integer-Prozent-Ableitung `(allianz × 85) / 100` aus
+  der Allianz-Zeile — keine erfundenen Absolutwerte. Die Power-Bilanz, der
+  Kampf (`WeaponProfiles` ist jetzt fraktions- UND rollenindiziert,
+  `CombatSystem` erhält die Slot-Fraktionen über das neue schmale
+  `ISlotFactionLookup`, implementiert vom `EconomySystem`), die
+  Platzierungs-/Produktionsvalidierung (fremd-fraktionale DefIds werden wie
+  unbekannte als `RejectedInvalidTarget` abgelehnt) und die
+  Produktionskosten sind fraktionsaufgelöst. Drittens ist `DefinitionsHash64`
+  echt: `SimDefinitions.ComputeDefinitionsHash64()` hasht alle 34 Zeilen
+  kanonisch (XXH64, Domäne `NOVA_DEFINITIONS_V1`, aufsteigende Ids, uniformes
+  20-Felder-Layout je Zeile) und ersetzt den bisherigen
+  Leer-Stub im Szenario-Fingerprint — ein Replay mit mutiertem Waffenwert
+  scheitert nachweislich am Fingerprint (Test in beiden Lanes). Das
+  Szenario-Skript baut jetzt GDD-konform zuerst das Kraftwerk (das
+  Startnetz 30/20 kann die Allianz-Kaserne mit 15 Verbrauch nicht versorgen).
+  Bewusst weiterhin flach (dokumentiert, nicht vergessen): Harvester-Ladekapazität
+  330 AE für beide Fraktionen (Legion 300 ist registrierte
+  ScopeLedger-Schuld, Rückkehr-Gate G4), Bewegungsgeschwindigkeiten (GDD-Werte
+  in m/s, Simulationsdomäne m/tick — Umrechnung unratifiziert,
+  ScopeLedger-Kandidat) und die Verteidigungsplattform-Waffe
+  (fraktionsneutrales Modul). Verifiziert: 401/401 .NET-Tests (+19 gegenüber
+  382), 397/397 EditMode-Tests (+18 gegenüber 379, handgespiegelte Lanes),
+  `DETERMINISM_10000`-SelfCheck grün mit erwartbar bewegten Hashes
+  (Checkpoint Tick 100 `0x9A2B01F88C03599D`, finaler Zustandshash
+  `0x309240E5B0EFFE6D`). Nicht enthalten: Salven/Flächenwirkung der
+  Legion (`[salvo, splash]`, ScopeLedger), Evolvierte, jede
+  Docs-Änderung außerhalb dieses Eintrags. `quality/**`,
+  `.github/workflows/**` und `VERSION` blieben unberührt; G0, MS-0 und MS-1
+  bleiben offen.
 - **Kampf ist bewertbar und ein Match kann enden (Diagnosestand, ohne
   Gate-Status, ohne Evidence):** `CombatSystem` wandte bis dahin einen flachen
   Schadenswert von 15 auf jeden Angriff an — ein Kampfpanzer und ein Schütze
@@ -736,6 +810,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Snapshot-Roundtrip + Fortsetzung, Replay-Kompatibilität.
 
 ### Behoben
+- **Review-Nachzügler der Fraktions-Sitzung (P2-1 bis P2-3):** **P2-1** —
+  der Legion-Fahrzeugschaden nutzt jetzt die konkreten
+  [Vehicles.md](docs/gamedesign/Vehicles.md)-Werte (Räuber 28, Koloss 50,
+  Donnerkanone 60) statt der 85-%-Ableitung (die 29/51/93 produzierte);
+  die Ableitung gilt nur noch, wo die GDDs schweigen (Scout, Gebäude-HP),
+  ein Test in beiden Lanes pinnt die drei Konkretwerte ausdrücklich gegen
+  die Ableitungsergebnisse (Teil-Entscheidung in D-075). **P2-2** — der
+  `ComputeDefinitionsHash64`-Kommentar stellt klar, dass `SightRadius`
+  aktuell kein Definitionsfeld ist und eine künftige fraktionsaufgelöste
+  Sichtweite eine neue Feld-Generation im Hash braucht. **P2-3** —
+  `EconomySystem.SetSlotFaction` ist jetzt guard-gesichert: die Zuweisung
+  ist nur zulässig, solange der registrierte Kernel nie gestartet wurde
+  (`CurrentTick == Tick.Zero && !IsRunning`), sonst
+  `InvalidOperationException` bei unverändertem Zustand;
+  `MatchBootstrap` und `Determinism10000Scenario.BuildHost` weisen die
+  Slot-Fraktionen deshalb vor `Kernel.Start()` zu.
 - **G0-B-Build-Nachweis echt gemacht (alle 10 G0-Checks grün):**
   `G0-BUILD-WINDOWS`/`G0-BUILD-MACOS` in `run_gate_check.py` führten bislang
   nur Voraussetzungs-Prüfungen aus und scheiterten per Design; sie führen
@@ -945,6 +1035,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   konfiguriertes `quality-gate`-Environment; G0-A und G0 bleiben offen.
 
 ### Entschieden
+- **D-075 (Fraktions-Achse in der kanonischen Simulation) — vom Agenten unter
+  ausdrücklicher Inhaber-Delegation entschieden (Teil-Entscheidung per
+  Inhaber-Sprint-Briefing vorgegeben):** Das Manifest modelliert zwei
+  Fraktionen, die Simulation kannte nur eine flache geteilte Tabelle.
+  Entschieden gegen die Alternativen „flache Tabelle plus kosmetische
+  Fraktion" und „getrennte Definitions-Assemblies je Fraktion": **die
+  Fraktions-Achse lebt in `SimDefinitions`** — 34 Definitionen, die
+  Allianz-Id IST der `UnitRole`-Wire-Wert (1..17), die Legion-Id addiert
+  17, Auflösung über `ToDefinitionId` und die Slot-Fraktion aus dem
+  Economy-Zustand (Snapshotblock v2, achtes Fingerprint-Array, vor
+  `Kernel.Start()` gebunden und danach guard-gesperrt). Tragend:
+  Wire-Kompatibilität (`IsValidDefinitionId` bleibt `!= 0`), der einmalige
+  Formatreset im offenen Pre-G1-Fenster (D-068) und die
+  D-068-Kostenasymmetrie, die Kosmetik nicht tragen kann. Teil-Entscheidung
+  Legion-Fahrzeugschaden: **der konkrete GDD-Wert schlägt die Ableitung**,
+  wo Vehicles.md eine Legion-Schadenszeile nennt (28/50/60); die Ableitung
+  gilt nur, wo die GDDs schweigen. Offen darin: die Hyäne-Zeile (Legion
+  Scout) in Vehicles.md nennt eine von der abgeleiteten 10 abweichende
+  konkrete Zahl — der Scout bleibt bis zur Inhaberentscheidung abgeleitet
+  (registriert im [DecisionLog](docs/production/DecisionLog.md), überstimmbar).
 - **D-074 (Autorität der Schaden-gegen-Panzerung-Matrix) — vom Agenten unter
   ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst:**
   Die Fachdokumentation führte drei einander widersprechende Matrizen

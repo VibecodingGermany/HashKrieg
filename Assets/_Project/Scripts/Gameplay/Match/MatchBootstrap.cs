@@ -35,11 +35,12 @@ namespace Nova.Gameplay.Match
     /// <c>SetupMatch</c> spawns through <see cref="EntityManager.SpawnUnit"/>
     /// defaults, which stamps maxHealth 100 on EVERY unit and ignores
     /// <see cref="SimDefinitions"/>. This bootstrap routes spawning through
-    /// <see cref="SimDefinitions.TryGetUnit"/> so units carry their real
-    /// stats. Move speeds are identical either way (the definition table and
-    /// the scenario literals agree exactly); the ONLY value that differs is
-    /// the Harvester's maxHealth (definition 300 vs. default 100), and
-    /// maxHealth IS part of the hashed entity-store block. Set
+    /// the slot faction's <see cref="SimUnitDefinition"/> so units carry
+    /// their real stats. Move speeds are identical either way (the
+    /// definition table is deliberately speed-flat across factions and the
+    /// scenario literals agree exactly); the ONLY value that differs is
+    /// maxHealth (e.g. the Alliance Harvester's 800 vs. the default 100),
+    /// and maxHealth IS part of the hashed entity-store block. Set
     /// <see cref="UseDefinitionStats"/> to false to get a byte-exact
     /// <c>SetupMatch</c> mirror — that is the switch the InitialStateHash
     /// test must flip.
@@ -71,12 +72,9 @@ namespace Nova.Gameplay.Match
         /// <summary>maxHealth stamped by SpawnUnit when no definition stats are applied.</summary>
         private const int SpawnDefaultMaxHealth = 100;
 
-        // Definition ids of the canonical table (SimDefinitions, manifest order).
-        private const ushort DefHQ = 1;
-        private const ushort DefRefinery = 3;
-        private const ushort DefBuilder = 1;
-        private const ushort DefHarvester = 2;
-        private const ushort DefBasicInfantry = 3;
+        // Definition ids are faction-resolved (SimDefinitions id rule:
+        // Alliance = role wire value, Legion = role + 17) and come from the
+        // slot's faction at spawn time — no per-faction literal constants.
 
         [Header("Match")]
         [Tooltip("Start the match automatically in Start(). The scene generator wires this.")]
@@ -189,6 +187,16 @@ namespace Nova.Gameplay.Match
             }
 
             Runner.InitializeMatch(_seed, _mapWidth, _mapHeight, _entityCapacity);
+
+            // Faction assignment (economy block v2): slot 0 plays Alliance,
+            // slot 1 plays Legion. Set BEFORE StartMatch — the SetSlotFaction
+            // guard forbids any change once the kernel runs, because the
+            // faction bytes are part of the hashed initial state and the
+            // match fingerprint. The scenario's BuildHost does the same, in
+            // the same order.
+            Runner.Economy.SetSlotFaction(LocalSlot, FactionId.Alliance);
+            Runner.Economy.SetSlotFaction(EnemySlot, FactionId.Legion);
+
             Runner.StartMatch();
 
             // Slot order is load-bearing for entity ids: slot 0 first.
@@ -220,39 +228,44 @@ namespace Nova.Gameplay.Match
                 throw new InvalidOperationException($"[MatchBootstrap] field {c.FieldId} could not be registered");
             }
 
-            _hq[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, DefHQ, c.HqOriginX, c.HqOriginY);
+            FactionId faction = Runner.Economy.GetSlotFaction(c.Slot);
+            ushort hqDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.HQ);
+            ushort refineryDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.Refinery);
+
+            _hq[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, hqDefId, c.HqOriginX, c.HqOriginY);
             if (!_hq[c.Slot].IsValid)
             {
                 throw new InvalidOperationException($"[MatchBootstrap] HQ placement failed for slot {c.Slot}");
             }
 
-            _refinery[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, DefRefinery, c.RefineryOriginX, c.RefineryOriginY);
+            _refinery[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, refineryDefId, c.RefineryOriginX, c.RefineryOriginY);
             if (!_refinery[c.Slot].IsValid)
             {
                 throw new InvalidOperationException($"[MatchBootstrap] Refinery placement failed for slot {c.Slot}");
             }
 
-            _harvesterA[c.Slot] = Spawn(c.Slot, DefHarvester, c.HarvesterAX, c.HarvesterAY);
-            _harvesterB[c.Slot] = Spawn(c.Slot, DefHarvester, c.HarvesterBX, c.HarvesterBY);
-            _builder[c.Slot] = Spawn(c.Slot, DefBuilder, c.BuilderX, c.BuilderY);
+            _harvesterA[c.Slot] = Spawn(c.Slot, UnitRole.Harvester, c.HarvesterAX, c.HarvesterAY);
+            _harvesterB[c.Slot] = Spawn(c.Slot, UnitRole.Harvester, c.HarvesterBX, c.HarvesterBY);
+            _builder[c.Slot] = Spawn(c.Slot, UnitRole.Builder, c.BuilderX, c.BuilderY);
 
             for (int i = 0; i < c.SquadX.Length; i++)
             {
-                Spawn(c.Slot, DefBasicInfantry, c.SquadX[i], c.SquadY[i]);
+                Spawn(c.Slot, UnitRole.BasicInfantry, c.SquadX[i], c.SquadY[i]);
             }
         }
 
         /// <summary>
-        /// Spawns one unit from its canonical definition. Role and move speed
-        /// always come from <see cref="SimDefinitions"/> (identical to the
-        /// scenario literals); maxHealth only when
-        /// <see cref="UseDefinitionStats"/> is set — see the class remarks.
+        /// Spawns one unit from its faction's canonical definition. Role and
+        /// move speed always come from <see cref="SimDefinitions"/>; maxHealth
+        /// only when <see cref="UseDefinitionStats"/> is set — see the class
+        /// remarks. The faction is the slot's, read from the economy state.
         /// </summary>
-        private EntityId Spawn(byte slot, ushort unitDefId, int cellX, int cellY)
+        private EntityId Spawn(byte slot, UnitRole role, int cellX, int cellY)
         {
-            if (!SimDefinitions.TryGetUnit(unitDefId, out SimUnitDefinition def))
+            FactionId faction = Runner.Economy.GetSlotFaction(slot);
+            if (!SimDefinitions.TryGetUnit(faction, role, out SimUnitDefinition def))
             {
-                throw new InvalidOperationException($"[MatchBootstrap] unknown unit definition {unitDefId}");
+                throw new InvalidOperationException($"[MatchBootstrap] unknown unit definition ({faction}, {role})");
             }
 
             return Runner.Entities.SpawnUnit(

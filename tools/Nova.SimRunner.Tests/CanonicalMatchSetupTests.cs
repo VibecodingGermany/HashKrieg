@@ -70,8 +70,12 @@ namespace Nova.SimRunner.Tests
         private const ushort MapHeight = 128;
         private const int EntityCapacity = 1024;
         private const long FieldReserveAE = 2000000L;
-        private const ushort DefHQ = 1;
-        private const ushort DefRefinery = 3;
+        // Faction-resolved opening placement ids (SimDefinitions id rule):
+        // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
+        private const ushort DefHQAlliance = 3;
+        private const ushort DefHQLegion = 20;
+        private const ushort DefRefineryAlliance = 4;
+        private const ushort DefRefineryLegion = 21;
 
         /// <summary>Harvester move speed, Q16.16 raw (2.5 cells/tick).</summary>
         private const int HarvesterSpeedRaw = 163840;
@@ -104,7 +108,7 @@ namespace Nova.SimRunner.Tests
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -121,6 +125,12 @@ namespace Nova.SimRunner.Tests
             _ = new LocalLoopbackTransport(ingress);
             kernel.BindCommands(
                 new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
+
+            // Mirror of BuildHost's faction assignment (economy block v2):
+            // slot 0 Alliance, slot 1 Legion, set BEFORE Kernel.Start() —
+            // the SetSlotFaction guard forbids it once the kernel runs.
+            economy.SetSlotFaction(0, FactionId.Alliance);
+            economy.SetSlotFaction(1, FactionId.Legion);
 
             kernel.Start();
             return new ReferenceHost
@@ -176,15 +186,18 @@ namespace Nova.SimRunner.Tests
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
+            // The slot factions are already bound: BuildReferenceHost mirrors
+            // BuildHost, which assigns them before Kernel.Start() (the
+            // SetSlotFaction guard requires it).
             for (byte slot = 0; slot < 2; slot++)
             {
                 SlotLayout c = slot == 0 ? Slot0Layout : Slot1Layout;
 
                 Assert.That(host.Economy.TryAddField(c.FieldId, new GridPos2D(c.FieldX, c.FieldY), FieldReserveAE),
                     Is.True, "reference field registration");
-                Assert.That(host.Construction.PlaceCompletedBuilding(slot, DefHQ, c.HqOriginX, c.HqOriginY).IsValid,
+                Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefHQAlliance : DefHQLegion, c.HqOriginX, c.HqOriginY).IsValid,
                     Is.True, "reference HQ placement");
-                Assert.That(host.Construction.PlaceCompletedBuilding(slot, DefRefinery, c.RefineryOriginX, c.RefineryOriginY).IsValid,
+                Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefRefineryAlliance : DefRefineryLegion, c.RefineryOriginX, c.RefineryOriginY).IsValid,
                     Is.True, "reference Refinery placement");
 
                 EntityId harvesterA = host.Entities.SpawnUnit(

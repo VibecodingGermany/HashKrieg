@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Nova.Core;
+using Nova.Simulation.Definitions;
 
 namespace Nova.Simulation.State
 {
@@ -190,11 +191,34 @@ namespace Nova.Simulation.State
         /// <summary>
         /// Fully parses and validates entity store block content produced by
         /// <see cref="WriteState"/> — every length, index and store
-        /// invariant — without mutating this manager in any way.
+        /// invariant — without mutating this manager in any way. Cargo is
+        /// checked against the cross-faction hard cap
+        /// (<see cref="SimDefinitions.MaxHarvesterCargoCapacityAE"/>): the
+        /// block can hold entities of BOTH factions and carries no faction
+        /// bytes of its own, so the per-faction bound is not decidable here.
         /// </summary>
         public bool TryValidateState(ReadOnlySpan<byte> content)
         {
-            return TryParseState(content, out _);
+            return TryParseState(content, null, out _);
+        }
+
+        /// <summary>
+        /// Same validation as <see cref="TryValidateState(ReadOnlySpan{byte})"/>,
+        /// plus the PER-ENTITY faction-precise cargo bound: with the slot
+        /// factions known, a Legion harvester carrying more than the Legion
+        /// capacity is rejected even though the hard cap would allow it.
+        /// An entity whose owner slot the lookup cannot answer is rejected.
+        /// The canonical kernel restore deliberately does NOT use this
+        /// overload: its two-phase contract validates every block before any
+        /// of them commits, so the economy block's faction bytes are not yet
+        /// available at entity-store validate time — the hard cap is the
+        /// bound that phase can honestly check, and the runtime harvest
+        /// clamp enforces the precise one.
+        /// </summary>
+        public bool TryValidateState(ReadOnlySpan<byte> content, ISlotFactionLookup factions)
+        {
+            if (factions == null) throw new ArgumentNullException(nameof(factions));
+            return TryParseState(content, factions, out _);
         }
 
         /// <summary>
@@ -208,7 +232,18 @@ namespace Nova.Simulation.State
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> content)
         {
-            if (!TryParseState(content, out ParsedEntityStore parsed)) return false;
+            return TryRestoreState(content, null);
+        }
+
+        /// <summary>
+        /// Restore variant with the per-entity faction-precise cargo bound —
+        /// see <see cref="TryValidateState(ReadOnlySpan{byte}, ISlotFactionLookup)"/>
+        /// for the contract and why the canonical kernel path stays on the
+        /// hard cap.
+        /// </summary>
+        public bool TryRestoreState(ReadOnlySpan<byte> content, ISlotFactionLookup factions)
+        {
+            if (!TryParseState(content, factions, out ParsedEntityStore parsed)) return false;
 
             // All checks passed; commit atomically.
             Array.Copy(parsed.Units, _units, Capacity);
@@ -236,9 +271,11 @@ namespace Nova.Simulation.State
 
         /// <summary>
         /// Parses and fully validates block content into a committed-ready
-        /// intermediate. Never mutates this manager.
+        /// intermediate. Never mutates this manager. When
+        /// <paramref name="factions"/> is non-null, cargo is additionally
+        /// bounded per entity by the owner slot's faction capacity.
         /// </summary>
-        private bool TryParseState(ReadOnlySpan<byte> content, out ParsedEntityStore parsed)
+        private bool TryParseState(ReadOnlySpan<byte> content, ISlotFactionLookup factions, out ParsedEntityStore parsed)
         {
             parsed = null;
             var reader = new Snapshots.SnapshotBlockReader(content);
@@ -301,10 +338,30 @@ namespace Nova.Simulation.State
                 if (!reader.TryReadEntityId(out EntityId attackTarget)) return false;
                 if (!reader.TryReadInt32(out int weaponCooldown)) return false;
                 if (!reader.TryReadInt32(out int cargoAE)) return false;
-                // Cargo is bounded by the provisional harvester capacity; a
-                // negative or over-capacity value is outside the defined
-                // domain and rejected like the negative radii above.
-                if (cargoAE < 0 || cargoAE > UnitState.DefaultCargoCapacityAE) return false;
+                // Cargo is bounded by the cross-faction HARD CAP (the
+                // Alliance 330 is the largest capacity any faction has): an
+                // entity block can hold both factions and carries no faction
+                // bytes, so 330 is the tightest bound this block can decide
+                // on its own. A negative or over-cap value is outside the
+                // defined domain and rejected like the negative radii above.
+                if (cargoAE < 0 || cargoAE > SimDefinitions.MaxHarvesterCargoCapacityAE) return false;
+                if (factions != null && cargoAE > 0)
+                {
+                    // Optional per-entity precision: with the slot factions
+                    // known, a Legion harvester may not exceed the Legion 300
+                    // even though the hard cap allows 330. An owner slot the
+                    // lookup cannot answer is outside the declared slot space.
+                    FactionId ownerFaction;
+                    try
+                    {
+                        ownerFaction = factions.GetSlotFaction(playerId);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        return false;
+                    }
+                    if (cargoAE > SimDefinitions.HarvesterCargoCapacityAE(ownerFaction)) return false;
+                }
                 if (!reader.TryReadUInt16(out ushort harvestFieldId)) return false;
                 if (!reader.TryReadUInt8(out byte returningCargoFlag) || returningCargoFlag > 1) return false;
                 if (!reader.TryReadUInt8(out byte movingFlag) || movingFlag > 1) return false;
