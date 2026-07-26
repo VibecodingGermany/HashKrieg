@@ -585,6 +585,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Snapshot-Roundtrip + Fortsetzung, Replay-Kompatibilität.
 
 ### Behoben
+- **Flaky Memory-Assertion im Perf-Harness (`SCALE_500_PRECOMBAT`):** die
+  reine Endpunkt-Regel (Retained nach vollem GC: Fensterende ≤ 1,10×
+  Baseline nach Warmup) war für Mini-Läufe mit wenigen Sekunden Messfenster
+  zu streng — Allokator-/JIT-/GC-Warm-up-Effekte dominierten das kurze
+  Fenster und ließen `PerfHarnessTests.MiniRun_ProducesValidArtifactsWithConsistentNumbers`
+  lastabhängig rot werden (z. B. Retained 3,61 → 4,13 MiB = 1,144× in Lauf 1),
+  während der 120-s-Vertragslauf stabil PASS blieb. Ehrlicher Fix in zwei
+  Teilen, ohne die Vertrags-Assertion zu verwässern: (a) Die Regel ist jetzt
+  fensterbasiert — der Retained-Heap wird einmal pro Wall-Sekunde des
+  Messfensters (jeweils nach vollem GC, zwischen den Ticks) als Probe
+  erfasst; ein Lauf besteht, wenn der MEDIAN des Auswertungsfensters
+  (letztes Zehntel der Proben, mindestens die letzten 10) die 1,10×-Baseline
+  nicht überschreitet — robust gegen Einzelpunkt-Spitzen, empfindlich für
+  jeden echten, anhaltenden Leck-Verlauf (`EvaluateMemoryGrowthBounded` als
+  reine, per Unit-Test abgedeckte Funktion: linearer Anstieg → FAIL,
+  Warm-up-Spitze danach flach → PASS, Toleranzgrenze strikt). (b) Für
+  Messfenster < 30 s wird die Assertion als NOT-APPLICABLE ausgewiesen
+  (stdout-Hinweis, Artefakt weiterhin `samples [1]` ohne Gate-Anspruch — ein
+  übersprungener Assertion-Nachweis in einem echten Gate-Lauf wäre ein
+  FAIL); der Vertragslauf (30 s + 3×120 s) wertet weiterhin strikt aus und
+  bleibt PASS.
 - **Harvest-Orders ohne zustandsabhängige Validierung (Review-Befunde
   P2-1/P2-2):** `Harvest` auf eine unbekannte FieldId wurde still als No-op
   „angewendet", `Harvest` auf Nicht-Harvester vergab eine tote Order, die das
