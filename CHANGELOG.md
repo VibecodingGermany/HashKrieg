@@ -18,6 +18,35 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Coverage-Messinfrastruktur (Diagnose, ohne Gate-Status, ohne Evidence):**
+  `tools/Nova.Coverage/coverage.py` führt die .NET-Test-Lane mit
+  Coverlet-Instrumentierung aus (`coverlet.msbuild` 6.0.4 als
+  PrivateAssets-Referenz in `tools/Nova.SimRunner.Tests`; zwingend
+  `/p:IncludeTestAssembly=true`, weil die Core-/Simulation-Quellen per
+  Compile-Include INS Test-Assembly kompilieren und Coverlet die Test-Assembly
+  sonst standardmäßig ausschließt; der In-Proc-XPlat-Collector lieferte auf
+  diesem Host leere Reports) oder konsumiert einen vorhandenen
+  Cobertura-Report und aggregiert die Line-Coverage pro G1-Scope aus
+  [docs/tech/Testing.md](docs/tech/Testing.md) §4: `Nova.Simulation`
+  (Simulation/**, ≥ 80 %), `Command` (CommandsV1/**, ≥ 90 %), `PRNG`
+  (Core/SimRandom.cs, ≥ 90 %), `Serializer` (Snapshots/**, ≥ 90 %), `Hash`
+  (Core/XxHash64.cs + SimHashWriter.cs, ≥ 90 %), `Replay` (Replays/**, ≥ 90 %)
+  und `CommandInventory` (die Payload-Reader/Writer-Pfade der 13 aktivierten
+  Command-Kinds = CommandPayloads.cs + CommandPayloadReader.cs +
+  CommandPayloadWriter.cs, 100 %). Ausgabe: stdout-Tabelle, striktes
+  `output/coverage/coverage-summary.json` (pro Scope name, linePercent,
+  requiredPercent, coveredLines, coverableLines samt ungedeckten Zeilen) und
+  der Cobertura-Report samt SHA-256 daneben (`output/` ist gitignoriert,
+  **keine Evidence**); Schwellen per `--set Scope=PCT` übersteuerbar,
+  Exit-Code ≠ 0 bei Schwellenriss. Erste Ist-Messung am G1-Stand (macOS
+  arm64, .NET 8 Debug, 300/300 Tests, zwei Läufe mit identischen Werten):
+  Nova.Simulation 87,50 % (4607/5265), Command 91,76 % (1125/1226), PRNG
+  100 % (57/57), Serializer 98,06 % (404/412), Hash 100 % (225/225), Replay
+  91,64 % (592/646), CommandInventory 100 % (352/352) — alle Schwellen
+  gehalten; PRNG (zuvor 89,47 %) und CommandInventory (zuvor 97,73 %) wurden
+  durch vier gezielte Verhaltenstests geschlossen (`NextInt`-Bereichsablehnung,
+  `NextFloat`-Intervall/Determinismus, `CommandPayloadWriter`-Byte-Exaktheit/
+  Längentracking und der strukturelle Wurf oberhalb `MaxPayloadBytes`).
 - **G1-Performance-Messgerüst V4/V5a (ohne Gate-Status, ohne Evidence):**
   `tools/Nova.SimRunner` führt jetzt das Szenario `SCALE_500_PRECOMBAT` aus
   [quality/scenarios/mvp-v1.json](quality/scenarios/mvp-v1.json) als
