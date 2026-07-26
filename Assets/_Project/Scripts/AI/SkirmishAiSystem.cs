@@ -13,17 +13,31 @@ namespace Nova.AI
     /// Deterministic utility-based Skirmish AI system for Alliance and Legion factions.
     /// Evaluates base building, economy expansion, unit production, and army squad attacks.
     /// Zero engine dependencies (no UnityEngine types).
+    /// <para>
+    /// Prototype scaffolding (not part of the canonical G3 AI contract): the
+    /// decision loop now targets the CANONICAL construction and production
+    /// domains — placement through
+    /// <see cref="ConstructionSystem.TryPlaceBuilding"/> and enqueues through
+    /// <see cref="ProductionSystem.TryQueueUnit"/> with the provisional
+    /// MS-1 definition ids of <see cref="SimDefinitions"/> (Q-040). The
+    /// retired research-tree dependency is gone: MS-1 has no research tree
+    /// (mvp-v1.json technology model).
+    /// </para>
     /// </summary>
     public sealed class SkirmishAiSystem : ISimSystem
     {
         public const ushort DecisionTickInterval = 20; // 1.0 second decision loop
+
+        /// <summary>Provisional placement anchor of the AI's power plant (Q-040 candidate).</summary>
+        private const int PowerPlantOriginX = 40;
+        private const int PowerPlantOriginY = 40;
 
         private readonly byte _aiPlayerId;
         private readonly AiFactionProfile _profile;
         private readonly EntityManager _entityManager;
         private readonly EconomySystem _economy;
         private readonly ConstructionSystem _construction;
-        private readonly ProductionQueueSystem _production;
+        private readonly ProductionSystem _production;
 
         public string Name => $"SkirmishAi_{_profile.FactionName}_P{_aiPlayerId}";
         public byte AiPlayerId => _aiPlayerId;
@@ -34,7 +48,7 @@ namespace Nova.AI
             EntityManager entityManager,
             EconomySystem economy,
             ConstructionSystem construction,
-            ProductionQueueSystem production)
+            ProductionSystem production)
         {
             _aiPlayerId = aiPlayerId;
             _profile = profile;
@@ -55,45 +69,43 @@ namespace Nova.AI
 
             ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(_aiPlayerId);
 
-            // 1. Evaluate Energy Power Grid
+            // 1. Evaluate Energy Power Grid: build a Power plant
+            //    (definition id 2, provisional Q-040 values) at a fixed anchor.
             int powerMargin = eco.PowerProvided - eco.PowerRequired;
-            if (powerMargin < _profile.TargetPowerMargin && eco.AetheriumCredits >= 100)
+            if (powerMargin < _profile.TargetPowerMargin)
             {
-                var powerPlantDef = new BuildingDefinition(
-                    definitionId: 2,
-                    stringId: "BLD_PowerPlant",
-                    sizeX: 2,
-                    sizeY: 2,
-                    maxHealth: 300,
-                    powerProduced: 50,
-                    powerConsumed: 0,
-                    aetheriumCost: 100,
-                    buildTimeTicks: 20
-                );
-
-                _construction.RequestConstruction(_aiPlayerId, in powerPlantDef, 40, 40);
+                _construction.TryPlaceBuilding(_aiPlayerId, 2, PowerPlantOriginX, PowerPlantOriginY);
                 return;
             }
 
-            // 2. Evaluate Unit Production
-            if (eco.AetheriumCredits >= 100 && _production.ActiveQueueCount == 0)
+            // 2. Evaluate Unit Production: queue a Builder (definition id 1)
+            //    at the first own completed HQ while nothing is queued.
+            if (_production.TotalQueuedUnits == 0)
             {
-                var riflemanDef = new UnitDefinition(
-                    definitionId: 10,
-                    stringId: "UNIT_Rifleman",
-                    moveSpeed: 5.0f,
-                    radius: 0.5f,
-                    maxHealth: 100,
-                    aetheriumCost: 100
-                );
-
-                _production.EnqueueUnitProduction(
-                    playerId: _aiPlayerId,
-                    def: in riflemanDef,
-                    spawnTransform: new Transform2D(SimFixed.FromInt(45), SimFixed.FromInt(45)),
-                    buildTimeTicks: 20
-                );
+                uint hqRaw = FindFirstOwnedCompletedHq();
+                if (hqRaw != 0)
+                {
+                    _production.TryQueueUnit(_aiPlayerId, hqRaw, 1, 1);
+                }
             }
+        }
+
+        /// <summary>Lowest-index own completed HQ placement, or 0 (ascending-index scan, deterministic).</summary>
+        private uint FindFirstOwnedCompletedHq()
+        {
+            UnitState[] units = _entityManager.RawUnits;
+            int capacity = _entityManager.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.Role != UnitRole.HQ || unit.PlayerId != _aiPlayerId) continue;
+                uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
+                if (_construction.IsCompletedPlacement(raw))
+                {
+                    return raw;
+                }
+            }
+            return 0;
         }
 
         public void Shutdown()

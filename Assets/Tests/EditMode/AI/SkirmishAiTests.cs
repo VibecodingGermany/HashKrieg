@@ -17,42 +17,37 @@ namespace Nova.AI.Tests
         {
             var entities = new EntityManager(100);
             var economy = new EconomySystem(entities, startingCredits: 500);
-            var research = new ResearchTreeSystem();
-            var grid = new ConstructionGrid(64, 64);
-            var construction = new ConstructionSystem(grid, economy);
-            var production = new ProductionQueueSystem(entities, economy, research);
+            var construction = new ConstructionSystem(entities, economy);
+            var production = new ProductionSystem(entities, economy, construction);
 
             var profile = new AiFactionProfile("Alliance");
             var aiSystem = new SkirmishAiSystem(1, profile, entities, economy, construction, production);
 
             var kernel = new SimulationKernel(new SimRandom(333));
             kernel.RegisterSystem(economy);
-            kernel.RegisterSystem(research);
             kernel.RegisterSystem(construction);
             kernel.RegisterSystem(production);
             kernel.RegisterSystem(aiSystem);
             kernel.Start();
 
             // The canonical power balance derives from building-role
-            // entities: an HQ gives the AI slot a positive margin
-            // (provisional 30), so the decision loop skips the power-plant
-            // branch and goes straight to production.
-            entities.SpawnUnit(
-                1,
-                new Transform2D(SimFixed.FromInt(30), SimFixed.FromInt(30)),
-                SimFixed.Zero,
-                role: UnitRole.HQ);
+            // entities: a completed HQ gives the AI slot exactly the target
+            // margin (provisional 30), so the decision loop skips the
+            // power-plant branch and goes straight to production.
+            Assert.IsTrue(construction.PlaceCompletedBuilding(1, 1, 30, 30).IsValid, "completed HQ");
 
-            Assert.AreEqual(0, production.ActiveQueueCount);
+            Assert.AreEqual(0, production.TotalQueuedUnits);
 
-            // Step 20 ticks to trigger AI decision loop
+            // Step 20 ticks to trigger the AI decision loop.
             for (int i = 0; i < 20; i++)
             {
                 kernel.StepTick();
             }
 
-            // AI should have enqueued unit production
-            Assert.Greater(production.ActiveQueueCount, 0);
+            // The AI queued a Builder (definition id 1) at its HQ through the
+            // canonical production domain; 100 AE were charged at enqueue.
+            Assert.Greater(production.TotalQueuedUnits, 0);
+            Assert.AreEqual(400L, economy.GetPlayerEconomy(1).AetheriumCredits);
         }
     }
 }
