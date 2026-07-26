@@ -128,7 +128,7 @@ namespace Nova.Gameplay.Match
             Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy);
             Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
-            Combat = new CombatSystem(Entities, FogOfWar);
+            Combat = new CombatSystem(Entities, FogOfWar, Economy);
             Victory = new Simulation.Victory.VictorySystem(Entities, Construction);
 
             // Canonical tick order (SimulationCore.md section 2): economy

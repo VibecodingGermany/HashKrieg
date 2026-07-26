@@ -25,9 +25,9 @@ namespace Nova.Simulation.Economy
     /// Phase 2 (economy and power): provided/required are recomputed from
     /// the living building-role entities in strict ascending entity-index
     /// order. The per-role power figures come from the canonical definition
-    /// table <see cref="Definitions.SimDefinitions"/> (provisional Q-040
-    /// values, not ratified balancing): HQ provides 30, a Power plant
-    /// provides 100, a Refinery requires 20; mobile roles draw nothing.
+    /// table <see cref="Definitions.SimDefinitions"/>, resolved through the
+    /// owner slot's faction (Buildings.md section 2: an Alliance Power plant
+    /// provides 100, a Legion one 80; the HQ provides 30 for both).
     /// Buildings-as-role-entities is the documented minimal building model
     /// of this slice; construction output becomes a building-role entity on
     /// completion (construction domain, phase 4).
@@ -97,7 +97,7 @@ namespace Nova.Simulation.Economy
     /// ids (entity-side cargo bounds are validated by the entity store).
     /// </para>
     /// </summary>
-    public sealed class EconomySystem : IStatefulSimSystem
+    public sealed class EconomySystem : IStatefulSimSystem, ISlotFactionLookup
     {
         /// <summary>
         /// Serialization version of the economy snapshot block. v2 adds the
@@ -246,10 +246,12 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Phase 2: provided/required per slot from the living building-role
-        /// entities (ascending index; provisional values, see class remarks).
-        /// The power figures come from the canonical definition table
-        /// (<see cref="Definitions.SimDefinitions"/>); mobile roles and
-        /// construction sites (role <see cref="UnitRole.Unit"/>) draw nothing.
+        /// entities (ascending index). The power figures come from the
+        /// canonical definition table (<see cref="Definitions.SimDefinitions"/>)
+        /// and are FACTION-RESOLVED: the entity's owner slot selects the row
+        /// (a Legion Schwerer Generator feeds 80, an Alliance Fusionsreaktor
+        /// 100). Mobile roles and construction sites (role
+        /// <see cref="UnitRole.Unit"/>) draw nothing.
         /// </summary>
         private void RecomputePower()
         {
@@ -266,7 +268,8 @@ namespace Nova.Simulation.Economy
                 ref readonly UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.PlayerId >= MaxPlayers) continue;
 
-                if (Definitions.SimDefinitions.TryGetBuilding(unit.Role, out Definitions.SimBuildingDefinition building))
+                if (Definitions.SimDefinitions.TryGetBuilding(
+                        _players[unit.PlayerId].Faction, unit.Role, out Definitions.SimBuildingDefinition building))
                 {
                     _players[unit.PlayerId].PowerProvided += building.PowerProvided;
                     _players[unit.PlayerId].PowerRequired += building.PowerRequired;

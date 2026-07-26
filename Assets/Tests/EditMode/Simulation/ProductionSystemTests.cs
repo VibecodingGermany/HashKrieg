@@ -49,16 +49,16 @@ namespace Nova.Simulation.Tests
             /// <summary>
             /// Places a completed Barracks at (10,10) and returns its raw wire
             /// id. Also places a completed Power plant at (40,40) unless
-            /// <paramref name="withPower"/> is false — a Barracks draws 10,
+            /// <paramref name="withPower"/> is false — a Barracks draws 15,
             /// so a powered grid keeps production at full speed.
             /// </summary>
             public uint SpawnBarracks(byte slot, bool withPower = true)
             {
                 if (withPower)
                 {
-                    Assert.That(Construction.PlaceCompletedBuilding(slot, 2, 40, 40).IsValid, Is.True);
+                    Assert.That(Construction.PlaceCompletedBuilding(slot, 5, 40, 40).IsValid, Is.True);
                 }
-                EntityId id = Construction.PlaceCompletedBuilding(slot, 5, 10, 10);
+                EntityId id = Construction.PlaceCompletedBuilding(slot, 7, 10, 10);
                 Assert.That(id.IsValid, Is.True);
                 return UnitCommandStateView.ToRawEntityId(id);
             }
@@ -75,12 +75,12 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
 
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 3), Is.True, "BasicInfantry x3");
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(700L),
-                "3 x 100 AE charged in full at enqueue");
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 3), Is.True, "BasicInfantry x3");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(640L),
+                "3 x 120 AE charged in full at enqueue");
             Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(3));
             Assert.That(f.Production.TryGetQueueEntry(barracks, 0, out ushort defId, out ushort remaining, out int progress), Is.True);
-            Assert.That(defId, Is.EqualTo((ushort)3));
+            Assert.That(defId, Is.EqualTo((ushort)12));
             Assert.That(remaining, Is.EqualTo((ushort)3));
             Assert.That(progress, Is.EqualTo(0));
         }
@@ -91,22 +91,22 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
 
-            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 4, 1), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
+            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 13, 1), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
                 "AntiArmorInfantry is T2 and the slot has no completed ResearchLab");
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 4, 1), Is.False);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 13, 1), Is.False);
             Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L), "a rejection charges nothing");
 
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 7, 20, 20).IsValid, Is.True, "ResearchLab completion unlocks T2");
-            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 4, 1), Is.EqualTo(CommandResultCode.Applied));
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 4, 1), Is.True);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(700L));
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 9, 20, 20).IsValid, Is.True, "ResearchLab completion unlocks T2");
+            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 13, 1), Is.EqualTo(CommandResultCode.Applied));
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 13, 1), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(750L));
         }
 
         [Test]
         public void QueueUnit_WrongProducer_IsRejectedInvalidTarget()
         {
             var f = new Fixture();
-            EntityId hq = f.Construction.PlaceCompletedBuilding(0, 1, 50, 50);
+            EntityId hq = f.Construction.PlaceCompletedBuilding(0, 3, 50, 50);
             uint hqRaw = UnitCommandStateView.ToRawEntityId(hq);
             uint barracks = f.SpawnBarracks(0);
 
@@ -126,11 +126,11 @@ namespace Nova.Simulation.Tests
 
             for (int i = 0; i < ProductionSystem.MaxQueueEntries; i++)
             {
-                Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True, $"entry {i + 1}");
+                Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True, $"entry {i + 1}");
             }
-            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 3, 1), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
+            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 12, 1), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
                 "provisional queue capacity is 5 entries per building");
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(500L), "the rejected sixth entry charges nothing");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(400L), "the rejected sixth entry charges nothing");
         }
 
         [Test]
@@ -139,10 +139,10 @@ namespace Nova.Simulation.Tests
             var f = new Fixture(startingCredits: 150);
             uint barracks = f.SpawnBarracks(0);
 
-            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 3, 2), Is.EqualTo(CommandResultCode.RejectedInsufficientResources),
-                "2 x 100 AE exceeds the 150 AE balance — the count-scaled cost is a domain check");
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(50L));
+            Assert.That(f.Production.ValidateQueueUnit(0, barracks, 12, 2), Is.EqualTo(CommandResultCode.RejectedInsufficientResources),
+                "2 x 120 AE exceeds the 150 AE balance — the count-scaled cost is a domain check");
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(30L));
         }
 
         [Test]
@@ -150,7 +150,7 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0); // center cell (11,11) -> default rally (13,11)
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
 
             f.Step(99);
             Assert.That(CountRole(f, UnitRole.BasicInfantry), Is.EqualTo(0), "one tick short of 100");
@@ -160,7 +160,7 @@ namespace Nova.Simulation.Tests
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(13)));
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(11)));
-            Assert.That(f.Entities.GetUnitRef(unit).MaxHealth, Is.EqualTo(100));
+            Assert.That(f.Entities.GetUnitRef(unit).MaxHealth, Is.EqualTo(90));
             Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(0));
         }
 
@@ -168,10 +168,10 @@ namespace Nova.Simulation.Tests
         public void Production_LowPower_ExactlyDoublesDuration()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 40, 40).IsValid, Is.True,
                 "a completed Refinery (20 required, nothing provided) forces low power");
             uint barracks = f.SpawnBarracks(0, withPower: false);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(1);
             Assert.That(f.Economy.GetPlayerEconomy(0).IsLowPower, Is.True);
 
@@ -195,7 +195,7 @@ namespace Nova.Simulation.Tests
             Assert.That(rallyX, Is.EqualTo(SimFixed.FromInt(30).RawValue));
             Assert.That(rallyY, Is.EqualTo(SimFixed.FromInt(30).RawValue));
 
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
@@ -208,9 +208,9 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0); // default rally (13,11)
             // Occupy the rally cell with a completed Storage at (13,11).
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 13, 11).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 6, 13, 11).IsValid, Is.True);
 
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
 
             // Ring-1 scan in ascending (y, x): (12,10) is Barracks footprint,
@@ -226,14 +226,14 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 3), Is.True); // 300 spent
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 3), Is.True); // 360 spent
 
             f.Step(100); // one infantry spawned
             Assert.That(CountRole(f, UnitRole.BasicInfantry), Is.EqualTo(1));
 
             Assert.That(f.Production.CancelProduction(barracks, 0), Is.True);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(900L),
-                "1000 - 300 + 200: the running entry refunds its REMAINING count in full");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(880L),
+                "1000 - 360 + 240: the running entry refunds its REMAINING count in full");
             Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(0));
         }
 
@@ -242,14 +242,14 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True); // entry 0: 100
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 2), Is.True); // entry 1: 200
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True); // entry 0: 120
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 2), Is.True); // entry 1: 240
 
             Assert.That(f.Production.ValidateCancelProduction(0, barracks, 2), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
                 "no entry at index 2");
             Assert.That(f.Production.CancelProduction(barracks, 1), Is.True);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(900L),
-                "1000 - 300 + 200: the unstarted entry refunds in full, the cancel itself is free");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(880L),
+                "1000 - 360 + 240: the unstarted entry refunds in full, the cancel itself is free");
             Assert.That(f.Production.TryGetQueueEntry(barracks, 0, out _, out ushort remaining, out _), Is.True);
             Assert.That(remaining, Is.EqualTo((ushort)1), "the running entry is untouched");
         }
@@ -259,7 +259,7 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture(capacity: 8);
             uint barracks = f.SpawnBarracks(0);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
 
             // Fill the store to capacity.
             var dummies = new System.Collections.Generic.List<EntityId>();
@@ -285,12 +285,12 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 2), Is.True); // 200 spent -> 800
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 2), Is.True); // 240 spent -> 760
 
-            Assert.That(f.Construction.SellBuilding(barracks), Is.True); // +250 -> 1050
+            Assert.That(f.Construction.SellBuilding(barracks), Is.True); // +250 -> 1010
             f.Step(1);
             Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(0), "the row is dropped with the dead building");
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1050L),
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1010L),
                 "queued units on a sold building are lost WITHOUT refund (documented provisional)");
         }
 
@@ -299,7 +299,7 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 2), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 2), Is.True);
             f.Production.SetRallyPoint(barracks, SimFixed.FromInt(30), SimFixed.FromInt(31));
             f.Step(37); // accumulate progress on the running entry
 
@@ -346,11 +346,54 @@ namespace Nova.Simulation.Tests
             Assert.That(rallyY, Is.EqualTo(SimFixed.FromInt(30).RawValue));
 
             // The queue is unaffected by the rejected rally (no parking).
-            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+        }
+
+        [Test]
+        public void QueueUnit_LegionSlot_ChargesLegionCost()
+        {
+            // The definition id is faction-resolved: the Legion Rekrut
+            // (def 29) costs 60 AE (Infantry.md), not the Alliance 120.
+            var f = new Fixture();
+            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            uint barracks = f.SpawnBarracks(1);
+
+            Assert.That(f.Production.ValidateQueueUnit(1, barracks, 29, 2), Is.EqualTo(CommandResultCode.Applied));
+            Assert.That(f.Production.TryQueueUnit(1, barracks, 29, 2), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(1).AetheriumCredits, Is.EqualTo(880L),
+                "2 x 60 AE at the Legion row");
+
+            f.Step(80); // Legion Rekrut: 80 build ticks at full power
+            Assert.That(CountRole(f, UnitRole.BasicInfantry), Is.EqualTo(1));
+            EntityId unit = FindRole(f, UnitRole.BasicInfantry);
+            Assert.That(f.Entities.GetUnitRef(unit).MaxHealth, Is.EqualTo(55), "Legion HP (Infantry.md)");
+        }
+
+        [Test]
+        public void QueueUnit_ForeignFactionDefinition_IsRejectedInvalidTarget()
+        {
+            var f = new Fixture();
+            f.Economy.SetSlotFaction(1, FactionId.Legion);
+            uint barracksA = f.SpawnBarracks(0);
+            // Slot 1's buildings stand at distinct cells (the fixture helper
+            // uses fixed coordinates).
+            Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 50, 50).IsValid, Is.True);
+            EntityId legionBarracks = f.Construction.PlaceCompletedBuilding(1, 24, 30, 30);
+            Assert.That(legionBarracks.IsValid, Is.True);
+            uint barracksL = UnitCommandStateView.ToRawEntityId(legionBarracks);
+
+            Assert.That(f.Production.ValidateQueueUnit(1, barracksL, 12, 1), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "Legion slot, Alliance BasicInfantry");
+            Assert.That(f.Production.ValidateQueueUnit(0, barracksA, 29, 1), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "Alliance slot, Legion BasicInfantry");
+            Assert.That(f.Production.ValidateQueueUnit(1, barracksL, 29, 1), Is.EqualTo(CommandResultCode.Applied),
+                "Legion slot, Legion BasicInfantry is legal");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L), "rejections charge nothing");
+            Assert.That(f.Economy.GetPlayerEconomy(1).AetheriumCredits, Is.EqualTo(1000L));
         }
 
         private static int CountRole(Fixture f, UnitRole role)

@@ -18,8 +18,9 @@ namespace Nova.AI
     /// decision loop now targets the CANONICAL construction and production
     /// domains — placement through
     /// <see cref="ConstructionSystem.TryPlaceBuilding"/> and enqueues through
-    /// <see cref="ProductionSystem.TryQueueUnit"/> with the provisional
-    /// MS-1 definition ids of <see cref="SimDefinitions"/> (Q-040). The
+    /// <see cref="ProductionSystem.TryQueueUnit"/> with the faction-resolved
+    /// definition ids of <see cref="SimDefinitions"/> (the AI plays the
+    /// faction its slot is assigned in the economy state). The
     /// retired research-tree dependency is gone: MS-1 has no research tree
     /// (mvp-v1.json technology model).
     /// </para>
@@ -68,24 +69,27 @@ namespace Nova.AI
             if (tick.Value % DecisionTickInterval != 0) return;
 
             ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(_aiPlayerId);
+            FactionId faction = eco.Faction;
 
-            // 1. Evaluate Energy Power Grid: build a Power plant
-            //    (definition id 2, provisional Q-040 values) at a fixed anchor.
+            // 1. Evaluate Energy Power Grid: build a Power plant of the AI
+            //    slot's faction at a fixed anchor.
             int powerMargin = eco.PowerProvided - eco.PowerRequired;
             if (powerMargin < _profile.TargetPowerMargin)
             {
-                _construction.TryPlaceBuilding(_aiPlayerId, 2, PowerPlantOriginX, PowerPlantOriginY);
+                _construction.TryPlaceBuilding(
+                    _aiPlayerId, SimDefinitions.ToDefinitionId(faction, UnitRole.Power), PowerPlantOriginX, PowerPlantOriginY);
                 return;
             }
 
-            // 2. Evaluate Unit Production: queue a Builder (definition id 1)
-            //    at the first own completed HQ while nothing is queued.
+            // 2. Evaluate Unit Production: queue a Builder of the AI slot's
+            //    faction at the first own completed HQ while nothing is queued.
             if (_production.TotalQueuedUnits == 0)
             {
                 uint hqRaw = FindFirstOwnedCompletedHq();
                 if (hqRaw != 0)
                 {
-                    _production.TryQueueUnit(_aiPlayerId, hqRaw, 1, 1);
+                    _production.TryQueueUnit(
+                        _aiPlayerId, hqRaw, SimDefinitions.ToDefinitionId(faction, UnitRole.Builder), 1);
                 }
             }
         }

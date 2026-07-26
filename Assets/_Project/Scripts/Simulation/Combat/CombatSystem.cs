@@ -122,13 +122,22 @@ namespace Nova.Simulation.Combat
 
         private readonly EntityManager _entityManager;
         private readonly FogOfWarSystem _fogOfWar;
+        private readonly ISlotFactionLookup _factions;
 
         public string Name => "CombatSystem";
 
-        public CombatSystem(EntityManager entityManager, FogOfWarSystem fogOfWar)
+        /// <summary>
+        /// Combat needs the slot factions because weapon profiles are
+        /// faction-resolved (faction identity slice): the same role fights
+        /// with different numbers depending on the owner slot's faction.
+        /// The lookup is the economy state — the single home of the faction
+        /// assignment — injected at construction like the FoW reference.
+        /// </summary>
+        public CombatSystem(EntityManager entityManager, FogOfWarSystem fogOfWar, ISlotFactionLookup factions)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _fogOfWar = fogOfWar ?? throw new ArgumentNullException(nameof(fogOfWar));
+            _factions = factions ?? throw new ArgumentNullException(nameof(factions));
         }
 
         public void Initialize(SimulationKernel kernel)
@@ -169,11 +178,11 @@ namespace Nova.Simulation.Combat
 
                 ref UnitState target = ref _entityManager.GetUnitRef(targetId);
 
-                // The attacker's own role decides damage, type, range and
-                // cadence. An unarmed role (base damage 0) holds its order
-                // exactly like an out-of-range one — it simply has nothing to
-                // fire, so it never starts a cooldown either.
-                WeaponProfile weapon = WeaponProfiles.Get(attacker.Role);
+                // The attacker's own faction and role decide damage, type,
+                // range and cadence. An unarmed role (base damage 0) holds
+                // its order exactly like an out-of-range one — it simply has
+                // nothing to fire, so it never starts a cooldown either.
+                WeaponProfile weapon = WeaponProfiles.Get(_factions.GetSlotFaction(attacker.PlayerId), attacker.Role);
                 if (!weapon.IsArmed) continue;
 
                 // Legality: range AND committed visibility. A living target
@@ -190,7 +199,7 @@ namespace Nova.Simulation.Combat
                 int damage = DamageMatrix.Resolve(
                     weapon.AttackDamage,
                     weapon.DamageType,
-                    WeaponProfiles.GetArmorClass(target.Role));
+                    WeaponProfiles.GetArmorClass(_factions.GetSlotFaction(target.PlayerId), target.Role));
 
                 target.CurrentHealth -= damage;
                 attacker.WeaponCooldownTicks = weapon.AttackCooldownTicks;

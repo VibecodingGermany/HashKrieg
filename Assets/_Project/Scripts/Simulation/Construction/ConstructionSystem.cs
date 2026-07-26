@@ -290,15 +290,24 @@ namespace Nova.Simulation.Construction
 
         /// <summary>
         /// Full state-dependent placement validation in fixed order: unknown
-        /// definition, out-of-map footprint and occupied cells
-        /// (RejectedInvalidTarget), then prerequisite role, power rule and
-        /// site capacity (RejectedPrerequisitesNotMet). Cost is the executor's
-        /// separate check (RejectedInsufficientResources) and runs BEFORE this.
+        /// definition, foreign-faction definition, out-of-map footprint and
+        /// occupied cells (RejectedInvalidTarget), then prerequisite role,
+        /// power rule and site capacity (RejectedPrerequisitesNotMet). Cost
+        /// is the executor's separate check (RejectedInsufficientResources)
+        /// and runs BEFORE this.
         /// </summary>
         public CommandResultCode ValidatePlacement(byte playerSlot, ushort buildingDefId, int originX, int originY)
         {
             if (!SimDefinitions.TryGetBuilding(buildingDefId, out SimBuildingDefinition def))
             {
+                return CommandResultCode.RejectedInvalidTarget;
+            }
+            if (def.Faction != _economy.GetSlotFaction(playerSlot))
+            {
+                // Definition ids are faction-resolved: a slot may only place
+                // its own faction's rows. A foreign id is a known id naming
+                // content the slot cannot build — an invalid target, exactly
+                // like an unknown one.
                 return CommandResultCode.RejectedInvalidTarget;
             }
             if (!FootprintInsideMap(originX, originY) || !FootprintFree(originX, originY))

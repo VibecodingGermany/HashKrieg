@@ -57,7 +57,7 @@ namespace Nova.SimRunner.Tests
                 var movement = new MovementSystem(entities, pathfinding);
                 var economy = new EconomySystem(entities);
                 var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, width, height);
-                var combat = new CombatSystem(entities, fogOfWar);
+                var combat = new CombatSystem(entities, fogOfWar, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy

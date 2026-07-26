@@ -110,6 +110,29 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void PowerRecompute_IsFactionResolved_LegionPowerPlantProvides80()
+        {
+            // The same building ROLE feeds different power depending on the
+            // owner slot's faction (Buildings.md section 2: Alliance 100,
+            // Legion 80) — the recompute resolves (faction, role), not role.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            economy.SetSlotFaction(1, FactionId.Legion);
+
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(5), SimFixed.FromInt(5)), SimFixed.Zero, role: UnitRole.Power);
+            entities.SpawnUnit(1, new Transform2D(SimFixed.FromInt(8), SimFixed.FromInt(5)), SimFixed.Zero, role: UnitRole.Power);
+            entities.SpawnUnit(1, new Transform2D(SimFixed.FromInt(11), SimFixed.FromInt(5)), SimFixed.Zero, role: UnitRole.Barracks);
+
+            kernel.StepTick();
+            Assert.That(economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(100), "Alliance plant");
+            Assert.That(economy.GetPlayerEconomy(1).PowerProvided, Is.EqualTo(80), "Legion plant");
+            Assert.That(economy.GetPlayerEconomy(1).PowerRequired, Is.EqualTo(10), "Legion Barracks draws 10");
+        }
+
+        [Test]
         public void HarvestCycle_GathersExactRate_AndDepositRaisesCreditsExactly()
         {
             EntityManager entities = CreateEntities();

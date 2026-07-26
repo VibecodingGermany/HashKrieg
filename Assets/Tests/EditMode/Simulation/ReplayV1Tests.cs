@@ -1,6 +1,7 @@
 using System;
 using NUnit.Framework;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 
@@ -215,6 +216,44 @@ namespace Nova.Simulation.Tests
                     out ReplayPlaybackError error, out string detail));
             Assert.AreEqual(ReplayPlaybackError.FingerprintMismatch, error);
             StringAssert.Contains("SlotFaction", detail);
+        }
+
+        [Test]
+        public void FingerprintMismatch_MutatedDefinitionsTable_RefusesPlayback()
+        {
+            // The definitions content hash is a REAL table hash now: a replay
+            // must refuse to start against a fingerprint whose table differs
+            // by a single weapon value — a changed Legion rifle damage is a
+            // different game.
+            ReplayV1TestUtil.LiveMatch live = ReplayV1TestUtil.RunLiveMatch();
+            var units = SimDefinitions.AllUnits.ToArray();
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i].Faction == FactionId.Legion && units[i].Role == UnitRole.BasicInfantry)
+                {
+                    units[i] = new SimUnitDefinition(
+                        units[i].DefinitionId, units[i].Faction, units[i].Role, units[i].CostAE, units[i].BuildTicks,
+                        units[i].Tier, units[i].ProducerRole, units[i].MaxHealth, units[i].MoveSpeed,
+                        units[i].ArmorClass, units[i].DamageType,
+                        attackDamage: units[i].AttackDamage + 1, units[i].AttackRangeTiles, units[i].AttackCooldownTicks);
+                }
+            }
+            ulong mutatedHash = SimDefinitions.ComputeDefinitionsHash64(SimDefinitions.AllBuildings, units);
+            Assert.AreNotEqual(SimDefinitions.ComputeDefinitionsHash64(), mutatedHash);
+
+            MatchFingerprint foreign = MatchFingerprint.CreateCurrent(
+                live.Fingerprint.RulesHash64, mutatedHash, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
+                live.Fingerprint.StartSeed,
+                live.Fingerprint.InitialStateHash, live.Fingerprint.InputDelayTicks);
+
+            ReplayV1TestUtil.TestHost playback = ReplayV1TestUtil.CreatePlaybackHost();
+            Assert.IsFalse(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, foreign, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail));
+            Assert.AreEqual(ReplayPlaybackError.FingerprintMismatch, error);
+            StringAssert.Contains("DefinitionsHash64", detail);
         }
 
         [Test]

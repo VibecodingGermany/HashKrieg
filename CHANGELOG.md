@@ -18,6 +18,55 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Fraktionsidentität ist Simulationswirklichkeit: Allianz und Legion spielen
+  sich unterschiedlich (Diagnosestand, ohne Gate-Status, ohne Evidence):**
+  `EconomySystem` modellierte bis dahin ausdrücklich „no faction differences" —
+  beide Slots bauten aus derselben flachen Tabelle. Neu ist erstens die
+  Fraktionsachse im Zustand: `FactionId : byte` (`Alliance = 0`, `Legion = 1`,
+  der Wire-Wert IST der Manifestindex in `quality/content/mvp-v1.json`) wird je
+  Spieler-Slot im Economy-Snapshotblock v2 serialisiert (v1 wird im offenen
+  Pre-G1-Formatfenster abgelehnt, nicht migriert), geht als zweites 8-Byte-
+  Slot-Array in den `MatchFingerprint` ein und wird von beiden kanonischen
+  Setup-Pfaden (`MatchBootstrap` wie `Determinism10000Scenario.SetupMatch`)
+  identisch gesetzt — Slot 0 Allianz, Slot 1 Legion —, sodass der
+  InitialStateHash-Paritätstest beider Lanes unverändert grün bleibt. Zweitens
+  trägt `SimDefinitions` jetzt 34 Definitionen (17 Rollen × 2 Fraktionen) mit
+  der dokumentierten Id-Regel: die Allianz-Id IST der `UnitRole`-Wire-Wert
+  (1..17), die Legion-Id addiert 17 (18..34) — jede Id ist global eindeutig,
+  `CommandIds.IsValidDefinitionId` bleibt wire-kompatibel (`!= 0`). Die Werte
+  kommen aus den GDDs (Buildings.md für Kosten/Bauzeit/Energie, Vehicles.md und
+  Infantry.md für Einheiten, Weapons.md führend per D-047 für Waffen): Legion
+  baut billiger und schneller, die Allianz reicht weiter; wo die GDDs keine
+  konkrete Zahl nennen (Gebäude-HP, Fahrzeug-Projektilschaden der Legion),
+  gilt die dokumentierte Integer-Prozent-Ableitung `(allianz × 85) / 100` aus
+  der Allianz-Zeile — keine erfundenen Absolutwerte. Die Power-Bilanz, der
+  Kampf (`WeaponProfiles` ist jetzt fraktions- UND rollenindiziert,
+  `CombatSystem` erhält die Slot-Fraktionen über das neue schmale
+  `ISlotFactionLookup`, implementiert vom `EconomySystem`), die
+  Platzierungs-/Produktionsvalidierung (fremd-fraktionale DefIds werden wie
+  unbekannte als `RejectedInvalidTarget` abgelehnt) und die
+  Produktionskosten sind fraktionsaufgelöst. Drittens ist `DefinitionsHash64`
+  echt: `SimDefinitions.ComputeDefinitionsHash64()` hasht alle 34 Zeilen
+  kanonisch (XXH64, Domäne `NOVA_DEFINITIONS_V1`, aufsteigende Ids, uniformes
+  20-Felder-Layout je Zeile) und ersetzt den bisherigen
+  Leer-Stub im Szenario-Fingerprint — ein Replay mit mutiertem Waffenwert
+  scheitert nachweislich am Fingerprint (Test in beiden Lanes). Das
+  Szenario-Skript baut jetzt GDD-konform zuerst das Kraftwerk (das
+  Startnetz 30/20 kann die Allianz-Kaserne mit 15 Verbrauch nicht versorgen).
+  Bewusst weiterhin flach (dokumentiert, nicht vergessen): Harvester-Ladekapazität
+  330 AE für beide Fraktionen (Legion 300 ist registrierte
+  ScopeLedger-Schuld, Rückkehr-Gate G4), Bewegungsgeschwindigkeiten (GDD-Werte
+  in m/s, Simulationsdomäne m/tick — Umrechnung unratifiziert,
+  ScopeLedger-Kandidat) und die Verteidigungsplattform-Waffe
+  (fraktionsneutrales Modul). Verifiziert: 401/401 .NET-Tests (+19 gegenüber
+  382), 397/397 EditMode-Tests (+18 gegenüber 379, handgespiegelte Lanes),
+  `DETERMINISM_10000`-SelfCheck grün mit erwartbar bewegten Hashes
+  (Checkpoint Tick 100 `0x9A2B01F88C03599D`, finaler Zustandshash
+  `0x309240E5B0EFFE6D`). Nicht enthalten: Salven/Flächenwirkung der
+  Legion (`[salvo, splash]`, ScopeLedger), Evolvierte, jede
+  Docs-Änderung außerhalb dieses Eintrags. `quality/**`,
+  `.github/workflows/**` und `VERSION` blieben unberührt; G0, MS-0 und MS-1
+  bleiben offen.
 - **Kampf ist bewertbar und ein Match kann enden (Diagnosestand, ohne
   Gate-Status, ohne Evidence):** `CombatSystem` wandte bis dahin einen flachen
   Schadenswert von 15 auf jeden Angriff an — ein Kampfpanzer und ein Schütze

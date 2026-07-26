@@ -6,6 +6,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -183,18 +184,16 @@ namespace Nova.SimRunner
         private const int EntityCapacity = 1024;
         private const long FieldReserveAE = 2000000L;
 
-        /// <summary>Building/unit definition ids of the canonical table (SimDefinitions, manifest order).</summary>
-        private const ushort DefHQ = 1;
-        private const ushort DefPower = 2;
-        private const ushort DefRefinery = 3;
-        private const ushort DefStorage = 4;
-        private const ushort DefBarracks = 5;
-        private const ushort DefResearchLab = 7;
-        private const ushort DefDefensePlatform = 9;
-        private const ushort DefBuilder = 1;
-        private const ushort DefHarvester = 2;
-        private const ushort DefBasicInfantry = 3;
-        private const ushort DefAntiArmorInfantry = 4;
+        /// <summary>
+        /// Faction-resolved definition id of a role for the given slot
+        /// (SimDefinitions id rule: Alliance = role wire value, Legion =
+        /// role + 17). The slot's faction comes from the economy state —
+        /// the single home of the assignment.
+        /// </summary>
+        private static ushort DefId(Host host, byte slot, UnitRole role)
+        {
+            return SimDefinitions.ToDefinitionId(host.Economy.GetSlotFaction(slot), role);
+        }
 
         /// <summary>Script timing (target ticks of the sealed batches).</summary>
         private const int SkirmishFirstOrderTick = 6;
@@ -517,6 +516,15 @@ namespace Nova.SimRunner
         /// records. Structural rejection of a self-generated command is a
         /// harness bug and throws; state-dependent rejections are part of the
         /// stream.
+        /// <para>
+        /// Build order (GDD power figures, Buildings.md): the Power plant
+        /// comes FIRST (tick 25) — the manifest start grid (HQ 30 provided,
+        /// Refinery 20/15 required) cannot power the Alliance Barracks' 15 —
+        /// the Barracks follows at tick 320, infantry production once it
+        /// stands (tick 540/900). Definition ids are faction-resolved per
+        /// slot (<see cref="DefId"/>): the same script drives the Alliance
+        /// rows on slot 0 and the Legion rows on slot 1.
+        /// </para>
         /// </summary>
         private static void IssueSlotCommands(
             Host host, SlotState[] slots, byte slot, uint nextTick, ref uint aiSequence)
@@ -535,50 +543,50 @@ namespace Nova.SimRunner
                     SubmitIfAlive(host, state.HarvesterB, slot, ref aiSequence,
                         ids => new HarvestPayload(ids, c.FieldId));
                     SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.BarracksBuildX), SimFixed.FromInt(c.BarracksBuildY)));
+                        ids => new MovePayload(ids, SimFixed.FromInt(c.PowerBuildX), SimFixed.FromInt(c.PowerBuildY)));
                     break;
                 case 25:
-                    Submit(host, slot, new PlaceBuildingPayload(DefBarracks, (ushort)c.BarracksOriginX, (ushort)c.BarracksOriginY), ref aiSequence);
+                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Power), (ushort)c.PowerOriginX, (ushort)c.PowerOriginY), ref aiSequence);
                     break;
                 case 300:
+                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
+                        ids => new MovePayload(ids, SimFixed.FromInt(c.BarracksBuildX), SimFixed.FromInt(c.BarracksBuildY)));
+                    break;
+                case 320:
+                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Barracks), (ushort)c.BarracksOriginX, (ushort)c.BarracksOriginY), ref aiSequence);
+                    break;
+                case 520:
+                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
+                        ids => new MovePayload(ids, SimFixed.FromInt(c.LabBuildX), SimFixed.FromInt(c.LabBuildY)));
+                    break;
+                case 540:
                 {
                     uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
                     if (barracks != 0)
                     {
                         Submit(host, slot, new SetRallyPointPayload(barracks, SimFixed.FromInt(c.RallyX), SimFixed.FromInt(c.RallyY)), ref aiSequence);
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefBasicInfantry, 2), ref aiSequence);
+                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.BasicInfantry), 2), ref aiSequence);
                     }
                     break;
                 }
-                case 320:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.PowerBuildX), SimFixed.FromInt(c.PowerBuildY)));
+                case 700:
+                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.ResearchLab), (ushort)c.LabOriginX, (ushort)c.LabOriginY), ref aiSequence);
                     break;
-                case 340:
-                    Submit(host, slot, new PlaceBuildingPayload(DefPower, (ushort)c.PowerOriginX, (ushort)c.PowerOriginY), ref aiSequence);
-                    break;
-                case 500:
+                case 900:
                 {
                     uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
                     if (barracks != 0)
                     {
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefBasicInfantry, 2), ref aiSequence);
+                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.BasicInfantry), 2), ref aiSequence);
                     }
                     break;
                 }
-                case 520:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.LabBuildX), SimFixed.FromInt(c.LabBuildY)));
-                    break;
-                case 700:
-                    Submit(host, slot, new PlaceBuildingPayload(DefResearchLab, (ushort)c.LabOriginX, (ushort)c.LabOriginY), ref aiSequence);
-                    break;
                 case 1200:
                 {
                     uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
                     if (barracks != 0)
                     {
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefAntiArmorInfantry, 1), ref aiSequence);
+                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.AntiArmorInfantry), 1), ref aiSequence);
                     }
                     break;
                 }
@@ -605,7 +613,7 @@ namespace Nova.SimRunner
                     uint hq = FindRoleRaw(host, slot, UnitRole.HQ);
                     if (hq != 0)
                     {
-                        Submit(host, slot, new QueueUnitPayload(hq, DefBuilder, 1), ref aiSequence);
+                        Submit(host, slot, new QueueUnitPayload(hq, DefId(host, slot, UnitRole.Builder), 1), ref aiSequence);
                     }
                     break;
                 }
@@ -614,7 +622,7 @@ namespace Nova.SimRunner
                     uint hq = FindRoleRaw(host, slot, UnitRole.HQ);
                     if (hq != 0)
                     {
-                        Submit(host, slot, new QueueUnitPayload(hq, DefHarvester, 1), ref aiSequence);
+                        Submit(host, slot, new QueueUnitPayload(hq, DefId(host, slot, UnitRole.Harvester), 1), ref aiSequence);
                     }
                     break;
                 }
@@ -623,7 +631,7 @@ namespace Nova.SimRunner
                         ids => new MovePayload(ids, SimFixed.FromInt(c.DefenseBuildX), SimFixed.FromInt(c.DefenseBuildY)));
                     break;
                 case 2000:
-                    Submit(host, slot, new PlaceBuildingPayload(DefDefensePlatform, (ushort)c.DefenseOriginX, (ushort)c.DefenseOriginY), ref aiSequence);
+                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.DefensePlatform), (ushort)c.DefenseOriginX, (ushort)c.DefenseOriginY), ref aiSequence);
                     break;
                 case 2500:
                 {
@@ -639,7 +647,7 @@ namespace Nova.SimRunner
                         ids => new MovePayload(ids, SimFixed.FromInt(c.StorageBuildX), SimFixed.FromInt(c.StorageBuildY)));
                     break;
                 case 3000:
-                    Submit(host, slot, new PlaceBuildingPayload(DefStorage, (ushort)c.StorageOriginX, (ushort)c.StorageOriginY), ref aiSequence);
+                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Storage), (ushort)c.StorageOriginX, (ushort)c.StorageOriginY), ref aiSequence);
                     break;
                 case 3050:
                 {
@@ -787,14 +795,14 @@ namespace Nova.SimRunner
                 {
                     throw new InvalidOperationException($"field {c.FieldId} could not be registered");
                 }
-                if (!host.Construction.PlaceCompletedBuilding(slot, DefHQ, c.HqOriginX, c.HqOriginY).IsValid)
+                if (!host.Construction.PlaceCompletedBuilding(slot, DefId(host, slot, UnitRole.HQ), c.HqOriginX, c.HqOriginY).IsValid)
                 {
                     throw new InvalidOperationException("HQ placement failed");
                 }
                 // The manifest's only prerequisite exception: the start
                 // Refinery exists WITHOUT a Power plant and spawns no
                 // additional Harvester.
-                if (!host.Construction.PlaceCompletedBuilding(slot, DefRefinery, c.RefineryOriginX, c.RefineryOriginY).IsValid)
+                if (!host.Construction.PlaceCompletedBuilding(slot, DefId(host, slot, UnitRole.Refinery), c.RefineryOriginX, c.RefineryOriginY).IsValid)
                 {
                     throw new InvalidOperationException("Refinery placement failed");
                 }
@@ -841,7 +849,7 @@ namespace Nova.SimRunner
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -871,7 +879,13 @@ namespace Nova.SimRunner
             };
         }
 
-        /// <summary>The standard match configuration fingerprint: slot 0 human/Alliance, slot 1 AI/Legion, stub content hashes.</summary>
+        /// <summary>
+        /// The standard match configuration fingerprint: slot 0
+        /// human/Alliance, slot 1 AI/Legion, stub rules/map hashes and the
+        /// REAL canonical definitions hash (SimDefinitions.ComputeDefinitionsHash64
+        /// — a replay recorded against a different definition table refuses
+        /// to start, SimulationCore.md section 6).
+        /// </summary>
         private static MatchFingerprint CreateFingerprint(Host host, ulong seed)
         {
             var slots = new byte[CommandLimits.ReservedPlayerSlots];
@@ -882,7 +896,7 @@ namespace Nova.SimRunner
             factions[AiSlot] = (byte)FactionId.Legion;
             return MatchFingerprint.CreateCurrent(
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
+                SimDefinitions.ComputeDefinitionsHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
                 factions,

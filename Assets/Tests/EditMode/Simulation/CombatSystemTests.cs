@@ -52,7 +52,10 @@ namespace Nova.Simulation.Tests
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
                 var fog = new FogOfWarSystem(entities, teamCount: 2, width, height);
-                var combat = new CombatSystem(entities, fog);
+                // Faction source for the combat weapon table: an unregistered
+                // economy state (all slots default to Alliance).
+                var factions = new EconomySystem(entities);
+                var combat = new CombatSystem(entities, fog, factions);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(pathfinding);
@@ -461,7 +464,7 @@ namespace Nova.Simulation.Tests
                 var movement = new MovementSystem(entities, pathfinding);
                 var economy = new EconomySystem(entities);
                 var fog = new FogOfWarSystem(entities, teamCount: 2, 64, 64);
-                var combat = new CombatSystem(entities, fog);
+                var combat = new CombatSystem(entities, fog, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(economy);
