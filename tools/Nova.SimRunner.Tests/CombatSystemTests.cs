@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Replays;
@@ -458,10 +459,12 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(64);
                 var pathfinding = new PathfindingSystem(64, 64);
                 var movement = new MovementSystem(entities, pathfinding);
+                var economy = new EconomySystem(entities);
                 var fog = new FogOfWarSystem(entities, teamCount: 2, 64, 64);
                 var combat = new CombatSystem(entities, fog);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
+                kernel.RegisterSystem(economy);
                 kernel.RegisterSystem(pathfinding);
                 kernel.RegisterSystem(movement);
                 kernel.RegisterSystem(fog);
@@ -471,7 +474,7 @@ namespace Nova.SimRunner.Tests
                     localSlot: HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
                 var ingress = new CommandIngress(session);
                 _ = new LocalLoopbackTransport(ingress);
-                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding), ingress);
+                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
 
                 kernel.Start();
                 return new ReplayHost(kernel, entities, session, ingress);

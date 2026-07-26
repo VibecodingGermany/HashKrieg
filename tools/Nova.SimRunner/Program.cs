@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
@@ -70,11 +71,14 @@ namespace Nova.SimRunner
             var entities = new EntityManager(2048);
             var pathfinding = new PathfindingSystem(128, 128);
             var movement = new MovementSystem(entities, pathfinding);
+            var economy = new EconomySystem(entities);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
             var combat = new CombatSystem(entities, fogOfWar);
 
-            // Canonical tick order (SimulationCore.md section 2): movement,
-            // then the 5 Hz FoW recompute, then combat.
+            // Canonical tick order (SimulationCore.md section 2): economy
+            // (phases 2/3) BEFORE movement (phase 6), then the 5 Hz FoW
+            // recompute, then combat.
+            kernel.RegisterSystem(economy);
             kernel.RegisterSystem(pathfinding);
             kernel.RegisterSystem(movement);
             kernel.RegisterSystem(fogOfWar);
@@ -83,7 +87,7 @@ namespace Nova.SimRunner
             var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             var ingress = new CommandIngress(session);
             _ = new LocalLoopbackTransport(ingress);
-            kernel.BindCommands(new UnitCommandStateView(entities, pathfinding), ingress);
+            kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
 
             kernel.Start();
 

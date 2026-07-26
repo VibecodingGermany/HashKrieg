@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Replays;
@@ -69,8 +70,10 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
+                var economy = new EconomySystem(entities);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
+                kernel.RegisterSystem(economy);
                 kernel.RegisterSystem(pathfinding);
                 kernel.RegisterSystem(movement);
 
@@ -78,7 +81,7 @@ namespace Nova.SimRunner.Tests
                     localSlot: HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
                 var ingress = new CommandIngress(session);
                 _ = new LocalLoopbackTransport(ingress);
-                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding), ingress);
+                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
 
                 kernel.Start();
                 return new TestHost(kernel, entities, pathfinding, session, ingress);

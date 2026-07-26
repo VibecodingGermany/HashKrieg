@@ -4,6 +4,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
@@ -70,6 +71,9 @@ namespace Nova.Gameplay.Match
         public PathfindingSystem Pathfinding { get; private set; }
         public MovementSystem Movement { get; private set; }
 
+        /// <summary>The canonical economy (credits, power, finite Aetherium harvest; SimulationCore.md section 2, phases 2/3).</summary>
+        public EconomySystem Economy { get; private set; }
+
         /// <summary>The canonical Fog of War (single committed sight for Combat/AI/snapshot/rendering, D-058).</summary>
         public FogOfWarSystem FogOfWar { get; private set; }
 
@@ -98,11 +102,14 @@ namespace Nova.Gameplay.Match
             Entities = new EntityManager(_maxUnits);
             Pathfinding = new PathfindingSystem(_mapWidth, _mapHeight);
             Movement = new MovementSystem(Entities, Pathfinding);
+            Economy = new EconomySystem(Entities);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
             Combat = new CombatSystem(Entities, FogOfWar);
 
-            // Canonical tick order (SimulationCore.md section 2): pathfinding/
-            // movement, then the FoW recompute, then combat.
+            // Canonical tick order (SimulationCore.md section 2): economy
+            // (phases 2/3) BEFORE pathfinding/movement (phase 6), then the
+            // FoW recompute, then combat.
+            Kernel.RegisterSystem(Economy);
             Kernel.RegisterSystem(Pathfinding);
             Kernel.RegisterSystem(Movement);
             Kernel.RegisterSystem(FogOfWar);
@@ -111,7 +118,7 @@ namespace Nova.Gameplay.Match
             Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             Ingress = new CommandIngress(Session);
             _transport = new LocalLoopbackTransport(Ingress);
-            Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding), Ingress);
+            Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding, Economy), Ingress);
         }
 
         public void StartMatch()

@@ -1,6 +1,7 @@
 using System;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
 
 namespace Nova.Simulation.State
@@ -8,8 +9,9 @@ namespace Nova.Simulation.State
     /// <summary>
     /// Adapter from the canonical command executor's state view
     /// (<see cref="ICommandStateView"/>) to the real unit state of this G1
-    /// slice: the <see cref="EntityManager"/> unit store and the
-    /// <see cref="PathfindingSystem"/> flow fields. The kernel applies due
+    /// slice: the <see cref="EntityManager"/> unit store, the
+    /// <see cref="PathfindingSystem"/> flow fields and the
+    /// <see cref="EconomySystem"/> field registry. The kernel applies due
     /// sealed batches exclusively through this view in tick phase 1
     /// (docs/tech/SimulationCore.md section 2); systems never see commands.
     /// <para>
@@ -21,25 +23,34 @@ namespace Nova.Simulation.State
     /// entity.
     /// </para>
     /// <para>
-    /// Slice scope: Move, Stop and AttackTarget mutate real unit state. All
-    /// other kinds (economy, construction, production, rally, module) have no
+    /// Slice scope: Move, Stop, AttackTarget, Harvest and ReturnCargo mutate
+    /// real unit state. Harvest assigns the standing
+    /// <see cref="UnitState.HarvestFieldId"/> order (and cancels a return
+    /// order); ReturnCargo assigns the standing
+    /// <see cref="UnitState.IsReturningCargo"/> order (and cancels a harvest
+    /// order); Stop clears both economy orders alongside the movement order.
+    /// A Harvest order naming an unknown field id is deliberately a no-op
+    /// (the sealed record and its deterministic Applied result stay in the
+    /// stream; a dedicated rejection result is a Q-040 candidate). The
+    /// remaining kinds (construction, production, rally, module) have no
     /// canonical domain state yet — those systems stay prototype scaffolding
-    /// in this slice — so <see cref="Apply"/> deliberately mutates nothing for
-    /// them; the sealed record and its deterministic result stay in the
-    /// stream (Commands.md section 4). <see cref="CanAfford"/> is only
+    /// in this slice — so <see cref="Apply"/> deliberately mutates nothing
+    /// for them (Commands.md section 4). <see cref="CanAfford"/> is only
     /// consulted for definition-bearing kinds and returns true until the
-    /// economy slice wires real costs (Q-040 candidate).
+    /// construction/production slices wire real costs (Q-040 candidate).
     /// </para>
     /// </summary>
     public sealed class UnitCommandStateView : ICommandStateView
     {
         private readonly EntityManager _entityManager;
         private readonly PathfindingSystem _pathfindingSystem;
+        private readonly EconomySystem _economySystem;
 
-        public UnitCommandStateView(EntityManager entityManager, PathfindingSystem pathfindingSystem)
+        public UnitCommandStateView(EntityManager entityManager, PathfindingSystem pathfindingSystem, EconomySystem economySystem)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _pathfindingSystem = pathfindingSystem ?? throw new ArgumentNullException(nameof(pathfindingSystem));
+            _economySystem = economySystem ?? throw new ArgumentNullException(nameof(economySystem));
         }
 
         /// <summary>Converts a packed wire id to a prototype handle; invalid when the generation does not fit.</summary>
@@ -76,16 +87,18 @@ namespace Nova.Simulation.State
         }
 
         /// <summary>
-        /// Always true in this slice: the economy is prototype scaffolding and
-        /// no canonical cost state exists yet. Consulted only for
-        /// definition-bearing kinds (executor contract).
+        /// Always true in this slice: no canonical cost state is wired for
+        /// the definition-bearing kinds yet (construction/production stay
+        /// prototype scaffolding). Consulted only for definition-bearing
+        /// kinds (executor contract).
         /// </summary>
         public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId) => true;
 
         /// <summary>
-        /// Applies a sealed, fully checked record. Move/Stop/AttackTarget
-        /// mutate the unit store; kinds without canonical domain state in
-        /// this slice deliberately mutate nothing (see class remarks).
+        /// Applies a sealed, fully checked record. Move/Stop/AttackTarget and
+        /// the economy orders Harvest/ReturnCargo mutate the unit store;
+        /// kinds without canonical domain state in this slice deliberately
+        /// mutate nothing (see class remarks).
         /// </summary>
         public void Apply(in CommandRecord record)
         {
@@ -113,7 +126,12 @@ namespace Nova.Simulation.State
                         EntityId id = ToEntityId(stop.EntityIds[i]);
                         if (_entityManager.IsValid(id))
                         {
-                            _entityManager.GetUnitRef(id).Stop();
+                            ref UnitState unit = ref _entityManager.GetUnitRef(id);
+                            unit.Stop();
+                            // Stop cancels every standing order, economy
+                            // orders included; the unit keeps its cargo.
+                            unit.HarvestFieldId = 0;
+                            unit.IsReturningCargo = false;
                         }
                     }
                     break;
@@ -136,9 +154,52 @@ namespace Nova.Simulation.State
                     }
                     break;
                 }
+                case CommandKind.Harvest:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!HarvestPayload.TryParse(ref reader, out HarvestPayload harvest))
+                    {
+                        throw new InvalidOperationException("Sealed Harvest payload failed to parse.");
+                    }
+                    // Unknown field id: documented no-op (see class remarks).
+                    if (!_economySystem.TryGetField(harvest.FieldId, out _))
+                    {
+                        break;
+                    }
+                    for (int i = 0; i < harvest.EntityIds.Length; i++)
+                    {
+                        EntityId id = ToEntityId(harvest.EntityIds[i]);
+                        if (_entityManager.IsValid(id))
+                        {
+                            ref UnitState unit = ref _entityManager.GetUnitRef(id);
+                            unit.HarvestFieldId = harvest.FieldId;
+                            unit.IsReturningCargo = false;
+                        }
+                    }
+                    break;
+                }
+                case CommandKind.ReturnCargo:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!ReturnCargoPayload.TryParse(ref reader, out ReturnCargoPayload returnCargo))
+                    {
+                        throw new InvalidOperationException("Sealed ReturnCargo payload failed to parse.");
+                    }
+                    for (int i = 0; i < returnCargo.EntityIds.Length; i++)
+                    {
+                        EntityId id = ToEntityId(returnCargo.EntityIds[i]);
+                        if (_entityManager.IsValid(id))
+                        {
+                            ref UnitState unit = ref _entityManager.GetUnitRef(id);
+                            unit.IsReturningCargo = true;
+                            unit.HarvestFieldId = 0;
+                        }
+                    }
+                    break;
+                }
                 default:
                     // No canonical domain state for this kind in the G1 kernel
-                    // slice (economy/construction/production stay prototype
+                    // slice (construction/production stay prototype
                     // scaffolding): deliberately no mutation.
                     break;
             }

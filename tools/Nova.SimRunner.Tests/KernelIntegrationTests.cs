@@ -2,6 +2,7 @@ using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
@@ -53,15 +54,18 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
+                var economy = new EconomySystem(entities);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 if (reverseOrder)
                 {
+                    kernel.RegisterSystem(economy);
                     kernel.RegisterSystem(movement);
                     kernel.RegisterSystem(pathfinding);
                 }
                 else
                 {
+                    kernel.RegisterSystem(economy);
                     kernel.RegisterSystem(pathfinding);
                     kernel.RegisterSystem(movement);
                 }
@@ -69,7 +73,7 @@ namespace Nova.SimRunner.Tests
                 var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
                 var ingress = new CommandIngress(session);
                 _ = new LocalLoopbackTransport(ingress);
-                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding), ingress);
+                kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
 
                 kernel.Start();
                 return new TestHost(kernel, entities, pathfinding, session, ingress);
