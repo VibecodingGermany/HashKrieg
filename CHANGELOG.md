@@ -18,6 +18,37 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Performance-Messgerüst V4/V5a (ohne Gate-Status, ohne Evidence):**
+  `tools/Nova.SimRunner` führt jetzt das Szenario `SCALE_500_PRECOMBAT` aus
+  [quality/scenarios/mvp-v1.json](quality/scenarios/mvp-v1.json) als
+  reproduzierbares Harness aus — CLI `--scenario SCALE_500_PRECOMBAT
+  [--runs 3] [--warmup-seconds 30] [--measure-seconds 120] [--agents 500]
+  [--out <dir>]` (Defaults = `performanceMethod`-Vertragswerte D-052/D-063;
+  die Artefakte protokollieren stets die tatsächlich verwendeten Werte; die
+  bisherige Demo bleibt der Default-Modus). Workload: 500 Agenten auf der
+  kanonischen 128×128-Karte, deterministischer Seed, dauerhafte Move-Last
+  über rotierende Re-Target-Slices durch die versiegelte Command-Pipeline
+  (eine Flow-Field-Regenerierung pro Tick), Movement-Spatial-Binning,
+  5-Hz-FoW-Filterung, kein Combat (Pre-Combat), daher
+  `precombatRestSimulationMs` = Gesamt-Tick − Pathfinding. Messung
+  ausschließlich im Harness (Stopwatch-Dekorateur plus neuem, dokumentiertem
+  Interception-Point: `PathfindingSystem` ist nicht mehr sealed,
+  `RequestFlowField` ist virtual — die Flow-Field-Generierung läuft in der
+  Command-Anwendung, nicht in einem System-Tick); die Sim-Quellen bleiben
+  frei von Mess-Logik, Determinismus unter aktiver Messung ist per Test
+  belegt. Pro Lauf frischer Host mit ungemessenem Warmup + gemessenem
+  Wall-Clock-Fenster, eine Rohprobe pro Tick. Artefakte strikt nach
+  D-062/D-063 (`name`/`unit`/`measurement` mit `methodRef`,
+  `warmupSeconds`, `runs[index, measurementSeconds, samples]`) pro Lauf und
+  kombiniert sowie Bool-Assertions (`no-crash`,
+  `no-unbounded-memory-growth`; dokumentierte Regel: Retained-Heap nach
+  vollem GC am Fensterende ≤ 1,10× Baseline nach Warmup) unter `output/`
+  (jetzt gitignoriert) — **keine Evidence, kein Gate-Nachweis**. Lokale
+  Diagnose auf macOS arm64 (.NET 8 Release, nicht die Windows-D-052-
+  Referenz): voller Vertragslauf (30 s + 3×120 s, ~850 Ticks/s,
+  ~307.000 Samples) — `pathfindingMs` P95 0,426 ms / P99 0,449 ms (Schwelle
+  4,0), `precombatRestSimulationMs` P95 0,940 ms / P99 1,029 ms (Schwelle
+  3,0), beide Assertionen PASS, Retained-Heap pro Lauf flach (≤ 11,3 MiB).
 - **G1-Replay (ohne Gate-Status, ohne Evidence):** kanonische Replay-Schicht
   in `Nova.Simulation.Replays` gemäß
   [docs/tech/SimulationCore.md](docs/tech/SimulationCore.md) §6/§8 —
