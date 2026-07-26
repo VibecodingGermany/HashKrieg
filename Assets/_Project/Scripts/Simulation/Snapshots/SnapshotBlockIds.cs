@@ -31,5 +31,11 @@ namespace Nova.Simulation.Snapshots
 
         /// <summary>Economy block (per-slot credits/power, Aetherium fields), written by EconomySystem.</summary>
         public const ushort Economy = FirstSystemBlock + 4;
+
+        /// <summary>Construction block (sites, finished placements, repair orders, T2 unlocks), written by ConstructionSystem.</summary>
+        public const ushort Construction = FirstSystemBlock + 5;
+
+        /// <summary>Production block (per-producer queues and rally points), written by ProductionSystem.</summary>
+        public const ushort Production = FirstSystemBlock + 6;
     }
 }
