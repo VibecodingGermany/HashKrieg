@@ -15,6 +15,8 @@ namespace Nova.Simulation.Tests
         {
             private readonly HashSet<uint> _existing = new HashSet<uint>();
             private readonly HashSet<uint> _ownedByLocal = new HashSet<uint>();
+            private readonly HashSet<uint> _fields = new HashSet<uint>();
+            private readonly HashSet<uint> _harvesters = new HashSet<uint>();
             private readonly byte _localSlot;
             public bool Affordable = true;
             public int ApplyCallCount { get; private set; }
@@ -30,12 +32,26 @@ namespace Nova.Simulation.Tests
                 if (ownedByLocal) _ownedByLocal.Add(rawId);
             }
 
+            public void AddField(uint fieldId)
+            {
+                _fields.Add(fieldId);
+            }
+
+            public void AddHarvester(uint rawId)
+            {
+                _harvesters.Add(rawId);
+            }
+
             public bool EntityExists(uint rawEntityId) => _existing.Contains(rawEntityId);
 
             public bool IsOwnedBy(byte playerSlot, uint rawEntityId)
             {
                 return playerSlot == _localSlot && _ownedByLocal.Contains(rawEntityId);
             }
+
+            public bool AetheriumFieldExists(uint fieldId) => _fields.Contains(fieldId);
+
+            public bool IsHarvester(uint rawEntityId) => _harvesters.Contains(rawEntityId);
 
             public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId) => Affordable;
 
@@ -150,6 +166,61 @@ namespace Nova.Simulation.Tests
             Assert.AreEqual(2, results.Length);
             Assert.AreEqual(CommandResultCode.Applied, results[0].Code);
             Assert.AreEqual(CommandResultCode.RejectedNotOwned, results[1].Code);
+            Assert.AreEqual(1, state.ApplyCallCount);
+        }
+
+        [Test]
+        public void Rejection_HarvestUnknownField_MutatesNothing_AndResultIsDeterministic()
+        {
+            // P2-1: a Harvest command naming an unregistered field is
+            // rejected state-dependently instead of silently applying.
+            uint actor = CommandV1TestUtil.EntityId(1, 1);
+            CommandRecord record = SealSingleRecord(new HarvestPayload(new[] { actor }, 7), out _);
+
+            var state = new FakeStateView(localSlot: 0);
+            state.AddEntity(actor, ownedByLocal: true);
+            state.AddHarvester(actor);
+            // Field 7 is not registered.
+
+            CommandResult first = CommandExecutor.Execute(record, state);
+            CommandResult second = CommandExecutor.Execute(record, state);
+
+            Assert.AreEqual(CommandResultCode.RejectedInvalidTarget, first.Code);
+            Assert.AreEqual(0, state.ApplyCallCount, "rejection must not mutate state");
+            Assert.AreEqual(first, second, "same record + same state => same result");
+        }
+
+        [Test]
+        public void Rejection_HarvestNonHarvester_MutatesNothing()
+        {
+            // P2-2: a Harvest command on a unit without the Harvester role is
+            // rejected state-dependently instead of assigning a dead order.
+            uint actor = CommandV1TestUtil.EntityId(1, 1);
+            CommandRecord record = SealSingleRecord(new HarvestPayload(new[] { actor }, 7), out _);
+
+            var state = new FakeStateView(localSlot: 0);
+            state.AddEntity(actor, ownedByLocal: true);
+            state.AddField(7);
+            // The actor has no harvester role.
+
+            CommandResult result = CommandExecutor.Execute(record, state);
+            Assert.AreEqual(CommandResultCode.RejectedInvalidTarget, result.Code);
+            Assert.AreEqual(0, state.ApplyCallCount);
+        }
+
+        [Test]
+        public void Harvest_ValidFieldAndHarvester_AppliesExactlyOnce()
+        {
+            uint actor = CommandV1TestUtil.EntityId(1, 1);
+            CommandRecord record = SealSingleRecord(new HarvestPayload(new[] { actor }, 7), out _);
+
+            var state = new FakeStateView(localSlot: 0);
+            state.AddEntity(actor, ownedByLocal: true);
+            state.AddField(7);
+            state.AddHarvester(actor);
+
+            CommandResult result = CommandExecutor.Execute(record, state);
+            Assert.AreEqual(CommandResultCode.Applied, result.Code);
             Assert.AreEqual(1, state.ApplyCallCount);
         }
     }

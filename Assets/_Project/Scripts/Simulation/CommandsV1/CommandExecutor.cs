@@ -16,6 +16,12 @@ namespace Nova.Simulation.CommandsV1
         /// <summary>True when the entity belongs to the given player slot.</summary>
         bool IsOwnedBy(byte playerSlot, uint rawEntityId);
 
+        /// <summary>True when the id names a registered Aetherium field (Harvest legality, state-dependent).</summary>
+        bool AetheriumFieldExists(uint fieldId);
+
+        /// <summary>True when the raw entity id refers to a live harvester (Harvest legality, state-dependent).</summary>
+        bool IsHarvester(uint rawEntityId);
+
         /// <summary>True when the player can pay the cost implied by kind and definition id.</summary>
         bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId);
 
@@ -26,15 +32,16 @@ namespace Nova.Simulation.CommandsV1
     /// <summary>
     /// State-dependent evaluation of sealed records at their target tick
     /// (docs/tech/Commands.md section 4). Checks run in a fixed, deterministic
-    /// order — acting entity existence, ownership, target existence, cost — so
-    /// the same record and the same state always yield the same
-    /// <see cref="CommandResult"/>. A failed check produces the deterministic
-    /// result, mutates nothing and stays in the replay.
+    /// order — acting entity existence, ownership, harvest field existence and
+    /// harvester role, target existence, cost — so the same record and the
+    /// same state always yield the same <see cref="CommandResult"/>. A failed
+    /// check produces the deterministic result, mutates nothing and stays in
+    /// the replay.
     /// <para>
     /// Vision, range, prerequisites and cooldowns are additional
     /// state-dependent checks of the full contract; the schema-v1 view models
-    /// existence, ownership and cost, and the result codes reserve the
-    /// remaining cases for the G1 integration.
+    /// existence, ownership, harvest legality and cost, and the result codes
+    /// reserve the remaining cases for the G1 integration.
     /// </para>
     /// </summary>
     public static class CommandExecutor
@@ -83,6 +90,26 @@ namespace Nova.Simulation.CommandsV1
             if (refs.TargetEntityId != 0 && !state.EntityExists(refs.TargetEntityId))
             {
                 return new CommandResult(record, CommandResultCode.RejectedInvalidTarget);
+            }
+
+            if (record.Kind == CommandKind.Harvest)
+            {
+                // Harvest legality at the target tick: the named field must
+                // exist (for Harvest the refs definition slot carries the
+                // field id) and every acting entity must be a harvester.
+                // Both failures are RejectedInvalidTarget — the order of the
+                // two checks is fixed, so the result stays deterministic.
+                if (!state.AetheriumFieldExists(refs.DefinitionId))
+                {
+                    return new CommandResult(record, CommandResultCode.RejectedInvalidTarget);
+                }
+                for (int i = 0; i < refs.ActingEntities.Length; i++)
+                {
+                    if (!state.IsHarvester(refs.ActingEntities[i]))
+                    {
+                        return new CommandResult(record, CommandResultCode.RejectedInvalidTarget);
+                    }
+                }
             }
 
             if (refs.DefinitionId != 0

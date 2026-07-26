@@ -46,6 +46,16 @@ namespace Nova.Simulation.Economy
     /// part of this slice (Q-040 candidates); orders come from commands only.
     /// </para>
     /// <para>
+    /// Harvester contention (review finding P2-3): when several harvesters
+    /// work the same field and the remaining reserve is smaller than the
+    /// combined per-tick demand, the strict ascending entity-index sweep
+    /// decides — the harvester with the LOWER index collects first, and a
+    /// later one may find the field already exhausted inside the same tick.
+    /// This is deterministic and spec-conform (SimulationCore.md section 2
+    /// phase order, same precedent as the combat duel asymmetry) but
+    /// economy-relevant and therefore stated explicitly.
+    /// </para>
+    /// <para>
     /// Scope (G2 reservation, D-010): fields are finite and never regrow,
     /// spread or take overharvest damage; there is no mother node and no
     /// depletion warning. Faction differences are not modeled: every

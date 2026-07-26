@@ -29,15 +29,16 @@ namespace Nova.Simulation.State
     /// order); ReturnCargo assigns the standing
     /// <see cref="UnitState.IsReturningCargo"/> order (and cancels a harvest
     /// order); Stop clears both economy orders alongside the movement order.
-    /// A Harvest order naming an unknown field id is deliberately a no-op
-    /// (the sealed record and its deterministic Applied result stay in the
-    /// stream; a dedicated rejection result is a Q-040 candidate). The
-    /// remaining kinds (construction, production, rally, module) have no
-    /// canonical domain state yet — those systems stay prototype scaffolding
-    /// in this slice — so <see cref="Apply"/> deliberately mutates nothing
-    /// for them (Commands.md section 4). <see cref="CanAfford"/> is only
-    /// consulted for definition-bearing kinds and returns true until the
-    /// construction/production slices wire real costs (Q-040 candidate).
+    /// Harvest legality is validated state-dependently by the executor before
+    /// <see cref="Apply"/> runs: an unknown field id or a non-harvester actor
+    /// is rejected with RejectedInvalidTarget and mutates nothing (review
+    /// fixes P2-1/P2-2). The remaining kinds (construction, production,
+    /// rally, module) have no canonical domain state yet — those systems stay
+    /// prototype scaffolding in this slice — so <see cref="Apply"/>
+    /// deliberately mutates nothing for them (Commands.md section 4).
+    /// <see cref="CanAfford"/> is only consulted for definition-bearing kinds
+    /// and returns true until the construction/production slices wire real
+    /// costs (Q-040 candidate).
     /// </para>
     /// </summary>
     public sealed class UnitCommandStateView : ICommandStateView
@@ -84,6 +85,25 @@ namespace Nova.Simulation.State
         {
             EntityId id = ToEntityId(rawEntityId);
             return _entityManager.TryGetUnit(id, out UnitState unit) && unit.PlayerId == playerSlot;
+        }
+
+        /// <summary>
+        /// State-dependent Harvest legality: true when the id names a
+        /// registered Aetherium field at the target tick.
+        /// </summary>
+        public bool AetheriumFieldExists(uint fieldId)
+        {
+            return fieldId <= ushort.MaxValue && _economySystem.TryGetField((ushort)fieldId, out _);
+        }
+
+        /// <summary>
+        /// State-dependent Harvest legality: true when the raw entity id
+        /// refers to a live unit with the Harvester role at the target tick.
+        /// </summary>
+        public bool IsHarvester(uint rawEntityId)
+        {
+            EntityId id = ToEntityId(rawEntityId);
+            return _entityManager.TryGetUnit(id, out UnitState unit) && unit.Role == UnitRole.Harvester;
         }
 
         /// <summary>
@@ -161,7 +181,10 @@ namespace Nova.Simulation.State
                     {
                         throw new InvalidOperationException("Sealed Harvest payload failed to parse.");
                     }
-                    // Unknown field id: documented no-op (see class remarks).
+                    // Defensive contract of Apply: the executor's
+                    // state-dependent field check already rejected unknown
+                    // ids, so this guard can only trigger on a broken
+                    // executor/view pairing, never on canonical input.
                     if (!_economySystem.TryGetField(harvest.FieldId, out _))
                     {
                         break;

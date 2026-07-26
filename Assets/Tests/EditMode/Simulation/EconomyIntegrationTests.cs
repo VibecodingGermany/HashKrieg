@@ -368,5 +368,107 @@ namespace Nova.Simulation.Tests
             Assert.That(host.Entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(10),
                 "no gathering after the order was cleared");
         }
+
+        [Test]
+        public void Harvest_OnNonHarvester_IsRejectedInvalidTarget_AndAssignsNoOrder()
+        {
+            var host = EcoHost.Create(Seed);
+            Assert.That(host.Economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
+            EntityId soldier = host.Entities.SpawnUnit(
+                0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(4));
+            uint rawSoldier = UnitCommandStateView.ToRawEntityId(soldier);
+
+            host.SubmitHarvest(new[] { rawSoldier }, 1);
+            host.StepTick();
+
+            Assert.That(host.Kernel.LastTickResults.Count, Is.EqualTo(1));
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "P2-2: a non-harvester actor is rejected state-dependently");
+            Assert.That(host.Entities.GetUnitRef(soldier).HarvestFieldId, Is.EqualTo((ushort)0),
+                "a rejected Harvest assigns no order");
+            Assert.That(host.Entities.GetUnitRef(soldier).CargoAE, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Harvest_OnUnknownField_IsRejectedInvalidTarget_AndAssignsNoOrder()
+        {
+            var host = EcoHost.Create(Seed);
+            (uint rawHarvester, EntityId harvester) = host.SpawnHarvestFixture(0, 1, 9000);
+
+            host.SubmitHarvest(new[] { rawHarvester }, 7); // field 7 is not registered
+            host.StepTick();
+
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "P2-1: an unknown field id is rejected state-dependently");
+            Assert.That(host.Entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)0),
+                "a rejected Harvest assigns no order");
+        }
+
+        [Test]
+        public void Replay_WithHarvestRejections_PlaybackReproducesResultsAndEndHash()
+        {
+            // The two rejection cases stay in the recorded stream with their
+            // deterministic RejectedInvalidTarget results; playback
+            // re-executes them to the identical results and end state hash.
+            var host = EcoHost.Create(Seed);
+            (uint rawHarvester, _) = host.SpawnHarvestFixture(0, 1, 9000);
+            EntityId soldier = host.Entities.SpawnUnit(
+                0, new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)), SimFixed.FromInt(4));
+            uint rawSoldier = UnitCommandStateView.ToRawEntityId(soldier);
+
+            var slots = new byte[CommandLimits.ReservedPlayerSlots];
+            slots[0] = (byte)PlayerSlotOccupancy.Human;
+            slots[1] = (byte)PlayerSlotOccupancy.AI;
+            MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
+                slots,
+                Seed,
+                host.Kernel.CalculateStateHash(),
+                host.Session.InputDelayTicks);
+            var recorder = new ReplayRecorder(fingerprint, host.Kernel.SaveSnapshot());
+
+            for (int tick = 1; tick <= 30; tick++)
+            {
+                if (tick == 1)
+                {
+                    host.SubmitHarvest(new[] { rawHarvester }, 7); // unknown field -> rejected
+                }
+                if (tick == 5)
+                {
+                    host.SubmitHarvest(new[] { rawSoldier }, 1); // non-harvester -> rejected
+                }
+                if (tick == 10)
+                {
+                    host.SubmitHarvest(new[] { rawHarvester }, 1); // valid -> applied
+                }
+                if (tick == 25)
+                {
+                    host.SubmitReturnCargo(new[] { rawHarvester });
+                }
+                CommandBatch batch = host.StepTick();
+                recorder.RecordTick(host.Kernel.CurrentTick.Value, batch, host.Kernel.LastTickResults);
+            }
+            ulong endHash = host.Kernel.CalculateStateHash();
+            byte[] replayBytes = recorder.Finalize(endHash);
+
+            Assert.That(ReplayFile.TryParse(replayBytes, out ReplayFile replay, out ReplayReadError readError),
+                Is.True, () => $"parse failed: {readError}");
+            Assert.That(replay.Frames[0].ResultCodes[0], Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "the unknown-field rejection stays in the stream");
+            Assert.That(replay.Frames[4].ResultCodes[0], Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "the non-harvester rejection stays in the stream");
+            Assert.That(replay.Frames[9].ResultCodes[0], Is.EqualTo(CommandResultCode.Applied),
+                "the valid harvest applies");
+
+            var playback = EcoHost.Create(Seed);
+            Assert.That(
+                ReplayPlayer.TryPlay(replayBytes, fingerprint, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.True, () => $"playback failed: {error} ({detail})");
+            Assert.That(playback.Kernel.CalculateStateHash(), Is.EqualTo(endHash),
+                "playback re-executes the rejections to the identical results and end state hash");
+        }
     }
 }
