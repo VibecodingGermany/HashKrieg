@@ -33,6 +33,12 @@ namespace Nova.Gameplay.Match
             _matchRunner.InitializeMatch(seed: 0xAE70123456789000UL, width: _mapWidth, height: _mapHeight, maxUnits: 1024);
             _viewManager.Initialize(_matchRunner);
 
+            // The debug units below are spawned for playerId 1 while the session's
+            // local slot is 0. UnitViewManager now renders only the committed Fog
+            // of War view of the viewer team, so without this override this debug
+            // scene would render nothing at all.
+            _viewManager.SetViewerTeamOverride(1);
+
             _matchRunner.StartMatch();
 
             // Set flow field target

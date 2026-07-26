@@ -10,6 +10,13 @@ namespace Nova.Simulation.Movement
     /// Combines Flow-Field direction vectors with O(N) spatial grid separation steering.
     /// Runs on the canonical fixed tick rate (<see cref="SimClock.TicksPerSecond"/> = 10 Hz).
     /// <para>
+    /// Every unit follows the flow field of its OWN
+    /// <see cref="UnitState.TargetGridPos"/>, looked up in the pathfinding
+    /// system's bounded multi-destination cache. Reading one shared global
+    /// field instead would make any new Move command retarget every already
+    /// moving unit on the map.
+    /// </para>
+    /// <para>
     /// Q-040(i) resolution (implemented, ratification pending): the whole
     /// tick path computes in canonical fixed-point — <see cref="SimFixed"/>
     /// positions/speeds, <see cref="SimAngle"/> headings and the purely
@@ -120,8 +127,14 @@ namespace Nova.Simulation.Movement
                     continue;
                 }
 
-                // Query flow direction vector
-                Direction2D flowDir = _pathfindingSystem.FlowField.GetDirection(gridX, gridY);
+                // Query the flow direction of THIS unit's own destination.
+                // Pure cache lookup, never a generation: a miss (destination
+                // evicted from the bounded cache) yields Direction2D.None and
+                // falls through to the direct-steering path below.
+                FlowField field = _pathfindingSystem.GetField(unit.TargetGridPos);
+                Direction2D flowDir = field != null
+                    ? field.GetDirection(gridX, gridY)
+                    : Direction2D.None;
                 var (flowDx, flowDy) = Direction2DUtility.GetOffset(flowDir);
 
                 SimFixed moveDx = SimFixed.FromInt(flowDx);

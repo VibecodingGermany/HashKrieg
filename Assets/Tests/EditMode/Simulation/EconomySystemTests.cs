@@ -142,7 +142,7 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void Harvest_StopsAtCapacity_AndResolvesTheOrder()
+        public void Harvest_StopsAtCapacity_AndStartsTheReturnLeg()
         {
             EntityManager entities = CreateEntities();
             var kernel = new SimulationKernel(new SimRandom(42UL));
@@ -160,13 +160,14 @@ namespace Nova.Simulation.Tests
             unit = ref entities.GetUnitRef(harvester);
             Assert.That(unit.CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
                 "only the free cargo space is gathered");
-            Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)0), "full cargo resolves the order (no auto-return in this slice)");
+            Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)1), "the field id is retained for the auto-cycle");
+            Assert.That(unit.IsReturningCargo, Is.True, "a full cargo starts the return leg");
             Assert.That(economy.TryGetField(1, out AetheriumField field), Is.True);
             Assert.That(field.RemainingAE, Is.EqualTo(8999L));
 
             kernel.StepTick();
             Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
-                "no further gathering once the order resolved");
+                "no further gathering while the return leg holds without a refinery in reach");
         }
 
         [Test]

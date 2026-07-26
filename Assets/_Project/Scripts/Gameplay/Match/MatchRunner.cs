@@ -50,8 +50,17 @@ namespace Nova.Gameplay.Match
     /// submits it to the kernel (the only intake) and steps. Systems never
     /// see commands — the kernel applies them in tick phase 1.
     /// </para>
+    /// <para>
+    /// Execution order -100: device input runs at -200 and must have enqueued
+    /// this frame's intents BEFORE the runner seals the next tick's batch here.
+    /// Without a pinned order the observed command latency is frame-ordering
+    /// noise instead of the deterministic one-tick input delay. View code
+    /// (UnitViewManager, RtsCameraController) reads in LateUpdate and is
+    /// therefore always downstream of the step.
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
+    [DefaultExecutionOrder(-100)]
     public class MatchRunner : MonoBehaviour
     {
         /// <summary>Canonical fixed tick delta (10 Hz, docs/tech/SimulationCore.md section 2).</summary>

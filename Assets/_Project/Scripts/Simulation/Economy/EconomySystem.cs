@@ -37,15 +37,32 @@ namespace Nova.Simulation.Economy
     /// <see cref="UnitState.HarvestFieldId"/> order whose grid cell is the
     /// field's cell or adjacent (Chebyshev distance &lt;= 1, documented
     /// reach rule) gathers <see cref="HarvestRateAE"/> per tick, bounded by
-    /// the field's remaining reserve and the free cargo space. The order
-    /// resolves (unit goes idle, keeps its cargo) when the cargo is full or
-    /// the field is exhausted; out-of-reach orders are HELD, never dropped —
+    /// the field's remaining reserve and the free cargo space. A FULL cargo
+    /// no longer resolves the order: the harvester flips to
+    /// <see cref="UnitState.IsReturningCargo"/> and KEEPS its
+    /// <see cref="UnitState.HarvestFieldId"/>, so after the deposit it
+    /// resumes the very same field by itself. An EXHAUSTED field still
+    /// resolves the order — the harvester goes idle and keeps whatever cargo
+    /// it holds. Out-of-reach orders are HELD, never dropped —
     /// closing the distance is Movement's concern. A harvester with a
     /// standing <see cref="UnitState.IsReturningCargo"/> order deposits its
     /// full cargo at an own refinery in reach (same Chebyshev rule): credits
-    /// rise by exactly the cargo amount and the order resolves. Automatic
-    /// return-on-full and harvest-on-arrival behaviors are deliberately NOT
-    /// part of this slice (Q-040 candidates); orders come from commands only.
+    /// rise by exactly the cargo amount and the return leg resolves.
+    /// </para>
+    /// <para>
+    /// Auto-cycle (harvest -&gt; return -&gt; harvest, Q-040 resolution): the
+    /// cycle is carried entirely by the RETAINED field id and adds no new
+    /// state — while returning, both order fields are set at once, which is
+    /// exactly why the return leg has dispatch priority in
+    /// <see cref="ExecuteHarvest"/>. An EXPLICIT ReturnCargo command keeps
+    /// its previous semantics: the command view clears
+    /// <see cref="UnitState.HarvestFieldId"/>, so a manually ordered return
+    /// ends in idle and never auto-resumes; Stop clears both fields and
+    /// cancels the cycle outright. Caveat, stated explicitly: the cycle only
+    /// closes when the harvester actually stands in reach of an own refinery.
+    /// This system issues NO movement (phase 6 concern), so a harvester whose
+    /// refinery is out of reach holds its full cargo indefinitely until
+    /// something else moves it.
     /// </para>
     /// <para>
     /// Harvester contention (review finding P2-3): when several harvesters
@@ -228,20 +245,26 @@ namespace Nova.Simulation.Economy
                 ref UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.Role != UnitRole.Harvester) continue;
 
-                if (unit.HarvestFieldId != 0)
-                {
-                    ExecuteHarvestOrder(ref unit);
-                }
-                else if (unit.IsReturningCargo)
+                // The return leg wins the dispatch: during an auto-cycle the
+                // harvester carries BOTH a returning flag and its retained
+                // field id, and the cargo must be delivered before the same
+                // field is worked again. Command-issued orders are unaffected
+                // — the command view keeps the two fields mutually exclusive.
+                if (unit.IsReturningCargo)
                 {
                     ExecuteReturnOrder(ref unit);
+                }
+                else if (unit.HarvestFieldId != 0)
+                {
+                    ExecuteHarvestOrder(ref unit);
                 }
             }
         }
 
         /// <summary>
         /// One harvest order: in reach, bounded by reserve and free cargo;
-        /// resolves on full cargo or exhausted field, holds out of reach.
+        /// starts the return leg on a full cargo (field id retained), resolves
+        /// to idle on an exhausted field, holds out of reach.
         /// </summary>
         private void ExecuteHarvestOrder(ref UnitState unit)
         {
@@ -268,18 +291,28 @@ namespace Nova.Simulation.Economy
             long gathered = Math.Min(HarvestRateAE, Math.Min(field.RemainingAE, freeCargo));
             if (gathered <= 0)
             {
-                // Cargo full: the order resolves; the unit idles with its
-                // load until a ReturnCargo command arrives (no auto-return
-                // in this slice — Q-040 candidate).
-                unit.HarvestFieldId = 0;
+                // The field is not exhausted (checked above) and the rate is
+                // positive, so the only way to gather nothing is a full
+                // cargo: start the return leg, keeping the field id.
+                unit.IsReturningCargo = true;
                 return;
             }
 
             unit.CargoAE += (int)gathered;
             field.RemainingAE -= gathered;
 
-            if (unit.CargoAE >= UnitState.DefaultCargoCapacityAE || field.IsExhausted)
+            if (unit.CargoAE >= UnitState.DefaultCargoCapacityAE)
             {
+                // Full cargo: return first, then auto-resume THIS field. The
+                // retained field id is the entire auto-cycle mechanism — it
+                // deliberately takes precedence over an exhausted field so a
+                // final load still gets delivered instead of being stranded.
+                unit.IsReturningCargo = true;
+            }
+            else if (field.IsExhausted)
+            {
+                // Exhaustion with a partial load resolves the order as before
+                // — the harvester goes idle and keeps its cargo.
                 unit.HarvestFieldId = 0;
             }
         }
@@ -287,6 +320,10 @@ namespace Nova.Simulation.Economy
         /// <summary>
         /// One return order: deposits the full cargo at an own refinery in
         /// reach (credits rise by exactly the cargo); holds out of reach.
+        /// Clearing the returning flag alone resumes an auto-cycle, because
+        /// the retained <see cref="UnitState.HarvestFieldId"/> is picked up by
+        /// the harvest branch on the next tick. A command-issued return
+        /// carries no field id and therefore ends in idle.
         /// </summary>
         private void ExecuteReturnOrder(ref UnitState unit)
         {

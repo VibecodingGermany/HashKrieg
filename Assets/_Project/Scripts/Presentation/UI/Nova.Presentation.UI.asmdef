@@ -1,11 +1,11 @@
 {
-    "name": "Nova.Gameplay",
-    "rootNamespace": "Nova.Gameplay",
+    "name": "Nova.Presentation.UI",
+    "rootNamespace": "Nova.Presentation.UI",
     "references": [
         "Nova.Core",
         "Nova.Simulation",
-        "Nova.AI",
-        "Nova.Data"
+        "Nova.Data",
+        "Nova.Gameplay"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
