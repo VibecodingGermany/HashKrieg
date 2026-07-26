@@ -389,9 +389,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   `ReturnCargo` liefert bei eigener Refinery in Reichweite exakt das Cargo in
   die Credits. Cargo und Harvest-Orders liegen im `UnitState` (EntityStore-
   Block 100 **v4**, harter Schnitt wie bei v3), nicht doppelt im Economy-Block.
-  `UnitCommandStateView` verdrahtet `Harvest`/`ReturnCargo` (unbekannte
-  FieldId = dokumentierter No-op, Q-040-Kandidat) und räumt Economy-Orders
-  bei `Stop` ab. Registrierung in `MatchRunner` und `Nova.SimRunner`:
+  `UnitCommandStateView` verdrahtet `Harvest`/`ReturnCargo` (Harvest-Legalität
+  zustandsabhängig: unbekannte FieldId oder Nicht-Harvester →
+  `RejectedInvalidTarget`, siehe „Behoben" P2-1/P2-2) und räumt Economy-Orders
+  bei `Stop` ab. Harvester-Konkurrenz am selben Feld (P2-3): bei Restreserve
+  unter der kombinierten Tick-Nachfrage entscheidet die strikt aufsteigende
+  Index-Reihenfolge — der Harvester mit dem kleineren Index sammelt zuerst
+  (deterministisch, spec-konform, selbes Muster wie die Combat-Duell-
+  Asymmetrie; im `EconomySystem`-Klassenkommentar dokumentiert). Registrierung in `MatchRunner` und `Nova.SimRunner`:
   Economy VOR Pathfinding/Movement (§2 Phasen 2/3 vor 6) — ein Harvester am
   Feld sammelt, bevor Movement desselben Ticks läuft (dokumentiert); der
   SimRunner-End-Hash ändert sich dadurch erwartungsgemäß (ehrlich neu
@@ -408,6 +413,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Intents und End-Hash-Verifikation.
 
 ### Behoben
+- **Harvest-Orders ohne zustandsabhängige Validierung (Review-Befunde
+  P2-1/P2-2):** `Harvest` auf eine unbekannte FieldId wurde still als No-op
+  „angewendet", `Harvest` auf Nicht-Harvester vergab eine tote Order, die das
+  Economy-System ignorierte. `ICommandStateView` kennt jetzt
+  `AetheriumFieldExists` und `IsHarvester`; der `CommandExecutor` prüft beide
+  für `CommandKind.Harvest` in fester Reihenfolge (Feld, dann Rolle) und
+  lehnt mit `RejectedInvalidTarget` ab — deterministisch, ohne Mutation, der
+  Record bleibt im Replay-Strom und wird beim Playback exakt reproduziert
+  (Tests in beiden Lanes: Executor-Doubles, Kernel-Rejects ohne
+  Order-Vergabe, Replay mit beiden Reject-Fällen und End-Hash-Verifikation).
 - **EditMode-Testzählung im Gate-Runner:** `run_gate_check.py` zählte
   `result="Passed"`-Vorkommen inklusive NUnit-Fixture-/Suite-Knoten und
   überzählte damit systematisch (z. B. 274 statt echter 212 Testfälle).
