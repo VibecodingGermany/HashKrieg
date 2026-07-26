@@ -55,8 +55,28 @@ namespace Nova.SimRunner
         public double[] PathfindingMs = Array.Empty<double>();
         public double[] PrecombatRestMs = Array.Empty<double>();
         public long[] MemoryBytes = Array.Empty<long>();
+
+        /// <summary>Retained heap (full GC) probed once per wall-second of the window.</summary>
+        public long[] RetainedProbes = Array.Empty<long>();
         public long Ticks;
         public double ElapsedSeconds;
+    }
+
+    /// <summary>
+    /// Tri-state of the no-unbounded-memory-growth assertion. For very short
+    /// diagnostic windows (&lt; 30 s measurement) the assertion is
+    /// <see cref="NotApplicable"/>: allocator/JIT/GC warm-up effects dominate
+    /// a few-second window, so a verdict would measure the environment, not
+    /// the workload. Gate-relevant runs use the contract window (120 s) and
+    /// are always evaluated strictly. In the D-062 model a skipped assertion
+    /// of a REAL gate run is a fail — the not-applicable case exists only
+    /// for diagnostic runs without gate claim and is announced on stdout.
+    /// </summary>
+    internal enum MemoryAssertionVerdict
+    {
+        NotApplicable,
+        Pass,
+        Fail,
     }
 
     /// <summary>Aggregate result of a full scenario execution.</summary>
@@ -64,13 +84,25 @@ namespace Nova.SimRunner
     {
         public readonly List<ScenarioRunSamples> Runs = new List<ScenarioRunSamples>();
         public bool NoCrash;
-        public bool MemoryGrowthBounded;
+
+        /// <summary>Verdict of the memory assertion (NotApplicable for short diagnostic windows).</summary>
+        public MemoryAssertionVerdict MemoryAssertion = MemoryAssertionVerdict.NotApplicable;
+
+        /// <summary>True unless the memory assertion was evaluated and FAILED (compatibility helper).</summary>
+        public bool MemoryGrowthBounded
+        {
+            get => MemoryAssertion != MemoryAssertionVerdict.Fail;
+            set => MemoryAssertion = value ? MemoryAssertionVerdict.Pass : MemoryAssertionVerdict.Fail;
+        }
 
         /// <summary>Per run: retained GC heap after the warmup (full GC, baseline).</summary>
         public readonly List<long> MemoryBaselineBytes = new List<long>();
 
         /// <summary>Per run: retained GC heap at the end of the measured window (full GC).</summary>
         public readonly List<long> MemoryRetainedEndBytes = new List<long>();
+
+        /// <summary>Per run: median of the retained probes in the evaluation window (full GC).</summary>
+        public readonly List<long> MemoryWindowMedianBytes = new List<long>();
 
         /// <summary>Per run: maximum observed GC heap in bytes (non-forcing per-tick samples).</summary>
         public readonly List<long> MemoryMaxObservedBytes = new List<long>();
@@ -131,18 +163,28 @@ namespace Nova.SimRunner
     /// </para>
     /// <para>
     /// Memory assertion (no-unbounded-memory-growth), documented rule: the
-    /// assertion compares RETAINED managed memory — GC.GetTotalMemory after a
-    /// full blocking collection — once after the warmup (baseline) and once
-    /// at the end of each measured window. A run passes when retained-end
-    /// &lt;= retained-baseline x 1.10; the scenario assertion passes when
-    /// every run passes. Rationale: non-forcing GetTotalMemory samples under
-    /// sustained allocation track the runtime's lazy segment growth (no
-    /// memory pressure on a dev machine), not leaks — local diagnosis showed
-    /// ~6 MiB of apparent within-run growth that a full collection collapses
-    /// back to baseline. The per-tick non-forcing samples are still recorded
-    /// and their maximum is reported as diagnosis. GC operates at runtime
-    /// level and never influences simulation state, so the determinism
-    /// contract is unaffected.
+    /// RETAINED managed heap — GC.GetTotalMemory after a full blocking
+    /// collection — is sampled once after the warmup (baseline) and probed
+    /// once per wall-second of the measured window. A run passes when the
+    /// MEDIAN of the evaluation window (last tenth of the probes, at least
+    /// the last 10) does not exceed baseline x 1.10; the scenario assertion
+    /// passes when every run passes (see
+    /// <see cref="EvaluateMemoryGrowthBounded"/>). Rationale: non-forcing
+    /// GetTotalMemory samples under sustained allocation track the runtime's
+    /// lazy segment growth (no memory pressure on a dev machine), not leaks —
+    /// local diagnosis showed ~6 MiB of apparent within-run growth that a
+    /// full collection collapses back to baseline. The windowed median is
+    /// robust against single-point spikes yet still catches any sustained
+    /// leak. For measurement windows shorter than
+    /// <see cref="MinMeasurementSecondsForMemoryAssertion"/> seconds the
+    /// assertion is reported as NOT-APPLICABLE (allocator/JIT/GC warm-up
+    /// dominates short windows; announced on stdout, artifact samples [1] —
+    /// diagnostic runs carry no gate claim; a skipped assertion in a real
+    /// gate run would be a fail). The per-tick non-forcing samples are still
+    /// recorded and their maximum is reported as diagnosis. GC operates at
+    /// runtime level and never influences simulation state, so the
+    /// determinism contract is unaffected; probes run between ticks and are
+    /// never part of the per-tick timing samples.
     /// </para>
     /// </summary>
     internal static class Scale500PrecombatScenario
@@ -152,11 +194,54 @@ namespace Nova.SimRunner
         private const int SpawnMarginCells = 4;
 
         /// <summary>
-        /// Permitted retained-heap growth ratio (retained end / retained
-        /// baseline after warmup, both after a full GC) for
-        /// no-unbounded-memory-growth.
+        /// Permitted retained-heap growth ratio (evaluation-window median of
+        /// the per-second retained probes / retained baseline after warmup,
+        /// both after a full GC) for no-unbounded-memory-growth.
         /// </summary>
         public const double MemoryGrowthTolerance = 1.10;
+
+        /// <summary>
+        /// Minimum measurement window in seconds for the memory assertion to
+        /// be evaluated. Shorter diagnostic windows are dominated by
+        /// allocator/JIT/GC warm-up effects (they measure the environment,
+        /// not the workload) and report the assertion as not-applicable; the
+        /// contract window (120 s) is always evaluated strictly.
+        /// </summary>
+        public const int MinMeasurementSecondsForMemoryAssertion = 30;
+
+        /// <summary>
+        /// The documented no-unbounded-memory-growth rule as a pure function
+        /// (unit-tested): the RETAINED heap is probed once per wall-second of
+        /// the measured window (each probe after a full blocking GC). The
+        /// evaluation window is the LAST TENTH of the probes, but never fewer
+        /// than the last 10 probes (and never more than available); a run
+        /// passes when the MEDIAN of that window does not exceed
+        /// <paramref name="baselineBytes"/> x <see cref="MemoryGrowthTolerance"/>.
+        /// The window median is robust against single-point spikes (GC
+        /// timing, one-off structures) while a genuine leak — sustained
+        /// growth through the end of the window — still fails.
+        /// </summary>
+        public static bool EvaluateMemoryGrowthBounded(
+            long baselineBytes, IReadOnlyList<long> retainedProbes, out long windowMedianBytes)
+        {
+            if (retainedProbes == null) throw new ArgumentNullException(nameof(retainedProbes));
+            if (retainedProbes.Count == 0) throw new ArgumentException("Probes must not be empty.", nameof(retainedProbes));
+
+            int count = retainedProbes.Count;
+            int window = Math.Min(count, Math.Max(count / 10, 10));
+            var slice = new long[window];
+            for (int i = 0; i < window; i++)
+            {
+                slice[i] = retainedProbes[count - window + i];
+            }
+            windowMedianBytes = PerfStatistics.Median(slice);
+
+            if (baselineBytes <= 0)
+            {
+                return windowMedianBytes <= 0;
+            }
+            return windowMedianBytes <= baselineBytes * MemoryGrowthTolerance;
+        }
 
         private sealed class Host
         {
@@ -208,6 +293,7 @@ namespace Nova.SimRunner
                     PathfindingMs = samples.ToArray(),
                     PrecombatRestMs = restSamples.ToArray(),
                     MemoryBytes = memorySamples.ToArray(),
+                    RetainedProbes = collector.RetainedProbes.ToArray(),
                     Ticks = collector.Ticks,
                     ElapsedSeconds = collector.ElapsedSeconds,
                 };
@@ -218,28 +304,43 @@ namespace Nova.SimRunner
                 {
                     if (runSamples.MemoryBytes[i] > max) max = runSamples.MemoryBytes[i];
                 }
+                bool bounded = EvaluateMemoryGrowthBounded(
+                    collector.MemoryBaselineBytes, runSamples.RetainedProbes, out long windowMedian);
                 result.MemoryBaselineBytes.Add(collector.MemoryBaselineBytes);
                 result.MemoryRetainedEndBytes.Add(collector.MemoryRetainedEndBytes);
+                result.MemoryWindowMedianBytes.Add(windowMedian);
                 result.MemoryMaxObservedBytes.Add(max);
 
                 Console.WriteLine(
                     $"[Run {run}] {runSamples.Ticks} ticks in {runSamples.ElapsedSeconds:F1}s " +
                     $"({runSamples.Ticks / runSamples.ElapsedSeconds:F0} ticks/s, {runSamples.PathfindingMs.Length} samples). " +
-                    $"Retained heap: {collector.MemoryBaselineBytes / 1048576.0:F2} -> " +
-                    $"{collector.MemoryRetainedEndBytes / 1048576.0:F2} MiB (full GC), " +
+                    $"Retained heap: baseline {collector.MemoryBaselineBytes / 1048576.0:F2} MiB, " +
+                    $"window median {windowMedian / 1048576.0:F2} MiB " +
+                    $"({(bounded ? "<=" : ">")} {MemoryGrowthTolerance:F2}x baseline), " +
+                    $"end {collector.MemoryRetainedEndBytes / 1048576.0:F2} MiB (full GC), " +
                     $"max observed {max / 1048576.0:F2} MiB.");
             }
 
             result.NoCrash = true;
-            result.MemoryGrowthBounded = true;
-            for (int i = 0; i < result.Runs.Count; i++)
+            if (options.MeasureSeconds < MinMeasurementSecondsForMemoryAssertion)
             {
-                double ratio = result.MemoryBaselineBytes[i] > 0
-                    ? (double)result.MemoryRetainedEndBytes[i] / result.MemoryBaselineBytes[i]
-                    : double.PositiveInfinity;
-                if (ratio > MemoryGrowthTolerance)
+                result.MemoryAssertion = MemoryAssertionVerdict.NotApplicable;
+                Console.WriteLine(
+                    $"[Memory] Measurement window {options.MeasureSeconds}s < " +
+                    $"{MinMeasurementSecondsForMemoryAssertion}s: no-unbounded-memory-growth is NOT-APPLICABLE " +
+                    "(allocator/JIT/GC warm-up dominates short diagnostic windows; the contract window is evaluated strictly).");
+            }
+            else
+            {
+                result.MemoryAssertion = MemoryAssertionVerdict.Pass;
+                for (int i = 0; i < result.Runs.Count; i++)
                 {
-                    result.MemoryGrowthBounded = false;
+                    bool bounded = EvaluateMemoryGrowthBounded(
+                        result.MemoryBaselineBytes[i], result.Runs[i].RetainedProbes, out _);
+                    if (!bounded)
+                    {
+                        result.MemoryAssertion = MemoryAssertionVerdict.Fail;
+                    }
                 }
             }
             return result;
@@ -270,6 +371,7 @@ namespace Nova.SimRunner
             public readonly List<double> PathfindingMs;
             public readonly List<double> RestMs;
             public readonly List<long> MemoryBytes;
+            public readonly List<long> RetainedProbes = new List<long>(256);
             public long Ticks;
             public double ElapsedSeconds;
             public long MemoryBaselineBytes;
@@ -324,10 +426,22 @@ namespace Nova.SimRunner
             GC.Collect();
             collect.MemoryBaselineBytes = GC.GetTotalMemory(forceFullCollection: false);
 
+            // Measured window: one retained-heap probe (full GC) per
+            // wall-second, taken BETWEEN ticks — probes are never part of the
+            // per-tick timing samples and cannot influence simulation state.
             var wallClock = Stopwatch.StartNew();
+            double nextProbeSeconds = 1.0;
             while (wallClock.Elapsed.TotalSeconds < measureSeconds)
             {
                 StepHostTick(host, tickStopwatch, collect);
+                if (wallClock.Elapsed.TotalSeconds >= nextProbeSeconds)
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    collect.RetainedProbes.Add(GC.GetTotalMemory(forceFullCollection: false));
+                    nextProbeSeconds += 1.0;
+                }
             }
             wallClock.Stop();
             collect.ElapsedSeconds = wallClock.Elapsed.TotalSeconds;

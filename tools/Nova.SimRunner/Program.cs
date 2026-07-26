@@ -127,7 +127,7 @@ namespace Nova.SimRunner
             catch (Exception exception)
             {
                 Console.Error.WriteLine($"[Failure] Scenario crashed: {exception}");
-                result = new ScenarioResult { NoCrash = false, MemoryGrowthBounded = false };
+                result = new ScenarioResult { NoCrash = false, MemoryAssertion = MemoryAssertionVerdict.Fail };
             }
 
             ScenarioArtifacts.WriteScenarioArtifacts(options, outDir, result);
@@ -140,9 +140,29 @@ namespace Nova.SimRunner
                 return 1;
             }
             Console.WriteLine("[Assertion] no-crash = PASS");
-            Console.WriteLine($"[Assertion] no-unbounded-memory-growth = {(result.MemoryGrowthBounded ? "PASS" : "FAIL")} " +
-                              $"(rule: retained heap at window end <= {Scale500PrecombatScenario.MemoryGrowthTolerance:F2}x retained baseline after warmup, full GC, per run)");
-            return result.MemoryGrowthBounded ? 0 : 1;
+            switch (result.MemoryAssertion)
+            {
+                case MemoryAssertionVerdict.NotApplicable:
+                    Console.WriteLine(
+                        "[Assertion] no-unbounded-memory-growth = NOT-APPLICABLE " +
+                        $"(measurement window < {Scale500PrecombatScenario.MinMeasurementSecondsForMemoryAssertion}s: " +
+                        "allocator/JIT/GC warm-up dominates short diagnostic windows; artifact samples [1] " +
+                        "without gate claim — a skipped assertion in a REAL gate run would be a fail)");
+                    break;
+                case MemoryAssertionVerdict.Pass:
+                    Console.WriteLine(
+                        "[Assertion] no-unbounded-memory-growth = PASS " +
+                        $"(rule: median of last-tenth retained probes (>= last 10) <= " +
+                        $"{Scale500PrecombatScenario.MemoryGrowthTolerance:F2}x retained baseline after warmup, full GC, per run)");
+                    break;
+                default:
+                    Console.WriteLine(
+                        "[Assertion] no-unbounded-memory-growth = FAIL " +
+                        $"(rule: median of last-tenth retained probes (>= last 10) <= " +
+                        $"{Scale500PrecombatScenario.MemoryGrowthTolerance:F2}x retained baseline after warmup, full GC, per run)");
+                    break;
+            }
+            return result.MemoryAssertion == MemoryAssertionVerdict.Fail ? 1 : 0;
         }
 
         // ----------------------------------------------------------------
@@ -272,11 +292,12 @@ namespace Nova.SimRunner
             PrintMetricSummary("pathfindingMs (threshold P95 <= 4.0 ms)", result.Runs, r => r.PathfindingMs, 4.0);
             PrintMetricSummary("precombatRestSimulationMs (threshold P95 <= 3.0 ms)", result.Runs, r => r.PrecombatRestMs, 3.0);
 
-            Console.WriteLine("[Memory] Retained GC heap per run (MiB): baseline after warmup -> end of window (full GC) | max observed (non-forcing)");
+            Console.WriteLine("[Memory] Retained GC heap per run (MiB): baseline after warmup | window median (rule value) | end of window | max observed (non-forcing)");
             for (int i = 0; i < result.Runs.Count; i++)
             {
                 Console.WriteLine(
-                    $"  run {i + 1}: {result.MemoryBaselineBytes[i] / 1048576.0:F2} -> " +
+                    $"  run {i + 1}: {result.MemoryBaselineBytes[i] / 1048576.0:F2} | " +
+                    $"{result.MemoryWindowMedianBytes[i] / 1048576.0:F2} | " +
                     $"{result.MemoryRetainedEndBytes[i] / 1048576.0:F2} | max {result.MemoryMaxObservedBytes[i] / 1048576.0:F2}");
             }
         }

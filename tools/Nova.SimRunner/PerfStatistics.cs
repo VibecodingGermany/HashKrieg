@@ -80,5 +80,24 @@ namespace Nova.SimRunner
                 OrderedNearestRank(ordered, 0.95),
                 OrderedNearestRank(ordered, 0.99));
         }
+
+        /// <summary>
+        /// Median (nearest-rank 50%, identical index formula) of an integer
+        /// sample series — used by the memory evaluation window rule.
+        /// </summary>
+        public static long Median(IReadOnlyList<long> samples)
+        {
+            if (samples == null) throw new ArgumentNullException(nameof(samples));
+            if (samples.Count == 0) throw new ArgumentException("Samples must not be empty.", nameof(samples));
+
+            var ordered = new long[samples.Count];
+            for (int i = 0; i < samples.Count; i++)
+            {
+                ordered[i] = samples[i];
+            }
+            Array.Sort(ordered);
+            int index = Math.Max(0, (int)Math.Ceiling(0.5 * ordered.Length) - 1);
+            return ordered[index];
+        }
     }
 }
