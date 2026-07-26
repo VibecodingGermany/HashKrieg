@@ -18,8 +18,17 @@ namespace Nova.Simulation.Pathfinding
     /// queues) is a later G1 slice; the prototype cost field is never mutated
     /// at runtime.
     /// </para>
+    /// <para>
+    /// Deliberately not sealed and <see cref="RequestFlowField"/> is virtual:
+    /// the flow-field generation runs inside kernel command application
+    /// (UnitCommandStateView.ApplyMove), so the headless performance harness
+    /// (tools/Nova.SimRunner) can only attribute the pathfinding phase by
+    /// subclassing this system. The simulation itself carries no measurement
+    /// logic; the interception point exists solely so harness code can wrap
+    /// the call from outside.
+    /// </para>
     /// </summary>
-    public sealed class PathfindingSystem : IStatefulSimSystem
+    public class PathfindingSystem : IStatefulSimSystem
     {
         /// <summary>Serialization version of the pathfinding snapshot block.</summary>
         public const byte StateVersion = 1;
@@ -47,7 +56,7 @@ namespace Nova.Simulation.Pathfinding
             kernel?.Logger.LogInfo($"[{Name}] Initialized Flow-Field Grid ({CostField.Width}x{CostField.Height}).");
         }
 
-        public void RequestFlowField(GridPos2D destination)
+        public virtual void RequestFlowField(GridPos2D destination)
         {
             IntegrationField.Generate(CostField, destination);
             FlowField.Generate(IntegrationField, CostField);
