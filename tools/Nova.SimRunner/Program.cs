@@ -33,7 +33,9 @@ namespace Nova.SimRunner
     /// Headless runner for the canonical kernel. Without arguments it
     /// executes the original determinism/benchmark demo (below). With
     /// <c>--scenario SCALE_500_PRECOMBAT</c> it runs the V4/V5a performance
-    /// harness (see <see cref="Scale500PrecombatScenario"/>).
+    /// harness (see <see cref="Scale500PrecombatScenario"/>), with
+    /// <c>--scenario DETERMINISM_10000</c> the G1/V1 cross-platform
+    /// determinism harness (see <see cref="Determinism10000Scenario"/>).
     /// </summary>
     internal static class Program
     {
@@ -80,9 +82,14 @@ namespace Nova.SimRunner
         /// </summary>
         private static int RunScenarioMode(string[] args, string scenarioId)
         {
+            if (scenarioId == DeterminismOptions.ScenarioId)
+            {
+                return RunDeterminismScenarioMode(args);
+            }
             if (scenarioId != ScenarioOptions.ScenarioId)
             {
-                Console.Error.WriteLine($"[Failure] Unknown scenario '{scenarioId}'. Supported: {ScenarioOptions.ScenarioId}.");
+                Console.Error.WriteLine(
+                    $"[Failure] Unknown scenario '{scenarioId}'. Supported: {ScenarioOptions.ScenarioId}, {DeterminismOptions.ScenarioId}.");
                 return 2;
             }
 
@@ -136,6 +143,121 @@ namespace Nova.SimRunner
             Console.WriteLine($"[Assertion] no-unbounded-memory-growth = {(result.MemoryGrowthBounded ? "PASS" : "FAIL")} " +
                               $"(rule: retained heap at window end <= {Scale500PrecombatScenario.MemoryGrowthTolerance:F2}x retained baseline after warmup, full GC, per run)");
             return result.MemoryGrowthBounded ? 0 : 1;
+        }
+
+        // ----------------------------------------------------------------
+        // Scenario mode (G1/V1 determinism harness)
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// CLI: <c>--scenario DETERMINISM_10000 [--verify &lt;other-platform.json&gt;]
+        /// [--out &lt;directory&gt;] [--platform &lt;tag&gt;] [--ticks 10000]
+        /// [--checkpoint-interval 100]</c>. Runs the fixed 10,000-tick
+        /// canonical replay on this machine and writes the platform profile
+        /// artifact plus the boolean assertions (D-062 naming) into the out
+        /// directory (diagnosis material, gitignored — never gate evidence).
+        /// Cross-platform workflow (SimulationCore.md section 9): run once on
+        /// macOS arm64 and once on Windows x64, then re-run on either machine
+        /// with <c>--verify</c> pointing at the other machine's
+        /// scenario.DETERMINISM_10000.&lt;platform&gt;.json — exit code 0
+        /// only when every checkpoint state hash and the final snapshot
+        /// SHA-256 match exactly. Running twice on the same machine and
+        /// verifying one artifact against the other is the local determinism
+        /// baseline.
+        /// </summary>
+        private static int RunDeterminismScenarioMode(string[] args)
+        {
+            var options = new DeterminismOptions();
+            if (!TryParseIntOption(args, "--ticks", ref options.Ticks)
+                || !TryParseIntOption(args, "--checkpoint-interval", ref options.CheckpointIntervalTicks))
+            {
+                Console.Error.WriteLine("[Failure] Invalid numeric option.");
+                return 2;
+            }
+            if (options.Ticks < 1 || options.CheckpointIntervalTicks < 1)
+            {
+                Console.Error.WriteLine("[Failure] Options out of range (ticks/checkpoint-interval >= 1).");
+                return 2;
+            }
+            options.PlatformId = ParseOption(args, "--platform");
+            options.VerifyPath = ParseOption(args, "--verify");
+
+            string outDir = ParseOption(args, "--out")
+                ?? Path.Combine("output", "determinism",
+                    $"{DeterminismOptions.ScenarioId}-{DateTime.UtcNow:yyyyMMdd-HHmmss}Z");
+
+            Console.WriteLine(
+                $"[Scenario] {DeterminismOptions.ScenarioId}: ticks={options.Ticks}, " +
+                $"checkpoint-interval={options.CheckpointIntervalTicks}, seed=0x{options.Seed:X16}");
+            Console.WriteLine("[Scenario] Contract: quality/scenarios/mvp-v1.json DETERMINISM_10000 (G1/V1); SimulationCore.md sections 7/9.");
+            Console.WriteLine("[Scenario] NOTE: artifacts in output/ are DIAGNOSIS, not gate evidence (D-061/D-064).");
+
+            DeterminismRunResult result;
+            try
+            {
+                result = Determinism10000Scenario.Run(options, NullNovaLogger.Instance);
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine($"[Failure] Scenario crashed: {exception}");
+                return 1;
+            }
+
+            Console.WriteLine(
+                $"[Run] generator {result.GeneratorSeconds:F1}s, playback {result.PlaybackSeconds:F1}s, " +
+                $"replay {result.ReplayLength} bytes (sha256 {result.ReplaySha256})");
+            Console.WriteLine(
+                $"[Run] fingerprint 0x{result.FingerprintHash64:X16}, checkpoints {result.Checkpoints.Count}, " +
+                $"final snapshot {result.FinalSnapshotLength} bytes (sha256 {result.FinalSnapshotSha256})");
+            if (result.Checkpoints.Count > 0)
+            {
+                Console.WriteLine(
+                    $"[Run] first checkpoint tick {result.Checkpoints[0].Tick} hash 0x{result.Checkpoints[0].StateHash64:X16}, " +
+                    $"final state hash 0x{result.FinalStateHash:X16}");
+            }
+
+            if (!result.PlaybackVerified)
+            {
+                Console.Error.WriteLine($"[Failure] Playback of the self-generated replay diverged: {result.PlaybackFailure}");
+                DeterminismArtifacts.WriteRunArtifacts(outDir, result, comparison: null);
+                Console.Error.WriteLine($"[Artifacts] Written to {Path.GetFullPath(outDir)} (run FAILED self-verification).");
+                return 1;
+            }
+            Console.WriteLine("[SelfCheck] Playback reproduced every recorded result and the recorded final state hash.");
+
+            DeterminismComparison comparison = null;
+            if (options.VerifyPath != null)
+            {
+                if (!DeterminismArtifacts.TryLoadProfile(options.VerifyPath, out PlatformProfile other, out string loadError))
+                {
+                    Console.Error.WriteLine($"[Failure] Cannot verify: {loadError} ({options.VerifyPath})");
+                    return 2;
+                }
+                Console.WriteLine($"[Verify] Against {options.VerifyPath} (platform {other.PlatformId}).");
+                comparison = Determinism10000Scenario.Compare(result, other);
+                if (comparison.CheckpointsExact && comparison.SnapshotExact)
+                {
+                    Console.WriteLine("[Verify] All checkpoint state hashes and the final snapshot bytes match EXACTLY.");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[Verify] DIVERGENCE: {comparison.FirstDivergence}");
+                }
+            }
+
+            DeterminismArtifacts.WriteRunArtifacts(outDir, result, comparison);
+            Console.WriteLine($"[Artifacts] Written to {Path.GetFullPath(outDir)} (NOT gate evidence; not committed).");
+
+            Console.WriteLine("[Assertion] managed-path-only = PASS (managed .NET lane; no Burst path exists here)");
+            Console.WriteLine($"[Assertion] same-sources-and-determinism-defines = {(result.DeterminismDefineActive ? "PASS" : "FAIL")} " +
+                              "(build self-report: NOVA_FIXED_POINT compiled in; sources linked from Assets/_Project)");
+            if (comparison != null)
+            {
+                Console.WriteLine($"[Assertion] exact-state-hash-every-checkpoint = {(comparison.CheckpointsExact ? "PASS" : "FAIL")}");
+                Console.WriteLine($"[Assertion] exact-final-snapshot-bytes = {(comparison.SnapshotExact ? "PASS" : "FAIL")}");
+                return comparison.CheckpointsExact && comparison.SnapshotExact ? 0 : 1;
+            }
+            return result.DeterminismDefineActive ? 0 : 1;
         }
 
         private static void PrintSummary(ScenarioResult result)
