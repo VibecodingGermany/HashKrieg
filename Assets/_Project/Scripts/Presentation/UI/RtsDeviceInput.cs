@@ -72,6 +72,15 @@ namespace Nova.Presentation.UI
         /// <summary>Selected unit count (read by <see cref="DebugHud"/>).</summary>
         public int SelectionCount => _selection.SelectedCount;
 
+        /// <summary>
+        /// The live selection, for read-only observers such as
+        /// <see cref="DebugHud"/>, which resolves the lead unit's combat
+        /// profile from it. Exposing the manager rather than a copy keeps the
+        /// per-frame path allocation-free; callers must treat it as read-only
+        /// (selection is owned by this component and mutated only here).
+        /// </summary>
+        public SelectionManager Selection => _selection;
+
         /// <summary>One-line control legend; single source of truth for the HUD.</summary>
         public string ControlLegend => _legend;
 

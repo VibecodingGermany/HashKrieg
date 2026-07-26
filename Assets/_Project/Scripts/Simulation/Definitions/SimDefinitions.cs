@@ -1,4 +1,5 @@
 using Nova.Core;
+using Nova.Simulation.Combat;
 using Nova.Simulation.State;
 
 namespace Nova.Simulation.Definitions
@@ -36,10 +37,51 @@ namespace Nova.Simulation.Definitions
         /// <summary>Hit points of the completed building.</summary>
         public int MaxHealth { get; }
 
+        /// <summary>
+        /// Armor class this building presents to incoming fire
+        /// (docs/gamedesign/ArmorSystem.md: every building type is
+        /// <see cref="Combat.ArmorClass.Building"/>). Column axis of
+        /// <see cref="Combat.DamageMatrix"/>.
+        /// </summary>
+        public ArmorClass ArmorClass { get; }
+
+        /// <summary>
+        /// Damage type of this building's weapon; meaningless while
+        /// <see cref="AttackDamage"/> is 0 (unarmed buildings carry
+        /// <see cref="Combat.DamageType.Kinetic"/> as a neutral placeholder
+        /// that is never applied).
+        /// </summary>
+        public DamageType DamageType { get; }
+
+        /// <summary>
+        /// Base damage per shot BEFORE the armor multiplier
+        /// (docs/gamedesign/Weapons.md, führend per D-047).
+        /// <b>0 means unarmed and is the single unambiguous marker for it:</b>
+        /// an entity with 0 base damage never fires and can never reduce a
+        /// target's health. Only the DefensePlatform is armed in MS-1 —
+        /// buildings CAN shoot, the other eight simply do not.
+        /// </summary>
+        public int AttackDamage { get; }
+
+        /// <summary>
+        /// Weapon range in tiles; 1 tile == 1 m (D-034/D-047), so the meter
+        /// value is numerically identical. 0 for unarmed buildings.
+        /// </summary>
+        public int AttackRangeTiles { get; }
+
+        /// <summary>
+        /// Firing interval in whole simulation ticks, converted from the
+        /// Weapons.md seconds value at the canonical 10 Hz tick rate. 0 for
+        /// unarmed buildings.
+        /// </summary>
+        public int AttackCooldownTicks { get; }
+
         public SimBuildingDefinition(
             ushort definitionId, UnitRole role, int costAE, int buildTicks,
             int powerProvided, int powerRequired,
-            bool hasPrerequisite, UnitRole prerequisiteRole, int maxHealth)
+            bool hasPrerequisite, UnitRole prerequisiteRole, int maxHealth,
+            ArmorClass armorClass, DamageType damageType,
+            int attackDamage, int attackRangeTiles, int attackCooldownTicks)
         {
             DefinitionId = definitionId;
             Role = role;
@@ -50,6 +92,11 @@ namespace Nova.Simulation.Definitions
             HasPrerequisite = hasPrerequisite;
             PrerequisiteRole = prerequisiteRole;
             MaxHealth = maxHealth;
+            ArmorClass = armorClass;
+            DamageType = damageType;
+            AttackDamage = attackDamage;
+            AttackRangeTiles = attackRangeTiles;
+            AttackCooldownTicks = attackCooldownTicks;
         }
     }
 
@@ -83,9 +130,52 @@ namespace Nova.Simulation.Definitions
         /// <summary>Movement speed of the produced unit (m/tick-domain fixed point).</summary>
         public SimFixed MoveSpeed { get; }
 
+        /// <summary>
+        /// Armor class this unit presents to incoming fire
+        /// (docs/gamedesign/ArmorSystem.md). Column axis of
+        /// <see cref="Combat.DamageMatrix"/>. Note that ArmorSystem.md places
+        /// BOTH the Light Tank and the Battle Tank in
+        /// <see cref="Combat.ArmorClass.Medium"/> and reserves
+        /// <see cref="Combat.ArmorClass.Heavy"/> for the (non-MS-1) Heavy
+        /// Tank — followed faithfully here.
+        /// </summary>
+        public ArmorClass ArmorClass { get; }
+
+        /// <summary>
+        /// Damage type of this unit's weapon; meaningless while
+        /// <see cref="AttackDamage"/> is 0 (unarmed units carry
+        /// <see cref="Combat.DamageType.Kinetic"/> as a neutral placeholder
+        /// that is never applied).
+        /// </summary>
+        public DamageType DamageType { get; }
+
+        /// <summary>
+        /// Base damage per shot BEFORE the armor multiplier
+        /// (docs/gamedesign/Weapons.md, führend per D-047).
+        /// <b>0 means unarmed and is the single unambiguous marker for it:</b>
+        /// an entity with 0 base damage never fires and can never reduce a
+        /// target's health. Builder and Harvester are the MS-1 unarmed units.
+        /// </summary>
+        public int AttackDamage { get; }
+
+        /// <summary>
+        /// Weapon range in tiles; 1 tile == 1 m (D-034/D-047), so the meter
+        /// value is numerically identical. 0 for unarmed units.
+        /// </summary>
+        public int AttackRangeTiles { get; }
+
+        /// <summary>
+        /// Firing interval in whole simulation ticks, converted from the
+        /// Weapons.md seconds value at the canonical 10 Hz tick rate. 0 for
+        /// unarmed units.
+        /// </summary>
+        public int AttackCooldownTicks { get; }
+
         public SimUnitDefinition(
             ushort definitionId, UnitRole role, int costAE, int buildTicks,
-            byte tier, UnitRole producerRole, int maxHealth, SimFixed moveSpeed)
+            byte tier, UnitRole producerRole, int maxHealth, SimFixed moveSpeed,
+            ArmorClass armorClass, DamageType damageType,
+            int attackDamage, int attackRangeTiles, int attackCooldownTicks)
         {
             DefinitionId = definitionId;
             Role = role;
@@ -95,6 +185,11 @@ namespace Nova.Simulation.Definitions
             ProducerRole = producerRole;
             MaxHealth = maxHealth;
             MoveSpeed = moveSpeed;
+            ArmorClass = armorClass;
+            DamageType = damageType;
+            AttackDamage = attackDamage;
+            AttackRangeTiles = attackRangeTiles;
+            AttackCooldownTicks = attackCooldownTicks;
         }
     }
 
@@ -123,35 +218,66 @@ namespace Nova.Simulation.Definitions
     /// technology.researchLabCompletionUnlocksTier2; no research upgrades,
     /// no research queue, no tier 3).
     /// </para>
+    /// <para>
+    /// COMBAT VALUES (ArmorClass / DamageType / AttackDamage /
+    /// AttackRangeTiles / AttackCooldownTicks) are NOT Q-040 provisionals like
+    /// the economy figures above — they are the ratified content values and
+    /// this table is where they live. Weapon numbers come from
+    /// docs/gamedesign/Weapons.md (führend per D-047), armor classes and the
+    /// counter multipliers from docs/gamedesign/ArmorSystem.md (authoritative
+    /// over the drifted 6x4 and 5x4 summaries in Infantry.md and Vehicles.md;
+    /// see <see cref="Combat.DamageMatrix"/> for the full grounds). Cooldowns
+    /// are the Weapons.md seconds converted at the canonical 10 Hz tick rate,
+    /// ranges are tiles with 1 tile == 1 m (D-034/D-047).
+    /// <br/>
+    /// Unarmed is expressed ONLY as <c>AttackDamage: 0</c> — there is no
+    /// separate flag to fall out of sync with. Builder, Harvester and the
+    /// eight non-defensive buildings are unarmed; the DefensePlatform is armed
+    /// because buildings CAN shoot.
+    /// </para>
     /// </summary>
     public static class SimDefinitions
     {
         /// <summary>Provisional building footprint in cells: every MS-1 building occupies 3x3 (Q-040 candidate).</summary>
         public const int BuildingFootprintCells = 3;
 
+        /// <summary>
+        /// Neutral damage-type placeholder for unarmed entities. Never
+        /// applied: <see cref="Combat.DamageMatrix.Resolve"/> short-circuits
+        /// on <c>AttackDamage == 0</c>, so the type is inert by construction.
+        /// Named rather than inlined so "unarmed" reads as a decision.
+        /// </summary>
+        private const DamageType Unarmed = DamageType.Kinetic;
+
         private static readonly SimBuildingDefinition[] Buildings =
         {
-            new SimBuildingDefinition(1, UnitRole.HQ,              costAE: 2000, buildTicks: 600, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 2000),
-            new SimBuildingDefinition(2, UnitRole.Power,           costAE: 300,  buildTicks: 150, powerProvided: 100, powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400),
-            new SimBuildingDefinition(3, UnitRole.Refinery,        costAE: 600,  buildTicks: 300, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 800),
-            new SimBuildingDefinition(4, UnitRole.Storage,         costAE: 200,  buildTicks: 100, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400),
-            new SimBuildingDefinition(5, UnitRole.Barracks,        costAE: 500,  buildTicks: 250, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 600),
-            new SimBuildingDefinition(6, UnitRole.VehicleFactory,  costAE: 1200, buildTicks: 400, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 900),
-            new SimBuildingDefinition(7, UnitRole.ResearchLab,     costAE: 1500, buildTicks: 450, powerProvided: 0,   powerRequired: 30, hasPrerequisite: true,  prerequisiteRole: UnitRole.Barracks,  maxHealth: 700),
-            new SimBuildingDefinition(8, UnitRole.Radar,           costAE: 800,  buildTicks: 200, powerProvided: 0,   powerRequired: 15, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 500),
-            new SimBuildingDefinition(9, UnitRole.DefensePlatform, costAE: 400,  buildTicks: 150, powerProvided: 0,   powerRequired: 10, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 600),
+            new SimBuildingDefinition(1, UnitRole.HQ,              costAE: 2000, buildTicks: 600, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 2000, armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(2, UnitRole.Power,           costAE: 300,  buildTicks: 150, powerProvided: 100, powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(3, UnitRole.Refinery,        costAE: 600,  buildTicks: 300, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 800,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(4, UnitRole.Storage,         costAE: 200,  buildTicks: 100, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(5, UnitRole.Barracks,        costAE: 500,  buildTicks: 250, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 600,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(6, UnitRole.VehicleFactory,  costAE: 1200, buildTicks: 400, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 900,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(7, UnitRole.ResearchLab,     costAE: 1500, buildTicks: 450, powerProvided: 0,   powerRequired: 30, hasPrerequisite: true,  prerequisiteRole: UnitRole.Barracks,  maxHealth: 700,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(8, UnitRole.Radar,           costAE: 800,  buildTicks: 200, powerProvided: 0,   powerRequired: 15, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 500,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(9, UnitRole.DefensePlatform, costAE: 400,  buildTicks: 150, powerProvided: 0,   powerRequired: 10, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 600,  armorClass: ArmorClass.Building, damageType: DamageType.Kinetic,  attackDamage: 20, attackRangeTiles: 10, attackCooldownTicks: 10),
         };
 
         private static readonly SimUnitDefinition[] Units =
         {
-            new SimUnitDefinition(1, UnitRole.Builder,            costAE: 100,  buildTicks: 150, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 100, moveSpeed: SimFixed.FromInt(3)),
-            new SimUnitDefinition(2, UnitRole.Harvester,          costAE: 700,  buildTicks: 300, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 300, moveSpeed: SimFixed.FromRaw(163840)), // 2.5
-            new SimUnitDefinition(3, UnitRole.BasicInfantry,      costAE: 100,  buildTicks: 100, tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 100, moveSpeed: SimFixed.FromInt(4)),
-            new SimUnitDefinition(4, UnitRole.AntiArmorInfantry,  costAE: 300,  buildTicks: 150, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 120, moveSpeed: SimFixed.FromRaw(229376)), // 3.5
-            new SimUnitDefinition(5, UnitRole.ScoutVehicle,       costAE: 400,  buildTicks: 200, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 150, moveSpeed: SimFixed.FromInt(6)),
-            new SimUnitDefinition(6, UnitRole.LightTank,          costAE: 700,  buildTicks: 300, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 300, moveSpeed: SimFixed.FromInt(4)),
-            new SimUnitDefinition(7, UnitRole.BattleTank,         costAE: 1200, buildTicks: 400, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 500, moveSpeed: SimFixed.FromInt(3)),
-            new SimUnitDefinition(8, UnitRole.Artillery,          costAE: 1500, buildTicks: 500, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 200, moveSpeed: SimFixed.FromRaw(163840)), // 2.5
+            new SimUnitDefinition(1, UnitRole.Builder,            costAE: 100,  buildTicks: 150, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 100, moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimUnitDefinition(2, UnitRole.Harvester,          costAE: 700,  buildTicks: 300, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 300, moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0), // 2.5
+            new SimUnitDefinition(3, UnitRole.BasicInfantry,      costAE: 100,  buildTicks: 100, tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 100, moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 9),
+            new SimUnitDefinition(4, UnitRole.AntiArmorInfantry,  costAE: 300,  buildTicks: 150, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 120, moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 50,  attackRangeTiles: 10, attackCooldownTicks: 25), // 3.5
+            new SimUnitDefinition(5, UnitRole.ScoutVehicle,       costAE: 400,  buildTicks: 200, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 150, moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 12,  attackRangeTiles: 8,  attackCooldownTicks: 10),
+            new SimUnitDefinition(6, UnitRole.LightTank,          costAE: 700,  buildTicks: 300, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 300, moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Medium,   damageType: DamageType.Kinetic,    attackDamage: 35,  attackRangeTiles: 9,  attackCooldownTicks: 20),
+            // Owner ruling (see D-074 consequences): BattleTank is Heavy, not the
+            // Medium that ArmorSystem.md assigns it. ArmorSystem.md reserves Heavy
+            // for the Heavy Tank, which MS-1 does not ship, which would have left
+            // the Heavy column unexercised and the "Kinetic 0.25 vs Heavy forces
+            // rockets" counter unreachable. Promoting the BattleTank is the
+            // smallest change that makes that counter play in MS-1.
+            new SimUnitDefinition(7, UnitRole.BattleTank,         costAE: 1200, buildTicks: 400, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 500, moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Heavy,    damageType: DamageType.Kinetic,    attackDamage: 60,  attackRangeTiles: 10, attackCooldownTicks: 25),
+            new SimUnitDefinition(8, UnitRole.Artillery,          costAE: 1500, buildTicks: 500, tier: 2, producerRole: UnitRole.VehicleFactory, maxHealth: 200, moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: DamageType.Explosive,  attackDamage: 110, attackRangeTiles: 20, attackCooldownTicks: 70), // 2.5
         };
 
         /// <summary>Number of building definitions (ids 1..<see cref="BuildingCount"/>).</summary>
@@ -194,6 +320,26 @@ namespace Nova.Simulation.Definitions
             {
                 definition = Units[definitionId - 1];
                 return true;
+            }
+            definition = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Looks up the unit definition of a unit role (mirror of
+        /// <see cref="TryGetBuilding(UnitRole, out SimBuildingDefinition)"/>).
+        /// Roles map one-to-one onto definitions in MS-1, so this is the
+        /// role-side entry point the combat weapon table is built from.
+        /// </summary>
+        public static bool TryGetUnit(UnitRole role, out SimUnitDefinition definition)
+        {
+            for (int i = 0; i < Units.Length; i++)
+            {
+                if (Units[i].Role == role)
+                {
+                    definition = Units[i];
+                    return true;
+                }
             }
             definition = default;
             return false;

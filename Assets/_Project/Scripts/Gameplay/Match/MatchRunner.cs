@@ -95,6 +95,13 @@ namespace Nova.Gameplay.Match
         /// <summary>The canonical FoW-gated hitscan combat (SimulationCore.md section 2, order step 8).</summary>
         public CombatSystem Combat { get; private set; }
 
+        /// <summary>
+        /// The canonical MS-1 victory contract (D-056): the read-only poll
+        /// surface a HUD uses to show whether the match is still running, who
+        /// won and when it was decided.
+        /// </summary>
+        public Simulation.Victory.VictorySystem Victory { get; private set; }
+
         /// <summary>Session authority binding the local player slot (MS-1: slot 0 of {0, 1}).</summary>
         public MatchSession Session { get; private set; }
 
@@ -122,12 +129,16 @@ namespace Nova.Gameplay.Match
             Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
             Combat = new CombatSystem(Entities, FogOfWar);
+            Victory = new Simulation.Victory.VictorySystem(Entities, Construction);
 
             // Canonical tick order (SimulationCore.md section 2): economy
             // (phases 2/3), construction and production (phases 4/5) BEFORE
             // pathfinding/movement (phase 6), then the FoW recompute, then
-            // combat. A unit spawned by production in tick T carries no
-            // movement order yet and moves earliest in tick T+1.
+            // combat, and match/victory logic LAST. A unit spawned by
+            // production in tick T carries no movement order yet and moves
+            // earliest in tick T+1. Victory runs after combat so it judges
+            // the state AFTER this tick's damage and deaths landed (D-056:
+            // "Auswertung nach Combat am Tickende").
             Kernel.RegisterSystem(Economy);
             Kernel.RegisterSystem(Construction);
             Kernel.RegisterSystem(Production);
@@ -135,6 +146,7 @@ namespace Nova.Gameplay.Match
             Kernel.RegisterSystem(Movement);
             Kernel.RegisterSystem(FogOfWar);
             Kernel.RegisterSystem(Combat);
+            Kernel.RegisterSystem(Victory);
 
             Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             Ingress = new CommandIngress(Session);

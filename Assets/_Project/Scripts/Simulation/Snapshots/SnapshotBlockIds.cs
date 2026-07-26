@@ -42,5 +42,13 @@ namespace Nova.Simulation.Snapshots
 
         /// <summary>Production block (per-producer queues and rally points), written by ProductionSystem.</summary>
         public const ushort Production = FirstSystemBlock + 6;
+
+        /// <summary>
+        /// Victory block (D-056 match outcome, winner slot, decision tick,
+        /// per-slot engagement latches and last-unit reveal holds), written by
+        /// VictorySystem. The outcome is final once decided, so this block is
+        /// what makes that property survive save/restore.
+        /// </summary>
+        public const ushort Victory = FirstSystemBlock + 7;
     }
 }

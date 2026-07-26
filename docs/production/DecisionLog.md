@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.17.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.18.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -1433,6 +1433,102 @@ Sammlung im öffentlichen Repo.
 Weitergaberegel; Sonniss-Rohdateien werden nicht ins öffentliche
 Repository eingecheckt.
 
+### D-074 | in Kraft — vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden | Sprint 7 (Kampf-Strang, Autorität der Schaden-gegen-Panzerung-Matrix)
+
+**Status:** In Kraft, aber **nicht vom Inhaber selbst getroffen**. Der Inhaber
+**Dennis Westermann** hat diese Entscheidung in der Sitzung vom 2026-07-26
+ausdrücklich an den ausführenden Agenten **delegiert**; der Agent hat
+entschieden und implementiert. AGENTS.md §2 Regel 6 („nicht eigenmächtig
+entscheiden") ist damit nicht verletzt, aber auch nicht auf dem Normalweg
+erfüllt — die Legitimation stammt aus der Delegation, nicht aus einer
+Inhaberprüfung der Optionen. **Der Inhaber kann diese Entscheidung jederzeit
+umstoßen.** Bis dahin ist sie verbindlich, weil Code und Tests sie bereits
+tragen. Dieser Eintrag ist bewusst als agent-entschieden gekennzeichnet und
+wird nicht als Inhaberentscheidung ausgegeben.
+
+**Kontext:** Der Kampf war nicht bewertbar: `CombatSystem` wandte einen flachen
+Schadenswert von 15 auf jeden Angriff an, ein Kampfpanzer und ein Schütze waren
+offensiv identisch. Für echte Konter braucht die Simulation eine
+Schaden-gegen-Panzerung-Matrix — und die Fachdokumentation lieferte dafür
+**drei einander widersprechende** Matrizen: [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md)
+mit 6 Schadensarten × 6 Panzerungsklassen, [../gamedesign/Infantry.md](../gamedesign/Infantry.md)
+mit 6 × 4 plus einer siebten Schadensart „Kristall" und
+[../gamedesign/Vehicles.md](../gamedesign/Vehicles.md) mit 5 × 4 und nur zwei
+Panzerungsklassen (`Leicht`/`Schwer`). Die Widersprüche sind nicht
+Rundungsrauschen, sondern gegenläufig: Energie gegen Schwer steht in
+ArmorSystem.md auf 0,75 und in Vehicles.md auf 1,25; Explosiv gegen Gebäude auf
+0,75 gegen 1,25. Ohne Auflösung hätte jede Implementierung eine der drei
+Quellen stillschweigend zur Autorität erhoben.
+
+**Alternativen:** (a) [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md)
+ist führend, die 6 × 6-Matrix ist kanonisch, die lokalen Tabellen in Infantry.md
+und Vehicles.md werden durch Verweise ersetzt; (b) die Einheitenkategorie-Achse
+aus Infantry.md/Vehicles.md („vs. Infanterie / vs. Fahrzeug / vs. Luft /
+vs. Gebäude") ist führend, ArmorSystem.md wird auf diese vier Spalten
+eingedampft; (c) eine neue, vierte Matrix, die alle drei Quellen zusammenführt
+und alle bestehenden Zahlen neu verhandelt.
+
+**Entscheidung:** (a) – [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md)
+ist die alleinige Autorität; ihre 36 Werte sind kanonisch und stehen
+unverändert. Repräsentation in der Simulation als ganzzahliger **Prozentwert**
+(100 = 1,00) in einer flachen 36-Einträge-Tabelle, angewandt als
+`(Basisschaden × Prozent) / 100` in Ganzzahlarithmetik mit Abschneiden — keine
+Fließkommazahlen, kein `SimFixed` nötig. Die Matrix behält alle sechs Zeilen und
+sechs Spalten, obwohl MS-1 nur vier Schadensarten und fünf Panzerungsklassen
+bespielt.
+
+**Begründung:** Vier Gründe, alle aus dem Bestand belegt, keiner erfunden.
+Erstens ist die Panzerungsklasse laut ArmorSystem.md ein **Einheitenattribut**
+(„jede Einheit hat genau eine Klasse"), während „vs. Fahrzeug" die Klassen
+`Light`/`Medium`/`Heavy` zusammenfaltet — genau die Unterscheidung, aus der
+Konterspiel entsteht. Zweitens sagt Vehicles.md in seiner eigenen
+D-047-Verweisregel, dass verbindliche Waffenwerte nur in
+[../gamedesign/Weapons.md](../gamedesign/Weapons.md) und die Konterlogik in
+ArmorSystem.md leben — die dortige Matrix widerspricht also der Regel des
+eigenen Dokuments. Drittens verweist Weapons.md seinerseits auf ArmorSystem.md.
+Viertens ist ArmorSystem.md als einzige der drei Quellen bereits als
+„flacher Satz von 36 Zahlen (`damageType × armorClass`), SO-tauglich"
+geschrieben, also implementierungsfertig. Die Tabellen in Infantry.md und
+Vehicles.md sind abgeleitete Zusammenfassungen, die auseinandergedriftet sind.
+Die volle 6 × 6-Ausdehnung bleibt erhalten, weil ein späteres Nachschneiden der
+Tabelle teuer ist und das Mitführen nichts kostet.
+
+**Konsequenzen:**
+- [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md) trägt einen
+  Autoritätsvermerk; die 36 Werte bleiben unverändert.
+- Die lokalen Matrizen in [../gamedesign/Infantry.md](../gamedesign/Infantry.md)
+  und [../gamedesign/Vehicles.md](../gamedesign/Vehicles.md) sind **aufgehoben**
+  und durch Verweise ersetzt. Die Einheiten-Stattabellen dieser Dokumente
+  bleiben unberührt.
+- **„Kristall" ist keine Schadensart.** Die siebte Zeile aus Infantry.md ist
+  Evolvierten-Inhalt und liegt außerhalb von MS-1 (das Manifest kennt nur
+  Allianz und Legion). Registriert im [ScopeLedger](ScopeLedger.md).
+- ArmorSystem.md ordnet **Leichten und Kampfpanzer beide der Klasse `Medium`**
+  zu und reserviert `Heavy` für den Heavy Tank, der nicht im MS-1-Roster steht.
+  Der Agent hatte das zunächst treu übernommen und die daraus folgende
+  unbespielte `Heavy`-Spalte als Konsequenz protokolliert statt sie
+  stillschweigend zu reparieren.
+  **Der Inhaber hat diese Konsequenz überstimmt (2026-07-26, im Chat): der
+  Kampfpanzer wird auf `Heavy` hochgestuft.** Damit ist die `Heavy`-Spalte in
+  MS-1 bespielt und der von ArmorSystem.md selbst beschriebene Konter
+  („Kinetisch 0,25 gegen Schwer erzwingt Raketen/Energie als Antwort auf
+  Heavy") wird im MVP tatsächlich erlebbar: Gewehrinfanterie richtet gegen den
+  Kampfpanzer kaum noch etwas aus, Raketeninfanterie wird zur Pflichtantwort.
+  Das ist eine bewusste **Abweichung von ArmorSystem.md §Panzerungsklassen**,
+  keine Konfliktauflösung — ArmorSystem.md bleibt im Übrigen unverändert
+  führend, und die 36 Matrixwerte sind nicht angefasst.
+  `Air` bleibt unbespielt, es gibt kein Luftroster; das bleibt im
+  [ScopeLedger](ScopeLedger.md) registriert. Ein Test in beiden Lanes hält
+  positiv fest, dass `Heavy` einen Träger hat, damit eine stille Rückstufung
+  auf `Medium` nicht unbemerkt durchgeht.
+- Implementiert in `Nova.Simulation.Combat` (`DamageType`, `ArmorClass`,
+  `DamageMatrix`, `WeaponProfiles`); Reichweite und Abklingzeit sind seither
+  rollenabhängig statt konstant. Der kanonische Zustandshash bewegt sich —
+  zulässig im offenen Pre-G1-Formatfenster (D-068, Entwurf).
+- Sollte der Inhaber (b) oder (c) vorziehen, sind Matrixwerte und
+  Rollenzuordnung Datenänderungen; die Tabellenform, die Prozentdarstellung und
+  die Aufrufstelle in `CombatSystem` bleiben davon unberührt.
+
 ---
 
 ## Offene Punkte
@@ -1462,6 +1558,12 @@ Repository eingecheckt.
   Graybox-Spur der Status quo ohne Gate-Autorität, und die im
   [ScopeLedger](ScopeLedger.md) registrierte Dokumentationsschuld ist offen
   ausgewiesen, nicht erlassen.
+- **D-074 ist in Kraft, aber vom Agenten unter Delegation entschieden** — der
+  einzige Eintrag dieses Protokolls, bei dem der Inhaber die Wahl zwischen
+  echten Design-Alternativen ausdrücklich abgegeben hat, statt sie selbst zu
+  treffen. Der Inhaber möge die Matrixautorität bestätigen oder überstimmen;
+  eine Umkehr ist eine Datenänderung, keine Strukturänderung. Bis dahin gilt
+  D-074, weil Code, Tests und die bereinigten Fachdokumente sie tragen.
 
 ## Nächste Schritte
 
@@ -1495,3 +1597,4 @@ Repository eingecheckt.
 | 1.15.0 | 2026-07-25 | D-066: zirkulären Authorize-Vertrag durch fail-closed G0-A1 und zweiphasigen Receipt-Vertrag für G0-A2 ersetzt | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.16.0 | 2026-07-26 | D-067 und D-068 als **Entwürfe** aufgenommen (Graybox-Spur ohne Gate-Autorität mit befristetem Dokumentationsschuld-Modus; Sim-Korrekturen im offenen Pre-G1-Formatfenster) – nicht in Kraft, Inhaberentscheidung ausstehend | Technical Writer (Entwurf) / Entscheid: Dennis Westermann |
 | 1.17.0 | 2026-07-26 | Art-Strang MS-1 aus PR #8 aufgenommen (Art-Mask-Kanalbelegung, 0-€-Beschaffungspfad mit Whitelist/Blacklist, Grid-Zellgröße 3,0 m mit Gebäude-Footprints, Fraktionspaletten Allianz/Legion, restriktive Sonniss-Weitergaberegel). Beim Merge kollidierten die dort unabhängig vergebenen IDs D-066–D-070 mit D-066/D-067/D-068; der Art-Strang wurde inhaltsgleich auf **D-069–D-073** verschoben, siehe „Offene Punkte" | Technical Art / Producer / Project Owner |
+| 1.18.0 | 2026-07-26 | D-074 aufgenommen: [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md) als alleinige Autorität der Schaden-gegen-Panzerung-Matrix (6 × 6, ganzzahlige Prozentdarstellung), widersprechende Lokaltabellen in Infantry.md/Vehicles.md aufgehoben, „Kristall" und die unbespielte `Heavy`-Spalte in den ScopeLedger verschoben. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst** — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |

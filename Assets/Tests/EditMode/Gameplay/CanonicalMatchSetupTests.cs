@@ -22,7 +22,7 @@ namespace Nova.Gameplay.Tests
     /// Unity player and the headless harness the SAME match, and until this
     /// slice nothing checked either of them:
     /// <list type="number">
-    /// <item>the seven G1 systems are registered in one canonical tick order
+    /// <item>the G1 systems are registered in one canonical tick order
     /// (SimulationCore.md section 2) — a reordering silently changes every
     /// state hash while every individual system test stays green. Note the
     /// snapshot writer sorts blocks by BlockId, so the state hash alone does
@@ -51,7 +51,8 @@ namespace Nova.Gameplay.Tests
         /// <summary>
         /// Canonical G1 tick order: economy (phases 2/3), construction and
         /// production (phases 4/5) BEFORE pathfinding/movement (phase 6), then
-        /// the FoW recompute, then combat. Runtime type full names, so a
+        /// the FoW recompute, then combat, then the D-056 victory evaluation
+        /// LAST (it must judge post-combat state). Runtime type full names, so a
         /// wrapper subclass (e.g. the perf harness's TimedPathfindingSystem)
         /// is rejected rather than silently accepted.
         /// </summary>
@@ -64,6 +65,7 @@ namespace Nova.Gameplay.Tests
             "Nova.Simulation.Movement.MovementSystem",
             "Nova.Simulation.Vision.FogOfWarSystem",
             "Nova.Simulation.Combat.CombatSystem",
+            "Nova.Simulation.Victory.VictorySystem",
         };
 
         /// <summary>Canonical match configuration (DeterminismOptions defaults / MS-1 manifest capacity).</summary>
@@ -107,6 +109,7 @@ namespace Nova.Gameplay.Tests
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
             var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar);
+            var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -115,6 +118,7 @@ namespace Nova.Gameplay.Tests
             kernel.RegisterSystem(movement);
             kernel.RegisterSystem(fogOfWar);
             kernel.RegisterSystem(combat);
+            kernel.RegisterSystem(victory);
 
             var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             var ingress = new CommandIngress(session);
@@ -285,7 +289,7 @@ namespace Nova.Gameplay.Tests
         // ----------------------------------------------------------------
 
         [Test]
-        public void MatchRunner_RegistersTheSevenSystemsInCanonicalOrder()
+        public void MatchRunner_RegistersTheCanonicalSystemsInCanonicalOrder()
         {
             var go = new GameObject("TestOrderRunner");
             _spawned.Add(go);
@@ -301,7 +305,7 @@ namespace Nova.Gameplay.Tests
         }
 
         [Test]
-        public void ReferenceHost_RegistersTheSevenSystemsInCanonicalOrder()
+        public void ReferenceHost_RegistersTheCanonicalSystemsInCanonicalOrder()
         {
             // Guards the mirror itself: if someone edits BuildReferenceHost the
             // hash tests below would keep passing against a wrong order.

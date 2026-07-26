@@ -819,9 +819,9 @@ namespace Nova.SimRunner
         /// Builds a fresh canonical host: all G1 domains in the canonical
         /// tick order of SimulationCore.md section 2 (economy phases 2/3,
         /// construction and production phases 4/5 BEFORE pathfinding/
-        /// movement phase 6, then the 5 Hz FoW recompute, then combat), the
-        /// sealed session/ingress command pipeline, slots 0+1 active, input
-        /// delay 1.
+        /// movement phase 6, then the 5 Hz FoW recompute, then combat, then
+        /// the D-056 victory evaluation LAST), the sealed session/ingress
+        /// command pipeline, slots 0+1 active, input delay 1.
         /// </summary>
         private static Host BuildHost(ulong seed, INovaLogger logger)
         {
@@ -835,6 +835,7 @@ namespace Nova.SimRunner
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
             var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar);
+            var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -843,6 +844,7 @@ namespace Nova.SimRunner
             kernel.RegisterSystem(movement);
             kernel.RegisterSystem(fogOfWar);
             kernel.RegisterSystem(combat);
+            kernel.RegisterSystem(victory);
 
             var session = new MatchSession(HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
             var ingress = new CommandIngress(session);

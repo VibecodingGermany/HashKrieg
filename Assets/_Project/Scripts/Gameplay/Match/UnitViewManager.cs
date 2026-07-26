@@ -32,12 +32,30 @@ namespace Nova.Gameplay.Match
     /// no asset, registry or material, so it deletes in one commit once real
     /// art lands.
     /// </para>
+    /// <para>
+    /// Health readout: brightness of that same tint carries the health
+    /// fraction, so damage is observable at a glance without a single extra
+    /// GameObject, Canvas or draw call — it rides the
+    /// <see cref="MaterialPropertyBlock"/> the owner tint already uses. The
+    /// value is quantised into <see cref="HealthTintSteps"/> buckets and the
+    /// block is only re-applied when the bucket changes, so a match at full
+    /// health costs exactly what it cost before. An undamaged unit is tinted
+    /// with the unmodified owner colour, i.e. the pre-existing look is
+    /// bit-identical.
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     public class UnitViewManager : MonoBehaviour
     {
         /// <summary>Slot count of the primitive pool table (<see cref="PrimitiveType"/> has six members).</summary>
         private const int ShapePoolCount = 6;
+
+        /// <summary>
+        /// Quantisation of the health tint. Sixteen buckets are far below the
+        /// perceptual threshold of the ramp yet coarse enough that a unit under
+        /// sustained fire re-tints a handful of times instead of every frame.
+        /// </summary>
+        private const int HealthTintSteps = 16;
 
         /// <summary>Shape key of a view instantiated from <see cref="_unitPrefab"/> instead of a primitive.</summary>
         private const int PrefabShapeKey = -1;
@@ -69,6 +87,14 @@ namespace Nova.Gameplay.Match
         [Tooltip("Tint for owners outside the configured colour array.")]
         [SerializeField] private Color _unknownPlayerColor = new Color(0.62f, 0.62f, 0.62f, 1f);
 
+        [Header("Graybox Health Readout")]
+        [Tooltip("Colour the owner tint is blended toward as health drops. Dark red reads as damage without inventing a third meaning for the colour channel.")]
+        [SerializeField] private Color _damagedColor = new Color(0.42f, 0.05f, 0.05f, 1f);
+
+        [Tooltip("Smallest share of the owner colour a nearly-dead unit keeps. Above zero so the colour channel never stops identifying the owner.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _healthTintFloor = 0.25f;
+
         // Slot-indexed view table (index == EntityId.Index).
         private GameObject[] _viewInstances;
         private Renderer[] _viewRenderers;
@@ -77,6 +103,7 @@ namespace Nova.Gameplay.Match
         private int[] _viewShapeKeys;
         private float[] _viewGroundOffsets;
         private int[] _viewOwners;
+        private int[] _viewHealthSteps;
         private int[] _lastSeenFrame;
         private bool[] _tracked;
 
@@ -216,10 +243,15 @@ namespace Nova.Gameplay.Match
                     spawned = true;
                 }
 
-                if (_viewOwners[slot] != unit.PlayerId)
+                // Owner and health share one tint, so they share one upload.
+                // Both are compared against the cached value: an undamaged,
+                // unchanged unit performs no SetPropertyBlock at all.
+                int healthStep = HealthStep(in unit);
+                if (_viewOwners[slot] != unit.PlayerId || _viewHealthSteps[slot] != healthStep)
                 {
                     _viewOwners[slot] = unit.PlayerId;
-                    ApplyTint(slot, unit.PlayerId);
+                    _viewHealthSteps[slot] = healthStep;
+                    ApplyTint(slot, unit.PlayerId, healthStep);
                 }
 
                 _lastSeenFrame[slot] = _frameStamp;
@@ -277,6 +309,7 @@ namespace Nova.Gameplay.Match
             _viewShapeKeys = new int[capacity];
             _viewGroundOffsets = new float[capacity];
             _viewOwners = new int[capacity];
+            _viewHealthSteps = new int[capacity];
             _lastSeenFrame = new int[capacity];
             _tracked = new bool[capacity];
 
@@ -285,6 +318,7 @@ namespace Nova.Gameplay.Match
                 _boundIds[i] = EntityId.Invalid;
                 _viewShapeKeys[i] = PrefabShapeKey;
                 _viewOwners[i] = -1;
+                _viewHealthSteps[i] = -1;
             }
 
             // Size the per-frame scratch to the worst case once, so the
@@ -348,7 +382,8 @@ namespace Nova.Gameplay.Match
             _viewRoles[slot] = unit.Role;
             _viewShapeKeys[slot] = shapeKey;
             _viewGroundOffsets[slot] = groundOffset;
-            _viewOwners[slot] = -1; // forces a tint on this frame
+            _viewOwners[slot] = -1;       // forces a tint on this frame
+            _viewHealthSteps[slot] = -1;  // ... including the health bucket of the recycled instance
             _viewObjectToSlot[instance] = slot;
 
             if (!_tracked[slot])
@@ -371,6 +406,7 @@ namespace Nova.Gameplay.Match
                 _boundIds[slot] = EntityId.Invalid;
                 _viewRenderers[slot] = null;
                 _viewOwners[slot] = -1;
+                _viewHealthSteps[slot] = -1;
                 return;
             }
 
@@ -397,6 +433,7 @@ namespace Nova.Gameplay.Match
             _viewRenderers[slot] = null;
             _boundIds[slot] = EntityId.Invalid;
             _viewOwners[slot] = -1;
+            _viewHealthSteps[slot] = -1;
         }
 
         private void ApplyTransform(int slot, in UnitState unit, float blend)
@@ -424,12 +461,12 @@ namespace Nova.Gameplay.Match
             viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
         }
 
-        private void ApplyTint(int slot, byte playerId)
+        private void ApplyTint(int slot, byte playerId, int healthStep)
         {
             Renderer renderer = _viewRenderers[slot];
             if (renderer == null) return;
 
-            Color color = ColorForPlayer(playerId);
+            Color color = TintFor(playerId, healthStep);
             _propertyBlock.Clear();
             // Built-in RP reads _Color, URP/HDRP read _BaseColor. Setting both
             // keeps the graybox tinted through the pipeline migration instead
@@ -437,6 +474,42 @@ namespace Nova.Gameplay.Match
             _propertyBlock.SetColor(ColorPropertyId, color);
             _propertyBlock.SetColor(BaseColorPropertyId, color);
             renderer.SetPropertyBlock(_propertyBlock);
+        }
+
+        /// <summary>
+        /// Owner colour, darkened toward <see cref="_damagedColor"/> by the
+        /// health bucket. A full-health unit returns the owner colour
+        /// unchanged, so undamaged views look exactly as they did before the
+        /// readout existed; <see cref="_healthTintFloor"/> keeps a share of the
+        /// owner hue at the brink so colour never stops answering "whose is
+        /// it?".
+        /// </summary>
+        private Color TintFor(byte playerId, int healthStep)
+        {
+            Color owner = ColorForPlayer(playerId);
+            if (healthStep >= HealthTintSteps) return owner;
+
+            float fraction = (float)healthStep / HealthTintSteps;
+            float blend = Mathf.Lerp(Mathf.Clamp01(_healthTintFloor), 1f, fraction);
+            return Color.Lerp(_damagedColor, owner, blend);
+        }
+
+        /// <summary>
+        /// Health fraction quantised into <see cref="HealthTintSteps"/> buckets
+        /// (0 = destroyed, <see cref="HealthTintSteps"/> = untouched). The
+        /// division rounds UP, so a unit surviving on a single hit point still
+        /// reports bucket 1 and never renders as the fully-damaged colour that
+        /// would read as "already dead".
+        /// </summary>
+        private static int HealthStep(in UnitState unit)
+        {
+            // A definition-less or not-yet-initialised entity reads as healthy
+            // rather than as a corpse.
+            if (unit.MaxHealth <= 0 || unit.CurrentHealth >= unit.MaxHealth) return HealthTintSteps;
+            if (unit.CurrentHealth <= 0) return 0;
+
+            int step = (unit.CurrentHealth * HealthTintSteps + unit.MaxHealth - 1) / unit.MaxHealth;
+            return step < 1 ? 1 : step;
         }
 
         private Color ColorForPlayer(byte playerId)

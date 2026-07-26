@@ -1,6 +1,6 @@
 # Panzerungssystem (Armor System)
 
-**Version:** 0.3.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.4.0 | **Status:** Entwurf – Matrix führend nach D-074, in Code implementiert | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -8,7 +8,8 @@ Definiert die Panzerungsklassen aller Einheiten und Gebäude, die Schaden-gegen-
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-011 (Evolvierte: Regeneration statt Reparatur), D-012 (Zerstörbarkeit), D-014 (Drohnen: Repair-Drohne), D-015 (Elite-Einheiten), D-027 (Fraktions-Sonderregeln: Legion ohne Infanterie-Heilung, EMP)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-011 (Evolvierte: Regeneration statt Reparatur), D-012 (Zerstörbarkeit), D-014 (Drohnen: Repair-Drohne), D-015 (Elite-Einheiten), D-027 (Fraktions-Sonderregeln: Legion ohne Infanterie-Heilung, EMP), **D-074 (dieses Dokument ist alleinige Autorität der Schaden-gegen-Panzerung-Matrix)**
+- [../production/ScopeLedger.md](../production/ScopeLedger.md) – Register der in MS-1 unbespielten Matrixanteile
 - [DamageSystem.md](DamageSystem.md) – Schadensarten, Pipeline, Status-Effekte
 - [Weapons.md](Weapons.md) – Waffenkatalog
 - [Factions.md](Factions.md), [Infantry.md](Infantry.md), [Vehicles.md](Vehicles.md), [Aircraft.md](Aircraft.md), [Buildings.md](Buildings.md) – Träger der Panzerungsklassen
@@ -35,6 +36,24 @@ Regeln und Begründungen:
 - **Aetherium-Felder**: Der Mutterkristall erhält Klasse `Building`; Ausläufer-Kristalle nutzen eine eigene Zerstörungsregel (Economy.md), um "Aetherium-Felder beschädigbar" (D-012) ohne Balance-Seiteneffekte auf Gebäudekämpfe abzubilden.
 
 ## Schaden-gegen-Panzerung-Matrix (Startwerte v0.1)
+
+> **Autorität (D-074).** Die folgende 6 × 6-Matrix ist die **alleinige
+> kanonische Quelle** für Schaden-gegen-Panzerung-Multiplikatoren. Die früher
+> in [Infantry.md](Infantry.md) und [Vehicles.md](Vehicles.md) geführten
+> Lokaltabellen waren abgeleitete Zusammenfassungen, sind auseinandergedriftet
+> (u. a. gegenläufige Werte für Energie gegen Schwer und Explosiv gegen
+> Gebäude) und sind mit D-074 **aufgehoben**; beide Dokumente verweisen jetzt
+> hierher. Die 36 Werte unten sind durch D-074 **nicht verändert** worden.
+>
+> **In Code implementiert:** `Nova.Simulation.Combat.DamageMatrix` führt genau
+> diese 36 Zahlen als ganzzahlige Prozentwerte (100 = 1.00) und wendet sie als
+> `(Basisschaden × Prozent) / 100` in Ganzzahlarithmetik an — keine
+> Fließkommazahlen in der Simulation. Alle sechs Zeilen und sechs Spalten sind
+> vorhanden, obwohl MS-1 nur vier Schadensarten und fünf Panzerungsklassen
+> bespielt; die unbespielten Anteile (`Heavy`, `Air`, Feuer/Bio/Strahlung) sind
+> im [ScopeLedger](../production/ScopeLedger.md) registriert. D-074 wurde vom
+> Agenten unter ausdrücklicher Inhaber-Delegation entschieden und ist
+> überstimmbar.
 
 Multiplikator auf den Basisschaden: `1.00` = neutral, `> 1.00` = Konter, `< 1.00` = ineffizient. Werte sind Richtwerte zum Tunen, keine Endwerte.
 
@@ -106,3 +125,4 @@ Kostenprinzip: Reparatur kostet einen Bruchteil des Neubaus (Faustregel: Volle R
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Feinschliff Sprint 2 Runde 2 (D-031) | Lead Gameplay Designer |
+| 0.4.0 | 2026-07-26 | Autoritätsvermerk nach D-074 ergänzt: die 6 × 6-Matrix ist alleinige kanonische Quelle und in `Nova.Simulation.Combat.DamageMatrix` implementiert; Lokaltabellen in Infantry.md/Vehicles.md aufgehoben. **Keiner der 36 Werte geändert** | Agent (unter Inhaber-Delegation, D-074) |

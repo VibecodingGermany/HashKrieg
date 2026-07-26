@@ -18,6 +18,54 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Kampf ist bewertbar und ein Match kann enden (Diagnosestand, ohne
+  Gate-Status, ohne Evidence):** `CombatSystem` wandte bis dahin einen flachen
+  Schadenswert von 15 auf jeden Angriff an — ein Kampfpanzer und ein Schütze
+  waren offensiv identisch —, und `grep -rn Victory` fand im Repository nichts:
+  ein Match konnte nicht enden. Neu ist erstens eine
+  Schaden-gegen-Panzerung-Matrix in `Nova.Simulation.Combat`
+  (`DamageType`, `ArmorClass`, `DamageMatrix`, `WeaponProfiles`): 36
+  ganzzahlige Prozentwerte, angewandt als `(Basisschaden × Prozent) / 100` mit
+  Abschneiden, keine Fließkommazahl und kein `SimFixed`; Reichweite und
+  Abklingzeit sind seither rollenabhängig statt konstant, die Ziel- und
+  Abklinglogik blieb unverändert. Zweitens `Nova.Simulation.Victory.VictorySystem`
+  als achtes und letztes System nach Combat mit dem MS-1-Siegvertrag aus D-056:
+  `Victory.Elimination`, `Draw.MutualAnnihilation`, `Draw.TimeLimit` bei Tick
+  27.000, unwiderruflich eingerastet und in Snapshotblock 107 serialisiert, also
+  Teil des kanonischen Zustandshashs. Eingebaut ist eine im Dokument nicht
+  vorgesehene Eingriffssperre („Engagement-Latch"): nur Slots, die je eine
+  lebende Entität besaßen, nehmen an der Eliminierungsentscheidung teil — ohne
+  sie meldete jeder frische Host auf Tick 1 ein beidseitiges Remis. Drittens
+  macht das Debug-HUD beides sichtbar (alle vier Ergebniscodes, Abstand zum
+  Zeitlimit, Streitkräftezählung aus derselben Quelle, die den Sieg entscheidet,
+  Waffenprofil der Auswahl samt Auflösung gegen jede in MS-1 getragene
+  Panzerungsklasse), und Einheiten zeigen ihren Gesundheitsstand über den
+  bestehenden `MaterialPropertyBlock` ohne ein neues GameObject. Verifiziert:
+  Unity-Batchmode-Kompilierung ohne Fehler und ohne Warnungen, 379/379
+  EditMode-Tests, 382/382 .NET-Tests (je +41 gegenüber 338/341, identische
+  Differenz in beiden handgespiegelten Lanes), `DETERMINISM_10000`-SelfCheck
+  grün mit neuer lokaler Baseline (Fingerprint `0xAF9FB211B6C9CACE`,
+  Checkpoint Tick 100 `0x01D276820F5FFE15`, finaler Zustandshash
+  `0xCB8A545B9710EF54`), zwei Läufe byte-identisch, macOS- und Windows-Player
+  gebaut, macOS-Player ausgeführt (640 Ticks, alle acht Systeme initialisiert
+  mit Victory an letzter Stelle, null Exceptions). Die Hash-Bewegung wurde
+  **getrennt gemessen statt zugeschrieben**: der Fingerprint-Sprung stammt
+  vollständig aus dem neuen Snapshotblock, die Zustandshash-Bewegung aus dem
+  Kampfmodell. **Nicht verifiziert:** Look and Feel — ob sich das Konterdreieck
+  wie eines anfühlt, entscheidet erst ein menschlicher Play-Durchlauf.
+  **Nicht enthalten und offen protokolliert:** Es gibt keine Zielerfassung — ein
+  Angriffsziel wird ausschließlich durch manuellen Klick gesetzt, Einheiten
+  erwidern kein Feuer, Angriffsbewegung existiert nicht und die
+  Verteidigungsplattform kann nie schießen; nur 3 der 36 Matrixzellen sind über
+  die aktuellen Tastenbelegungen erreichbar; die Sichtbarmachung der letzten
+  Einheiten nach D-056 ist berechnet und serialisiert, aber von nichts
+  konsumiert; der Host tickt nach der Siegentscheidung unverändert weiter und
+  es gibt keinen Ergebnisbildschirm; und `MatchFingerprint` hasht Inhalt
+  weiterhin nur als Stub, sieht diese Waffenwertänderung also nicht. Alles
+  registriert in [docs/production/ScopeLedger.md](docs/production/ScopeLedger.md)
+  und [docs/production/GrayboxLog.md](docs/production/GrayboxLog.md) (Sitzung
+  GB-002). `quality/**`, `.github/workflows/**` und `VERSION` blieben unberührt;
+  G0, MS-0 und MS-1 bleiben offen.
 - **Hashkrieg-Weltentwurf (Entwurf, kein Gate-Nachweis):**
   [docs/vision/Lore.md](docs/vision/Lore.md) (0.1.0) beschreibt Vorgeschichte,
   Aetherium-Ökonomie, die Fraktionen Allianz und Legion sowie den Grund ihres
@@ -897,6 +945,30 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   konfiguriertes `quality-gate`-Environment; G0-A und G0 bleiben offen.
 
 ### Entschieden
+- **D-074 (Autorität der Schaden-gegen-Panzerung-Matrix) — vom Agenten unter
+  ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst:**
+  Die Fachdokumentation führte drei einander widersprechende Matrizen
+  ([ArmorSystem.md](docs/gamedesign/ArmorSystem.md) 6 × 6,
+  [Infantry.md](docs/gamedesign/Infantry.md) 6 × 4 plus einer siebten
+  Schadensart „Kristall", [Vehicles.md](docs/gamedesign/Vehicles.md) 5 × 4),
+  teils mit gegenläufigen Werten — Energie gegen Schwer 0,75 gegen 1,25,
+  Explosiv gegen Gebäude 0,75 gegen 1,25. Entschieden gegen die Alternativen
+  „Einheitenkategorie-Achse führend" und „neue zusammengeführte Matrix":
+  **ArmorSystem.md ist alleinige Autorität**, seine 36 Werte sind kanonisch und
+  bleiben unverändert. Tragend war der Bestand, nicht der Rang: die
+  Panzerungsklasse ist laut ArmorSystem.md ein Einheitenattribut, während
+  „vs. Fahrzeug" `Light`/`Medium`/`Heavy` zusammenfaltet und damit genau die
+  Unterscheidung verliert, aus der Konterspiel entsteht; Vehicles.md verweist in
+  seiner eigenen D-047-Regel bereits auf ArmorSystem.md für die Konterlogik;
+  und ArmorSystem.md ist als einzige Quelle schon als flacher 36-Zahlen-Satz
+  geschrieben. Folgen: „Kristall" ist **keine** Schadensart (Evolvierten-Inhalt
+  außerhalb MS-1), und weil ArmorSystem.md Leichten **und** Kampfpanzer der
+  Klasse `Medium` zuordnet, bleibt die `Heavy`-Spalte in MS-1 unbespielt —
+  festgehalten statt stillschweigend repariert, registriert im
+  [ScopeLedger](docs/production/ScopeLedger.md). Der Eintrag ist im
+  [DecisionLog](docs/production/DecisionLog.md) ausdrücklich als
+  agent-entschieden gekennzeichnet und **jederzeit vom Inhaber überstimmbar**;
+  eine Umkehr wäre eine Datenänderung, keine Strukturänderung.
 - **D-069:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
   B=TeamMask/A=Smoothness (URP-Lit-kompatibel).
 - **D-070:** 0-€-Beschaffungspfad für den Art-Strang mit Anbieter-Whitelist
@@ -921,6 +993,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Anker: Environment-Protection plus `NOVA_TRUST_CONTEXT_SHA256`).
 
 ### Geändert
+- **Widersprechende Schadensmatrizen in der Fachdokumentation aufgehoben
+  (D-074):** [ArmorSystem.md](docs/gamedesign/ArmorSystem.md) (0.4.0) trägt
+  einen Autoritätsvermerk und den Hinweis auf die Implementierung — **keiner
+  der 36 Werte wurde geändert**. Die abgedrifteten Lokaltabellen in
+  [Infantry.md](docs/gamedesign/Infantry.md) (0.5.0) und
+  [Vehicles.md](docs/gamedesign/Vehicles.md) (0.5.0) sind ersatzlos entfernt
+  und durch Verweise ersetzt; die Einheiten-Stattabellen, Rollen, Drohnen- und
+  Elite-Werte beider Dokumente bleiben unverändert.
+  [ScopeLedger.md](docs/production/ScopeLedger.md) (0.2.0) erhält eine Zeile für
+  die unkonsumierte Sichtbarmachung der letzten Einheiten, schreibt die Zeilen
+  zu Siegauswertung und Waffenprofil auf den neuen Stand fort — ohne sie zu
+  entfernen, denn es gibt keinen auflösenden Gate-Nachweis — und führt in einem
+  getrennten Anhang vier Verschiebungen ohne Manifest-Schlüsselpfad
+  („Kristall", `Heavy`, `Air`, Feuer/Bio/Strahlung), damit die
+  „Zeigen statt kopieren"-Regel des Hauptregisters unangetastet bleibt.
+  [GrayboxLog.md](docs/production/GrayboxLog.md) (0.2.0) protokolliert die
+  Sitzung GB-002 append-only.
 - **Movement-State auf SimFixed migriert (Q-040(i)-Auflösung implementiert,
   Ratifizierung per D-ID ausstehend; ohne Gate-Status, ohne Evidence):**
   `Transform2D` speichert Position als `SimFixed` (Q16.16) und Rotation als

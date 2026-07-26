@@ -25,6 +25,20 @@ namespace Nova.Simulation.Combat
     /// dead id is cleared from every unit's attack order in the same tick.
     /// </para>
     /// <para>
+    /// DAMAGE MODEL (this is what a shot is worth, as opposed to when it is
+    /// scheduled): every entity's weapon values — base damage, range, cooldown
+    /// and <see cref="Combat.DamageType"/> — and its own
+    /// <see cref="Combat.ArmorClass"/> come from its role's
+    /// <see cref="WeaponProfile"/>, i.e. from the content definitions in
+    /// <see cref="Definitions.SimDefinitions"/>. The landed damage is
+    /// <c>DamageMatrix.Resolve(profile.AttackDamage, profile.DamageType,
+    /// targetProfile.ArmorClass)</c> — an integer percent multiplier, no
+    /// floats, no fixed-point multiply. A role with base damage 0 is unarmed
+    /// and never fires at all: Builder, Harvester and the eight non-defensive
+    /// buildings hold their attack order forever, while the DefensePlatform
+    /// shoots like any unit because buildings CAN shoot.
+    /// </para>
+    /// <para>
     /// Duel asymmetry (review finding): because engagements run in ascending
     /// entity-index order and death takes effect immediately, mutual kills
     /// inside one tick are won by the unit with the LOWER index — spawn order
@@ -35,8 +49,10 @@ namespace Nova.Simulation.Combat
     /// <para>
     /// Range rule (simplest documented rule, boundary inclusive): the
     /// center-to-center distance must satisfy
-    /// <c>dist &lt;= WeaponRange + target.Radius</c> — edge-adjusted on the
-    /// target side only, the attacker's own radius is ignored. The comparison
+    /// <c>dist &lt;= attackerWeaponRange + target.Radius</c> — edge-adjusted on
+    /// the target side only, the attacker's own radius is ignored. The
+    /// range is the attacker role's, so an Artillery (20 m) outranges a
+    /// BasicInfantry (7 m) on the same board. The comparison
     /// is exact fixed-point in widened Q32.32 long arithmetic; a squared
     /// distance can overflow only beyond ~46 km, far outside any map domain.
     /// </para>
@@ -74,26 +90,35 @@ namespace Nova.Simulation.Combat
     /// self-computed sight exists on this path.
     /// </para>
     /// <para>
-    /// Provisional content values (Q-040 candidates, not ratified balancing):
-    /// weapon range 8 m, damage 15, cooldown
-    /// <see cref="DefaultCooldownTicks"/> = 5 ticks — 0.5 s on the canonical
-    /// 10 Hz clock (the retired prototype's "10 ticks = 0.5 sec" was a
-    /// 20 Hz relic). Per-unit-type weapons from docs/gamedesign/Weapons.md
-    /// are content definitions and not yet wired. Same-team attack orders
-    /// are not filtered in this slice (command-side validation is a Q-040
-    /// candidate); the visibility rule applies to every target alike.
+    /// Per-unit-type weapons from docs/gamedesign/Weapons.md ARE wired now —
+    /// the flat 15-damage-for-everyone placeholder is gone. What remains
+    /// provisional: same-team attack orders are not filtered in this slice
+    /// (command-side validation is a Q-040 candidate); the visibility rule
+    /// applies to every target alike.
     /// </para>
     /// </summary>
     public sealed class CombatSystem : ISimSystem
     {
-        /// <summary>Provisional default weapon range in meters (Q-040 candidate; see class remarks).</summary>
-        public static readonly SimFixed DefaultWeaponRange = SimFixed.FromInt(8);
+        // The three Default* members below are NOT the damage model any more.
+        // They are named aliases of the generic-role fallback profile
+        // (WeaponProfiles.Fallback, applied only to UnitRole.Unit — see the
+        // remarks there), kept because the canonical combat suites in both
+        // test lanes express their expectations through them. Nothing on the
+        // content path reads them: a role-carrying entity resolves through
+        // WeaponProfiles.Get, and the values below are simply that role's
+        // numbers restated. They are deliberately not [Obsolete]: an alias
+        // that is still the correct answer for the role it describes is not
+        // deprecated, and marking it so would only spray warnings across two
+        // test suites that this sprint's write scope forbids editing.
 
-        /// <summary>Provisional default weapon damage per shot (Q-040 candidate; see class remarks).</summary>
-        public const int DefaultWeaponDamage = 15;
+        /// <summary>Weapon range in meters of the generic-role fallback profile (alias of <see cref="WeaponProfiles.FallbackAttackRangeTiles"/>).</summary>
+        public static readonly SimFixed DefaultWeaponRange = SimFixed.FromInt(WeaponProfiles.FallbackAttackRangeTiles);
 
-        /// <summary>Provisional firing interval in whole ticks: 5 ticks = 0.5 s at the canonical 10 Hz (Q-040 candidate).</summary>
-        public const int DefaultCooldownTicks = 5;
+        /// <summary>Damage per shot of the generic-role fallback profile (alias of <see cref="WeaponProfiles.FallbackAttackDamage"/>).</summary>
+        public const int DefaultWeaponDamage = WeaponProfiles.FallbackAttackDamage;
+
+        /// <summary>Firing interval in ticks of the generic-role fallback profile (alias of <see cref="WeaponProfiles.FallbackAttackCooldownTicks"/>).</summary>
+        public const int DefaultCooldownTicks = WeaponProfiles.FallbackAttackCooldownTicks;
 
         private readonly EntityManager _entityManager;
         private readonly FogOfWarSystem _fogOfWar;
@@ -144,16 +169,31 @@ namespace Nova.Simulation.Combat
 
                 ref UnitState target = ref _entityManager.GetUnitRef(targetId);
 
+                // The attacker's own role decides damage, type, range and
+                // cadence. An unarmed role (base damage 0) holds its order
+                // exactly like an out-of-range one — it simply has nothing to
+                // fire, so it never starts a cooldown either.
+                WeaponProfile weapon = WeaponProfiles.Get(attacker.Role);
+                if (!weapon.IsArmed) continue;
+
                 // Legality: range AND committed visibility. A living target
                 // that fails either check is held, never dropped.
-                if (!IsInRange(in attacker, in target)) continue;
+                if (!IsInRange(in attacker, in target, weapon.AttackRange)) continue;
                 if (!IsVisibleToAttacker(in attacker, in target)) continue;
 
                 if (attacker.WeaponCooldownTicks != 0) continue;
 
                 // MS-1 hitscan: damage lands in the same tick, no projectile.
-                target.CurrentHealth -= DefaultWeaponDamage;
-                attacker.WeaponCooldownTicks = DefaultCooldownTicks;
+                // The counter table is applied here and nowhere else —
+                // attacker damage type versus target armor class, integer
+                // percent, truncating once against the untouched base value.
+                int damage = DamageMatrix.Resolve(
+                    weapon.AttackDamage,
+                    weapon.DamageType,
+                    WeaponProfiles.GetArmorClass(target.Role));
+
+                target.CurrentHealth -= damage;
+                attacker.WeaponCooldownTicks = weapon.AttackCooldownTicks;
 
                 if (target.CurrentHealth <= 0)
                 {
@@ -170,14 +210,16 @@ namespace Nova.Simulation.Combat
         /// Exact range test (boundary inclusive): center distance squared
         /// &lt;= (range + target radius)^2, computed in widened Q32.32 long
         /// arithmetic so the comparison can never overflow the Q16.16 domain.
+        /// <paramref name="weaponRange"/> is the ATTACKER role's range, so the
+        /// same call answers for a 7 m rifle and a 20 m artillery piece.
         /// </summary>
-        private static bool IsInRange(in UnitState attacker, in UnitState target)
+        private static bool IsInRange(in UnitState attacker, in UnitState target, SimFixed weaponRange)
         {
             long dx = (long)attacker.Transform.PositionX.RawValue - target.Transform.PositionX.RawValue;
             long dy = (long)attacker.Transform.PositionY.RawValue - target.Transform.PositionY.RawValue;
             long distanceSquared = dx * dx + dy * dy;
 
-            SimFixed reach = DefaultWeaponRange + target.Radius;
+            SimFixed reach = weaponRange + target.Radius;
             long reachSquared = (long)reach.RawValue * reach.RawValue;
             return distanceSquared <= reachSquared;
         }

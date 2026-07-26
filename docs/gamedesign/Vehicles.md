@@ -1,6 +1,6 @@
 # Fahrzeuge (Vehicles)
 
-**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Vehicle Artist / Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -8,7 +8,8 @@ Spezifikation aller Bodenfahrzeuge für die drei Fraktionen (Allianz, Legion, Ev
 
 ## Abhängigkeiten
 
-- [DecisionLog](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte bauen durch Wachstum), D-014 (Drohnen), D-015 (Elite-Einheiten), D-021 (kein Pop-Limit außer Elite), D-026 (Radar-Fahrzeug, Konter-Lücken), D-034/D-047 (1 Grid-Feld ≙ 1 m, Weapons.md führend für Reichweiten)
+- [DecisionLog](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte bauen durch Wachstum), D-014 (Drohnen), D-015 (Elite-Einheiten), D-021 (kein Pop-Limit außer Elite), D-026 (Radar-Fahrzeug, Konter-Lücken), D-034/D-047 (1 Grid-Feld ≙ 1 m, Weapons.md führend für Reichweiten), D-074 (Konter-Matrix führend in ArmorSystem.md)
+- [ArmorSystem](./ArmorSystem.md) – **führende Quelle** für Panzerungsklassen und Schaden-gegen-Panzerung-Multiplikatoren (D-074)
 - [Factions](./Factions.md) – Fraktionsidentitäten, Ressourcenprofile
 - [Buildings](./Buildings.md) – Produktionsgebäude (Fahrzeugfabrik, Raffinerie), Voraussetzungen
 - [Aircraft](./Aircraft.md) – geteilte Schadens-/Panzerungstypen, Flak-Konter
@@ -60,15 +61,24 @@ Jede Einheit ist ein flacher Datensatz mit folgenden Feldern:
 | `prerequisites` | string[] | Gebäude-/Tech-Voraussetzungen |
 | `abilities` | string[] | Aktive/passive Fähigkeiten |
 
-**Schadens-Konter-Matrix (Richtwerte, Schadensmultiplikatoren):**
+**Schadens-Konter-Matrix: führend in [ArmorSystem](./ArmorSystem.md) (D-074).**
+Die Schaden-gegen-Panzerung-Multiplikatoren stehen dort als 6 × 6-Matrix und
+existieren genau einmal (Grundsatzregel D-047 – dieselbe Regel, die diese Datei
+in der Verweis-Regel unten für Waffenwerte schon anwendet). Die früher an dieser
+Stelle geführte 5 × 4-Tabelle über der Achse „vs. Leicht / vs. Schwer /
+vs. Gebäude / vs. Luft" war eine abgeleitete Zusammenfassung, ist von der
+führenden Quelle abgedriftet – teils gegenläufig, etwa Energie gegen Schwer
+(hier 1,25, führend 0,75) und Explosiv gegen Gebäude (hier 1,25, führend 0,75) –
+und wurde mit **D-074 aufgehoben**; sie ist ersatzlos entfernt.
 
-| Schadenstyp | vs. Leicht | vs. Schwer | vs. Gebäude | vs. Luft |
-|---|---|---|---|---|
-| Kinetisch | 1,0 | 0,75 | 0,5 | 0,5 |
-| Explosiv | 0,75 | 1,0 | 1,25 | 0,5 |
-| Flamme | 1,5 | 0,5 | 1,0 (entzündet Vegetation) | 0 |
-| Energie | 1,0 | 1,25 | 1,0 | 0,75 |
-| Bio | 1,25 | 0,75 | 0,75 | 0,5 |
+Damit ändert sich auch die Panzerungsachse: Die `armorType`-Angabe im
+Datenmodell oben nennt weiterhin `Leicht`/`Schwer` als Rahmenbeschreibung, die
+regelwirksame Klasse einer Einheit ist jedoch eine der sechs Klassen aus
+[ArmorSystem](./ArmorSystem.md) (`Infantry`, `Light`, `Medium`, `Heavy`,
+`Building`, `Air`). Für MS-1 gilt die dortige Zuordnung unverändert: Leichter
+Panzer **und** Kampfpanzer sind `Medium`, `Heavy` ist dem Heavy Tank
+vorbehalten und damit in MS-1 unbespielt (registriert im
+[ScopeLedger](../production/ScopeLedger.md)).
 
 Flak-Waffen (Verteidigungsplattform-Modul, Radar-Fahrzeug nein) besitzen dedizierte Anti-Luft-Werte; Werte verbindlich in [Weapons](./Weapons.md) (D-047), Konter-Logik in [Aircraft](./Aircraft.md). Mobile Luftabwehr der Evolvierten (Konter-Lücke, D-026): Der Kristallmagier (Infanterie) erhält Zielklasse „Beides" (Boden + Luft) – Details in [Infantry](./Infantry.md).
 
@@ -190,6 +200,10 @@ Derzeit keine unentschiedenen Punkte. Stand nach Korrekturlauf Sprint 2 und Spri
 - Reichweiten-/Sichtweiten-Harmonisierung: **entschieden (D-047, Korrekturlauf Sprint 4)** – 1 Grid-Feld ≙ 1 m; [Weapons](./Weapons.md) führend für Waffenwerte (z. B. Artillerie 18–22 statt 80–85, Panzerkanonen 8–10), [FogOfWar](./FogOfWar.md) führend für Sichtklassen; alle Reichweiten-/Sicht-Spalten hier angeglichen bzw. durch Verweise ersetzt.
 - Alpha-Mutant-Doppeldefinition: **historisch entschieden, durch D-056 aus
   MS-1 verschoben** – Werte und Produktionsweg bleiben Post-MVP-Zielbild.
+- Schadens-Konter-Matrix: **entschieden (D-074)** – die lokale 5 × 4-Tabelle war
+  gegenüber [ArmorSystem](./ArmorSystem.md) abgedriftet und ist aufgehoben;
+  führend ist ausschließlich die dortige 6 × 6-Matrix. D-074 wurde vom Agenten
+  unter ausdrücklicher Inhaber-Delegation entschieden und ist überstimmbar.
 
 ## Nächste Schritte
 
@@ -207,3 +221,4 @@ Derzeit keine unentschiedenen Punkte. Stand nach Korrekturlauf Sprint 2 und Spri
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Vehicle Artist / Lead Gameplay Designer |
 | 0.4.0 | 2026-07-24 | Sechs MS-1-Fahrzeugrollen, Harvester-Kapazitäten und deaktivierte Fähigkeiten gemäß D-056 festgelegt | Lead Vehicle Artist / Lead Gameplay Designer |
+| 0.5.0 | 2026-07-26 | Lokale 5 × 4-Schadensmatrix nach D-074 aufgehoben und durch Verweis auf [ArmorSystem](./ArmorSystem.md) ersetzt; Panzerungsachse auf die sechs Klassen der führenden Quelle umgestellt (Leichter Panzer und Kampfpanzer beide `Medium`). Fahrzeugtabellen, Drohnen und Elite-Werte unverändert | Agent (unter Inhaber-Delegation, D-074) |

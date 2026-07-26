@@ -319,10 +319,15 @@ namespace Nova.SimRunner.Tests
                 1, new Transform2D(SimFixed.FromInt(21), SimFixed.FromInt(20)), SimFixed.FromInt(4));
             host.Entities.GetUnitRef(attacker).AttackTarget = plant;
 
-            // Let the FoW commit (5 Hz) and combat engage until the plant dies
-            // (100 health, 15 damage per 5-tick cooldown cycle).
+            // Let the FoW commit (5 Hz) and combat engage until the plant dies.
+            // The attacker carries the generic UnitRole.Unit fallback weapon
+            // (15 Kinetic, 5-tick cadence) and the plant is armor class
+            // Building, so the counter matrix scores it at 0.30: 4 damage per
+            // cycle, 25 shots for 100 health, last shot at tick 122. The
+            // budget below is that plus headroom — this test is about the
+            // economy reacting to the kill, not about how long the kill takes.
             bool died = false;
-            for (int i = 0; i < 100 && !died; i++)
+            for (int i = 0; i < 200 && !died; i++)
             {
                 host.StepTick();
                 died = !host.Entities.IsValid(plant);

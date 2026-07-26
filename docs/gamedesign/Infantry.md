@@ -1,6 +1,6 @@
 # Infanterie – Einheiten-Design (24 Einheiten)
 
-**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -8,7 +8,8 @@ Vollständige, spielbar spezifizierte Infanterie-Roster aller drei Fraktionen (8
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-008 (Gebäudetypen), D-010 (Wirtschaft/Matchdauer), D-011 (Evolvierte-Mechanik), D-015 (Elite-Regel), D-018 (Modi-Staffelung), D-021 (kein Versorgungssystem), D-022 (Capture-Regelwerk), D-026 (Einheiten-Korrekturen), D-027 (Fraktions-Sonderregeln), D-028 (Brücken-Reparatur)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – insb. D-008 (Gebäudetypen), D-010 (Wirtschaft/Matchdauer), D-011 (Evolvierte-Mechanik), D-015 (Elite-Regel), D-018 (Modi-Staffelung), D-021 (kein Versorgungssystem), D-022 (Capture-Regelwerk), D-026 (Einheiten-Korrekturen), D-027 (Fraktions-Sonderregeln), D-028 (Brücken-Reparatur), D-074 (Konter-Matrix führend in ArmorSystem.md)
+- [./ArmorSystem.md](./ArmorSystem.md) – **führende Quelle** für Panzerungsklassen und Schaden-gegen-Panzerung-Multiplikatoren (D-074)
 - [../analysis/KnowledgeBase.md](../analysis/KnowledgeBase.md) – Fraktions-Grunddaten
 - `RTS_Asset_Pipeline.md` (Projektroot), Paket 04 – verbindliche Einheitennamen
 - `./Factions.md`, `./Economy.md`, `./Buildings.md`, `./Vehicles.md`, `./Aircraft.md`, `./ResearchTree.md` (parallel in Sprint 2 in Arbeit) – Zahlengeüst: Währung AE, Start 1.000 AE, Harvester-Ladung ~300 AE, Tech-Tiers 1–3, Low-Power-Regel
@@ -40,14 +41,28 @@ Damit die 24 Einheiten untereinander und zu Fahrzeugen/Luft/Gebäuden konsistent
 
 ### Schadens- und Rüstungsmatrix (Konter-Kohärenz)
 
-| Schadenstyp | vs. Infanterie | vs. Fahrzeug | vs. Luft | vs. Gebäude |
-|---|---|---|---|---|
-| Kinetik (Gewehr/MG) | 1,0 | 0,5 | 0,5 | 0,25 |
-| Spreng (Rakete/Mörser) | 0,75 | 1,5 | 1,25 (gelenkt) | 1,0 |
-| Energie (Allianz-Tech) | 1,0 | 1,0 | 1,0 | 0,75 |
-| Flamme (Legion) | 1,5 | 0,75 | 0 | 1,25 (+ Vegetation/Dekor, D-012) |
-| Bio/Sporen (Evolvierte) | 1,25 | 0,75 | 1,0 | 0,75 |
-| Kristall (Evolvierte) | 0,75 | 1,5 | 0,5 | 1,25 |
+**Führend ist [./ArmorSystem.md](./ArmorSystem.md).** Die
+Schaden-gegen-Panzerung-Multiplikatoren stehen dort als 6 × 6-Matrix
+(6 Schadensarten × 6 Panzerungsklassen) und existieren genau einmal
+(Grundsatzregel D-047). Die früher an dieser Stelle geführte 6 × 4-Tabelle über
+der Achse „vs. Infanterie / vs. Fahrzeug / vs. Luft / vs. Gebäude" war eine
+abgeleitete Zusammenfassung, ist von der führenden Quelle abgedriftet und wurde
+mit **D-074 aufgehoben**; sie ist ersatzlos entfernt.
+
+Zwei Folgen für dieses Dokument:
+
+- **Panzerungsklasse statt Einheitenkategorie.** Die Konterachse ist die
+  Panzerungsklasse einer Einheit (`Infantry`, `Light`, `Medium`, `Heavy`,
+  `Building`, `Air`), nicht ihre Kategorie. „vs. Fahrzeug" faltet `Light`,
+  `Medium` und `Heavy` zusammen und kann deshalb kein Konterspiel tragen.
+- **„Kristall" ist keine Schadensart** (D-074). Der siebte Eintrag der alten
+  Tabelle war Evolvierten-Inhalt; die Evolvierten liegen außerhalb von MS-1.
+  Registriert im [ScopeLedger](../production/ScopeLedger.md).
+
+Die `damageType`-Angaben in den Einheitentabellen weiter unten bleiben gültig
+und benennen die Zeile der führenden Matrix; verbindliche Waffenwerte
+(Reichweite, Schaden, Abklingzeit) stehen in [./Weapons.md](./Weapons.md)
+(D-047).
 
 **Rollen-Konter-Prinzip über alle Fraktionen:** Jede Fraktion hat je mindestens eine Infanterie-Antwort auf Fahrzeuge, Luft, Infanterie und Gebäude; die *Form* der Antwort ist asymmetrisch (Allianz präzise/teuer, Legion billig/flächig, Evolvierte nah/regenerierend).
 
@@ -158,3 +173,4 @@ Bereinigt im Korrekturlauf Sprint 4: Alpha-Mutant-Doppelwerte (Kosten/HP/DPS/Fä
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Alpha-Mutant-Werte/-Fähigkeiten durch Verweis auf Vehicles.md ersetzt (D-047-Grundsatzregel, keine Doppelpflege) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-24 | MS-1 auf Basis- und Panzerabwehrinfanterie von Allianz und Legion begrenzt; aktive Fähigkeiten gemäß D-056 deaktiviert | Lead Gameplay Designer |
+| 0.5.0 | 2026-07-26 | Lokale 6 × 4-Schadensmatrix nach D-074 aufgehoben und durch Verweis auf [./ArmorSystem.md](./ArmorSystem.md) ersetzt; „Kristall" als Schadensart gestrichen (in den ScopeLedger verschoben). Einheitentabellen, Rollen und Konter-Matrix unverändert | Agent (unter Inhaber-Delegation, D-074) |
