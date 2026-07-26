@@ -74,6 +74,12 @@ namespace Nova.Gameplay.Match
         /// <summary>The canonical economy (credits, power, finite Aetherium harvest; SimulationCore.md section 2, phases 2/3).</summary>
         public EconomySystem Economy { get; private set; }
 
+        /// <summary>The canonical construction domain (placement, sites, repair, T2 unlock; SimulationCore.md section 2, phases 4/5).</summary>
+        public Simulation.Construction.ConstructionSystem Construction { get; private set; }
+
+        /// <summary>The canonical production domain (unit queues, rally points; SimulationCore.md section 2, phase 4).</summary>
+        public Simulation.Production.ProductionSystem Production { get; private set; }
+
         /// <summary>The canonical Fog of War (single committed sight for Combat/AI/snapshot/rendering, D-058).</summary>
         public FogOfWarSystem FogOfWar { get; private set; }
 
@@ -103,13 +109,19 @@ namespace Nova.Gameplay.Match
             Pathfinding = new PathfindingSystem(_mapWidth, _mapHeight);
             Movement = new MovementSystem(Entities, Pathfinding);
             Economy = new EconomySystem(Entities);
+            Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy);
+            Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
             Combat = new CombatSystem(Entities, FogOfWar);
 
             // Canonical tick order (SimulationCore.md section 2): economy
-            // (phases 2/3) BEFORE pathfinding/movement (phase 6), then the
-            // FoW recompute, then combat.
+            // (phases 2/3), construction and production (phases 4/5) BEFORE
+            // pathfinding/movement (phase 6), then the FoW recompute, then
+            // combat. A unit spawned by production in tick T carries no
+            // movement order yet and moves earliest in tick T+1.
             Kernel.RegisterSystem(Economy);
+            Kernel.RegisterSystem(Construction);
+            Kernel.RegisterSystem(Production);
             Kernel.RegisterSystem(Pathfinding);
             Kernel.RegisterSystem(Movement);
             Kernel.RegisterSystem(FogOfWar);
@@ -118,7 +130,7 @@ namespace Nova.Gameplay.Match
             Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
             Ingress = new CommandIngress(Session);
             _transport = new LocalLoopbackTransport(Ingress);
-            Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding, Economy), Ingress);
+            Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding, Economy, Construction, Production), Ingress);
         }
 
         public void StartMatch()
