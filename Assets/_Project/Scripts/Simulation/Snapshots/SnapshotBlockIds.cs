@@ -20,7 +20,12 @@ namespace Nova.Simulation.Snapshots
         /// <summary>Entity store block (units, generations, free list), written by MovementSystem.</summary>
         public const ushort EntityStore = FirstSystemBlock;
 
-        /// <summary>Pathfinding block (flow-field target; the field itself is rebuilt on restore).</summary>
+        /// <summary>
+        /// Pathfinding block: cost field epoch, recency clock and the
+        /// flow-field cache directory (destination + last-used tick per
+        /// entry). The field contents themselves are rebuilt on restore; the
+        /// epoch is the proof that the rebuild sees the same terrain.
+        /// </summary>
         public const ushort Pathfinding = FirstSystemBlock + 1;
 
         /// <summary>Fog of War block (committed per-team masks, last recompute tick), written by FogOfWarSystem.</summary>
