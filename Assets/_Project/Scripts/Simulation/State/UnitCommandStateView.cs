@@ -205,9 +205,16 @@ namespace Nova.Simulation.State
                         record.PlayerSlot, cancel.BuildingEntityId, cancel.QueueIndex);
                 }
                 case CommandKind.SetRallyPoint:
-                    return _productionSystem == null
-                        ? CommandResultCode.RejectedPrerequisitesNotMet
-                        : _productionSystem.ValidateSetRallyPoint(record.PlayerSlot, refs.SingleEntityId);
+                {
+                    if (_productionSystem == null) return CommandResultCode.RejectedPrerequisitesNotMet;
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!SetRallyPointPayload.TryParse(ref reader, out SetRallyPointPayload rally))
+                    {
+                        throw new InvalidOperationException("Sealed SetRallyPoint payload failed to parse.");
+                    }
+                    return _productionSystem.ValidateSetRallyPoint(
+                        record.PlayerSlot, rally.BuildingEntityId, rally.TargetX, rally.TargetY);
+                }
                 case CommandKind.InstallDefenseModule:
                     // Schema-v1 payload exists, but defense modules are G2/G4
                     // content (mvp-v1.json defenseModules): deterministic

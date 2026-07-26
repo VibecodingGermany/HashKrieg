@@ -254,8 +254,15 @@ namespace Nova.Simulation.Production
                 : CommandResultCode.RejectedInvalidTarget;
         }
 
-        /// <summary>SetRallyPoint legality: the building must be an own completed placement with a producer role.</summary>
-        public CommandResultCode ValidateSetRallyPoint(byte playerSlot, uint buildingRaw)
+        /// <summary>
+        /// SetRallyPoint legality: the building must be an own completed
+        /// placement with a producer role, and the rally target (SimFixed
+        /// world coordinates, grid-mapped by floor) must lie inside the map
+        /// (0 &lt;= x,y &lt; <see cref="Construction.ConstructionSystem.GridSize"/>
+        /// in grid cells) — an off-map target is RejectedInvalidTarget and
+        /// leaves the existing rally point unchanged.
+        /// </summary>
+        public CommandResultCode ValidateSetRallyPoint(byte playerSlot, uint buildingRaw, SimFixed targetX, SimFixed targetY)
         {
             EntityId id = UnitCommandStateView.ToEntityId(buildingRaw);
             if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot)
@@ -263,6 +270,14 @@ namespace Nova.Simulation.Production
                 return CommandResultCode.RejectedInvalidTarget;
             }
             if (!IsProducerRole(unit.Role) || !IsCompletedPlacement(buildingRaw))
+            {
+                return CommandResultCode.RejectedInvalidTarget;
+            }
+            int gridX = SimFixed.WorldToGrid(targetX);
+            int gridY = SimFixed.WorldToGrid(targetY);
+            if (gridX < 0 || gridY < 0
+                || gridX >= Construction.ConstructionSystem.GridSize
+                || gridY >= Construction.ConstructionSystem.GridSize)
             {
                 return CommandResultCode.RejectedInvalidTarget;
             }

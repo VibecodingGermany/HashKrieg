@@ -455,6 +455,70 @@ namespace Nova.Simulation.Tests
             Assert.That(restored.TryValidateState(longer), Is.False);
         }
 
+        [Test]
+        public void Snapshot_AssignedBuilderRoleViolation_IsRejectedWithoutMutation()
+        {
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 2, 40, 40).IsValid, Is.True, "power provider");
+            f.SpawnBuilder(0, 19, 20);
+            EntityId soldier = f.Entities.SpawnUnit(
+                0, new Transform2D(SimFixed.FromInt(50), SimFixed.FromInt(50)), SimFixed.FromInt(4),
+                role: UnitRole.BasicInfantry);
+            f.Step(1);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True);
+
+            var writer = new SnapshotBlockWriter();
+            f.Construction.WriteState(writer);
+            byte[] bytes = writer.ToArray();
+            Assert.That(f.Construction.TryValidateState(bytes), Is.True, "the untampered block validates");
+
+            // Tamper: replace the site's assigned builder with the combat
+            // unit (offset: version 1 + t2 1 + siteCount 2 + defId 2 +
+            // originX 2 + originY 2 + siteEntity 4 = 14, LE uint32).
+            byte[] tampered = (byte[])bytes.Clone();
+            uint soldierRaw = UnitCommandStateView.ToRawEntityId(soldier);
+            tampered[14] = (byte)(soldierRaw & 0xFF);
+            tampered[15] = (byte)((soldierRaw >> 8) & 0xFF);
+            tampered[16] = (byte)((soldierRaw >> 16) & 0xFF);
+            tampered[17] = (byte)((soldierRaw >> 24) & 0xFF);
+
+            Assert.That(f.Construction.TryValidateState(tampered), Is.False,
+                "P2-2: a combat unit as assigned builder rejects the block");
+            Assert.That(f.Construction.TryRestoreState(tampered), Is.False,
+                "restore refuses the tampered block");
+            Assert.That(f.Construction.SiteCount, Is.EqualTo(1), "the host is unchanged");
+            Assert.That(f.Construction.TryGetSite(
+                UnitCommandStateView.ToRawEntityId(SiteEntity(f)), out _, out _, out uint assigned), Is.True);
+            Assert.That(assigned, Is.Not.EqualTo(soldierRaw), "the live assignment is unchanged");
+        }
+
+        [Test]
+        public void ProgressSites_ReassignsNonBuilderAssignment_DefenseInDepth()
+        {
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 2, 40, 40).IsValid, Is.True, "power provider");
+            EntityId builder = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True);
+            uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
+
+            f.Step(10);
+            Assert.That(f.Construction.TryGetSite(siteRaw, out _, out int progressRaw, out uint assigned), Is.True);
+            Assert.That(progressRaw, Is.EqualTo(10 * SimFixed.OneRaw));
+            Assert.That(assigned, Is.EqualTo(UnitCommandStateView.ToRawEntityId(builder)));
+
+            // Defense-in-depth (P2-2): an assignment that no longer names a
+            // Builder (here: direct role mutation, standing in for a tampered
+            // or stale reference) is dropped and re-resolved like a dead
+            // builder — the site pauses instead of letting a combat unit build.
+            f.Entities.GetUnitRef(builder).Role = UnitRole.BasicInfantry;
+            f.Step(5);
+            Assert.That(f.Construction.TryGetSite(siteRaw, out _, out int pausedProgress, out assigned), Is.True);
+            Assert.That(assigned, Is.EqualTo(0u), "no own Builder exists to re-assign");
+            Assert.That(pausedProgress, Is.EqualTo(10 * SimFixed.OneRaw),
+                "the site pauses — the non-builder never progressed it");
+        }
+
         /// <summary>Returns the single active site entity of the fixture.</summary>
         private static EntityId SiteEntity(Fixture f)
         {

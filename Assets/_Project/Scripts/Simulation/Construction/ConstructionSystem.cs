@@ -552,12 +552,21 @@ namespace Nova.Simulation.Construction
                 if (!_entityManager.TryGetUnit(siteId, out UnitState siteUnit)) continue; // swept next tick
                 SimDefinitions.TryGetBuilding(site.BuildingDefId, out SimBuildingDefinition def);
 
-                // Builder (re-)assignment: the assigned builder must be alive;
-                // a dead builder is replaced by the lowest-index own Builder.
-                if (site.AssignedBuilderRaw != 0
-                    && !_entityManager.IsValid(UnitCommandStateView.ToEntityId(site.AssignedBuilderRaw)))
+                // Builder (re-)assignment: the assigned builder must be alive,
+                // still carry the Builder role and still belong to the site
+                // owner (P2-2 defense-in-depth against tampered snapshots and
+                // stale assignments); a dead, role-changed or foreign builder
+                // is replaced by the lowest-index own Builder.
+                if (site.AssignedBuilderRaw != 0)
                 {
-                    site.AssignedBuilderRaw = 0;
+                    EntityId assignedId = UnitCommandStateView.ToEntityId(site.AssignedBuilderRaw);
+                    bool usable = _entityManager.TryGetUnit(assignedId, out UnitState assigned)
+                        && assigned.Role == UnitRole.Builder
+                        && assigned.PlayerId == siteUnit.PlayerId;
+                    if (!usable)
+                    {
+                        site.AssignedBuilderRaw = 0;
+                    }
                 }
                 if (site.AssignedBuilderRaw == 0)
                 {
@@ -935,6 +944,7 @@ namespace Nova.Simulation.Construction
                 if (!CommandIds.IsCanonicalEntityId(rawEntityId)) return false;
                 if (!reader.TryReadUInt32(out uint builderRaw)) return false;
                 if (builderRaw != 0 && !CommandIds.IsCanonicalEntityId(builderRaw)) return false;
+                if (builderRaw != 0 && !ValidateAssignedBuilder(builderRaw, rawEntityId)) return false;
                 if (!reader.TryReadInt32(out int progressRaw)) return false;
                 if (progressRaw < 0 || progressRaw > (def.BuildTicks << 16)) return false;
                 if (!FootprintInsideMap(originX, originY)) return false;
@@ -1018,6 +1028,36 @@ namespace Nova.Simulation.Construction
                     if (occupancy[cell] != 0) return false;
                     occupancy[cell] = 1;
                 }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Cross-block invariant of a site's assigned builder (P2-2): when the
+        /// referenced builder entity is visible in the CURRENT entity store,
+        /// it must carry the Builder role and — when the site entity is also
+        /// visible — belong to the site owner's slot; a violation rejects the
+        /// block (restore leaves the host untouched). A builder reference
+        /// whose entity is NOT in the current store cannot be judged here:
+        /// the kernel validates every block against the pre-restore state, so
+        /// a restore into a fresh host resolves entity ids only after this
+        /// block was validated — that case is covered by the defense-in-depth
+        /// role/owner re-check in <see cref="ProgressSites"/>, which
+        /// re-assigns any unusable builder deterministically.
+        /// </summary>
+        private bool ValidateAssignedBuilder(uint builderRaw, uint siteRawEntityId)
+        {
+            EntityId builderId = UnitCommandStateView.ToEntityId(builderRaw);
+            if (!_entityManager.TryGetUnit(builderId, out UnitState builderUnit))
+            {
+                return true; // not judgeable against the pre-restore store (see remarks)
+            }
+            if (builderUnit.Role != UnitRole.Builder) return false;
+            EntityId siteId = UnitCommandStateView.ToEntityId(siteRawEntityId);
+            if (_entityManager.TryGetUnit(siteId, out UnitState siteUnit)
+                && builderUnit.PlayerId != siteUnit.PlayerId)
+            {
+                return false;
             }
             return true;
         }
