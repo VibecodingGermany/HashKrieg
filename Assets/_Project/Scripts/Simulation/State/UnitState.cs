@@ -18,8 +18,24 @@ namespace Nova.Simulation.State
         /// </summary>
         public static readonly SimFixed DefaultSightRadius = SimFixed.FromInt(10);
 
+        /// <summary>
+        /// Provisional harvester cargo capacity in AE (Q-040 candidate): the
+        /// canonical manifest distinguishes Allianz 330 / Legion 300
+        /// (quality/content/mvp-v1.json harvesterCargoAE), but factions are
+        /// not modeled in this slice, so every harvester carries the Allianz
+        /// value 330 until the faction slice ratifies the split.
+        /// </summary>
+        public const int DefaultCargoCapacityAE = 330;
+
         public EntityId Id;
         public byte PlayerId;
+
+        /// <summary>
+        /// Provisional entity role (see <see cref="UnitRole"/>): drives the
+        /// economy's power accounting and harvest eligibility. Part of the
+        /// hashed/serialized unit state since entity store block v4.
+        /// </summary>
+        public UnitRole Role;
         public Transform2D Transform;
         public SimFixed MoveSpeed;
         public SimFixed Radius;
@@ -35,6 +51,29 @@ namespace Nova.Simulation.State
         public int MaxHealth;
         public EntityId AttackTarget;
         public int WeaponCooldownTicks;
+
+        /// <summary>
+        /// Carried Aetherium in AE (harvesters only). Authoritative economy
+        /// state living with the entity — same precedent as
+        /// <see cref="AttackTarget"/> — so it serializes into the entity
+        /// store block (v4) instead of a separate economy-side table.
+        /// </summary>
+        public int CargoAE;
+
+        /// <summary>
+        /// Standing harvest order: the stable id of the target
+        /// <see cref="Economy.AetheriumField"/>; 0 means no order. Applied by
+        /// the Harvest command, resolved by the economy system (cargo full or
+        /// field exhausted) and cleared by Stop.
+        /// </summary>
+        public ushort HarvestFieldId;
+
+        /// <summary>
+        /// Standing return-cargo order: the unit deposits its cargo at an own
+        /// refinery in reach. Applied by the ReturnCargo command, resolved by
+        /// the economy system on deposit and cleared by Stop.
+        /// </summary>
+        public bool IsReturningCargo;
         public bool IsActive;
         public bool IsMoving;
 
@@ -45,10 +84,12 @@ namespace Nova.Simulation.State
             SimFixed moveSpeed,
             SimFixed? radius = null,
             int maxHealth = 100,
-            SimFixed? sightRadius = null)
+            SimFixed? sightRadius = null,
+            UnitRole role = UnitRole.Unit)
         {
             Id = id;
             PlayerId = playerId;
+            Role = role;
             Transform = transform;
             MoveSpeed = moveSpeed;
             Radius = radius ?? SimFixed.FromRaw(SimFixed.OneRaw / 2); // default 0.5 m
@@ -57,6 +98,9 @@ namespace Nova.Simulation.State
             MaxHealth = maxHealth;
             AttackTarget = EntityId.Invalid;
             WeaponCooldownTicks = 0;
+            CargoAE = 0;
+            HarvestFieldId = 0;
+            IsReturningCargo = false;
             TargetGridPos = GridPos2D.Invalid;
             IsActive = true;
             IsMoving = false;

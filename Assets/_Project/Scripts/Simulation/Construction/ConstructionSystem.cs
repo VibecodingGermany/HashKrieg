@@ -20,23 +20,32 @@ namespace Nova.Simulation.Construction
     /// <summary>
     /// Deterministic simulation system handling building placement, construction progress timers, and power grid integration.
     /// Zero engine dependencies (no UnityEngine types).
+    /// <para>
+    /// Prototype scaffolding (not part of the canonical kernel wiring): the
+    /// canonical economy slice replaced the energy grid with
+    /// <see cref="EconomySystem"/>. The low-power penalty now reads the exact
+    /// Q16.16 multiplier via <see cref="PlayerEconomyState.IsLowPower"/>, and
+    /// power registration on completion was dropped — the canonical power
+    /// balance derives from building-role entities, and wiring construction
+    /// output to role entities is the construction slice's job.
+    /// </para>
     /// </summary>
     public sealed class ConstructionSystem : ISimSystem
     {
         public const int MaxBuildingSites = 128;
 
         private readonly ConstructionGrid _grid;
-        private readonly EnergyGridSystem _energyGrid;
+        private readonly EconomySystem _economy;
         private readonly BuildingSiteState[] _sites;
         private int _activeSiteCount;
 
         public string Name => "ConstructionSystem";
         public ConstructionGrid Grid => _grid;
 
-        public ConstructionSystem(ConstructionGrid grid, EnergyGridSystem energyGrid)
+        public ConstructionSystem(ConstructionGrid grid, EconomySystem economy)
         {
             _grid = grid ?? throw new ArgumentNullException(nameof(grid));
-            _energyGrid = energyGrid ?? throw new ArgumentNullException(nameof(energyGrid));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _sites = new BuildingSiteState[MaxBuildingSites];
         }
 
@@ -47,7 +56,7 @@ namespace Nova.Simulation.Construction
 
         public bool RequestConstruction(byte playerId, in BuildingDefinition def, ushort originX, ushort originY)
         {
-            ref PlayerEconomyState eco = ref _energyGrid.GetPlayerEconomy(playerId);
+            ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(playerId);
 
             // 1. Check Aetherium Credit affordability
             if (!eco.TrySpendCredits(def.AetheriumCost)) return false;
@@ -92,21 +101,19 @@ namespace Nova.Simulation.Construction
                 ref BuildingSiteState site = ref _sites[i];
                 if (!site.IsActive) continue;
 
-                ref PlayerEconomyState eco = ref _energyGrid.GetPlayerEconomy(site.PlayerId);
-                float speedMultiplier = eco.ProductionSpeedMultiplier;
+                ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(site.PlayerId);
 
                 // Progress construction timer (accounting for Low-Power -50% penalty)
-                if (speedMultiplier >= 1.0f || (tick.Value % 2 == 0))
+                if (!eco.IsLowPower || (tick.Value % 2 == 0))
                 {
                     site.RemainingTicks--;
                 }
 
                 if (site.IsComplete)
                 {
-                    // Register Power Produced/Consumed upon building completion
-                    _energyGrid.RegisterPowerProduction(site.PlayerId, site.Definition.PowerProduced);
-                    _energyGrid.RegisterPowerConsumption(site.PlayerId, site.Definition.PowerConsumed);
-
+                    // Power accounting derives from building-role entities in
+                    // the canonical economy; the construction slice wires its
+                    // output to role entities (no registration here anymore).
                     site.IsActive = false;
                     _activeSiteCount--;
                 }

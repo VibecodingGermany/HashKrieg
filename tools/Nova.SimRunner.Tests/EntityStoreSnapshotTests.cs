@@ -7,12 +7,12 @@ using Nova.Simulation.State;
 namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Entity store snapshot block v3 suite (.NET lane): the Q-040(i)
+    /// Entity store snapshot block v4 suite (.NET lane): the Q-040(i)
     /// SimFixed layout (SimFixed raw int32 positions/speeds/radii, SimAngle
-    /// uint16 rotation) plus the authoritative SimFixed sight radius of the
-    /// canonical Fog of War roundtrips byte-exactly, v1/v2 blocks are
-    /// rejected and the smallest fixed-point state mutation changes the
-    /// block bytes.
+    /// uint16 rotation), the authoritative SimFixed sight radius of the
+    /// canonical Fog of War and the v4 economy fields (role, cargo,
+    /// harvest orders) roundtrip byte-exactly, v1-v3 blocks are rejected
+    /// and the smallest fixed-point state mutation changes the block bytes.
     /// Mirror of the EditMode lane EntityStoreSnapshotTests.
     /// </summary>
     [TestFixture]
@@ -32,6 +32,15 @@ namespace Nova.SimRunner.Tests
                 1,
                 new Transform2D(SimFixed.FromInt(127), SimFixed.FromInt(127), SimAngle.FromRaw(49152)),
                 SimFixed.FromFloat(4.5f));
+            EntityId harvester = store.SpawnUnit(
+                1,
+                new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)),
+                SimFixed.FromInt(4),
+                role: UnitRole.Harvester);
+            ref UnitState eco = ref store.GetUnitRef(harvester);
+            eco.CargoAE = 120;
+            eco.HarvestFieldId = 3;
+            eco.IsReturningCargo = true;
             return store;
         }
 
@@ -43,7 +52,7 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void BlockV3_RoundtripsByteIdentical_AndRestoresExactState()
+        public void BlockV4_RoundtripsByteIdentical_AndRestoresExactState()
         {
             EntityManager store = CreateStoreWithUnits();
             byte[] bytes = Serialize(store);
@@ -66,20 +75,27 @@ namespace Nova.SimRunner.Tests
             // The second unit carries the documented default sight radius.
             Assert.That(restored.TryGetUnit(new EntityId(1, 1), out UnitState second), Is.True);
             Assert.That(second.SightRadius, Is.EqualTo(UnitState.DefaultSightRadius));
+
+            // The v4 economy fields of the harvester roundtrip exactly.
+            Assert.That(restored.TryGetUnit(new EntityId(2, 1), out UnitState harvester), Is.True);
+            Assert.That(harvester.Role, Is.EqualTo(UnitRole.Harvester));
+            Assert.That(harvester.CargoAE, Is.EqualTo(120));
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo((ushort)3));
+            Assert.That(harvester.IsReturningCargo, Is.True);
         }
 
         [Test]
-        public void LegacyBlockVersionsV1AndV2_AreRejected()
+        public void LegacyBlockVersionsV1ToV3_AreRejected()
         {
-            // v1 (float layout) and v2 (no sight radius) blocks are rejected
+            // v1 (float layout), v2 (no sight radius) and v3 (no economy fields) blocks are rejected
             // at the version byte; the pre-G1 reset allows the hard cut
             // without a migration path.
             EntityManager store = CreateStoreWithUnits();
-            byte[] v3 = Serialize(store);
+            byte[] current = Serialize(store);
 
-            foreach (byte legacyVersion in new byte[] { 1, 2 })
+            foreach (byte legacyVersion in new byte[] { 1, 2, 3 })
             {
-                var legacy = (byte[])v3.Clone();
+                var legacy = (byte[])current.Clone();
                 legacy[0] = legacyVersion;
                 var victim = new EntityManager(64);
                 Assert.That(victim.TryValidateState(legacy), Is.False, $"v{legacyVersion} must fail validation");
@@ -89,10 +105,10 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void HeaderVersion_IsThree()
+        public void HeaderVersion_IsFour()
         {
-            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)3));
-            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)3));
+            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)4));
+            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)4));
         }
 
         [Test]

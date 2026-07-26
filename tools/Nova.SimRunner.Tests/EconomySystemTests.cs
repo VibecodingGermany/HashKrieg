@@ -6,18 +6,18 @@ using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
-namespace Nova.Simulation.Tests
+namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Canonical economy suite (EditMode lane): per-slot credits and power
+    /// Canonical economy suite (.NET lane): per-slot credits and power
     /// (SimulationCore.md section 2, phase 2), the finite Aetherium harvest
     /// cycle (phase 3) and the snapshot block 104 v1 contract. G2
     /// reservation: no D-010 regrowth/spread/overharvest — fields are finite
     /// and stay exhausted.
-    /// Mirror of the .NET lane EconomySystemTests.
+    /// Mirror of the EditMode lane EconomySystemTests.
     /// </summary>
     [TestFixture]
-    public class EconomySystemTests
+    public sealed class EconomySystemTests
     {
         private static EntityManager CreateEntities() => new EntityManager(64);
 

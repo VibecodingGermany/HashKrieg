@@ -21,13 +21,20 @@ namespace Nova.Simulation.Production
     /// Deterministic simulation system managing unit production queues in production buildings.
     /// Deducts credits on queueing, applies Low-Power speed penalties, and spawns units into EntityManager upon completion.
     /// Zero engine dependencies (no UnityEngine types).
+    /// <para>
+    /// Prototype scaffolding (not part of the canonical kernel wiring): the
+    /// canonical economy slice replaced the energy grid with
+    /// <see cref="EconomySystem"/>; the low-power penalty now reads
+    /// <see cref="PlayerEconomyState.IsLowPower"/> (exact Q16.16 factor
+    /// behind it, no float).
+    /// </para>
     /// </summary>
     public sealed class ProductionQueueSystem : ISimSystem
     {
         public const int MaxQueueSlots = 128;
 
         private readonly EntityManager _entityManager;
-        private readonly EnergyGridSystem _energyGrid;
+        private readonly EconomySystem _economy;
         private readonly ResearchTreeSystem _researchTree;
         private readonly ProductionItemState[] _queue;
         private int _activeQueueCount;
@@ -35,10 +42,10 @@ namespace Nova.Simulation.Production
         public string Name => "ProductionQueueSystem";
         public int ActiveQueueCount => _activeQueueCount;
 
-        public ProductionQueueSystem(EntityManager entityManager, EnergyGridSystem energyGrid, ResearchTreeSystem researchTree)
+        public ProductionQueueSystem(EntityManager entityManager, EconomySystem economy, ResearchTreeSystem researchTree)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
-            _energyGrid = energyGrid ?? throw new ArgumentNullException(nameof(energyGrid));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _researchTree = researchTree ?? throw new ArgumentNullException(nameof(researchTree));
             _queue = new ProductionItemState[MaxQueueSlots];
         }
@@ -54,7 +61,7 @@ namespace Nova.Simulation.Production
             if (!_researchTree.IsTechUnlocked(playerId, requiredTechTier)) return false;
 
             // 2. Check Aetherium Credit affordability
-            ref PlayerEconomyState eco = ref _energyGrid.GetPlayerEconomy(playerId);
+            ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(playerId);
             if (!eco.TrySpendCredits(def.AetheriumCost)) return false;
 
             // 3. Find free queue slot
@@ -87,11 +94,10 @@ namespace Nova.Simulation.Production
                 ref ProductionItemState item = ref _queue[i];
                 if (!item.IsActive) continue;
 
-                ref PlayerEconomyState eco = ref _energyGrid.GetPlayerEconomy(item.PlayerId);
-                float speedMultiplier = eco.ProductionSpeedMultiplier;
+                ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(item.PlayerId);
 
                 // Account for Low-Power -50% speed penalty
-                if (speedMultiplier >= 1.0f || (tick.Value % 2 == 0))
+                if (!eco.IsLowPower || (tick.Value % 2 == 0))
                 {
                     item.RemainingTicks--;
                 }

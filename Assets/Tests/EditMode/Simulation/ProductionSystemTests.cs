@@ -27,12 +27,12 @@ namespace Nova.Simulation.Tests
         public void ProductionQueueSystem_EnqueueAndComplete_SpawnsUnit()
         {
             var entities = new EntityManager(100);
-            var energy = new EnergyGridSystem(startingCredits: 500);
+            var economy = new EconomySystem(entities, startingCredits: 500);
             var research = new ResearchTreeSystem();
-            var production = new ProductionQueueSystem(entities, energy, research);
+            var production = new ProductionQueueSystem(entities, economy, research);
 
             var kernel = new SimulationKernel(new SimRandom(888));
-            kernel.RegisterSystem(energy);
+            kernel.RegisterSystem(economy);
             kernel.RegisterSystem(research);
             kernel.RegisterSystem(production);
             kernel.Start();
@@ -52,7 +52,7 @@ namespace Nova.Simulation.Tests
             Assert.IsTrue(enqueued);
             Assert.AreEqual(1, production.ActiveQueueCount);
 
-            ref PlayerEconomyState p0 = ref energy.GetPlayerEconomy(0);
+            ref PlayerEconomyState p0 = ref economy.GetPlayerEconomy(0);
             Assert.AreEqual(400, p0.AetheriumCredits);
 
             // Step 5 ticks to complete production

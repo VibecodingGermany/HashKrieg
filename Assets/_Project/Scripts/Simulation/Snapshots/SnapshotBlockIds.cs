@@ -25,5 +25,11 @@ namespace Nova.Simulation.Snapshots
 
         /// <summary>Fog of War block (committed per-team masks, last recompute tick), written by FogOfWarSystem.</summary>
         public const ushort FogOfWar = FirstSystemBlock + 2;
+
+        /// <summary>Reserved for the G2 Aetherium domain block (D-010 loop); intentionally unassigned in this slice.</summary>
+        public const ushort ReservedAetherium = FirstSystemBlock + 3;
+
+        /// <summary>Economy block (per-slot credits/power, Aetherium fields), written by EconomySystem.</summary>
+        public const ushort Economy = FirstSystemBlock + 4;
     }
 }

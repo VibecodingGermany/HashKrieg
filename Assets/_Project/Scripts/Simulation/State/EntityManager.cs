@@ -45,7 +45,7 @@ namespace Nova.Simulation.State
             return _versions[id.Index] == id.Version && _units[id.Index].IsActive;
         }
 
-        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, SimFixed moveSpeed, SimFixed? radius = null, int maxHealth = 100, SimFixed? sightRadius = null)
+        public EntityId SpawnUnit(byte playerId, Transform2D initialTransform, SimFixed moveSpeed, SimFixed? radius = null, int maxHealth = 100, SimFixed? sightRadius = null, UnitRole role = UnitRole.Unit)
         {
             if (_freeSlots.Count == 0)
             {
@@ -56,7 +56,7 @@ namespace Nova.Simulation.State
             ushort version = _versions[index];
             var id = new EntityId(index, version);
 
-            _units[index] = new UnitState(id, playerId, initialTransform, moveSpeed, radius, maxHealth, sightRadius);
+            _units[index] = new UnitState(id, playerId, initialTransform, moveSpeed, radius, maxHealth, sightRadius, role);
             ActiveCount++;
 
             return id;
@@ -119,10 +119,14 @@ namespace Nova.Simulation.State
         /// SimFixed raw int32, rotation is a SimAngle uint16 — replacing the
         /// v1 IEEE-754 float bit patterns. v3 adds the authoritative
         /// <see cref="UnitState.SightRadius"/> (SimFixed raw int32) for the
-        /// canonical Fog of War (docs/tech/FogOfWar.md). v1/v2 blocks are
+        /// canonical Fog of War (docs/tech/FogOfWar.md). v4 adds the
+        /// canonical economy fields of the harvest slice:
+        /// <see cref="UnitState.Role"/> (uint8), <see cref="UnitState.CargoAE"/>
+        /// (int32), <see cref="UnitState.HarvestFieldId"/> (uint16) and
+        /// <see cref="UnitState.IsReturningCargo"/> (uint8). v1–v3 blocks are
         /// rejected (the pre-G1 reset allows the hard cut; no migration path).
         /// </summary>
-        public const byte StateVersion = 3;
+        public const byte StateVersion = 4;
 
         /// <summary>
         /// Writes the complete authoritative entity store state as canonical
@@ -163,6 +167,7 @@ namespace Nova.Simulation.State
 
                 writer.WriteEntityId(u.Id);
                 writer.WriteUInt8(u.PlayerId);
+                writer.WriteUInt8((byte)u.Role);
                 writer.WriteSimFixed(u.Transform.PositionX);
                 writer.WriteSimFixed(u.Transform.PositionY);
                 writer.WriteSimAngle(u.Transform.Rotation);
@@ -175,6 +180,9 @@ namespace Nova.Simulation.State
                 writer.WriteInt32(u.MaxHealth);
                 writer.WriteEntityId(u.AttackTarget);
                 writer.WriteInt32(u.WeaponCooldownTicks);
+                writer.WriteInt32(u.CargoAE);
+                writer.WriteUInt16(u.HarvestFieldId);
+                writer.WriteUInt8(u.IsReturningCargo ? (byte)1 : (byte)0);
                 writer.WriteUInt8(u.IsMoving ? (byte)1 : (byte)0);
             }
         }
@@ -271,6 +279,8 @@ namespace Nova.Simulation.State
 
                 if (!reader.TryReadEntityId(out EntityId id)) return false;
                 if (!reader.TryReadUInt8(out byte playerId)) return false;
+                if (!reader.TryReadUInt8(out byte roleRaw)) return false;
+                if (roleRaw > (byte)UnitRole.Power) return false; // unknown role value
                 if (!reader.TryReadInt32(out int posX)) return false;
                 if (!reader.TryReadInt32(out int posY)) return false;
                 if (!reader.TryReadUInt16(out ushort rotation)) return false;
@@ -290,6 +300,13 @@ namespace Nova.Simulation.State
                 if (!reader.TryReadInt32(out int maxHealth)) return false;
                 if (!reader.TryReadEntityId(out EntityId attackTarget)) return false;
                 if (!reader.TryReadInt32(out int weaponCooldown)) return false;
+                if (!reader.TryReadInt32(out int cargoAE)) return false;
+                // Cargo is bounded by the provisional harvester capacity; a
+                // negative or over-capacity value is outside the defined
+                // domain and rejected like the negative radii above.
+                if (cargoAE < 0 || cargoAE > UnitState.DefaultCargoCapacityAE) return false;
+                if (!reader.TryReadUInt16(out ushort harvestFieldId)) return false;
+                if (!reader.TryReadUInt8(out byte returningCargoFlag) || returningCargoFlag > 1) return false;
                 if (!reader.TryReadUInt8(out byte movingFlag) || movingFlag > 1) return false;
 
                 // The unit handle must match its slot and the slot generation.
@@ -299,6 +316,7 @@ namespace Nova.Simulation.State
                 {
                     Id = id,
                     PlayerId = playerId,
+                    Role = (UnitRole)roleRaw,
                     Transform = new Transform2D(
                         SimFixed.FromRaw(posX),
                         SimFixed.FromRaw(posY),
@@ -311,6 +329,9 @@ namespace Nova.Simulation.State
                     MaxHealth = maxHealth,
                     AttackTarget = attackTarget,
                     WeaponCooldownTicks = weaponCooldown,
+                    CargoAE = cargoAE,
+                    HarvestFieldId = harvestFieldId,
+                    IsReturningCargo = returningCargoFlag == 1,
                     IsActive = true,
                     IsMoving = movingFlag == 1
                 };

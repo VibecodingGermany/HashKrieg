@@ -16,22 +16,32 @@ namespace Nova.AI.Tests
         public void SkirmishAiSystem_ExecutesDecisionLoop_TriggersProduction()
         {
             var entities = new EntityManager(100);
-            var energy = new EnergyGridSystem(startingCredits: 500);
+            var economy = new EconomySystem(entities, startingCredits: 500);
             var research = new ResearchTreeSystem();
             var grid = new ConstructionGrid(64, 64);
-            var construction = new ConstructionSystem(grid, energy);
-            var production = new ProductionQueueSystem(entities, energy, research);
+            var construction = new ConstructionSystem(grid, economy);
+            var production = new ProductionQueueSystem(entities, economy, research);
 
             var profile = new AiFactionProfile("Alliance");
-            var aiSystem = new SkirmishAiSystem(1, profile, entities, energy, construction, production);
+            var aiSystem = new SkirmishAiSystem(1, profile, entities, economy, construction, production);
 
             var kernel = new SimulationKernel(new SimRandom(333));
-            kernel.RegisterSystem(energy);
+            kernel.RegisterSystem(economy);
             kernel.RegisterSystem(research);
             kernel.RegisterSystem(construction);
             kernel.RegisterSystem(production);
             kernel.RegisterSystem(aiSystem);
             kernel.Start();
+
+            // The canonical power balance derives from building-role
+            // entities: an HQ gives the AI slot a positive margin
+            // (provisional 30), so the decision loop skips the power-plant
+            // branch and goes straight to production.
+            entities.SpawnUnit(
+                1,
+                new Transform2D(SimFixed.FromInt(30), SimFixed.FromInt(30)),
+                SimFixed.Zero,
+                role: UnitRole.HQ);
 
             Assert.AreEqual(0, production.ActiveQueueCount);
 

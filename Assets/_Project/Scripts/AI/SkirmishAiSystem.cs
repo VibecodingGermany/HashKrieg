@@ -21,7 +21,7 @@ namespace Nova.AI
         private readonly byte _aiPlayerId;
         private readonly AiFactionProfile _profile;
         private readonly EntityManager _entityManager;
-        private readonly EnergyGridSystem _energyGrid;
+        private readonly EconomySystem _economy;
         private readonly ConstructionSystem _construction;
         private readonly ProductionQueueSystem _production;
 
@@ -32,14 +32,14 @@ namespace Nova.AI
             byte aiPlayerId,
             AiFactionProfile profile,
             EntityManager entityManager,
-            EnergyGridSystem energyGrid,
+            EconomySystem economy,
             ConstructionSystem construction,
             ProductionQueueSystem production)
         {
             _aiPlayerId = aiPlayerId;
             _profile = profile;
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
-            _energyGrid = energyGrid ?? throw new ArgumentNullException(nameof(energyGrid));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _construction = construction ?? throw new ArgumentNullException(nameof(construction));
             _production = production ?? throw new ArgumentNullException(nameof(production));
         }
@@ -53,10 +53,10 @@ namespace Nova.AI
         {
             if (tick.Value % DecisionTickInterval != 0) return;
 
-            ref PlayerEconomyState eco = ref _energyGrid.GetPlayerEconomy(_aiPlayerId);
+            ref PlayerEconomyState eco = ref _economy.GetPlayerEconomy(_aiPlayerId);
 
             // 1. Evaluate Energy Power Grid
-            int powerMargin = eco.PowerProduced - eco.PowerConsumed;
+            int powerMargin = eco.PowerProvided - eco.PowerRequired;
             if (powerMargin < _profile.TargetPowerMargin && eco.AetheriumCredits >= 100)
             {
                 var powerPlantDef = new BuildingDefinition(
