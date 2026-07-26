@@ -1,6 +1,6 @@
 # Dokumentationsstandard
 
-**Version:** 1.6.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
+**Version:** 1.7.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -11,7 +11,7 @@ Gate-Erfolg entsteht ausschließlich durch aktuelle, reproduzierbare Evidence.
 ## Abhängigkeiten
 
 - [../production/DecisionLog.md](../production/DecisionLog.md) – D-001,
-  D-005, D-047, D-061 bis D-064
+  D-005, D-047, D-061 bis D-066
 - [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
 - [`../../quality/schemas/GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
 - [`../../quality/scripts/validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
@@ -95,21 +95,19 @@ Schema 1.2 ist ausschließlich eine Integritätsvorstufe. Evidence:
 - wird bei relevanten Änderungen stale und
 - wertet Skip, Cancel oder fehlendes Pflichtresultat als Fail.
 
-Der Zielvertrag für Schema 1.3 wird in G0-A zweistufig hergestellt:
+Der Zielvertrag wird nach D-066 in zwei G0-A-Bausteinen hergestellt:
 
-- Der geschützte Authorize-Job bezieht Manifest, Szenariovertrag, Schema,
-  Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und
-  Authorize-Workflow ausschließlich aus einem subject-unabhängigen
-  Trusted-Tool-Checkout. Commit, SHA-256 und exakte Node-Version werden
-  gebunden.
-- Eine Änderung an diesem Trust-Bundle wird ohne Gate-Fortschritt über einen
-  geschützten PR gemergt und kann sich nicht selbst autorisieren. Erst ein
-  nachfolgender sauberer Subject-Commit darf damit G0-Evidence erzeugen.
-- Der externe Kontext enthält die vollständige geordnete
-  `authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag
-  bindet Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie
-  CI- und Review-Attestierung; fehlende, zusätzliche, vertauschte oder nur
-  lokale Einträge sind ungültig.
+- G0-A1 liefert Schema-, Semantik-, Trusted-Checkout-, Umgebungs- und
+  Runner-Integritätsprüfungen. Sein PR-Workflow kann keinen Pass
+  autorisieren; auch alte Trust-Kontexte enden fail-closed.
+- G0-A2 trennt Subject-Commit, Evidence-Carrier-Commit und Trusted-Tool-
+  Commit. Ein geschützter Lauf erzeugt nach der Validierung ein
+  hashgebundenes `GateAuthorization.json`-Receipt. Kein Lauf darf seinen
+  eigenen noch ausstehenden Erfolg attestieren.
+- Vorgänger-Receipts werden append-only versioniert und von späteren Gates
+  gegen den exakten erfolgreichen GitHub-Run/-Attempt/-Job geprüft.
+  Fehlende, zusätzliche, vertauschte, manipulierte oder wiederverwendete
+  Receipts sind ungültig.
 - Command und Performance-Messung referenzieren dieselbe `environmentId`.
   Windows-x64-Referenzmessung und Mac-M2-Funktionsmessung besitzen getrennte
   Methodenprofile und binden OS, Architektur, Hardware, Build, Managed/Burst,
@@ -142,11 +140,11 @@ zwei aktiven menschlichen Maintainers Pflicht.
 
 ## Nächste Schritte
 
-1. Standard bei der G0-A-Bootstrap-Änderung anwenden, ohne Gate-Fortschritt
-   zu behaupten.
-2. Schema 1.3 und das Trusted Tooling erst an einem nachfolgenden sauberen
-   Subject für reale G0-Evidence verwenden.
-3. Nach G5 Review-Rhythmus für Post-MVP neu bewerten.
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 separat implementieren und adversarial prüfen.
+3. Den vollständigen Trustpfad erst an einem nachfolgenden sauberen Subject
+   für reale G0-Evidence verwenden.
+4. Nach G5 Review-Rhythmus für Post-MVP neu bewerten.
 
 ## Änderungsverlauf
 
@@ -159,3 +157,4 @@ zwei aktiven menschlichen Maintainers Pflicht.
 | 1.4.0 | 2026-07-24 | D-062-Subject-Blob-, Szenariometrik- und Same-Subject-Gate-Ketten-Regeln ergänzt | Technical Writer |
 | 1.5.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust-Autorität verankert | Technical Writer |
 | 1.6.0 | 2026-07-24 | D-064-Fail-Closed-Schema 1.2, subject-unabhängigen Schema-1.3-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Technical Writer |
+| 1.7.0 | 2026-07-25 | D-066: Integrity-Basis G0-A1 von zweiphasiger Receipt-Autorisierung G0-A2 getrennt und alle Pass-Behauptungen bis dahin gesperrt | Technical Writer |

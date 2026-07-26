@@ -1,6 +1,6 @@
 # Beitragen zu Project Nova
 
-**Version:** 2.4.0 | **Status:** verbindlich | **Verantwortungsbereich:** Maintainers | **Sprint:** 7
+**Version:** 2.5.0 | **Status:** verbindlich | **Verantwortungsbereich:** Maintainers | **Sprint:** 7
 
 ## Zweck
 
@@ -11,7 +11,7 @@ KI-Agenten. Detailregeln stehen in [AGENTS.md](AGENTS.md), Dokumentregeln in
 ## Abhängigkeiten
 
 - [AGENTS.md](AGENTS.md)
-- [DecisionLog D-059 und D-064](docs/production/DecisionLog.md)
+- [DecisionLog D-059, D-064 und D-066](docs/production/DecisionLog.md)
 - [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md)
 - [PR-Vorlage](.github/pull_request_template.md)
 
@@ -49,30 +49,32 @@ die konkrete Aktion**.
 
 Pflicht ist:
 
-- `docs-check` und
-- nach realer G0-Implementierung `quality-gate`.
+- `docs-check`,
+- `integrity` für Änderungen an Quality-Verträgen und
+- der Authorize-Teil des `quality-gate` erst nach seiner realen
+  G0-A2-Implementierung.
 
-Docs-only-PRs deklarieren ihren Scope explizit; das aggregierte
-`quality-gate` wird nicht übersprungen. `docs-check` läuft auch für
-`quality/**` und installiert die gepinnten Ajv-Abhängigkeiten. Dieses
-Rebaseline erzeugt noch keinen Code-CI-/Trust-Workflow und keine
-Evidence-Platzhalter.
+Docs-only-PRs deklarieren ihren Scope explizit. `docs-check` läuft auch für
+`quality/**` und installiert die gepinnten Ajv-Abhängigkeiten. Der aktuelle
+`quality-gate` führt nur den PR-Job `integrity` aus; er enthält bewusst keinen
+Dispatch-Authorizer und erzeugt keine Evidence-Platzhalter.
 
 Schema 1.2 ist nur eine Integritätsvorstufe. Jeder Pass-Versuch muss aktuell
-zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP` fehlschlagen. G0-A etabliert zuerst
-Schema 1.3 und das subject-unabhängige Trusted Tooling; die Bootstrap-Änderung
-wird ohne Gate-Fortschritt gemergt und darf erst einen nachfolgenden sauberen
-Subject-Commit prüfen. Danach folgt G0-B.
+zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP` fehlschlagen. G0-A1 etabliert
+Schema 1.3, Trusted-Checkout-Topologie und Gate-Runner als Integrity-Basis.
+G0-A2 implementiert separat den zweiphasigen D-066-Receipt-Vertrag. Beide
+werden ohne Gate-Fortschritt gemergt; erst danach darf ein nachfolgender
+sauberer Subject-Commit geprüft werden. Danach folgt G0-B.
 
 ## 4. Reviews
 
 Im Solo-/KI-Modus ersetzt ein unabhängiges, read-only Review die unmögliche
 Autoren-Selbstfreigabe. Der Reviewer ist nicht der Implementation Writer und
 reproduziert mindestens einen kanonischen Check als eigene artefaktgebundene
-Ausführung. Ein lokales Evidence-Dokument autorisiert keinen Pass; dafür ist
-nach G0-A der externe Trust-Kontext des subject-unabhängigen, unveränderten
-Trusted-Tool-Bundles erforderlich. Er bindet die vollständige geordnete
-`authorizedEvidence`-Kette von G0 bis zum aktuellen Gate.
+Ausführung. Ein lokales Evidence-Dokument und die G0-A1-Integritätsprüfungen
+autorisieren keinen Pass. G0-A2 muss Subject, Evidence-Carrier und Trusted
+Tooling trennen und erfolgreiche Vorgänger über append-only
+`GateAuthorization.json`-Receipts plus GitHub-API-Verifikation binden.
 
 Sobald mindestens zwei aktive menschliche Maintainer existieren, wird eine
 zweite menschliche Freigabe zwingend. CODEOWNERS und Branch Protection dürfen
@@ -98,35 +100,33 @@ Die Beschreibung nennt:
 - ausgeführte Checks und
 - bei Gate-Behauptungen den Evidence-Pfad.
 
-Schema 1.2 autorisiert keinen Gate-Pass. Ein PR darf ein Gate erst dann als
-bestanden bezeichnen, wenn ein nachfolgender sauberer Subject-Commit mit
-Schema 1.3 aus dem Trusted-Tool-Checkout geprüft wurde und sein externer
-Trust-Kontext die vollständige geordnete `authorizedEvidence`-Kette samt
-Subject-, CI- und Review-Bindung belegt. Eine Trust-Bundle-Änderung darf sich
-nicht selbst autorisieren. Performance-Command und -Messung müssen dieselbe
-`environmentId` referenzieren; Windows-x64-Referenz und Mac-M2-Funktionslauf
-verwenden getrennte Methodenprofile.
+Schema 1.2/1.3 und G0-A1 autorisieren keinen Gate-Pass. Ein PR darf ein Gate
+erst dann als bestanden bezeichnen, wenn G0-A2 gemergt ist und ein
+nachfolgender sauberer Subject-Commit mit vollständiger Receipt-Kette samt
+Subject-, Carrier-, CI- und Review-Bindung geprüft wurde. Eine
+Trust-Bundle-Änderung darf sich nicht selbst autorisieren. Performance-
+Command und -Messung müssen dieselbe `environmentId` referenzieren;
+Windows-x64-Referenz und Mac-M2-Funktionslauf verwenden getrennte
+Methodenprofile.
 
 ## 7. Releases
 
 Nur ein Maintainer darf nach expliziter Freigabe Tag/Release erzeugen.
-Wiki-Versionen sind nicht automatisch Game-Releases. Aktuell ist 0.11.0 ein
+Wiki-Versionen sind nicht automatisch Game-Releases. Aktuell ist 0.12.0 ein
 unveröffentlichter Dokumentationsstand; G0, MS-0 und MS-1 sind offen.
 
 ## Offene Punkte
 
-- `quality-gate` und Schema 1.3 werden zuerst in G0-A implementiert und sind
-  bis zum Beweis an einem nachfolgenden sauberen Subject keine behauptete
-  vorhandene Gate-Autorität.
+- G0-A1 ist eine Integrity-Basis. G0-A2, das geschützte Environment und der
+  reale Receipt-Lauf sind offen; es gibt keine Gate-Autorität.
 
 ## Nächste Schritte
 
-1. Bestehenden `docs-check` für dieses Rebaseline verwenden.
-2. G0-A einschließlich Gate-Runner als nicht selbstautorisierende Bootstrap-
-   Änderung geschützt mergen.
-3. G0-B am nachfolgenden sauberen Subject herstellen und dieses erst danach
-   mit dem bereits gemergten Schema-1.3-Trustpfad autorisieren; anschließend
-   die Branch-Protection gegen D-059 prüfen.
+1. `docs-check` und `integrity` für G0-A1 als Required Checks verwenden.
+2. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+3. G0-A2 als separaten Receipt-Authorizer implementieren und prüfen.
+4. G0-B am nachfolgenden sauberen Subject herstellen und erst danach mit
+   dem vollständigen Trustpfad autorisieren.
 
 ## Änderungsverlauf
 
@@ -139,3 +139,4 @@ unveröffentlichter Dokumentationsstand; G0, MS-0 und MS-1 sind offen.
 | 2.2.0 | 2026-07-24 | D-062-Same-Subject-Gate-Kette, artefaktgebundene Szenarioschwellen und Wiki-Stand 0.9.0 als PR-Pflicht ergänzt | Maintainers |
 | 2.3.0 | 2026-07-24 | D-063-Schema 1.2, Check-Artefakte, Protected-CI-Trust und Wiki-Stand 0.10.0 als PR-Pflicht ergänzt | Maintainers |
 | 2.4.0 | 2026-07-24 | D-064-Fail-Closed-Schema 1.2, zweistufigen Trusted-Gate-Bootstrap und Wiki-Stand 0.11.0 als PR-Pflicht ergänzt | Maintainers |
+| 2.5.0 | 2026-07-25 | D-066: G0-A1-Integrity und G0-A2-Receipt-Autorisierung getrennt, Required-Check-Regeln und Wiki-Stand 0.12.0 synchronisiert | Maintainers |

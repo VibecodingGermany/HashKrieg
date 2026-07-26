@@ -1,18 +1,19 @@
 # Teststrategie
 
-**Version:** 1.6.0 | **Status:** verbindlich für MS-1 – G0-A implementiert, Gate-Pass ausstehend | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
+**Version:** 1.9.2 | **Status:** verbindlich für MS-1 – G0-A1, G0-A2-Receipt-Vertrag und geschützter Authorize-Workflow implementiert, `quality-gate`-Environment, erster realer Lauf und Gate-Pass offen | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
 Definiert Testpyramide, Coverage, Matchkadenz, Gate-Evidence und
-Fehlerdenominator. Die Anforderungen beschreiben den zu bauenden
-`quality-gate`; aktuell existiert nur `docs-check`, G0 ist offen.
+Fehlerdenominator. `docs-check` und der integrity-only PR-Job des
+`quality-gate` existieren; eine Gate-Pass-Autorisierung existiert nicht und
+G0 ist offen.
 
 ## Abhängigkeiten
 
 - [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
 - [../production/DecisionLog.md](../production/DecisionLog.md) – D-057 bis
-  D-064
+  D-066
 - [SimulationCore.md](SimulationCore.md), [Commands.md](Commands.md) und
   [FogOfWar.md](FogOfWar.md)
 - [PerformanceBudget.md](PerformanceBudget.md)
@@ -41,12 +42,19 @@ Test-only-Direktmutation ist nur in expliziten Buildern vor Matchstart erlaubt.
 ### G0-A – Trusted-Gate-Bootstrap
 
 Schema 1.2 prüft nur Struktur und Semantik. Jeder Pass-Versuch endet aktuell
-zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`. G0-A implementiert Schema 1.3,
-den subject-unabhängigen Trusted-Tool-Checkout, die vollständige geordnete
-`authorizedEvidence`-Kette und die `environmentId`-Bindung. Die Bootstrap-
-Änderung wird ohne Gate-Fortschritt geschützt gemergt und darf sich nicht
-selbst autorisieren. Erst ein nachfolgender sauberer Subject-Commit darf den
-neuen Trustpfad für G0-B verwenden.
+zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`.
+
+- **G0-A1 (dieser Stand):** Schema 1.3, Semantikvalidator, Trusted-Checkout-
+  Topologie, Umgebungsbindung, Negative Controls und Gate-Runner bilden eine
+  integrity-only Grundlage. Der PR-Workflow führt ausschließlich
+  `integrity` aus.
+- **G0-A2 (offen):** Der zweiphasige D-066-Receipt-Vertrag trennt Subject,
+  Evidence-Carrier und Trusted Tooling. Erst dieser Folgebaustein darf einen
+  geschützten Authorize-Job einführen.
+
+Die Bootstrap-Arbeit wird ohne Gate-Fortschritt geschützt gemergt und darf
+sich nicht selbst autorisieren. Erst ein späterer sauberer Subject-Commit
+darf den abgeschlossenen Trustpfad für G0-B verwenden.
 
 ### G0-B – Plattformbasis
 
@@ -193,50 +201,107 @@ beziehungsweise `review-` (Reviewer), etwa `impl-g0-architecture` und
 `review-g0-architecture` für denselben Check.
 
 Die öffentliche CLI führt gepinntes Ajv Draft 2020-12 und die
-Cross-Field-Prüfung für Schema 1.3 gemeinsam aus. Lokal bleibt diese Prüfung
-integrity-only: Für `verdict=pass` entsteht ohne
-`--trusted-tool-checkout <checkout>` zusätzlich
-`E_AUTHORIZATION_BOOTSTRAP`, ohne `--trust-context <external.json>` bleibt
-`E_TRUST_CONTEXT`. Ein lokales Evidence-Dokument autorisiert daher kein Gate.
+Cross-Field-Prüfung für Schema 1.4 gemeinsam aus. Lokal bleibt diese Prüfung
+integrity-only: Jeder `verdict=pass` endet außerhalb des geschützten
+`--authorize`-Laufs mit `E_AUTHORIZATION_BOOTSTRAP`; der Exit-Code meldet
+nie einen Gate-Pass. Der zurückgezogene `--trust-context`-Eingang existiert
+nicht mehr. Ein lokales Evidence-Dokument autorisiert daher kein Gate.
 
-Seit G0-A führt der geschützte Authorize-Job Manifest, Szenariovertrag,
-Schema, Python-Validator, Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner
-und Authorize-Workflow ausschließlich aus einem separaten Trusted-Tool-
-Checkout aus (`trusted/`, Vorgänger-Commit von `main`, niemals der Subject-
-Commit selbst) und bindet Subject-/Trusted-Commit, SHA-256 sowie die exakte
-Node-Version. Validator und Ajv laufen dabei aus `trusted/`; die Evidence
-wird nicht in den Trusted-Checkout kopiert, sondern über
-`--subject-root <subject>` gelesen, sodass die Cleanliness-Prüfung des
-Trusted-Checkouts intakt bleibt. `subjectSha256` und `trustedSha256` von
-Manifest und Szenariovertrag dürfen differieren (der Trusted-Stand ist
-älter); Schwellenänderungen laufen bewusst ausschließlich über PR-Review.
-Eine Änderung an diesem Bundle wird ohne Gate-Fortschritt gemergt und gilt
-erst für einen nachfolgenden sauberen Subject-Commit.
+G0-A1 prüft Manifest, Szenariovertrag, Schema, Python-Validator,
+Ajv-Wrapper, `package.json`, Lockdatei, Gate-Runner und Workflow als
+Trust-Bundle und testet getrennte Trusted-/Subject-Checkouts. Diese Prüfungen
+belegen ausschließlich Integrität. D-066 hat den zirkulären
+`gate-evidence-authorize`-Entwurf und seinen Generator entfernt; der
+Validator kennt keinen Trust-Kontext mehr.
 
-Der externe Kontext enthält die vollständige geordnete
-`authorizedEvidence`-Kette von G0 bis zum aktuellen Gate. Jeder Eintrag bindet
-Gate, Pfad, Evidence-Hash, Subject-Commit/-Tree, CI-Run/-Job sowie CI- und
-Review-Attestierung und wird vom geschützten Job gegen die GitHub-API mit
-der D-065-Authorize-Run-Bindung verifiziert: `ciRunId` gehört zu
-`quality-gate.yml` mit `event=workflow_dispatch` und `conclusion=success`,
-`headSha` gleicht dem Subject-Commit des Eintrags, und `ciJobId` ist der
-erfolgreiche `gate-evidence-authorize`-Job dieses Runs (die
-Evidence-`ci.jobName`-Konstante ist identisch). Run-IDs sind über die Kette
-eindeutig — jedes Gate braucht seinen eigenen Authorize-Run. Fehlende,
-zusätzliche, vertauschte oder nur lokale Einträge sind Fail; fehlendes
-`gh`-Tool oder Token ist fail-closed. Verbleibender Anker ist die
-GitHub-Environment-Protection des manuellen Dispatch auf `main` samt dieser
-API-Verifikation; die Bindung des Laufs an die Evidence-Bytes läuft über
-`NOVA_TRUST_CONTEXT_SHA256`, und die Review-Attestierung ist hash-gebunden,
-aber ohne PR-/Review-ID nicht API-verifizierbar (dokumentiertes Restrisiko).
+G0-A2 trennt drei Identitäten und ist als Vertrag implementiert:
 
-`--self-test` erzeugt positive und negative Fälle nur temporär und muss in G0
+1. `subjectCommitSha` für den geprüften Produktstand,
+2. `evidenceCarrierCommitSha` für die später eingecheckte Evidence und
+3. `trustedToolCommitSha` für die unabhängigen Prüftools.
+
+Evidence-Schema 1.4.0 und `quality/schemas/GateAuthorization.schema.json`
+(`gate-authorization-v1`) bilden den Vertrag ohne Migration ab; ältere
+1.2-/1.3-Artefakte bleiben fail-closed. Der geschützte Lauf ruft
+`validate_gate_evidence.py --authorize` auf: Er validiert die Evidence
+vollständig gegen den Trusted-Checkout (Integrität inklusive
+`priorGateReceipts`; Szenarioprofile und Schwellen kommen aus dem
+Trusted-Tool-Stand, nie aus dem änderbaren Subject, und der deklarierte
+Vertragsdigest muss exakt dem Trusted-Vertrag entsprechen), bindet Run,
+Attempt, Job, Workflow, Repository und Trusted-Tool-Commit aus der
+GitHub-Actions-Umgebung — niemals gegen seine eigene noch ausstehende
+Conclusion — und schreibt bei Erfolg das hashgebundene Receipt
+`GateAuthorization.json`. Es wird als CI-Artefakt transportiert und nach
+erfolgreichem Lauf unverändert per kleinem Folge-PR append-only unter
+`quality/authorizations/G<N>/<subjectSha>/<runId>-attempt<runAttempt>/GateAuthorization.json`
+versioniert. Ab G1 ist `priorGateReceipts` Pflicht: die geordnete Kette
+G0..G(n-1); jedes Receipt existiert, ist hashstimmig, schemavalid, an Gate,
+Subject und Evidence gebunden, und Run-IDs sind über die Kette eindeutig.
+Im `--authorize`-Modus verifiziert der Validator zusätzlich jedes
+Vorgänger-Receipt online gegen die GitHub-API (`gh` mit `GH_TOKEN`/
+`GITHUB_TOKEN`): exakter `workflow_dispatch`-Run/-Attempt, Workflow,
+`conclusion=success`, Trusted-Head und erfolgreicher
+`gate-evidence-authorize`-Job; fehlendes Token, fehlendes `gh` oder jeder
+Mismatch enden fail-closed (`E_RECEIPT_GITHUB`). Die lokale
+Integritätsvalidierung bleibt offline. G0 benötigt kein
+Vorgänger-Receipt; G1 ohne erfolgreiches G0-Receipt ist ungültig.
+
+Die Bindung `GITHUB_SHA == trustedSha` bedeutet: Der Trusted-Tool-Stand ist
+immer der aktuelle main-HEAD zum Dispatch-Zeitpunkt. Trust-Bundle-
+Änderungen auf main machen ältere Evidences stale-by-design — eine Evidence
+wird stets gegen den aktuellen Trusted-Vertrag autorisiert, nicht gegen
+den Stand ihres Subject-Commits.
+
+**Restrisiko Attempt-Substitution (N-1 aus dem G0-A2-Review):** Die
+GitHub-Runs-API kann einen Run nicht an Gate/Evidence-Hash binden; ein
+Angreifer mit einem echten erfolgreichen Authorize-Run eines Gates könnte
+die committed Receipt-Datei am selben Pfad durch ein Receipt ersetzen, das
+diesen Run auf eine abweichende Evidence zitiert. Maschinelle Gegenmittel:
+`check_docs.py` erzwingt in PR-CI append-only für `quality/authorizations/`
+(hinzufügen erlaubt, Ändern/Löschen/Umbenennen schlägt `docs-check` fehl);
+die Gate-/Evidence-Hash-Bindung gilt offline über die Receipt-Felder. Der
+verbleibende Anker ist das Pflicht-Review der Folge-PRs, die Receipts
+versionieren.
+
+Der geschützte Lauf ist als Job `gate-evidence-authorize` in
+`.github/workflows/quality-gate.yml` implementiert. Er startet nur per
+`workflow_dispatch` auf `main` (Job-`if:` auf Event und `refs/heads/main`)
+hinter dem geschützten GitHub-Environment `quality-gate`; die
+Job-Concurrency nutzt `cancel-in-progress: false`, damit laufende
+Authorize-Versuche nie abgebrochen werden. Pflicht-Inputs sind
+`evidencePath` (`quality/evidence/G<N>/<subjectSha>/<attempt>/GateEvidence.json`),
+`subjectSha` und `trustedSha` (je 40-hex); `notes` ist optional. Alle Inputs
+laufen über `env:`-Mapping und einen fail-closed Format-/Konsistenz-Check
+als ersten Step. Der Primary-Checkout holt das Trusted Tool an `trustedSha`
+nach `trusted/`, ein zweiter das Subject an `subjectSha` nach `subject/`
+(beide `fetch-depth: 0`, `persist-credentials: false`). Guards:
+`trustedSha != subjectSha`, `git merge-base --is-ancestor trustedSha
+origin/main`, `GITHUB_SHA == trustedSha` (der Dispatch muss deshalb auf
+`main` erfolgen, solange der origin/main-HEAD dem Trusted-Commit
+entspricht) sowie committed Evidence im Subject-Checkout (`git log -1` nicht
+leer). Node wird exakt auf die Evidence-deklarierte Version gepinnt, die
+Abhängigkeiten kommen per `npm ci --ignore-scripts` aus `trusted/quality`.
+Die numerische Job-ID wird per `gh api` + `jq` aus dem aktuellen Run
+ermittelt (keine Selbst-Conclusion-Prüfung). Nur bei Exit 0 des
+`--authorize`-Aufrufs wird das Receipt unter dem vom Validator ausgegebenen
+Versionspfad als Artefakt
+`gate-authorization-G<N>-<runId>-attempt<runAttempt>` hochgeladen
+(`upload-artifact` auf Commit-SHA gepinnt, `if: success()`). Der Workflow
+pusht/committet nichts; die append-only Versionierung des Receipts erfolgt
+per separatem Folge-PR unter
+`quality/authorizations/G<N>/<subjectSha>/<runId>-attempt<runAttempt>/GateAuthorization.json`.
+Vor dem ersten Authorize-Lauf muss ein Maintainer das `quality-gate`-
+Environment einmalig mit Required-Reviewers-Schutz in den Repo-Einstellungen
+anlegen (bewusster Root-of-Trust-Anker, D-066 Punkt 6).
+
+`--self-test` erzeugt Struktur-Baselines und negative Fälle nur temporär und
+muss in G0
 unter anderem No-op-Commands, falsche/missing Check-Artefakte, lokale
 Pass-Autorisierung, falsche Units, negative Samples, unvollständige
 Drei-Lauf-Messungen, Szenarioschwellen, Subject-Blob-Hashes,
 schemawidrige Vorgänger und eine fehlende Gate-Kette ablehnen. Für G0-A kommen
 manipuliertes Subject-Schema/Ajv-Wrapper/Lockfile, unvollständige
-`authorizedEvidence`-Ketten, falsche oder widersprüchliche Umgebungen,
+Autorisierungsketten, falsche oder widersprüchliche Umgebungen,
 fehlender Node-/Ajv-Stack und ein hängender Schema-Subprozess hinzu. Kriterien-
 und Szenarioprofile kommen aus
 [`mvp-v1.json`](../../quality/scenarios/mvp-v1.json).
@@ -250,8 +315,9 @@ kanonische Implementation-Check muss das Szenario als ausgeführt deklarieren;
 ein freier `command:<id>` genügt nicht. `stdout`, `stderr` und Check-Ergebnis
 sind gehashte Attempt-Artefakte.
 
-Der Trust-Kontext autorisiert nicht nur diese unmittelbare Referenz, sondern
-die vollständige geordnete Kette von G0 bis zum aktuellen Gate.
+Der Receipt-Vertrag autorisiert nicht nur diese unmittelbare Referenz,
+sondern die vollständige geordnete Kette von G0 bis zum aktuellen Gate
+(`priorGateReceipts` in Schema 1.4).
 
 Punktmetriken besitzen exakt `name`, `unit`, `samples`; Performance-Metriken
 exakt `name`, `unit`, `measurement`. Letzteres bindet den 30-s-Warmup und drei
@@ -266,18 +332,22 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 
 ## Offene Punkte
 
-- Schema 1.3, Trusted-Tool-Checkout und der geschützte Authorize-Workflow
-  sind seit G0-A implementiert und per `--self-test`/`--self-test-topology`
-  belegt; ein autorisierter Gate-Pass an einem nachfolgenden sauberen
-  Subject-Commit steht noch aus, sodass G0 offen bleibt.
+- Schema 1.4, `GateAuthorization.schema.json`, Receipt-Validierung, der
+  `--authorize`-Modus und der geschützte `workflow_dispatch`-Authorize-
+  Workflow sind als G0-A2 implementiert und per Self-Test belegt. Das
+  `quality-gate`-Environment muss noch einmalig von einem Maintainer
+  angelegt werden, und ein realer Receipt-Lauf ist offen; deshalb kann
+  weiterhin kein Gate autorisiert werden.
 
 ## Nächste Schritte
 
-1. G0-A Trusted-Tool-Bundle und Schema 1.3 ohne Gate-Fortschritt
-   implementieren und geschützt mergen.
-2. Am nachfolgenden sauberen Subject den Trustpfad, G0-B-Suiten,
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 abschließen: `quality-gate`-Environment anlegen, Authorize-
+   Workflow adversarial prüfen, geschützt mergen und den ersten realen
+   Authorize-Lauf samt append-only Receipt-Folge-PR belegen.
+3. Am nachfolgenden sauberen Subject den Trustpfad, G0-B-Suiten,
    Umgebungsprofile und Negative Controls beweisen.
-3. G1-Golden-/Coverage-Gates vor Gameplay aufbauen und Evidence nur aus
+4. G1-Golden-/Coverage-Gates vor Gameplay aufbauen und Evidence nur aus
    realen, sauberen Läufen schreiben.
 
 ## Änderungsverlauf
@@ -293,3 +363,8 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 | 1.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Tool-Bootstrap, vollständige Kette und Umgebungsprofile verankert | Lead QA Engineer |
 | 1.5.0 | 2026-07-25 | G0-A-Umsetzungsstand: Schema 1.3/Trusted-Checkout mit `--subject-root`-Topologie, GitHub-API-Verifikation der Kette, `NOVA_GATE_EXECUTOR`/commandId-Konvention und Restrisiko Review-Attestierung dokumentiert | Lead QA Engineer |
 | 1.6.0 | 2026-07-25 | D-065-Authorize-Run-Bindung (workflow_dispatch-Event, exklusiver `gate-evidence-authorize`-Job, eindeutige Run-IDs, `ci.jobName`-Konstante) und Restrisiko-Präzisierung aufgenommen | Lead QA Engineer |
+| 1.7.0 | 2026-07-25 | D-066: G0-A1 auf Integrität begrenzt, zirkulären Authorizer zurückgezogen und G0-A2 als zweiphasigen Receipt-Vertrag mit getrennten Subject-/Carrier-/Trusted-Identitäten festgelegt | Lead QA Engineer |
+| 1.8.0 | 2026-07-25 | G0-A2-Umsetzungsstand: Evidence-Schema 1.4.0, GateAuthorization-Receipt-Schema, `--authorize`-Modus und `priorGateReceipts`-Kette implementiert; geschützter Workflow bleibt offen | Lead QA Engineer |
+| 1.9.0 | 2026-07-25 | Geschützten Authorize-Job `gate-evidence-authorize` (Dispatch-Inputs, Guards, Artefakt-Name, Folge-PR) in §10 dokumentiert; `quality-gate`-Environment-Anlage als Voraussetzung vermerkt | Lead QA Engineer |
+| 1.9.1 | 2026-07-25 | Review-Härtung: GitHub-API-Verifikation der Vorgänger-Receipts im `--authorize`-Modus, Trusted-Szenarioprofile/-Schwellen mit Vertragsdigest, `GITHUB_SHA == trustedSha` als main-HEAD-Bindung (stale-by-design) präzisiert | Lead QA Engineer |
+| 1.9.2 | 2026-07-25 | Review-N3: Restrisiko Attempt-Substitution dokumentiert; append-only-Guard für `quality/authorizations/` in `check_docs.py` und fehlendes `GH_TOKEN` am Authorize-Step ergänzt | Lead QA Engineer |

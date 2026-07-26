@@ -3,11 +3,32 @@
 
 JSON Schema remains the structural contract. This standard-library validator
 adds comparisons, reference resolution, repository checks and negative
-controls that Draft 2020-12 cannot express reliably. Per D-064, Schema 1.3
-authorizes a gate pass only from a subject-independent trusted tool checkout
-(`--trusted-tool-checkout`). D-066 removed the self-referential authorizer;
-all runs remain integrity-only and fail closed on any pass verdict until the
-separate two-phase receipt contract is implemented.
+controls that Draft 2020-12 cannot express reliably.
+
+D-066 (G0-A2) replaced the retired self-referential trust-context authorizer
+with a two-phase receipt contract:
+
+- Local and PR validation stays integrity-only. A ``verdict=pass`` evidence
+  always ends with ``E_AUTHORIZATION_BOOTSTRAP`` outside the protected
+  authorize job; the exit code never signals a gate pass.
+- The protected ``gate-evidence-authorize`` job runs this script with
+  ``--authorize``. The evidence is fully validated against the trusted tool
+  checkout: authoritative scenario profiles and thresholds come from the
+  trusted checkout (never the subject), and the declared scenario contract
+  digest must equal the trusted contract. Every prior receipt is verified
+  against the GitHub API (exact ``workflow_dispatch`` run/attempt, workflow,
+  conclusion, trusted head and the successful authorize job); the current
+  run is bound from the GitHub Actions runtime environment, never against
+  its own pending conclusion. On success a hash-bound
+  ``GateAuthorization.json`` receipt candidate is written. That receipt
+  artifact is the only authorization product.
+- Receipts are versioned append-only under the fixed convention
+
+      quality/authorizations/G<N>/<subjectCommitSha>/<runId>-attempt<runAttempt>/GateAuthorization.json
+
+  after a small follow-up PR. From schema 1.4 only a receipt authorizes a
+  gate, never the evidence itself. Later gates bind the ordered chain
+  G0..G(n-1) in ``priorGateReceipts``.
 """
 
 from __future__ import annotations
@@ -22,16 +43,21 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIO_CONTRACT = ROOT / "quality/scenarios/mvp-v1.json"
 EVIDENCE_SCHEMA = ROOT / "quality/schemas/GateEvidence.schema.json"
+RECEIPT_SCHEMA = ROOT / "quality/schemas/GateAuthorization.schema.json"
 SCHEMA_VALIDATOR = ROOT / "quality/scripts/validate_evidence_schema.mjs"
-SCHEMA_VERSION = "1.3.0"
-TRUST_CONTEXT_VERSION = "2.0.0"
-SCENARIO_AUTHORIZATION_STATUS = "integrity-only-d066"
+SCHEMA_VERSION = "1.4.0"
+RECEIPT_SCHEMA_VERSION = "gate-authorization-v1"
+SCENARIO_AUTHORIZATION_STATUS = "two-phase-receipt-d066"
+REPOSITORY = "VibecodingGermany/Project_Nova"
+WORKFLOW_NAME = "quality-gate.yml"
+AUTHORIZING_JOB = "gate-evidence-authorize"
 # D-064: the trust bundle binds every tool/contract component per subject and
 # trusted commit plus SHA-256. Component ids are canonical; paths are
 # repository-relative and enforced semantically.
@@ -72,21 +98,20 @@ ENVIRONMENT_FIELDS = (
     "deepProfilingEnabled",
     "replay",
 )
-AUTHORIZED_EVIDENCE_KEYS = {
-    "gateId",
-    "evidencePath",
-    "evidenceSha256",
-    "subjectCommitSha",
-    "subjectTreeSha",
-    "ciRunId",
-    "ciJobId",
-    "ciAttestationSha256",
-    "reviewArtifactSha256",
-}
 GATE_SEQUENCE = tuple(f"G{number}" for number in range(6))
 GATES = set(GATE_SEQUENCE)
 ATTEMPT_RE = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z-[a-z0-9-]+$"
+)
+# D-066: append-only receipt location convention. The attempt directory is
+# derived from the protected authorize run identity.
+RECEIPT_PATH_CONVENTION = (
+    "quality/authorizations/G<N>/<subjectCommitSha>/"
+    "<runId>-attempt<runAttempt>/GateAuthorization.json"
+)
+RECEIPT_PATH_RE = re.compile(
+    r"^quality/authorizations/G[0-5]/[0-9a-f]{40,64}/"
+    r"[1-9][0-9]*-attempt[1-9][0-9]*/GateAuthorization\.json$"
 )
 
 
@@ -932,334 +957,583 @@ def _validate_previous_chain(
         current = predecessor
 
 
-def _validate_trust_context(
-    trust_context_path: Path | None,
-    document: dict[str, Any],
-    evidence_path: Path,
-    root: Path,
-    errors: list[tuple[str, str]],
-    *,
-    gate_id: str,
-) -> None:
-    """Validate the retired draft context without authorizing a pass.
+def _load_receipt_schema_bytes(
+    trusted_checkout: Path | None,
+) -> bytes:
+    """Load the receipt schema from the trusted checkout when available.
 
-    D-066 found that the first protected authorizer was self-referential:
-    the current run could not already be successful, and committed evidence
-    could not know its own future carrier SHA. Until the two-phase
-    GateAuthorization receipt exists, every pass stays fail-closed even when
-    an otherwise well-formed legacy context is supplied.
+    Like the evidence schema, the receipt schema is subject-independent:
+    in trusted-checkout mode it always comes from the trusted tools.
     """
 
-    errors.append(
-        (
-            "E_AUTHORIZATION_BOOTSTRAP",
-            "D-066 keeps gate authorization disabled until the two-phase "
-            "GateAuthorization receipt binds subject, evidence carrier, "
-            "trusted tools and the completed protected run independently",
+    base = RECEIPT_SCHEMA
+    if trusted_checkout is not None:
+        base = trusted_checkout.resolve() / Path(
+            "quality/schemas/GateAuthorization.schema.json"
         )
-    )
+    return base.read_bytes()
 
-    if trust_context_path is None:
-        errors.append(
-            (
-                "E_TRUST_CONTEXT",
-                "pass evidence requires --trust-context from protected CI",
-            )
-        )
-        return
-    resolved_context = trust_context_path.resolve()
+
+def validate_receipt(
+    receipt_path: Path,
+    *,
+    root: Path,
+    receipt_schema_bytes: bytes | None = None,
+    schema_validator_path: Path = SCHEMA_VALIDATOR,
+    schema_working_directory: Path = ROOT,
+    verify_evidence: bool = True,
+    verify_git: bool = False,
+) -> tuple[dict[str, Any] | None, list[tuple[str, str]]]:
+    """Validate one GateAuthorization receipt against the referenced evidence.
+
+    Returns the strict-loaded receipt (or None) plus stable
+    ``(code, message)`` errors. Checks: strict I-JSON, pinned Ajv against the
+    receipt schema (trusted-checkout mode like evidence), the append-only
+    path convention for versioned receipts inside the repository and field
+    consistency (gate, subject, evidence path/hash) against the referenced
+    GateEvidence document. With ``verify_git`` the declared
+    ``evidenceCarrierCommitSha`` must equal the actual git history of the
+    evidence path, exactly like at emission time. The GitHub-API
+    verification of the recorded workflow_dispatch run happens separately in
+    ``--authorize`` mode.
+    """
+
+    errors: list[tuple[str, str]] = []
     try:
-        resolved_context.relative_to(root.resolve())
-    except ValueError:
-        pass
-    else:
-        errors.append(
-            ("E_TRUST_CONTEXT", "trust context must be generated outside the repository")
-        )
-        return
-    try:
-        raw_context = resolved_context.read_bytes()
-        context = strict_load_bytes(raw_context)
+        receipt = strict_load(receipt_path)
     except (OSError, StrictJsonError) as error:
-        errors.append(("E_TRUST_CONTEXT", str(error)))
-        return
-    if not isinstance(context, dict):
-        errors.append(("E_TRUST_CONTEXT", "trust context root must be an object"))
-        return
-
-    expected_keys = {
-        "schemaVersion",
-        "repository",
-        "workflowPath",
-        "authorizingRunId",
-        "authorizingRunAttempt",
-        "authorizingJob",
-        "subjectCommitSha",
-        "subjectTreeSha",
-        "evidencePath",
-        "evidenceSha256",
-        "evidenceCiRunId",
-        "evidenceCiJobId",
-        "ciAttestationSha256",
-        "reviewerId",
-        "reviewArtifactSha256",
-        "trustedToolCommitSha",
-        "authorizedEvidence",
-    }
-    if set(context) != expected_keys:
+        return None, [("E_RECEIPT_INVALID", f"{receipt_path}: {error}")]
+    if not isinstance(receipt, dict):
+        return None, [("E_RECEIPT_INVALID", "receipt root must be an object")]
+    if receipt.get("schemaVersion") != RECEIPT_SCHEMA_VERSION:
         errors.append(
             (
-                "E_TRUST_CONTEXT",
-                f"trust context fields differ: {sorted(set(context) ^ expected_keys)}",
+                "E_RECEIPT_VERSION",
+                f"receipt schemaVersion must be {RECEIPT_SCHEMA_VERSION}",
             )
         )
-        return
 
-    subject = document.get("subject", {})
-    attempt = document.get("attempt", {})
-    ci = document.get("ci", {})
-    reviewer = document.get("reviewer", {})
-    review_artifact = (
-        reviewer.get("reviewArtifact") if isinstance(reviewer, dict) else None
-    )
-    ci_artifact = ci.get("attestationArtifact") if isinstance(ci, dict) else None
     try:
-        evidence_digest = sha256_file(evidence_path)
-    except OSError as error:
-        errors.append(("E_TRUST_CONTEXT", f"cannot hash evidence: {error}"))
-        evidence_digest = None
-    expected_values = {
-        "schemaVersion": TRUST_CONTEXT_VERSION,
-        "repository": "VibecodingGermany/Project_Nova",
-        "workflowPath": ".github/workflows/quality-gate.yml",
-        "authorizingJob": "d066-disabled-authorizer",
-        "subjectCommitSha": subject.get("commitSha"),
-        "subjectTreeSha": subject.get("treeSha"),
-        "evidencePath": attempt.get("evidencePath"),
-        "evidenceSha256": evidence_digest,
-        "evidenceCiRunId": ci.get("runId"),
-        "evidenceCiJobId": ci.get("jobId"),
-        "ciAttestationSha256": (
-            ci_artifact.get("sha256") if isinstance(ci_artifact, dict) else None
-        ),
-        "reviewerId": reviewer.get("id"),
-        "reviewArtifactSha256": (
-            review_artifact.get("sha256")
-            if isinstance(review_artifact, dict)
-            else None
-        ),
-    }
-    for field, expected in expected_values.items():
-        if context.get(field) != expected:
+        actual = receipt_path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        actual = None
+    if actual is not None:
+        # A receipt inside the repository is a versioned append-only receipt
+        # and must follow the location convention exactly. An emitted
+        # candidate outside the repository skips only this location check.
+        if RECEIPT_PATH_RE.fullmatch(actual) is None:
             errors.append(
                 (
-                    "E_TRUST_CONTEXT",
-                    f"{field} does not match evidence: "
-                    f"{context.get(field)!r} != {expected!r}",
+                    "E_RECEIPT_PATH",
+                    f"versioned receipt must follow {RECEIPT_PATH_CONVENTION}: "
+                    f"{actual!r}",
                 )
             )
-
-    trust_bundle = document.get("trustBundle")
-    trusted_commit = (
-        trust_bundle.get("trustedCommitSha")
-        if isinstance(trust_bundle, dict)
-        else None
-    )
-    if context.get("trustedToolCommitSha") != trusted_commit:
-        errors.append(
-            (
-                "E_TRUST_CONTEXT",
-                "trustedToolCommitSha does not match evidence trustBundle: "
-                f"{context.get('trustedToolCommitSha')!r} != {trusted_commit!r}",
-            )
-        )
-
-    chain = context.get("authorizedEvidence")
-    if not isinstance(chain, list) or any(
-        not isinstance(entry, dict) for entry in chain
-    ):
-        errors.append(
-            (
-                "E_AUTHORIZATION_CHAIN",
-                "authorizedEvidence must be an array of objects",
-            )
-        )
-        return
-    expected_length = GATE_SEQUENCE.index(gate_id) + 1
-    if len(chain) != expected_length:
-        errors.append(
-            (
-                "E_AUTHORIZATION_CHAIN",
-                f"authorizedEvidence must contain exactly {expected_length} "
-                f"entries (G0..{gate_id}), got {len(chain)}",
-            )
-        )
-        return
-    for index, entry in enumerate(chain):
-        if set(entry) != AUTHORIZED_EVIDENCE_KEYS:
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"entry {index} fields differ: "
-                    f"{sorted(set(entry) ^ AUTHORIZED_EVIDENCE_KEYS)}",
-                )
-            )
-            return
-        if entry.get("gateId") != GATE_SEQUENCE[index]:
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"entry {index} must be {GATE_SEQUENCE[index]}, "
-                    f"got {entry.get('gateId')!r}",
-                )
-            )
-            return
-
-    current_entry = chain[-1]
-    current_expected = {
-        "evidencePath": attempt.get("evidencePath"),
-        "evidenceSha256": evidence_digest,
-        "subjectCommitSha": subject.get("commitSha"),
-        "subjectTreeSha": subject.get("treeSha"),
-        "ciRunId": ci.get("runId"),
-        "ciJobId": ci.get("jobId"),
-        "ciAttestationSha256": (
-            ci_artifact.get("sha256") if isinstance(ci_artifact, dict) else None
-        ),
-        "reviewArtifactSha256": (
-            review_artifact.get("sha256")
-            if isinstance(review_artifact, dict)
-            else None
-        ),
-    }
-    for field, expected in current_expected.items():
-        if current_entry.get(field) != expected:
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"current gate entry {field} does not match evidence: "
-                    f"{current_entry.get(field)!r} != {expected!r}",
-                )
-            )
-
-    for entry in chain[:-1]:
-        entry_gate = entry.get("gateId")
-        if (
-            entry.get("subjectCommitSha") != subject.get("commitSha")
-            or entry.get("subjectTreeSha") != subject.get("treeSha")
-        ):
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"{entry_gate}: prior entry must prove the same subject "
-                    "commit/tree",
-                )
-            )
-            continue
-        raw_prior_path = entry.get("evidencePath")
-        if not isinstance(raw_prior_path, str):
-            errors.append(
-                ("E_AUTHORIZATION_CHAIN", f"{entry_gate}: evidencePath missing")
-            )
-            continue
-        try:
-            prior_path = _safe_repo_path(root, raw_prior_path)
-        except ValueError as error:
-            errors.append(
-                ("E_AUTHORIZATION_CHAIN", f"{raw_prior_path}: {error}")
-            )
-            continue
-        if not prior_path.is_file():
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"authorized prior evidence missing: {raw_prior_path}",
-                )
-            )
-            continue
-        if sha256_file(prior_path) != entry.get("evidenceSha256"):
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"{raw_prior_path}: evidence SHA-256 mismatch",
-                )
-            )
-            continue
-        try:
-            prior_document = strict_load(prior_path)
-        except (OSError, StrictJsonError) as error:
-            errors.append(
-                ("E_AUTHORIZATION_CHAIN", f"{raw_prior_path}: {error}")
-            )
-            continue
-        prior_ci = prior_document.get("ci")
-        prior_ci_artifact = (
-            prior_ci.get("attestationArtifact")
-            if isinstance(prior_ci, dict)
-            else None
-        )
-        prior_reviewer = prior_document.get("reviewer")
-        prior_review_artifact = (
-            prior_reviewer.get("reviewArtifact")
-            if isinstance(prior_reviewer, dict)
-            else None
-        )
-        prior_verdict = prior_document.get("verdict")
-        prior_expected = {
-            "gateId": prior_document.get("gateId"),
-            "ciRunId": prior_ci.get("runId") if isinstance(prior_ci, dict) else None,
-            "ciJobId": prior_ci.get("jobId") if isinstance(prior_ci, dict) else None,
-            "ciAttestationSha256": (
-                prior_ci_artifact.get("sha256")
-                if isinstance(prior_ci_artifact, dict)
-                else None
-            ),
-            "reviewArtifactSha256": (
-                prior_review_artifact.get("sha256")
-                if isinstance(prior_review_artifact, dict)
-                else None
-            ),
-        }
-        if (
-            not isinstance(prior_verdict, dict)
-            or prior_verdict.get("result") != "pass"
-        ):
-            errors.append(
-                (
-                    "E_AUTHORIZATION_CHAIN",
-                    f"{raw_prior_path}: prior gate was not authorized as pass",
-                )
-            )
-        for field, actual in prior_expected.items():
-            if entry.get(field) != actual:
+        else:
+            parts = PurePosixPath(actual).parts
+            if receipt.get("gateId") != parts[2]:
                 errors.append(
                     (
-                        "E_AUTHORIZATION_CHAIN",
-                        f"{raw_prior_path}: chain entry {field} does not match "
-                        f"prior evidence: {entry.get(field)!r} != {actual!r}",
+                        "E_RECEIPT_PATH",
+                        f"receipt gateId does not match its path: {actual!r}",
+                    )
+                )
+            if receipt.get("subjectCommitSha") != parts[3]:
+                errors.append(
+                    (
+                        "E_RECEIPT_PATH",
+                        "receipt subjectCommitSha does not match its path: "
+                        f"{actual!r}",
+                    )
+                )
+            expected_attempt = (
+                f"{receipt.get('runId')}-attempt{receipt.get('runAttempt')}"
+            )
+            if parts[4] != expected_attempt:
+                errors.append(
+                    (
+                        "E_RECEIPT_PATH",
+                        "receipt run identity does not match its path: "
+                        f"{actual!r}",
                     )
                 )
 
-    environment_values = {
-        "GITHUB_ACTIONS": "true",
-        "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
-        "GITHUB_RUN_ID": str(context.get("authorizingRunId")),
-        "GITHUB_RUN_ATTEMPT": str(context.get("authorizingRunAttempt")),
-        "GITHUB_JOB": "d066-disabled-authorizer",
-        "GITHUB_WORKFLOW_REF": (
-            "VibecodingGermany/Project_Nova/"
-            ".github/workflows/quality-gate.yml@refs/heads/main"
-        ),
-        "NOVA_TRUST_CONTEXT_SHA256": sha256_bytes(raw_context),
+    if receipt_schema_bytes is not None:
+        for message in _schema_validation_errors(
+            receipt,
+            receipt_schema_bytes,
+            validator_path=schema_validator_path,
+            working_directory=schema_working_directory,
+        ):
+            errors.append(("E_RECEIPT_SCHEMA", message))
+
+    if verify_evidence:
+        raw_evidence_path = receipt.get("evidencePath")
+        if not isinstance(raw_evidence_path, str):
+            errors.append(("E_RECEIPT_EVIDENCE", "receipt evidencePath is missing"))
+        else:
+            if verify_git:
+                try:
+                    actual_carrier = _git(
+                        "log", "-1", "--format=%H", "--", raw_evidence_path,
+                        root=root,
+                    )
+                except ValueError as error:
+                    errors.append(
+                        (
+                            "E_RECEIPT_CARRIER",
+                            f"{raw_evidence_path}: cannot derive the carrier "
+                            f"commit: {error}",
+                        )
+                    )
+                else:
+                    if receipt.get("evidenceCarrierCommitSha") != actual_carrier:
+                        errors.append(
+                            (
+                                "E_RECEIPT_CARRIER",
+                                f"evidenceCarrierCommitSha does not match the "
+                                f"git history of {raw_evidence_path}: "
+                                f"{receipt.get('evidenceCarrierCommitSha')!r} "
+                                f"!= {actual_carrier!r}",
+                            )
+                        )
+            try:
+                evidence_file = _safe_repo_path(root, raw_evidence_path)
+            except ValueError as error:
+                errors.append(("E_RECEIPT_EVIDENCE", f"{raw_evidence_path}: {error}"))
+                evidence_file = None
+            if evidence_file is not None:
+                if not evidence_file.is_file():
+                    errors.append(
+                        (
+                            "E_RECEIPT_EVIDENCE",
+                            f"referenced evidence missing: {raw_evidence_path}",
+                        )
+                    )
+                elif sha256_file(evidence_file) != receipt.get("evidenceSha256"):
+                    errors.append(
+                        (
+                            "E_RECEIPT_EVIDENCE",
+                            f"evidence SHA-256 mismatch: {raw_evidence_path}",
+                        )
+                    )
+                else:
+                    try:
+                        evidence = strict_load(evidence_file)
+                    except (OSError, StrictJsonError) as error:
+                        errors.append(
+                            (
+                                "E_RECEIPT_EVIDENCE",
+                                f"{raw_evidence_path}: {error}",
+                            )
+                        )
+                        evidence = None
+                    if isinstance(evidence, dict):
+                        subject = evidence.get("subject")
+                        if not isinstance(subject, dict):
+                            subject = {}
+                        attempt = evidence.get("attempt")
+                        if not isinstance(attempt, dict):
+                            attempt = {}
+                        expected_fields = {
+                            "gateId": evidence.get("gateId"),
+                            "subjectCommitSha": subject.get("commitSha"),
+                            "subjectTreeSha": subject.get("treeSha"),
+                            "evidencePath": attempt.get("evidencePath"),
+                        }
+                        for field, expected in expected_fields.items():
+                            if receipt.get(field) != expected:
+                                errors.append(
+                                    (
+                                        "E_RECEIPT_EVIDENCE",
+                                        f"receipt {field} does not match the "
+                                        f"referenced evidence: "
+                                        f"{receipt.get(field)!r} != {expected!r}",
+                                    )
+                                )
+    return receipt, errors
+
+
+def _gh_api_json(
+    endpoint: str,
+    environ: dict[str, str],
+    errors: list[tuple[str, str]],
+) -> Any | None:
+    """Call ``gh api <endpoint>`` and strict-parse the JSON response.
+
+    The token travels via the GH_TOKEN environment variable only, never via
+    argv. Any failure (missing token, missing gh binary, non-zero exit,
+    non-JSON response) is fail-closed.
+    """
+
+    token = environ.get("GH_TOKEN") or environ.get("GITHUB_TOKEN")
+    if not token:
+        errors.append(
+            (
+                "E_RECEIPT_GITHUB",
+                "GitHub API verification of prior receipts requires "
+                "GH_TOKEN or GITHUB_TOKEN",
+            )
+        )
+        return None
+    run_env = {
+        "PATH": environ.get("PATH", os.environ.get("PATH", "")),
+        "HOME": environ.get("HOME", os.environ.get("HOME", "")),
+        "GH_TOKEN": token,
     }
-    for name, expected in environment_values.items():
-        if os.environ.get(name) != expected:
+    try:
+        result = subprocess.run(
+            ["gh", "api", endpoint],
+            env=run_env,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+        )
+    except OSError as error:
+        errors.append(
+            ("E_RECEIPT_GITHUB", f"gh CLI unavailable for {endpoint}: {error}")
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        errors.append(("E_RECEIPT_GITHUB", f"gh api timed out: {endpoint}"))
+        return None
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        errors.append(
+            ("E_RECEIPT_GITHUB", f"gh api {endpoint} failed: {detail or 'exit 1'}")
+        )
+        return None
+    try:
+        return strict_load_bytes(result.stdout)
+    except StrictJsonError as error:
+        errors.append(
+            ("E_RECEIPT_GITHUB", f"gh api {endpoint} returned invalid JSON: {error}")
+        )
+        return None
+
+
+def _verify_prior_receipts_github(
+    prior_receipt_refs: Any,
+    *,
+    root: Path,
+    environ: dict[str, str],
+    errors: list[tuple[str, str]],
+) -> None:
+    """Verify every prior receipt against the GitHub API (D-066 point 5).
+
+    For each versioned receipt in the chain the recorded
+    ``workflow_dispatch`` run must exist in the pinned repository, belong to
+    the pinned workflow, be a successful dispatch event at the recorded
+    trusted tool commit, and contain the recorded successful
+    ``gate-evidence-authorize`` job in the recorded attempt. The current run
+    is never queried: it could not already be successful. Only runs in
+    ``--authorize`` mode perform this online check; plain integrity
+    validation stays offline.
+    """
+
+    if not isinstance(prior_receipt_refs, list) or not prior_receipt_refs:
+        return
+    for ref in prior_receipt_refs:
+        raw_path = ref.get("receiptPath") if isinstance(ref, dict) else None
+        if not isinstance(raw_path, str):
+            continue  # structural errors are already reported elsewhere
+        try:
+            receipt = strict_load(_safe_repo_path(root, raw_path))
+        except (OSError, StrictJsonError, ValueError):
+            continue
+        if not isinstance(receipt, dict):
+            continue
+        gate = receipt.get("gateId")
+        run_id = str(receipt.get("runId"))
+        run_attempt = receipt.get("runAttempt")
+        run_info = _gh_api_json(
+            f"repos/{REPOSITORY}/actions/runs/{run_id}", environ, errors
+        )
+        if run_info is None:
+            continue
+        if not isinstance(run_info, dict):
+            errors.append(
+                ("E_RECEIPT_GITHUB", f"{gate}: run {run_id} response malformed")
+            )
+            continue
+        expected_run_fields = {
+            "path": f".github/workflows/{WORKFLOW_NAME}",
+            "event": "workflow_dispatch",
+            "conclusion": "success",
+            "head_sha": receipt.get("trustedToolCommitSha"),
+            "run_attempt": run_attempt,
+        }
+        for field, expected in expected_run_fields.items():
+            if run_info.get(field) != expected:
+                errors.append(
+                    (
+                        "E_RECEIPT_GITHUB",
+                        f"{gate}: run {run_id} {field} is "
+                        f"{run_info.get(field)!r}, expected {expected!r}",
+                    )
+                )
+        jobs_info = _gh_api_json(
+            f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/"
+            f"{run_attempt}/jobs",
+            environ,
+            errors,
+        )
+        if jobs_info is None:
+            continue
+        jobs = jobs_info.get("jobs") if isinstance(jobs_info, dict) else None
+        if not isinstance(jobs, list):
+            errors.append(
+                ("E_RECEIPT_GITHUB", f"{gate}: jobs response for run {run_id} malformed")
+            )
+            continue
+        receipt_job_id = str(receipt.get("jobId"))
+        matches = [
+            job
+            for job in jobs
+            if isinstance(job, dict) and str(job.get("id")) == receipt_job_id
+        ]
+        if not matches:
             errors.append(
                 (
-                    "E_TRUST_CONTEXT",
-                    f"protected environment {name} does not match trust context",
+                    "E_RECEIPT_GITHUB",
+                    f"{gate}: authorize job {receipt_job_id} not found in "
+                    f"run {run_id} attempt {run_attempt}",
                 )
             )
+            continue
+        job = matches[0]
+        if job.get("name") != AUTHORIZING_JOB:
+            errors.append(
+                (
+                    "E_RECEIPT_GITHUB",
+                    f"{gate}: job {receipt_job_id} is named "
+                    f"{job.get('name')!r}, expected {AUTHORIZING_JOB!r}",
+                )
+            )
+        if job.get("conclusion") != "success":
+            errors.append(
+                (
+                    "E_RECEIPT_GITHUB",
+                    f"{gate}: authorize job {receipt_job_id} in run {run_id} "
+                    f"did not succeed: {job.get('conclusion')!r}",
+                )
+            )
+
+
+def authorize_evidence(
+    document: Any,
+    evidence_path: Path,
+    *,
+    root: Path,
+    trusted_checkout: Path,
+    receipt_out: Path,
+    job_id: str,
+    notes: str | None = None,
+    environ: dict[str, str] | None = None,
+) -> tuple[list[tuple[str, str]], dict[str, Any] | None]:
+    """Protected two-phase authorization (D-066, G0-A2).
+
+    Validates the evidence completely (integrity including the
+    ``priorGateReceipts`` chain) against the trusted tool checkout --
+    authoritative scenario profiles and thresholds always come from the
+    trusted checkout, and ``content.scenarioSha256`` must equal the trusted
+    contract digest. Every prior receipt is then verified against the
+    GitHub API (exact ``workflow_dispatch`` run/attempt, workflow,
+    conclusion, trusted head and the successful authorize job). The current
+    run is bound from the GitHub Actions runtime environment -- never
+    against its own pending conclusion -- and, on success, the hash-bound
+    ``GateAuthorization.json`` receipt candidate is written. The receipt
+    artifact is the only authorization product; the caller decides the exit
+    code.
+    """
+
+    env = os.environ if environ is None else environ
+    errors: list[tuple[str, str]] = []
+
+    if env.get("GITHUB_ACTIONS") != "true":
+        errors.append(
+            ("E_TRUST_CONTEXT", "authorize requires the GitHub Actions runtime")
+        )
+    if env.get("GITHUB_REPOSITORY") != REPOSITORY:
+        errors.append(
+            ("E_TRUST_CONTEXT", f"GITHUB_REPOSITORY must be {REPOSITORY!r}")
+        )
+    workflow_ref = env.get("GITHUB_WORKFLOW_REF") or ""
+    expected_workflow_ref = (
+        f"{REPOSITORY}/.github/workflows/{WORKFLOW_NAME}@refs/heads/main"
+    )
+    if workflow_ref != expected_workflow_ref:
+        errors.append(
+            (
+                "E_TRUST_CONTEXT",
+                f"GITHUB_WORKFLOW_REF must equal {expected_workflow_ref!r}",
+            )
+        )
+    if not env.get("GITHUB_WORKFLOW"):
+        errors.append(("E_TRUST_CONTEXT", "GITHUB_WORKFLOW is missing"))
+    if env.get("GITHUB_JOB") != AUTHORIZING_JOB:
+        errors.append(
+            ("E_TRUST_CONTEXT", f"GITHUB_JOB must be {AUTHORIZING_JOB!r}")
+        )
+    run_id = env.get("GITHUB_RUN_ID") or ""
+    if re.fullmatch(r"[1-9][0-9]*", run_id) is None:
+        errors.append(("E_TRUST_CONTEXT", "GITHUB_RUN_ID is invalid"))
+    run_attempt_raw = env.get("GITHUB_RUN_ATTEMPT") or ""
+    run_attempt = (
+        int(run_attempt_raw)
+        if run_attempt_raw.isdigit() and int(run_attempt_raw) >= 1
+        else None
+    )
+    if run_attempt is None:
+        errors.append(("E_TRUST_CONTEXT", "GITHUB_RUN_ATTEMPT is invalid"))
+    trusted_sha = env.get("GITHUB_SHA") or ""
+    if re.fullmatch(r"[0-9a-f]{40}", trusted_sha) is None:
+        errors.append(
+            ("E_TRUST_CONTEXT", "GITHUB_SHA must be the trusted tool commit")
+        )
+    if re.fullmatch(r"[1-9][0-9]*", job_id) is None:
+        errors.append(
+            ("E_TRUST_CONTEXT", "--job-id must be the numeric authorize job id")
+        )
+    if errors:
+        return errors, None
+
+    doc_errors = validate_document(
+        document,
+        evidence_path,
+        root=root,
+        trusted_checkout=trusted_checkout,
+        require_trust=True,
+        authorize_mode=True,
+    )
+    errors.extend(doc_errors)
+    data = document if isinstance(document, dict) else {}
+    verdict = data.get("verdict")
+    if not isinstance(verdict, dict) or verdict.get("result") != "pass":
+        errors.append(("E_VERDICT", "authorize requires verdict.result=pass"))
+    if errors:
+        return errors, None
+
+    # D-066: the evidence must have been produced against the exact scenario
+    # contract of the trusted tools. A drifted subject contract (e.g. a
+    # lowered threshold) must land on main and become the trusted stand
+    # first; until then authorization fails closed.
+    trusted_root = trusted_checkout.resolve()
+    trusted_contract = trusted_root / Path("quality/scenarios/mvp-v1.json")
+    try:
+        trusted_contract_digest = sha256_file(trusted_contract)
+    except OSError as error:
+        errors.append(
+            ("E_TRUSTED_TOOL", f"trusted scenario contract unreadable: {error}")
+        )
+        return errors, None
+    content = data.get("content")
+    declared_contract_digest = (
+        content.get("scenarioSha256") if isinstance(content, dict) else None
+    )
+    if declared_contract_digest != trusted_contract_digest:
+        errors.append(
+            (
+                "E_SCENARIO_CONTRACT",
+                "content.scenarioSha256 does not match the trusted scenario "
+                "contract: the evidence was produced against a different "
+                "contract; contract changes must land on main first",
+            )
+        )
+        return errors, None
+
+    # D-066 point 5: every prior receipt is verified against the GitHub API
+    # (exact workflow_dispatch run/attempt, workflow, conclusion, trusted
+    # head and the successful authorize job). The current run is never
+    # queried against its own pending conclusion.
+    _verify_prior_receipts_github(
+        data.get("priorGateReceipts"), root=root, environ=env, errors=errors
+    )
+    if errors:
+        return errors, None
+
+    try:
+        trusted_head = _git("rev-parse", "HEAD", root=trusted_checkout)
+    except ValueError as error:
+        errors.append(("E_TRUSTED_TOOL", f"trusted checkout unreadable: {error}"))
+        return errors, None
+    if trusted_sha != trusted_head:
+        errors.append(
+            (
+                "E_TRUST_CONTEXT",
+                "GITHUB_SHA must equal the trusted checkout HEAD: "
+                f"{trusted_sha!r} != {trusted_head!r}",
+            )
+        )
+        return errors, None
+
+    subject = data["subject"]
+    attempt = data["attempt"]
+    declared_path = attempt["evidencePath"]
+    try:
+        carrier_commit = _git(
+            "log", "-1", "--format=%H", "--", declared_path, root=root
+        )
+    except ValueError as error:
+        errors.append(
+            (
+                "E_RECEIPT_CARRIER",
+                f"cannot derive the evidence carrier commit: {error}",
+            )
+        )
+        return errors, None
+    if re.fullmatch(r"[0-9a-f]{40}", carrier_commit or "") is None:
+        errors.append(
+            (
+                "E_RECEIPT_CARRIER",
+                "evidence is not versioned in the subject repository; the "
+                "carrier commit must come from git history",
+            )
+        )
+        return errors, None
+
+    receipt: dict[str, Any] = {
+        "schemaVersion": RECEIPT_SCHEMA_VERSION,
+        "gateId": data["gateId"],
+        "subjectCommitSha": subject["commitSha"],
+        "subjectTreeSha": subject["treeSha"],
+        "evidenceCarrierCommitSha": carrier_commit,
+        "evidencePath": declared_path,
+        "evidenceSha256": sha256_file(evidence_path),
+        "trustedToolCommitSha": trusted_sha,
+        "repository": REPOSITORY,
+        "workflow": WORKFLOW_NAME,
+        "runId": run_id,
+        "runAttempt": run_attempt,
+        "jobId": job_id,
+        "authorizingJob": AUTHORIZING_JOB,
+        "createdAtUtc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if notes is not None:
+        receipt["notes"] = notes
+
+    try:
+        receipt_schema_bytes = _load_receipt_schema_bytes(trusted_checkout)
+    except OSError as error:
+        errors.append(("E_RECEIPT_SCHEMA", f"cannot load receipt schema: {error}"))
+        return errors, None
+    for message in _schema_validation_errors(
+        receipt,
+        receipt_schema_bytes,
+        validator_path=trusted_root
+        / Path("quality/scripts/validate_evidence_schema.mjs"),
+        working_directory=trusted_root,
+    ):
+        errors.append(("E_RECEIPT_SCHEMA", message))
+    if errors:
+        return errors, None
+
+    receipt_out.parent.mkdir(parents=True, exist_ok=True)
+    receipt_out.write_text(
+        json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
+    )
+    return [], receipt
 
 
 def _node_version() -> str | None:
@@ -1412,9 +1686,10 @@ def validate_document(
     scenario_definitions: dict[str, dict[str, Any]] | None = None,
     scenario_methods: dict[str, dict[str, Any]] | None = None,
     evidence_schema_bytes: bytes | None = None,
-    trust_context_path: Path | None = None,
+    receipt_schema_bytes: bytes | None = None,
     trusted_checkout: Path | None = None,
     require_trust: bool = True,
+    authorize_mode: bool = False,
     _validation_stack: set[str] | None = None,
 ) -> list[tuple[str, str]]:
     """Return stable `(code, message)` errors for one parsed evidence object."""
@@ -1538,16 +1813,24 @@ def validate_document(
         or scenario_methods is None
     ):
         try:
-            contract_commit = (
-                commit_sha
-                if verify_git
-                and isinstance(commit_sha, str)
-                and re.fullmatch(r"[0-9a-f]{40,64}", commit_sha)
-                else None
-            )
-            profiles, scenario_definitions, scenario_methods = _load_scenario_contract(
-                root, contract_commit
-            )
+            if trusted_checkout is not None:
+                # D-066: authoritative scenario profiles and thresholds come
+                # from the subject-independent trusted tool checkout, never
+                # from the subject.
+                profiles, scenario_definitions, scenario_methods = (
+                    _load_scenario_contract(trusted_checkout.resolve())
+                )
+            else:
+                contract_commit = (
+                    commit_sha
+                    if verify_git
+                    and isinstance(commit_sha, str)
+                    and re.fullmatch(r"[0-9a-f]{40,64}", commit_sha)
+                    else None
+                )
+                profiles, scenario_definitions, scenario_methods = (
+                    _load_scenario_contract(root, contract_commit)
+                )
         except (OSError, StrictJsonError, ValueError) as error:
             errors.append(("E_PROFILE", str(error)))
             return errors
@@ -1726,6 +2009,7 @@ def validate_document(
                 scenario_definitions=scenario_definitions,
                 scenario_methods=scenario_methods,
                 evidence_schema_bytes=evidence_schema_bytes,
+                receipt_schema_bytes=receipt_schema_bytes,
                 trusted_checkout=trusted_checkout,
                 require_trust=False,
                 _validation_stack=validation_stack,
@@ -1737,6 +2021,164 @@ def validate_document(
                         f"{raw_path}: {nested_code}: {nested_message}",
                     )
                 )
+
+    # D-066 receipt chain: from schema 1.4 only GateAuthorization receipts
+    # authorize predecessor gates. The same-subject evidence chain above
+    # stays as the integrity proof; this ordered chain is the authorization
+    # proof. G0 declares null/empty, G<n> declares exactly G0..G(n-1).
+    receipt_refs_raw = data.get("priorGateReceipts")
+    gate_index = GATE_SEQUENCE.index(gate_id)
+    expected_receipt_gates = list(GATE_SEQUENCE[:gate_index])
+    receipt_refs: list[dict[str, Any]] = []
+    if gate_index == 0:
+        if receipt_refs_raw is not None and receipt_refs_raw != []:
+            errors.append(
+                ("E_RECEIPT_CHAIN", "G0 must not declare prior gate receipts")
+            )
+    elif not isinstance(receipt_refs_raw, list):
+        errors.append(
+            (
+                "E_RECEIPT_CHAIN",
+                f"{gate_id} requires the ordered receipt chain "
+                f"G0..{GATE_SEQUENCE[gate_index - 1]}",
+            )
+        )
+    else:
+        declared_receipt_gates = [
+            ref.get("gateId") if isinstance(ref, dict) else None
+            for ref in receipt_refs_raw
+        ]
+        if declared_receipt_gates != expected_receipt_gates:
+            errors.append(
+                (
+                    "E_RECEIPT_CHAIN",
+                    f"receipt chain must be {expected_receipt_gates}, "
+                    f"got {declared_receipt_gates}",
+                )
+            )
+        else:
+            receipt_refs = [
+                ref for ref in receipt_refs_raw if isinstance(ref, dict)
+            ]
+
+    if receipt_refs:
+        if receipt_schema_bytes is None:
+            try:
+                receipt_schema_bytes = _load_receipt_schema_bytes(trusted_checkout)
+            except OSError as error:
+                errors.append(
+                    ("E_RECEIPT_SCHEMA", f"cannot load receipt schema: {error}")
+                )
+
+    if receipt_refs and verify_files:
+        prior_evidence_ref = prior_gate_map.get(GATE_SEQUENCE[gate_index - 1])
+        seen_receipt_paths: set[str] = set()
+        seen_run_ids: set[str] = set()
+        for position, ref in enumerate(receipt_refs):
+            raw_receipt_path = ref.get("receiptPath")
+            expected_receipt_digest = ref.get("receiptSha256")
+            if not isinstance(raw_receipt_path, str) or not isinstance(
+                expected_receipt_digest, str
+            ):
+                errors.append(
+                    (
+                        "E_RECEIPT",
+                        "receipt reference requires receiptPath/receiptSha256",
+                    )
+                )
+                continue
+            if RECEIPT_PATH_RE.fullmatch(raw_receipt_path) is None:
+                errors.append(
+                    (
+                        "E_RECEIPT_PATH",
+                        f"receipt reference must follow "
+                        f"{RECEIPT_PATH_CONVENTION}: {raw_receipt_path!r}",
+                    )
+                )
+                continue
+            if raw_receipt_path in seen_receipt_paths or (
+                raw_receipt_path in validation_stack
+            ):
+                errors.append(
+                    ("E_RECEIPT_CYCLE", f"receipt chain cycles at {raw_receipt_path}")
+                )
+                continue
+            seen_receipt_paths.add(raw_receipt_path)
+            try:
+                receipt_file = _safe_repo_path(root, raw_receipt_path)
+            except ValueError as error:
+                errors.append(("E_RECEIPT_PATH", f"{raw_receipt_path}: {error}"))
+                continue
+            if not receipt_file.is_file():
+                errors.append(
+                    ("E_RECEIPT_MISSING", f"missing receipt: {raw_receipt_path}")
+                )
+                continue
+            if sha256_file(receipt_file) != expected_receipt_digest:
+                errors.append(
+                    ("E_RECEIPT_DIGEST", f"SHA-256 mismatch: {raw_receipt_path}")
+                )
+                continue
+            receipt, receipt_errors = validate_receipt(
+                receipt_file,
+                root=root,
+                receipt_schema_bytes=receipt_schema_bytes,
+                schema_validator_path=schema_validator_path,
+                schema_working_directory=schema_working_directory,
+                verify_git=verify_git,
+            )
+            if receipt is not None:
+                if receipt.get("gateId") != ref.get("gateId"):
+                    errors.append(
+                        (
+                            "E_RECEIPT_CHAIN",
+                            f"{raw_receipt_path}: receipt gate "
+                            f"{receipt.get('gateId')!r} does not match the "
+                            f"declared chain position {ref.get('gateId')!r}",
+                        )
+                    )
+                if (
+                    receipt.get("subjectCommitSha") != commit_sha
+                    or receipt.get("subjectTreeSha") != tree_sha
+                ):
+                    errors.append(
+                        (
+                            "E_RECEIPT_SUBJECT",
+                            f"{raw_receipt_path}: receipt must prove the same "
+                            "subject commit/tree",
+                        )
+                    )
+                receipt_run_id = receipt.get("runId")
+                if isinstance(receipt_run_id, str):
+                    if receipt_run_id in seen_run_ids:
+                        errors.append(
+                            (
+                                "E_RECEIPT_RUN_ID",
+                                f"run id {receipt_run_id} is reused within the "
+                                "receipt chain",
+                            )
+                        )
+                    else:
+                        seen_run_ids.add(receipt_run_id)
+                if position == len(receipt_refs) - 1 and isinstance(
+                    prior_evidence_ref, dict
+                ):
+                    # The immediate predecessor receipt must authorize the
+                    # same evidence the integrity chain binds.
+                    if (
+                        receipt.get("evidencePath")
+                        != prior_evidence_ref.get("evidencePath")
+                        or receipt.get("evidenceSha256")
+                        != prior_evidence_ref.get("sha256")
+                    ):
+                        errors.append(
+                            (
+                                "E_RECEIPT_CHAIN",
+                                "the last receipt must authorize the same "
+                                "evidence that priorGateEvidence binds",
+                            )
+                        )
+            errors.extend(receipt_errors)
 
     bundle_components = trust_bundle.get("components")
     for component_id, (path_field, digest_field) in CONTENT_COMPONENT_FIELDS.items():
@@ -2473,23 +2915,15 @@ def validate_document(
                 errors.append(
                     ("E_PASS_CRITERION", f"{criterion_id}: pass requires criterion pass")
                 )
-        if require_trust:
-            if trusted_checkout is None:
-                errors.append(
-                    (
-                        "E_AUTHORIZATION_BOOTSTRAP",
-                        "gate pass authorization requires "
-                        "--trusted-tool-checkout with the subject-independent "
-                        "D-064 trusted tools",
-                    )
+        if require_trust and not authorize_mode:
+            errors.append(
+                (
+                    "E_AUTHORIZATION_BOOTSTRAP",
+                    "local validation is integrity-only: a gate pass is "
+                    "authorized only by the protected "
+                    f"{AUTHORIZING_JOB} job via --authorize, which emits the "
+                    "hash-bound GateAuthorization.json receipt",
                 )
-            _validate_trust_context(
-                trust_context_path,
-                data,
-                evidence_path,
-                root,
-                errors,
-                gate_id=gate_id,
             )
     elif verdict.get("result") != "fail":
         errors.append(("E_VERDICT", "verdict.result must be pass or fail"))
@@ -2620,6 +3054,7 @@ def _self_test_fixture() -> tuple[
             "previousEvidence": None,
         },
         "priorGateEvidence": [],
+        "priorGateReceipts": None,
         "scope": {
             "classification": "code",
             "changedPaths": ["quality/scripts/validate_gate_evidence.py"],
@@ -2813,7 +3248,7 @@ def _substitute(value: Any, old: str, new: str) -> Any:
 
 
 def _harness_scenario_contract_bytes() -> bytes:
-    """Minimal but fully valid 1.3.0 scenario contract for harness repos."""
+    """Minimal but fully valid 1.4.0 scenario contract for harness repos."""
 
     timing = {
         "warmupSeconds": 30,
@@ -2859,7 +3294,7 @@ def _harness_scenario_contract_bytes() -> bytes:
         "scenarios": [
             {
                 "id": "SELF_TEST_SCENARIO",
-                "gateUsage": ["G0"],
+                "gateUsage": list(GATE_SEQUENCE),
                 "requiredAssertions": ["validator-pass"],
                 "thresholds": {"latencyMs": {"unit": "score", "maximum": 1.0}},
             }
@@ -2869,10 +3304,8 @@ def _harness_scenario_contract_bytes() -> bytes:
                 "requiredPriorGateIds": (
                     [] if index == 0 else [GATE_SEQUENCE[index - 1]]
                 ),
-                "requiredCriterionIds": ["G0-SELF-TEST"] if gate == "G0" else [],
-                "requiredScenarioIds": (
-                    ["SELF_TEST_SCENARIO"] if gate == "G0" else []
-                ),
+                "requiredCriterionIds": ["G0-SELF-TEST"],
+                "requiredScenarioIds": ["SELF_TEST_SCENARIO"],
                 "requiredCoverage": {},
             }
             for index, gate in enumerate(GATE_SEQUENCE)
@@ -2881,98 +3314,11 @@ def _harness_scenario_contract_bytes() -> bytes:
     return (json.dumps(contract, indent=2) + "\n").encode("utf-8")
 
 
-def _build_trusted_harness(
-    fixture: dict[str, Any],
-    harness_root: Path,
-    *,
-    weaken_subject_schema: bool = False,
-    document_mutation: Callable[[dict[str, Any]], None] | None = None,
-) -> tuple[dict[str, Any], Path, Path, Path, Path, bytes]:
-    """Create a subject repo, a trusted tool checkout and a trust context."""
+def _write_attempt_files(subject_repo: Path, document: dict[str, Any]) -> Path:
+    """Write a harness attempt: artifact payloads plus the evidence file."""
 
-    subject_repo = harness_root / "subject"
-    trusted_repo = harness_root / "trusted"
-    external = harness_root / "external"
-    for repository in (subject_repo, trusted_repo):
-        (repository / "quality/content").mkdir(parents=True)
-        (repository / "quality/scenarios").mkdir(parents=True)
-        (repository / "quality/schemas").mkdir(parents=True)
-        (repository / "quality/scripts").mkdir(parents=True)
-        (repository / ".github/workflows").mkdir(parents=True)
-    external.mkdir(parents=True)
-    schema_bytes = EVIDENCE_SCHEMA.read_bytes()
-    subject_schema_bytes = (
-        b'{"type":"object"}\n' if weaken_subject_schema else schema_bytes
-    )
-    component_bytes = {
-        "manifest": b'{"subject":"manifest"}\n',
-        "scenarioContract": _harness_scenario_contract_bytes(),
-        "evidenceSchema": subject_schema_bytes,
-        "evidenceValidator": Path(__file__).read_bytes(),
-        "ajvWrapper": (
-            ROOT / "quality/scripts/validate_evidence_schema.mjs"
-        ).read_bytes(),
-        "packageManifest": b'{"name":"harness-quality"}\n',
-        "packageLock": b'{"lockfileVersion":3}\n',
-        "gateRunner": b"#!/usr/bin/env python3\n",
-        "integrityWorkflow": b"name: quality-gate\n",
-    }
-    trusted_component_bytes = dict(
-        component_bytes, evidenceSchema=schema_bytes
-    )
-    for component_id, raw_bytes in component_bytes.items():
-        target = subject_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
-        target.write_bytes(raw_bytes)
-    for component_id, raw_bytes in trusted_component_bytes.items():
-        target = trusted_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
-        target.write_bytes(raw_bytes)
-    (trusted_repo / ".gitignore").write_text(
-        "quality/node_modules/\n", encoding="utf-8"
-    )
-    (trusted_repo / "quality/node_modules").symlink_to(
-        ROOT / "quality/node_modules"
-    )
-    for repository in (subject_repo, trusted_repo):
-        for arguments in (
-            ("init", "-q"),
-            ("config", "user.email", "self-test@example.invalid"),
-            ("config", "user.name", "Evidence Self Test"),
-            ("add", "."),
-            ("commit", "-qm", "harness"),
-        ):
-            subprocess.run(
-                ["git", *arguments],
-                cwd=repository,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-    subject_commit = _git("rev-parse", "HEAD", root=subject_repo)
-    subject_tree = _git("rev-parse", "HEAD^{tree}", root=subject_repo)
-    trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
-    node_version = _node_version()
-    if node_version is None:
-        raise ValueError("node is unavailable for the trusted harness")
-
-    document = _substitute(
-        copy.deepcopy(fixture), fixture["subject"]["commitSha"], subject_commit
-    )
-    document["subject"].update(
-        commitSha=subject_commit, treeSha=subject_tree
-    )
-    document["ci"]["headSha"] = subject_commit
-    for component_id, (_, digest_field) in CONTENT_COMPONENT_FIELDS.items():
-        subject_digest = sha256_bytes(component_bytes[component_id])
-        trusted_digest = sha256_bytes(trusted_component_bytes[component_id])
-        document["content"][digest_field] = subject_digest
-        component = document["trustBundle"]["components"][component_id]
-        component["subjectSha256"] = subject_digest
-        component["trustedSha256"] = trusted_digest
-    document["trustBundle"]["trustedCommitSha"] = trusted_commit
-    document["trustBundle"]["nodeVersion"] = node_version
-    if document_mutation is not None:
-        document_mutation(document)
-
+    subject_commit = document["subject"]["commitSha"]
+    subject_tree = document["subject"]["treeSha"]
     payloads: dict[str, Any] = {}
     for command in document["commands"]:
         payloads[command["stdoutArtifact"]["path"]] = b"stdout\n"
@@ -3041,57 +3387,229 @@ def _build_trusted_harness(
 
     evidence_file = subject_repo / Path(document["attempt"]["evidencePath"])
     evidence_file.parent.mkdir(parents=True, exist_ok=True)
-    evidence_raw = json.dumps(document, indent=2).encode("utf-8")
-    evidence_file.write_bytes(evidence_raw)
-    evidence_digest = sha256_bytes(evidence_raw)
-    chain_entry = {
-        "gateId": document["gateId"],
-        "evidencePath": document["attempt"]["evidencePath"],
-        "evidenceSha256": evidence_digest,
-        "subjectCommitSha": subject_commit,
-        "subjectTreeSha": subject_tree,
-        "ciRunId": ci_section["runId"],
-        "ciJobId": ci_section["jobId"],
-        "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
-        "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
-    }
-    context = {
-        "schemaVersion": TRUST_CONTEXT_VERSION,
-        "repository": "VibecodingGermany/Project_Nova",
-        "workflowPath": ".github/workflows/quality-gate.yml",
-        "authorizingRunId": "999",
-        "authorizingRunAttempt": 1,
-        "authorizingJob": "d066-disabled-authorizer",
-        "subjectCommitSha": subject_commit,
-        "subjectTreeSha": subject_tree,
-        "evidencePath": document["attempt"]["evidencePath"],
-        "evidenceSha256": evidence_digest,
-        "evidenceCiRunId": ci_section["runId"],
-        "evidenceCiJobId": ci_section["jobId"],
-        "ciAttestationSha256": ci_section["attestationArtifact"]["sha256"],
-        "reviewerId": reviewer_section["id"],
-        "reviewArtifactSha256": reviewer_section["reviewArtifact"]["sha256"],
-        "trustedToolCommitSha": trusted_commit,
-        "authorizedEvidence": [chain_entry],
-    }
-    context_path = external / "trust-context.json"
-    context_raw = json.dumps(context, indent=2).encode("utf-8")
-    context_path.write_bytes(context_raw)
-    return document, evidence_file, context_path, subject_repo, trusted_repo, context_raw
+    evidence_file.write_text(
+        json.dumps(document, indent=2) + "\n", encoding="utf-8"
+    )
+    return evidence_file
 
 
-def _harness_environment(context_raw: bytes) -> dict[str, str]:
+
+def _build_trusted_harness(
+    fixture: dict[str, Any],
+    harness_root: Path,
+    *,
+    weaken_subject_schema: bool = False,
+    document_mutation: Callable[[dict[str, Any]], None] | None = None,
+) -> tuple[dict[str, Any], Path, Path, Path]:
+    """Create a subject repo and a trusted tool checkout with one G0 attempt."""
+
+    subject_repo = harness_root / "subject"
+    trusted_repo = harness_root / "trusted"
+    external = harness_root / "external"
+    for repository in (subject_repo, trusted_repo):
+        (repository / "quality/content").mkdir(parents=True)
+        (repository / "quality/scenarios").mkdir(parents=True)
+        (repository / "quality/schemas").mkdir(parents=True)
+        (repository / "quality/scripts").mkdir(parents=True)
+        (repository / ".github/workflows").mkdir(parents=True)
+    external.mkdir(parents=True)
+    schema_bytes = EVIDENCE_SCHEMA.read_bytes()
+    subject_schema_bytes = (
+        b'{"type":"object"}\n' if weaken_subject_schema else schema_bytes
+    )
+    component_bytes = {
+        "manifest": b'{"subject":"manifest"}\n',
+        "scenarioContract": _harness_scenario_contract_bytes(),
+        "evidenceSchema": subject_schema_bytes,
+        "evidenceValidator": Path(__file__).read_bytes(),
+        "ajvWrapper": (
+            ROOT / "quality/scripts/validate_evidence_schema.mjs"
+        ).read_bytes(),
+        "packageManifest": b'{"name":"harness-quality"}\n',
+        "packageLock": b'{"lockfileVersion":3}\n',
+        "gateRunner": b"#!/usr/bin/env python3\n",
+        "integrityWorkflow": b"name: quality-gate\n",
+    }
+    trusted_component_bytes = dict(
+        component_bytes, evidenceSchema=schema_bytes
+    )
+    for component_id, raw_bytes in component_bytes.items():
+        target = subject_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+        target.write_bytes(raw_bytes)
+    for component_id, raw_bytes in trusted_component_bytes.items():
+        target = trusted_repo / Path(TRUST_BUNDLE_COMPONENTS[component_id])
+        target.write_bytes(raw_bytes)
+    (trusted_repo / ".gitignore").write_text(
+        "quality/node_modules/\n", encoding="utf-8"
+    )
+    (trusted_repo / "quality/node_modules").symlink_to(
+        ROOT / "quality/node_modules"
+    )
+    receipt_schema_bytes = RECEIPT_SCHEMA.read_bytes()
+    for repository in (subject_repo, trusted_repo):
+        (repository / "quality/schemas/GateAuthorization.schema.json").write_bytes(
+            receipt_schema_bytes
+        )
+    for repository in (subject_repo, trusted_repo):
+        for arguments in (
+            ("init", "-q"),
+            ("config", "user.email", "self-test@example.invalid"),
+            ("config", "user.name", "Evidence Self Test"),
+            ("add", "."),
+            ("commit", "-qm", "harness"),
+        ):
+            subprocess.run(
+                ["git", *arguments],
+                cwd=repository,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    subject_commit = _git("rev-parse", "HEAD", root=subject_repo)
+    subject_tree = _git("rev-parse", "HEAD^{tree}", root=subject_repo)
+    trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
+    node_version = _node_version()
+    if node_version is None:
+        raise ValueError("node is unavailable for the trusted harness")
+
+    document = _substitute(
+        copy.deepcopy(fixture), fixture["subject"]["commitSha"], subject_commit
+    )
+    document["subject"].update(
+        commitSha=subject_commit, treeSha=subject_tree
+    )
+    document["ci"]["headSha"] = subject_commit
+    for component_id, (_, digest_field) in CONTENT_COMPONENT_FIELDS.items():
+        subject_digest = sha256_bytes(component_bytes[component_id])
+        trusted_digest = sha256_bytes(trusted_component_bytes[component_id])
+        document["content"][digest_field] = subject_digest
+        component = document["trustBundle"]["components"][component_id]
+        component["subjectSha256"] = subject_digest
+        component["trustedSha256"] = trusted_digest
+    document["trustBundle"]["trustedCommitSha"] = trusted_commit
+    document["trustBundle"]["nodeVersion"] = node_version
+    if document_mutation is not None:
+        document_mutation(document)
+
+    evidence_file = _write_attempt_files(subject_repo, document)
+    return document, evidence_file, subject_repo, trusted_repo
+
+
+def _git_commit_all(repository: Path, message: str) -> str:
+    for arguments in (
+        ("add", "."),
+        ("commit", "-qm", message),
+    ):
+        subprocess.run(
+            ["git", *arguments],
+            cwd=repository,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    return _git("rev-parse", "HEAD", root=repository)
+
+
+def _derive_gate_document(
+    document: dict[str, Any],
+    gate_id: str,
+    prior_evidence: dict[str, Any] | None,
+    prior_receipts: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    """Re-target a harness document at another gate of the same subject."""
+
+    derived = _substitute(copy.deepcopy(document), "/G0/", f"/{gate_id}/")
+    derived = _substitute(derived, "--gate G0", f"--gate {gate_id}")
+    derived["gateId"] = gate_id
+    derived["priorGateEvidence"] = [] if prior_evidence is None else [prior_evidence]
+    derived["priorGateReceipts"] = prior_receipts
+    return derived
+
+
+def _receipt_reference(receipt_path: Path, root: Path) -> dict[str, Any]:
+    receipt = strict_load(receipt_path)
+    return {
+        "gateId": receipt["gateId"],
+        "receiptPath": receipt_path.relative_to(root).as_posix(),
+        "receiptSha256": sha256_file(receipt_path),
+    }
+
+
+def _harness_github_environment(
+    trusted_commit: str,
+    *,
+    run_id: str = "999",
+    run_attempt: str = "1",
+) -> dict[str, str]:
     return {
         "GITHUB_ACTIONS": "true",
-        "GITHUB_REPOSITORY": "VibecodingGermany/Project_Nova",
-        "GITHUB_RUN_ID": "999",
-        "GITHUB_RUN_ATTEMPT": "1",
-        "GITHUB_JOB": "d066-disabled-authorizer",
+        "GITHUB_REPOSITORY": REPOSITORY,
+        "GITHUB_WORKFLOW": "Quality Gate",
         "GITHUB_WORKFLOW_REF": (
-            "VibecodingGermany/Project_Nova/"
-            ".github/workflows/quality-gate.yml@refs/heads/main"
+            f"{REPOSITORY}/.github/workflows/{WORKFLOW_NAME}@refs/heads/main"
         ),
-        "NOVA_TRUST_CONTEXT_SHA256": sha256_bytes(context_raw),
+        "GITHUB_RUN_ID": run_id,
+        "GITHUB_RUN_ATTEMPT": run_attempt,
+        "GITHUB_JOB": AUTHORIZING_JOB,
+        "GITHUB_SHA": trusted_commit,
+    }
+
+
+def _write_fake_gh(bin_dir: Path, catalog: dict[str, Any]) -> None:
+    """Write a fake ``gh`` binary answering ``gh api <endpoint>`` from a catalog.
+
+    Unknown endpoints exit 1, mirroring a GitHub API 404. Keeps the GitHub
+    verification controls hermetic: no network access in the self-test.
+    """
+
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    catalog_json = json.dumps(catalog)
+    script = bin_dir / "gh"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        f"catalog = json.loads({catalog_json!r})\n"
+        "if len(sys.argv) >= 3 and sys.argv[1] == 'api' and sys.argv[2] in catalog:\n"
+        "    print(json.dumps(catalog[sys.argv[2]]))\n"
+        "    sys.exit(0)\n"
+        "sys.exit(1)\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+
+
+def _receipt_run_catalog(
+    receipt: dict[str, Any],
+    *,
+    event: str = "workflow_dispatch",
+    conclusion: str = "success",
+    head_sha: str | None = None,
+    job_name: str = AUTHORIZING_JOB,
+    job_conclusion: str = "success",
+) -> dict[str, Any]:
+    """Catalog of GitHub API answers matching one receipt's run identity."""
+
+    run_id = str(receipt["runId"])
+    return {
+        f"repos/{REPOSITORY}/actions/runs/{run_id}": {
+            "path": f".github/workflows/{WORKFLOW_NAME}",
+            "event": event,
+            "conclusion": conclusion,
+            "head_sha": (
+                receipt["trustedToolCommitSha"] if head_sha is None else head_sha
+            ),
+            "run_attempt": receipt["runAttempt"],
+        },
+        f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/"
+        f"{receipt['runAttempt']}/jobs": {
+            "jobs": [
+                {
+                    "id": int(receipt["jobId"]),
+                    "name": job_name,
+                    "conclusion": job_conclusion,
+                }
+            ]
+        },
     }
 
 
@@ -3147,7 +3665,28 @@ def run_self_test() -> int:
         (
             "schema-version",
             "E_SCHEMA_VERSION",
-            lambda value: value.update(schemaVersion="1.0.0"),
+            lambda value: value.update(schemaVersion="1.3.0"),
+        ),
+        (
+            "ci-authorizer-job",
+            "E_JSON_SCHEMA",
+            lambda value: value["ci"].update(jobName="gate-evidence-authorize"),
+        ),
+        (
+            "g0-with-receipts",
+            "E_RECEIPT_CHAIN",
+            lambda value: value.update(
+                priorGateReceipts=[
+                    {
+                        "gateId": "G0",
+                        "receiptPath": (
+                            "quality/authorizations/G0/"
+                            f"{'1' * 40}/999-attempt1/GateAuthorization.json"
+                        ),
+                        "receiptSha256": "0" * 64,
+                    }
+                ]
+            ),
         ),
         ("exit", "E_COMMAND_EXIT", lambda value: value["commands"][0].update(exitCode=7)),
         (
@@ -3307,11 +3846,10 @@ def run_self_test() -> int:
         )
     }
     checks += 1
-    if not {"E_AUTHORIZATION_BOOTSTRAP", "E_TRUST_CONTEXT"}.issubset(
-        trusted_codes
-    ):
+    if trusted_codes != {"E_AUTHORIZATION_BOOTSTRAP"}:
         print(
-            "SELF-TEST FAIL: local pass escaped the bootstrap/trust guards"
+            "SELF-TEST FAIL: local pass escaped the bootstrap guard: "
+            f"{sorted(trusted_codes)}"
         )
         return 1
 
@@ -3616,11 +4154,12 @@ def run_self_test() -> int:
     environment_names = (
         "GITHUB_ACTIONS",
         "GITHUB_REPOSITORY",
+        "GITHUB_WORKFLOW",
+        "GITHUB_WORKFLOW_REF",
         "GITHUB_RUN_ID",
         "GITHUB_RUN_ATTEMPT",
         "GITHUB_JOB",
-        "GITHUB_WORKFLOW_REF",
-        "NOVA_TRUST_CONTEXT_SHA256",
+        "GITHUB_SHA",
         "PATH",
     )
     saved_environment = {name: os.environ.get(name) for name in environment_names}
@@ -3630,19 +4169,15 @@ def run_self_test() -> int:
                 (
                     trusted_document,
                     trusted_evidence,
-                    trusted_context_path,
                     subject_repo,
                     trusted_repo,
-                    context_raw,
                 ) = _build_trusted_harness(fixture, Path(temp))
             except (OSError, ValueError) as error:
                 print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
                 return 1
-            os.environ.update(_harness_environment(context_raw))
 
             def trusted_codes(
                 candidate: dict[str, Any],
-                context_path: Path,
                 active_trusted_repo: Path = trusted_repo,
             ) -> set[str]:
                 return {
@@ -3656,18 +4191,17 @@ def run_self_test() -> int:
                         profiles=profiles,
                         scenario_definitions=scenarios,
                         scenario_methods=methods,
-                        trust_context_path=context_path,
                         trusted_checkout=active_trusted_repo,
                         require_trust=True,
                     )
                 }
 
-            baseline_errors = trusted_codes(trusted_document, trusted_context_path)
+            baseline_errors = trusted_codes(trusted_document)
             checks += 1
             if baseline_errors != {"E_AUTHORIZATION_BOOTSTRAP"}:
                 print(
-                    "SELF-TEST FAIL: retired trusted baseline did not fail "
-                    "closed only at the D-066 bootstrap lock: "
+                    "SELF-TEST FAIL: trusted baseline did not fail closed "
+                    "only at the D-066 bootstrap lock: "
                     f"{sorted(baseline_errors)}"
                 )
                 return 1
@@ -3677,9 +4211,7 @@ def run_self_test() -> int:
                 b'{"lockfileVersion":3,"tampered":true}\n'
             )
             checks += 1
-            if "E_TRUSTED_TOOL" not in trusted_codes(
-                trusted_document, trusted_context_path
-            ):
+            if "E_TRUSTED_TOOL" not in trusted_codes(trusted_document):
                 print("SELF-TEST FAIL: tampered trusted lockfile was accepted")
                 return 1
             wrapper_path = trusted_repo / Path(
@@ -3700,9 +4232,7 @@ def run_self_test() -> int:
                     stderr=subprocess.DEVNULL,
                 )
             checks += 1
-            if "E_TRUSTED_TOOL" not in trusted_codes(
-                trusted_document, trusted_context_path
-            ):
+            if "E_TRUSTED_TOOL" not in trusted_codes(trusted_document):
                 print("SELF-TEST FAIL: tampered trusted Ajv wrapper was accepted")
                 return 1
             subprocess.run(
@@ -3713,173 +4243,486 @@ def run_self_test() -> int:
                 stderr=subprocess.DEVNULL,
             )
 
+            # D-066 receipt contract controls (G0-A2).
             external = Path(temp) / "external"
-            for name, chain in (
-                ("incomplete", []),
-                (
-                    "extra",
-                    [
-                        strict_load(trusted_context_path)["authorizedEvidence"][0],
-                        strict_load(trusted_context_path)["authorizedEvidence"][0],
-                    ],
-                ),
-            ):
-                mutated_context = strict_load(trusted_context_path)
-                mutated_context["authorizedEvidence"] = chain
-                mutated_path = external / f"trust-context-{name}.json"
-                mutated_raw = json.dumps(mutated_context).encode("utf-8")
-                mutated_path.write_bytes(mutated_raw)
-                os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(mutated_raw)
-                checks += 1
-                if "E_AUTHORIZATION_CHAIN" not in trusted_codes(
-                    trusted_document, mutated_path
-                ):
-                    print(
-                        f"SELF-TEST FAIL: {name} authorization chain was accepted"
-                    )
-                    return 1
+            trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
+            subject_commit = trusted_document["subject"]["commitSha"]
 
-            swapped_context = strict_load(trusted_context_path)
-            base_entry = swapped_context["authorizedEvidence"][0]
-            swapped_context["authorizedEvidence"] = [
-                dict(base_entry, gateId="G1"),
-                base_entry,
-            ]
-            swapped_path = external / "trust-context-swapped.json"
-            swapped_raw = json.dumps(swapped_context).encode("utf-8")
-            swapped_path.write_bytes(swapped_raw)
-            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(swapped_raw)
-            swapped_document = copy.deepcopy(trusted_document)
-            swapped_document["gateId"] = "G1"
-            swapped_errors: list[tuple[str, str]] = []
-            _validate_trust_context(
-                swapped_path,
-                swapped_document,
+            def authorize(
+                candidate: dict[str, Any],
+                candidate_evidence: Path,
+                receipt_out: Path,
+                environ: dict[str, str],
+                job_id: str = "456",
+            ) -> tuple[set[str], dict[str, Any] | None]:
+                authorize_errors, receipt = authorize_evidence(
+                    candidate,
+                    candidate_evidence,
+                    root=subject_repo,
+                    trusted_checkout=trusted_repo,
+                    receipt_out=receipt_out,
+                    job_id=job_id,
+                    environ=environ,
+                )
+                return {code for code, _ in authorize_errors}, receipt
+
+            # --authorize outside the protected GitHub runtime fails closed.
+            no_env_codes, no_env_receipt = authorize(
+                trusted_document,
                 trusted_evidence,
-                subject_repo,
-                swapped_errors,
-                gate_id="G1",
+                external / "receipt-no-env.json",
+                {},
             )
             checks += 1
-            if "E_AUTHORIZATION_CHAIN" not in {
-                code for code, _ in swapped_errors
-            }:
-                print("SELF-TEST FAIL: swapped authorization chain was accepted")
+            if no_env_receipt is not None or "E_TRUST_CONTEXT" not in no_env_codes:
+                print(
+                    "SELF-TEST FAIL: --authorize without the GitHub runtime "
+                    f"escaped the trust-context lock: {sorted(no_env_codes)}"
+                )
                 return 1
 
-            for env_name, wrong_value in (
-                ("GITHUB_JOB", "integrity"),
-                (
-                    "GITHUB_WORKFLOW_REF",
-                    "VibecodingGermany/Project_Nova/"
-                    ".github/workflows/quality-gate.yml@refs/heads/topic",
-                ),
-                ("NOVA_TRUST_CONTEXT_SHA256", "0" * 64),
-            ):
-                saved_value = os.environ[env_name]
-                os.environ[env_name] = wrong_value
-                checks += 1
-                if "E_TRUST_CONTEXT" not in trusted_codes(
-                    trusted_document, trusted_context_path
-                ):
-                    print(
-                        f"SELF-TEST FAIL: mismatched {env_name} escaped the "
-                        "protected-environment binding"
-                    )
-                    return 1
-                os.environ[env_name] = saved_value
-
-            wrong_subject_context = strict_load(trusted_context_path)
-            wrong_subject_context["authorizedEvidence"] = [
-                dict(
-                    wrong_subject_context["authorizedEvidence"][0],
-                    subjectCommitSha="0" * 40,
-                )
-            ]
-            wrong_subject_path = external / "trust-context-subject.json"
-            wrong_subject_raw = json.dumps(wrong_subject_context).encode("utf-8")
-            wrong_subject_path.write_bytes(wrong_subject_raw)
-            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(
-                wrong_subject_raw
+            # A fail verdict can never be authorized.
+            fail_document = copy.deepcopy(trusted_document)
+            fail_document["verdict"] = {
+                "result": "fail",
+                "rationale": "negative gate attempt",
+            }
+            fail_codes, fail_receipt = authorize(
+                fail_document,
+                trusted_evidence,
+                external / "receipt-fail.json",
+                _harness_github_environment(trusted_commit),
             )
             checks += 1
-            if "E_AUTHORIZATION_CHAIN" not in trusted_codes(
-                trusted_document, wrong_subject_path
+            if fail_receipt is not None or "E_VERDICT" not in fail_codes:
+                print(
+                    "SELF-TEST FAIL: verdict=fail was authorized: "
+                    f"{sorted(fail_codes)}"
+                )
+                return 1
+
+            # Positive: the protected run emits the hash-bound receipt.
+            _git_commit_all(subject_repo, "version g0 evidence")
+            os.environ.update(_harness_github_environment(trusted_commit))
+            g0_receipt_out = external / "GateAuthorization.json"
+            g0_authorize_codes, g0_receipt = authorize(
+                trusted_document,
+                trusted_evidence,
+                g0_receipt_out,
+                dict(os.environ),
+            )
+            checks += 1
+            if (
+                g0_authorize_codes
+                or g0_receipt is None
+                or not g0_receipt_out.is_file()
             ):
                 print(
-                    "SELF-TEST FAIL: chain entry with a foreign subject commit "
+                    "SELF-TEST FAIL: protected authorize did not emit the "
+                    f"receipt: {sorted(g0_authorize_codes)}"
+                )
+                return 1
+
+            # The emitted candidate satisfies the receipt contract.
+            _, candidate_errors = validate_receipt(
+                g0_receipt_out,
+                root=subject_repo,
+                receipt_schema_bytes=_load_receipt_schema_bytes(trusted_repo),
+                schema_validator_path=trusted_repo
+                / Path("quality/scripts/validate_evidence_schema.mjs"),
+                schema_working_directory=trusted_repo,
+            )
+            checks += 1
+            if candidate_errors:
+                print(
+                    "SELF-TEST FAIL: emitted receipt candidate was rejected: "
+                    f"{candidate_errors}"
+                )
+                return 1
+
+            # Version the receipt append-only (follow-up PR simulation).
+            g0_receipt_versioned = subject_repo / Path(
+                f"quality/authorizations/G0/{subject_commit}/"
+                "999-attempt1/GateAuthorization.json"
+            )
+            g0_receipt_versioned.parent.mkdir(parents=True, exist_ok=True)
+            g0_receipt_versioned.write_bytes(g0_receipt_out.read_bytes())
+            g0_receipt_original = g0_receipt_versioned.read_bytes()
+            _git_commit_all(subject_repo, "version g0 receipt")
+
+            g0_receipt_ref = _receipt_reference(g0_receipt_versioned, subject_repo)
+            g0_evidence_ref = {
+                "gateId": "G0",
+                "evidencePath": trusted_document["attempt"]["evidencePath"],
+                "sha256": sha256_file(trusted_evidence),
+            }
+            chain_profiles = {
+                gate: {
+                    "requiredPriorGateIds": (
+                        [] if gate == "G0" else [GATE_SEQUENCE[index - 1]]
+                    ),
+                    "requiredCriterionIds": ["G0-SELF-TEST"],
+                    "requiredScenarioIds": ["SELF_TEST_SCENARIO"],
+                    "requiredCoverage": {},
+                }
+                for index, gate in enumerate(GATE_SEQUENCE[:3])
+            }
+            chain_scenarios = copy.deepcopy(scenarios)
+            chain_scenarios["SELF_TEST_SCENARIO"]["gateUsage"] = ["G0", "G1", "G2"]
+
+            def chain_codes(
+                candidate: dict[str, Any], candidate_evidence: Path
+            ) -> set[str]:
+                return {
+                    code
+                    for code, _ in validate_document(
+                        candidate,
+                        candidate_evidence,
+                        root=subject_repo,
+                        verify_files=True,
+                        verify_git=True,
+                        profiles=chain_profiles,
+                        scenario_definitions=chain_scenarios,
+                        scenario_methods=methods,
+                        require_trust=False,
+                    )
+                }
+
+            # Positive: G1 with the ordered receipt chain validates cleanly.
+            g1_document = _derive_gate_document(
+                trusted_document, "G1", g0_evidence_ref, [g0_receipt_ref]
+            )
+            g1_evidence_file = _write_attempt_files(subject_repo, g1_document)
+            _git_commit_all(subject_repo, "version g1 evidence")
+            g1_codes = chain_codes(g1_document, g1_evidence_file)
+            checks += 1
+            if g1_codes:
+                print(
+                    "SELF-TEST FAIL: valid G1 receipt chain was rejected: "
+                    f"{sorted(g1_codes)}"
+                )
+                return 1
+
+            # Positive: the protected run also authorizes G1 via its chain,
+            # with the GitHub API verification answered by a fake gh binary.
+            os.environ.update(
+                _harness_github_environment(trusted_commit, run_id="1000")
+            )
+            fake_gh_bin = external / "fake-gh"
+            _write_fake_gh(fake_gh_bin, _receipt_run_catalog(g0_receipt))
+            github_env = dict(os.environ)
+            github_env["GH_TOKEN"] = "self-test-token"
+            github_env["PATH"] = (
+                f"{fake_gh_bin}{os.pathsep}{os.environ['PATH']}"
+            )
+            g1_receipt_out = external / "GateAuthorization-g1.json"
+            g1_authorize_codes, g1_receipt = authorize(
+                g1_document,
+                g1_evidence_file,
+                g1_receipt_out,
+                github_env,
+                job_id="457",
+            )
+            checks += 1
+            if (
+                g1_authorize_codes
+                or g1_receipt is None
+                or not g1_receipt_out.is_file()
+            ):
+                print(
+                    "SELF-TEST FAIL: chained G1 authorize did not emit the "
+                    f"receipt: {sorted(g1_authorize_codes)}"
+                )
+                return 1
+
+            # Negatives: the GitHub API verification rejects forged receipts.
+            github_negatives = [
+                ("invented run id", {}),
+                (
+                    "pull_request event",
+                    _receipt_run_catalog(g0_receipt, event="pull_request"),
+                ),
+                (
+                    "failed run conclusion",
+                    _receipt_run_catalog(g0_receipt, conclusion="failure"),
+                ),
+                (
+                    "head sha mismatch",
+                    _receipt_run_catalog(g0_receipt, head_sha="0" * 40),
+                ),
+                (
+                    "wrong job name",
+                    _receipt_run_catalog(g0_receipt, job_name="integrity"),
+                ),
+                (
+                    "failed job conclusion",
+                    _receipt_run_catalog(g0_receipt, job_conclusion="failure"),
+                ),
+            ]
+            for index, (name, catalog) in enumerate(github_negatives):
+                negative_bin = external / f"fake-gh-negative-{index}"
+                _write_fake_gh(negative_bin, catalog)
+                negative_env = dict(os.environ)
+                negative_env["GH_TOKEN"] = "self-test-token"
+                negative_env["PATH"] = (
+                    f"{negative_bin}{os.pathsep}{os.environ['PATH']}"
+                )
+                negative_codes, negative_receipt = authorize(
+                    g1_document,
+                    g1_evidence_file,
+                    external / f"receipt-gh-negative-{index}.json",
+                    negative_env,
+                    job_id="457",
+                )
+                checks += 1
+                if (
+                    negative_receipt is not None
+                    or "E_RECEIPT_GITHUB" not in negative_codes
+                ):
+                    print(
+                        f"SELF-TEST FAIL: {name} escaped the GitHub receipt "
+                        f"verification: {sorted(negative_codes)}"
+                    )
+                    return 1
+
+            # Missing API token fails closed.
+            tokenless_env = dict(os.environ)
+            tokenless_env.pop("GH_TOKEN", None)
+            tokenless_env.pop("GITHUB_TOKEN", None)
+            tokenless_env["PATH"] = (
+                f"{fake_gh_bin}{os.pathsep}{os.environ['PATH']}"
+            )
+            tokenless_codes, tokenless_receipt = authorize(
+                g1_document,
+                g1_evidence_file,
+                external / "receipt-tokenless.json",
+                tokenless_env,
+                job_id="457",
+            )
+            checks += 1
+            if (
+                tokenless_receipt is not None
+                or "E_RECEIPT_GITHUB" not in tokenless_codes
+            ):
+                print(
+                    "SELF-TEST FAIL: missing GitHub token escaped the "
+                    "receipt verification: "
+                    f"{sorted(tokenless_codes)}"
+                )
+                return 1
+
+            g1_receipt_versioned = subject_repo / Path(
+                f"quality/authorizations/G1/{subject_commit}/"
+                "1000-attempt1/GateAuthorization.json"
+            )
+            g1_receipt_versioned.parent.mkdir(parents=True, exist_ok=True)
+            g1_receipt_versioned.write_bytes(g1_receipt_out.read_bytes())
+            g1_receipt_ref = _receipt_reference(g1_receipt_versioned, subject_repo)
+            g1_evidence_ref = {
+                "gateId": "G1",
+                "evidencePath": g1_document["attempt"]["evidencePath"],
+                "sha256": sha256_file(g1_evidence_file),
+            }
+
+            g2_document = _derive_gate_document(
+                trusted_document,
+                "G2",
+                g1_evidence_ref,
+                [g0_receipt_ref, g1_receipt_ref],
+            )
+            g2_evidence_file = _write_attempt_files(subject_repo, g2_document)
+
+            def g2_with_receipts(receipt_refs: list[dict[str, Any]]) -> set[str]:
+                candidate = copy.deepcopy(g2_document)
+                candidate["priorGateReceipts"] = receipt_refs
+                return chain_codes(candidate, g2_evidence_file)
+
+            # Negative: a chain with a gap fails closed.
+            checks += 1
+            if "E_RECEIPT_CHAIN" not in g2_with_receipts([g0_receipt_ref]):
+                print("SELF-TEST FAIL: receipt chain with a gap was accepted")
+                return 1
+
+            # Negative: a swapped chain order fails closed.
+            checks += 1
+            if "E_RECEIPT_CHAIN" not in g2_with_receipts(
+                [g1_receipt_ref, g0_receipt_ref]
+            ):
+                print("SELF-TEST FAIL: swapped receipt chain was accepted")
+                return 1
+
+            # Negative: a receipt from the wrong gate fails closed.
+            wrong_gate_receipt = dict(g0_receipt, runAttempt=3)
+            wrong_gate_path = subject_repo / Path(
+                f"quality/authorizations/G0/{subject_commit}/"
+                "999-attempt3/GateAuthorization.json"
+            )
+            wrong_gate_path.parent.mkdir(parents=True, exist_ok=True)
+            wrong_gate_path.write_text(
+                json.dumps(wrong_gate_receipt, indent=2) + "\n", encoding="utf-8"
+            )
+            checks += 1
+            if "E_RECEIPT_CHAIN" not in g2_with_receipts(
+                [
+                    g0_receipt_ref,
+                    dict(
+                        _receipt_reference(wrong_gate_path, subject_repo),
+                        gateId="G1",
+                    ),
+                ]
+            ):
+                print("SELF-TEST FAIL: wrong-gate receipt was accepted")
+                return 1
+
+            # Negative: run ids must be unique across the chain.
+            reused_run_receipt = dict(g1_receipt, runId="999", runAttempt=2)
+            reused_run_path = subject_repo / Path(
+                f"quality/authorizations/G1/{subject_commit}/"
+                "999-attempt2/GateAuthorization.json"
+            )
+            reused_run_path.parent.mkdir(parents=True, exist_ok=True)
+            reused_run_path.write_text(
+                json.dumps(reused_run_receipt, indent=2) + "\n", encoding="utf-8"
+            )
+            checks += 1
+            if "E_RECEIPT_RUN_ID" not in g2_with_receipts(
+                [g0_receipt_ref, _receipt_reference(reused_run_path, subject_repo)]
+            ):
+                print("SELF-TEST FAIL: reused run id in the chain was accepted")
+                return 1
+
+            # Negative: a receipt bound to a foreign evidence hash fails.
+            tampered_receipt = dict(g0_receipt, evidenceSha256="0" * 64)
+            g0_receipt_versioned.write_text(
+                json.dumps(tampered_receipt, indent=2) + "\n", encoding="utf-8"
+            )
+            tampered_g1 = _derive_gate_document(
+                trusted_document,
+                "G1",
+                g0_evidence_ref,
+                [_receipt_reference(g0_receipt_versioned, subject_repo)],
+            )
+            checks += 1
+            if "E_RECEIPT_EVIDENCE" not in chain_codes(
+                tampered_g1, g1_evidence_file
+            ):
+                print(
+                    "SELF-TEST FAIL: receipt with a foreign evidence hash "
                     "was accepted"
                 )
                 return 1
-            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(context_raw)
+            g0_receipt_versioned.write_bytes(g0_receipt_original)
 
-            # A "locally created" predecessor: the on-disk G0 evidence does not
-            # match the CI-attested chain entry, so authorization must fail.
-            local_prior = subject_repo / Path(
-                trusted_document["attempt"]["evidencePath"].replace(
-                    "/G0/", "/G0-local/"
-                )
+            # Negative: a receipt from a foreign subject fails closed.
+            foreign_subject_receipt = dict(
+                g0_receipt, subjectCommitSha="0" * 40, subjectTreeSha="0" * 40
             )
-            local_prior.parent.mkdir(parents=True, exist_ok=True)
-            local_prior_document = {
-                "gateId": "G0",
-                "subject": dict(trusted_document["subject"]),
-                "verdict": {"result": "pass"},
-                "ci": {
-                    "runId": "777",
-                    "jobId": "888",
-                    "attestationArtifact": {"sha256": "a" * 64},
-                },
-                "reviewer": {"reviewArtifact": {"sha256": "b" * 64}},
-            }
-            local_prior_raw = json.dumps(local_prior_document).encode("utf-8")
-            local_prior.write_bytes(local_prior_raw)
-            g1_context = strict_load(trusted_context_path)
-            g1_current = dict(g1_context["authorizedEvidence"][0], gateId="G1")
-            g1_context["authorizedEvidence"] = [
-                dict(
-                    g1_current,
-                    gateId="G0",
-                    evidencePath=local_prior.relative_to(
-                        subject_repo
-                    ).as_posix(),
-                    evidenceSha256=sha256_bytes(local_prior_raw),
-                ),
-                g1_current,
-            ]
-            g1_path = external / "trust-context-local-prior.json"
-            g1_raw = json.dumps(g1_context).encode("utf-8")
-            g1_path.write_bytes(g1_raw)
-            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(g1_raw)
-            g1_document = copy.deepcopy(trusted_document)
-            g1_document["gateId"] = "G1"
-            g1_errors: list[tuple[str, str]] = []
-            _validate_trust_context(
-                g1_path,
-                g1_document,
-                trusted_evidence,
-                subject_repo,
-                g1_errors,
-                gate_id="G1",
+            foreign_path = subject_repo / Path(
+                f"quality/authorizations/G0/{'0' * 40}/"
+                "999-attempt1/GateAuthorization.json"
+            )
+            foreign_path.parent.mkdir(parents=True, exist_ok=True)
+            foreign_path.write_text(
+                json.dumps(foreign_subject_receipt, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            foreign_g1 = _derive_gate_document(
+                trusted_document,
+                "G1",
+                g0_evidence_ref,
+                [_receipt_reference(foreign_path, subject_repo)],
             )
             checks += 1
-            if "E_AUTHORIZATION_CHAIN" not in {code for code, _ in g1_errors}:
+            if "E_RECEIPT_SUBJECT" not in chain_codes(
+                foreign_g1, g1_evidence_file
+            ):
+                print("SELF-TEST FAIL: foreign-subject receipt was accepted")
+                return 1
+
+            # D-066: scenario profiles and thresholds come from the trusted
+            # tool checkout, never from the subject. A tightened trusted
+            # threshold governs the evaluation even when the subject
+            # contract still allows the samples.
+            trusted_contract_path = trusted_repo / Path(
+                "quality/scenarios/mvp-v1.json"
+            )
+            original_contract = trusted_contract_path.read_bytes()
+            tightened = strict_load(trusted_contract_path)
+            tightened["scenarios"][0]["thresholds"]["latencyMs"]["maximum"] = 0.5
+            trusted_contract_path.write_text(
+                json.dumps(tightened, indent=2) + "\n", encoding="utf-8"
+            )
+            tightened_head = _git_commit_all(trusted_repo, "tighten threshold")
+            tightened_document = copy.deepcopy(trusted_document)
+            tightened_bundle = tightened_document["trustBundle"]
+            tightened_bundle["trustedCommitSha"] = tightened_head
+            tightened_bundle["components"]["scenarioContract"]["trustedSha256"] = (
+                sha256_file(trusted_contract_path)
+            )
+            tightened_codes = {
+                code
+                for code, _ in validate_document(
+                    tightened_document,
+                    trusted_evidence,
+                    root=subject_repo,
+                    verify_files=True,
+                    verify_git=True,
+                    trusted_checkout=trusted_repo,
+                    require_trust=False,
+                )
+            }
+            checks += 1
+            if "E_SCENARIO_THRESHOLD" not in tightened_codes:
                 print(
-                    "SELF-TEST FAIL: locally created predecessor escaped the "
-                    "authorization chain"
+                    "SELF-TEST FAIL: subject contract thresholds overruled "
+                    "the trusted checkout: "
+                    f"{sorted(tightened_codes)}"
                 )
                 return 1
-            os.environ["NOVA_TRUST_CONTEXT_SHA256"] = sha256_bytes(context_raw)
+
+            # A drifted contract digest (evidence produced against another
+            # contract stand) fails authorization closed.
+            drifted = strict_load(trusted_contract_path)
+            drifted["scenarios"][0]["thresholds"]["latencyMs"]["maximum"] = 5.0
+            trusted_contract_path.write_text(
+                json.dumps(drifted, indent=2) + "\n", encoding="utf-8"
+            )
+            drifted_head = _git_commit_all(trusted_repo, "drift threshold")
+            drifted_document = copy.deepcopy(trusted_document)
+            drifted_bundle = drifted_document["trustBundle"]
+            drifted_bundle["trustedCommitSha"] = drifted_head
+            drifted_bundle["components"]["scenarioContract"]["trustedSha256"] = (
+                sha256_file(trusted_contract_path)
+            )
+            drifted_env = dict(os.environ)
+            drifted_env.update(_harness_github_environment(drifted_head))
+            drifted_codes, drifted_receipt = authorize(
+                drifted_document,
+                trusted_evidence,
+                external / "receipt-drifted-contract.json",
+                drifted_env,
+            )
+            checks += 1
+            if (
+                drifted_receipt is not None
+                or "E_SCENARIO_CONTRACT" not in drifted_codes
+            ):
+                print(
+                    "SELF-TEST FAIL: evidence against a drifted scenario "
+                    "contract was authorized: "
+                    f"{sorted(drifted_codes)}"
+                )
+                return 1
+            trusted_contract_path.write_bytes(original_contract)
+            _git_commit_all(trusted_repo, "restore contract")
 
         with tempfile.TemporaryDirectory() as temp:
             try:
                 (
                     weakened_document,
                     weakened_evidence,
-                    weakened_context_path,
                     weakened_subject,
                     weakened_trusted,
-                    weakened_context_raw,
                 ) = _build_trusted_harness(
                     fixture,
                     Path(temp),
@@ -3889,7 +4732,6 @@ def run_self_test() -> int:
             except (OSError, ValueError) as error:
                 print(f"SELF-TEST FAIL: cannot build trusted harness: {error}")
                 return 1
-            os.environ.update(_harness_environment(weakened_context_raw))
             weakened_codes = {
                 code
                 for code, _ in validate_document(
@@ -3901,7 +4743,6 @@ def run_self_test() -> int:
                     profiles=profiles,
                     scenario_definitions=scenarios,
                     scenario_methods=methods,
-                    trust_context_path=weakened_context_path,
                     trusted_checkout=weakened_trusted,
                     require_trust=True,
                 )
@@ -3976,7 +4817,6 @@ def run_self_test() -> int:
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = previous
-
     with tempfile.TemporaryDirectory() as temp:
         duplicate_path = Path(temp) / "duplicate.json"
         duplicate_path.write_text('{"a":1,"a":2}', encoding="utf-8")
@@ -4001,155 +4841,222 @@ def run_self_test() -> int:
 
 
 def run_self_test_topology() -> int:
-    """End-to-end CLI controls for the trusted/subject topology (D-064).
+    """End-to-end CLI controls for the trusted/subject topology (D-066).
 
     Unlike the in-process controls above, these cases invoke the validator
     exactly like the protected workflow does: the script runs from the
     trusted tool checkout and learns the subject repository only via
-    ``--subject-root``.
+    ``--subject-root``. The ``--authorize`` mode is exercised with and
+    without the protected GitHub Actions runtime environment.
     """
 
     fixture, _, _, _, _ = _self_test_fixture()
     checks = 0
-    environment_names = (
-        "GITHUB_ACTIONS",
-        "GITHUB_REPOSITORY",
-        "GITHUB_RUN_ID",
-        "GITHUB_RUN_ATTEMPT",
-        "GITHUB_JOB",
-        "GITHUB_WORKFLOW_REF",
-        "NOVA_TRUST_CONTEXT_SHA256",
-        "GH_TOKEN",
-        "GITHUB_TOKEN",
-    )
-    saved_environment = {name: os.environ.get(name) for name in environment_names}
-    try:
-        with tempfile.TemporaryDirectory() as temp:
-            harness_root = Path(temp)
-            try:
-                (
-                    document,
-                    evidence_file,
-                    context_path,
-                    subject_repo,
-                    trusted_repo,
-                    context_raw,
-                ) = _build_trusted_harness(fixture, harness_root)
-            except (OSError, ValueError) as error:
-                print(f"SELF-TEST-TOPOLOGY FAIL: cannot build harness: {error}")
-                return 1
-            del document
-            environment = os.environ.copy()
-            environment.update(_harness_environment(context_raw))
-            environment["PYTHONDONTWRITEBYTECODE"] = "1"
-            validator = trusted_repo / "quality/scripts/validate_gate_evidence.py"
+    with tempfile.TemporaryDirectory() as temp:
+        harness_root = Path(temp)
+        try:
+            (
+                document,
+                evidence_file,
+                subject_repo,
+                trusted_repo,
+            ) = _build_trusted_harness(fixture, harness_root)
+        except (OSError, ValueError) as error:
+            print(f"SELF-TEST-TOPOLOGY FAIL: cannot build harness: {error}")
+            return 1
+        del document
+        trusted_commit = _git("rev-parse", "HEAD", root=trusted_repo)
+        _git_commit_all(subject_repo, "version g0 evidence")
+        base_environment = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith("GITHUB_")
+        }
+        base_environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        validator = trusted_repo / "quality/scripts/validate_gate_evidence.py"
 
-            def run_cli(*cli_arguments: str) -> subprocess.CompletedProcess[str]:
-                return subprocess.run(
-                    [sys.executable, str(validator), *cli_arguments],
-                    cwd=harness_root,
-                    env=environment,
-                    check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=180,
-                )
-
-            checks += 1
-            fail_closed = run_cli(
-                "--trusted-tool-checkout",
-                str(trusted_repo),
-                "--subject-root",
-                str(subject_repo),
-                "--trust-context",
-                str(context_path),
-                str(evidence_file),
-            )
-            if (
-                fail_closed.returncode == 0
-                or "E_AUTHORIZATION_BOOTSTRAP" not in fail_closed.stdout
-            ):
-                print(
-                    "SELF-TEST-TOPOLOGY FAIL: retired trust context escaped "
-                    f"the D-066 bootstrap lock:\n{fail_closed.stdout}"
-                )
-                return 1
-
-            checks += 1
-            same_root = run_cli(
-                "--trusted-tool-checkout",
-                str(subject_repo),
-                "--subject-root",
-                str(subject_repo),
-                "--trust-context",
-                str(context_path),
-                str(evidence_file),
-            )
-            if same_root.returncode == 0 or "E_TRUSTED_TOOL" not in same_root.stdout:
-                print(
-                    "SELF-TEST-TOPOLOGY FAIL: identical trusted/subject root "
-                    "was accepted"
-                )
-                return 1
-
-            staged = trusted_repo / "quality/evidence/G0/staged/GateEvidence.json"
-            staged.parent.mkdir(parents=True, exist_ok=True)
-            staged.write_text("{}\n", encoding="utf-8")
-            try:
-                checks += 1
-                dirty = run_cli(
-                    "--trusted-tool-checkout",
-                    str(trusted_repo),
-                    "--subject-root",
-                    str(subject_repo),
-                    "--trust-context",
-                    str(context_path),
-                    str(evidence_file),
-                )
-                if dirty.returncode == 0 or "E_TRUSTED_TOOL" not in dirty.stdout:
-                    print(
-                        "SELF-TEST-TOPOLOGY FAIL: staged untracked evidence "
-                        "inside the trusted checkout was accepted"
-                    )
-                    return 1
-            finally:
-                staged.unlink()
-
-            checks += 1
-            default_root = subprocess.run(
-                [
-                    sys.executable,
-                    str(validator),
-                    "--trusted-tool-checkout",
-                    str(trusted_repo),
-                    "--trust-context",
-                    str(context_path),
-                    str(evidence_file),
-                ],
-                cwd=trusted_repo,
-                env=environment,
+        def run_cli(
+            *cli_arguments: str, env: dict[str, str] | None = None
+        ) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, str(validator), *cli_arguments],
+                cwd=harness_root,
+                env=base_environment if env is None else env,
                 check=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 timeout=180,
             )
-            if (
-                default_root.returncode == 0
-            ):
+
+        checks += 1
+        fail_closed = run_cli(
+            "--trusted-tool-checkout",
+            str(trusted_repo),
+            "--subject-root",
+            str(subject_repo),
+            str(evidence_file),
+        )
+        if (
+            fail_closed.returncode == 0
+            or "E_AUTHORIZATION_BOOTSTRAP" not in fail_closed.stdout
+        ):
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: local pass escaped the D-066 "
+                f"bootstrap lock:\n{fail_closed.stdout}"
+            )
+            return 1
+
+        checks += 1
+        same_root = run_cli(
+            "--trusted-tool-checkout",
+            str(subject_repo),
+            "--subject-root",
+            str(subject_repo),
+            str(evidence_file),
+        )
+        if same_root.returncode == 0 or "E_TRUSTED_TOOL" not in same_root.stdout:
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: identical trusted/subject root "
+                "was accepted"
+            )
+            return 1
+
+        staged = trusted_repo / "quality/evidence/G0/staged/GateEvidence.json"
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        staged.write_text("{}\n", encoding="utf-8")
+        try:
+            checks += 1
+            dirty = run_cli(
+                "--trusted-tool-checkout",
+                str(trusted_repo),
+                "--subject-root",
+                str(subject_repo),
+                str(evidence_file),
+            )
+            if dirty.returncode == 0 or "E_TRUSTED_TOOL" not in dirty.stdout:
                 print(
-                    "SELF-TEST-TOPOLOGY FAIL: missing --subject-root did not "
-                    "fail closed"
+                    "SELF-TEST-TOPOLOGY FAIL: staged untracked evidence "
+                    "inside the trusted checkout was accepted"
                 )
                 return 1
+        finally:
+            staged.unlink()
 
-    finally:
-        for name, previous in saved_environment.items():
-            if previous is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = previous
+        checks += 1
+        default_root = subprocess.run(
+            [
+                sys.executable,
+                str(validator),
+                "--trusted-tool-checkout",
+                str(trusted_repo),
+                str(evidence_file),
+            ],
+            cwd=trusted_repo,
+            env=base_environment,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=180,
+        )
+        if (
+            default_root.returncode == 0
+        ):
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: missing --subject-root did not "
+                "fail closed"
+            )
+            return 1
+
+        checks += 1
+        no_runtime = run_cli(
+            "--authorize",
+            "--trusted-tool-checkout",
+            str(trusted_repo),
+            "--subject-root",
+            str(subject_repo),
+            "--job-id",
+            "456",
+            "--receipt-out",
+            str(harness_root / "external/receipt-no-runtime.json"),
+            str(evidence_file),
+        )
+        if (
+            no_runtime.returncode == 0
+            or "E_TRUST_CONTEXT" not in no_runtime.stdout
+        ):
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: --authorize outside the "
+                f"protected runtime did not fail closed:\n"
+                f"{no_runtime.stdout}"
+            )
+            return 1
+
+        wrong_job_environment = {
+            **base_environment,
+            **_harness_github_environment(trusted_commit),
+            "GITHUB_JOB": "integrity",
+        }
+        checks += 1
+        wrong_job = run_cli(
+            "--authorize",
+            "--trusted-tool-checkout",
+            str(trusted_repo),
+            "--subject-root",
+            str(subject_repo),
+            "--job-id",
+            "456",
+            "--receipt-out",
+            str(harness_root / "external/receipt-wrong-job.json"),
+            str(evidence_file),
+            env=wrong_job_environment,
+        )
+        if (
+            wrong_job.returncode == 0
+            or "E_TRUST_CONTEXT" not in wrong_job.stdout
+        ):
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: --authorize from a non-authorize "
+                f"job did not fail closed:\n{wrong_job.stdout}"
+            )
+            return 1
+
+        authorize_environment = dict(
+            base_environment,
+            **_harness_github_environment(trusted_commit),
+        )
+        receipt_out = harness_root / "external/GateAuthorization.json"
+        checks += 1
+        authorized = run_cli(
+            "--authorize",
+            "--trusted-tool-checkout",
+            str(trusted_repo),
+            "--subject-root",
+            str(subject_repo),
+            "--job-id",
+            "456",
+            "--receipt-out",
+            str(receipt_out),
+            str(evidence_file),
+            env=authorize_environment,
+        )
+        if authorized.returncode != 0:
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: protected --authorize did not "
+                f"emit a receipt:\n{authorized.stdout}"
+            )
+            return 1
+        if (
+            not receipt_out.is_file()
+            or "gate-authorization-v1" not in receipt_out.read_text()
+        ):
+            print(
+                "SELF-TEST-TOPOLOGY FAIL: protected --authorize wrote no "
+                "receipt candidate"
+            )
+            return 1
+
 
     print(f"OK: {checks} Topologie-End-to-End-Kontrollen bestanden.")
     return 0
@@ -4172,20 +5079,43 @@ def main() -> int:
         ),
     )
     parser.add_argument(
-        "--trust-context",
+        "--authorize",
+        action="store_true",
+        help=(
+            "protected two-phase authorization (D-066): validate the evidence "
+            "completely, bind the GitHub Actions runtime environment and "
+            "write the GateAuthorization.json receipt candidate; requires "
+            "--trusted-tool-checkout, --receipt-out and --job-id and fails "
+            "closed outside the protected runtime"
+        ),
+    )
+    parser.add_argument(
+        "--receipt-out",
         type=Path,
         help=(
-            "retired D-065 context input kept for fail-closed regression "
-            "tests; it cannot authorize verdict=pass under D-066"
+            "output path for the GateAuthorization.json receipt candidate "
+            "(only with --authorize); version it unchanged under "
+            f"{RECEIPT_PATH_CONVENTION}"
         ),
+    )
+    parser.add_argument(
+        "--job-id",
+        help=(
+            "numeric GitHub job id of the protected authorize job "
+            "(only with --authorize)"
+        ),
+    )
+    parser.add_argument(
+        "--notes",
+        default=None,
+        help="optional free-text note embedded in the emitted receipt",
     )
     parser.add_argument(
         "--trusted-tool-checkout",
         type=Path,
         help=(
-            "subject-independent trusted tool checkout (schema, validators, "
-            "pinned npm dependencies); validates integrity but cannot "
-            "authorize verdict=pass until G0-A2"
+            "subject-independent trusted tool checkout (schemas, validators, "
+            "pinned npm dependencies); mandatory for --authorize"
         ),
     )
     parser.add_argument(
@@ -4194,9 +5124,8 @@ def main() -> int:
         default=ROOT,
         help=(
             "subject repository root the evidence belongs to; defaults to "
-            "the repository containing this script. In the protected "
-            "workflow the script runs from the trusted checkout, so the "
-            "subject must be passed explicitly"
+            "the repository containing this script. Pass it explicitly when "
+            "this script runs from a checkout other than the subject"
         ),
     )
     arguments = parser.parse_args()
@@ -4207,6 +5136,43 @@ def main() -> int:
         return run_self_test_topology()
     if not arguments.evidence:
         parser.error("provide at least one GateEvidence.json or use --self-test")
+
+    if arguments.authorize:
+        if len(arguments.evidence) != 1:
+            parser.error("--authorize validates exactly one GateEvidence.json")
+        if arguments.trusted_tool_checkout is None:
+            parser.error("--authorize requires --trusted-tool-checkout")
+        if arguments.receipt_out is None:
+            parser.error("--authorize requires --receipt-out")
+        if not arguments.job_id:
+            parser.error("--authorize requires --job-id")
+        evidence_path = arguments.evidence[0]
+        try:
+            document = strict_load(evidence_path)
+        except (OSError, StrictJsonError) as error:
+            print(f"{evidence_path}: E_STRICT_JSON: {error}")
+            return 1
+        errors, receipt = authorize_evidence(
+            document,
+            evidence_path,
+            root=arguments.subject_root,
+            trusted_checkout=arguments.trusted_tool_checkout,
+            receipt_out=arguments.receipt_out,
+            job_id=arguments.job_id,
+            notes=arguments.notes,
+        )
+        if errors or receipt is None:
+            for code, message in errors:
+                print(f"{evidence_path}: {code}: {message}")
+            return 1
+        conventional_path = (
+            f"quality/authorizations/{receipt['gateId']}/"
+            f"{receipt['subjectCommitSha']}/{receipt['runId']}-attempt"
+            f"{receipt['runAttempt']}/GateAuthorization.json"
+        )
+        print(f"RECEIPT EMITTED: {arguments.receipt_out}")
+        print(f"RECEIPT VERSION PATH: {conventional_path}")
+        return 0
 
     failed = False
     for path in arguments.evidence:
@@ -4220,7 +5186,6 @@ def main() -> int:
             document,
             path,
             root=arguments.subject_root,
-            trust_context_path=arguments.trust_context,
             trusted_checkout=arguments.trusted_tool_checkout,
         )
         if errors:

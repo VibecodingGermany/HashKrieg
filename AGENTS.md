@@ -17,7 +17,7 @@ auch wenn viele verschiedene Agenten-Sessions daran arbeiten.
 **Unity `6000.5.4f1` (Revision `d550df8bd089`), C# und URP**. Das Repository
 enthält einen unvollständig integrierten Prototyp und ein strukturiertes Wiki
 unter [`docs/`](docs/). Aktiver Stand ist Sprint 7, Implementierungs-Recovery:
-G0 ist offen, MS-0 und MS-1 sind nicht erreicht. Führend sind D-055 bis D-064,
+G0 ist offen, MS-0 und MS-1 sind nicht erreicht. Führend sind D-055 bis D-066,
 der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md) und das
 [MVP-Inhaltsmanifest](docs/production/MVPContentManifest.md).
 
@@ -26,7 +26,8 @@ der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md) und das
 1. **`main` ist geschützt – Veröffentlichung ausschließlich über Pull Requests.** Direkte
    Pushes auf `main` sind technisch gesperrt (GitHub Branch Protection) und für niemanden
    erlaubt – auch nicht nach einem Versionsbump. Jede Änderung: kurzer Topic-Branch →
-   Pull Request → grüne CI (`docs-check`, nach G0 zusätzlich `quality-gate`) →
+   Pull Request → grüne CI (`docs-check`, bei Quality-Verträgen zusätzlich
+   `integrity`; Authorize erst nach G0-A2) →
    unabhängiges Review → Squash-Merge.
    Es gibt keinen dauerhaften Integrationsbranch. Agenten committen oder pushen
    nur nach einer **ausdrücklichen Anfrage für die jeweilige Aktion**. Details:
@@ -49,10 +50,11 @@ der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md) und das
    append-only unter dem in D-061 definierten Pfad.
 8. **Kleine, fokussierte Änderungen.** Ein Commit = eine logische Änderung. Keine
    Sammel-Commits über mehrere unabhängige Themen.
-9. **Gate-Autorisierung bleibt fail-closed.** Schema 1.2 prüft nur Integrität
-   und darf keinen Pass autorisieren. Zuerst wird G0-A
-   Trusted-Gate-Bootstrap ohne Gate-Fortschritt gemergt; erst ein
-   nachfolgender sauberer Subject-Commit darf mit Schema 1.3 G0 belegen.
+9. **Gate-Autorisierung bleibt fail-closed.** Schema 1.2/1.3 und G0-A1
+   prüfen nur Integrität und dürfen keinen Pass autorisieren. G0-A2 muss
+   Subject, Evidence-Carrier und Trusted Tooling trennen und abgeschlossene
+   Authorize-Läufe über append-only Receipts binden. Erst ein nachfolgender
+   sauberer Subject-Commit darf damit G0 belegen.
 
 ## 3. Repository-Struktur (Schreibhoheiten)
 
@@ -76,7 +78,7 @@ docs/
 quality/
 ├── content/          ← kanonisches, maschinenlesbares MS-1-Manifest
 ├── scenarios/        ← kanonische Workloads und Schwellen
-├── schemas/          ← Schema 1.2 integritäts-only; Schema 1.3 ist G0-A-Ziel
+├── schemas/          ← Evidence-Schema 1.4 + GateAuthorization-Receipt-Schema (G0-A2)
 ├── scripts/          ← verpflichtende, aktuell fail-closed Schema-/Semantikprüfung
 └── package-lock.json ← gepinnte Evidence-Validator-Abhängigkeiten
 ```
@@ -142,9 +144,9 @@ Regeln:
 - Titel im Conventional-Commit-Stil; Beschreibung listet: Was, Warum, betroffene
   Dokumente, geänderte Entscheidungen (D-IDs), Changelog-Eintrag.
 - Bei sprintabschließenden PRs: Sprint-Bericht verlinken.
-- **Merge nach `main` nur per PR mit grüner CI:** `docs-check` und, sobald
-  G0-A/G0-B den Trustpfad an einem späteren sauberen Subject real bewiesen
-  haben, `quality-gate`.
+- **Merge nach `main` nur per PR mit grüner CI:** `docs-check`, bei
+  Quality-Verträgen `integrity` und nach realem G0-A2 zusätzlich der
+  geschützte Authorize-Pfad.
 - Im Solo-/KI-Modus ersetzt ein unabhängiges read-only Review die
   Autoren-Selbstfreigabe. Sobald mindestens zwei aktive menschliche Maintainer
   existieren, ist eine zweite menschliche Freigabe Pflicht.
@@ -193,14 +195,13 @@ Eine Änderung ist erst „fertig", wenn **alle** Punkte erfüllt sind:
 - [ ] Entscheidung? → im [DecisionLog](docs/production/DecisionLog.md) mit ≥3 Alternativen
 - [ ] Eintrag unter `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
 - [ ] Interne Links geprüft (keine toten relativen Links; CI `docs-check` grün)
-- [ ] Aktuelle Schema-1.2-Evidence? → gepinntes Ajv **und**
+- [ ] Aktuelle Schema-Evidence? → gepinntes Ajv **und**
       `quality/scripts/validate_gate_evidence.py` prüfen nur Integrität; jeder
       Pass-Versuch endet zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`
-- [ ] Gate-Pass? → erst nach zweistufigem G0-A-Bootstrap mit Schema 1.3 aus
-      subject-unabhängigem Trusted-Tool-Checkout an einem späteren sauberen
-      Subject autorisiert
-- [ ] Gate-Kette? → vollständige geordnete `authorizedEvidence`-Kette von G0
-      bis zum aktuellen Gate samt Evidence-Hash, Subject, CI und Review belegt
+- [ ] Gate-Pass? → erst nach G0-A2 mit getrenntem Subject-, Evidence-Carrier-
+      und Trusted-Tool-Commit an einem späteren sauberen Subject autorisiert
+- [ ] Gate-Kette? → vollständige geordnete Receipt-Kette von G0 bis zum
+      aktuellen Gate samt Evidence-Hash, Subject, Carrier, CI und Review belegt
 - [ ] Performance-Evidence? → Command und Messung referenzieren dieselbe
       `environmentId`; Windows-x64-Referenz und Mac-M2-Funktionstest verwenden
       getrennte Methodenprofile
@@ -246,3 +247,5 @@ gh pr create --fill --base main
 | 3.2.0 | 2026-07-24 | D-062-Same-Subject-Vorgängergate-Kette und Szenarioschwellen in Status und DoD verankert | Orchestrator |
 | 3.3.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust in Governance/DoD verankert | Orchestrator |
 | 3.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Gate-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Orchestrator |
+| 3.5.0 | 2026-07-25 | D-066: G0-A1-Integrity von G0-A2-Receipt-Autorisierung getrennt und `integrity` als Quality-Vertragscheck verankert | Orchestrator |
+| 3.6.0 | 2026-07-25 | G0-A2-Umsetzungsstand: Schema-Verzeichnis auf Evidence 1.4 plus GateAuthorization-Receipt-Schema aktualisiert | Orchestrator |

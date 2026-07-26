@@ -1,6 +1,6 @@
 # Sprint-Planung
 
-**Version:** 2.4.0 | **Status:** Sprint 7 gestartet – G0-A aktiv | **Verantwortungsbereich:** Executive Producer / Producer / Project Owner | **Sprint:** 7
+**Version:** 2.5.0 | **Status:** Sprint 7 gestartet – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Producer / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -10,7 +10,7 @@ schema- und semantikvalide Evidenz erreicht.
 
 ## Abhängigkeiten
 
-- [DecisionLog.md](DecisionLog.md) – D-055 bis D-064
+- [DecisionLog.md](DecisionLog.md) – D-055 bis D-066
 - [MVPRecoveryPlan.md](MVPRecoveryPlan.md) – führender Sprint-7-Ablauf
 - [Milestones.md](Milestones.md) – MS-0/MS-1
 - [RiskAnalysis.md](RiskAnalysis.md)
@@ -26,25 +26,26 @@ schema- und semantikvalide Evidenz erreicht.
 | 3 | Technical Design | technische Zielarchitektur | abgeschlossen |
 | 4 | Architecture Review | Review-Befunde und D-043–D-052 | abgeschlossen |
 | 5 | Asset Audit | Register, Lizenzen, Beschaffungsstrategie | abgeschlossen |
-| 6 | Produktionsplanung | alte Abschlussbehauptung widerrufen; durch D-055 beendet und mit D-056–D-064 ersetzt | **beendet / ersetzt** |
-| 7 | Implementierungs-Recovery | Gates G0–G5 ohne Statusvorgriff | **gestartet – G0-A aktiv** |
+| 6 | Produktionsplanung | alte Abschlussbehauptung widerrufen; durch D-055 beendet und mit D-056–D-066 ersetzt | **beendet / ersetzt** |
+| 7 | Implementierungs-Recovery | Gates G0–G5 ohne Statusvorgriff | **gestartet – G0-A1 Mergekandidat, G0-A2 offen** |
 
 ## Sprint 7 – Arbeitsvertrag
 
-Sprint 7 arbeitet strikt sequenziell:
+Sprint 7 schließt Gates in dieser Reihenfolge:
 
-1. G0-A subject-unabhängiger Trusted-Gate-Bootstrap,
-2. G0-B reproduzierbare Plattform,
-3. G1 kanonischer Kern und V1–V5a,
-4. G2 Player-Graybox-Kern,
-5. G3 KI/Fortsetzung/V5b,
-6. G4 exakter Produktionsumfang und
-7. G5 eingefrorene Abnahme.
+1. G0-A1 integrity-only Trusted-Gate-Grundlage,
+2. G0-A2 zweiphasiger Receipt-Authorizer,
+3. G0-B reproduzierbare Plattform,
+4. G1 kanonischer Kern und V1–V5a,
+5. G2 Player-Graybox-Kern,
+6. G3 KI/Fortsetzung/V5b,
+7. G4 exakter Produktionsumfang und
+8. G5 eingefrorene Abnahme.
 
-Sprint 7 ist gestartet. Aktuell ist ausschließlich G0-A zur Implementierung
-freigegeben. Der Begriff
-„freigegeben“ bezeichnet Arbeitsscope, nicht ein bestandenes Gate. MS-0 und
-MS-1 sind nicht erreicht.
+Sprint 7 ist gestartet. G0-A1 ist Mergekandidat, G0-A2 bleibt blockierende
+Folgearbeit. G0-B-Code darf parallel vorbereitet werden, aber erst nach
+G0-A2 einen Gate-Status beanspruchen. „Freigegeben“ bezeichnet Arbeitsscope,
+nicht ein bestandenes Gate. MS-0 und MS-1 sind nicht erreicht.
 
 ## Sprint-Abschluss-Ritual
 
@@ -58,13 +59,12 @@ MS-1 sind nicht erreicht.
 8. Sprint-Bericht, Wiki-Index und `[Unreleased]`,
 9. schema- und semantikvalide Evidence für jeden beanspruchten Gate-Status.
 
-Punkt 9 verlangt nach G0-A Schema 1.3, kriterienspezifische Check-Artefakte,
-subject-unabhängiges Trusted Tooling und einen externen Trust-Kontext aus dem
-geschützten `quality-gate`. Schema 1.2 ist nur Integritätsvorstufe und kann
-keinen Pass autorisieren. Der Kontext umfasst die vollständige geordnete
-Same-Subject-Gate-Kette. Performance-Schwellen werden in drei getrennten
-Läufen pro Lauf und kombiniert sowie gegen die gebundene Windows- oder
-Mac-Umgebung geprüft.
+Punkt 9 verlangt nach G0-A2 kriterienspezifische Check-Artefakte, getrennte
+Subject-/Evidence-Carrier-/Trusted-Identitäten und die vollständige
+append-only Receipt-Kette aus dem geschützten `quality-gate`. Schema 1.2/1.3
+und G0-A1 sind nur Integritätsvorstufen und können keinen Pass autorisieren.
+Performance-Schwellen werden in drei getrennten Läufen pro Lauf und
+kombiniert sowie gegen die gebundene Windows- oder Mac-Umgebung geprüft.
 
 Sobald mindestens zwei aktive menschliche Maintainer existieren, ist zusätzlich
 eine zweite menschliche Freigabe Pflicht.
@@ -77,12 +77,13 @@ eine zweite menschliche Freigabe Pflicht.
 
 ## Nächste Schritte
 
-1. Nur G0-A implementieren: Trusted-Tool-Checkout, Schema-1.3-Vertrag,
-   vollständige Autorisierungskette, Umgebungsbindung und Negative Controls.
-2. G0-A als Bootstrap-Änderung ohne Gate-Fortschritt mergen; erst der
-   nachfolgende saubere Subject-Commit darf G0-B belegen.
-3. Keine Evidence-Platzhalter und keine Vorab-Fertigmeldungen erzeugen.
-4. Erst nach bestandenem G0 zu G1 wechseln.
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 mit zweiphasigem Receipt, Umgebungsbindung und Negative Controls
+   separat implementieren und adversarial prüfen.
+3. G0-B parallel vorbereiten, aber erst nach G0-A2 am sauberen Subject
+   belegen.
+4. Keine Evidence-Platzhalter und keine Vorab-Fertigmeldungen erzeugen.
+5. Erst nach bestandenem G0 zu G1 wechseln.
 
 ## Änderungsverlauf
 
@@ -102,3 +103,4 @@ eine zweite menschliche Freigabe Pflicht.
 | 2.2.0 | 2026-07-24 | D-062-Szenarioschwellen und Same-Subject-Vorgängergate-Kette in den Sprintabschluss aufgenommen | Executive Producer / Lead QA Engineer |
 | 2.3.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trust als Sprint-7-Exit ergänzt | Executive Producer / Lead QA Engineer |
 | 2.4.0 | 2026-07-24 | D-064 Trusted-Gate-Bootstrap als G0-A vor die Plattformarbeit gestellt und Schema 1.2 für Pass-Autorisierung gesperrt | Executive Producer / Lead QA Engineer |
+| 2.5.0 | 2026-07-25 | D-066: G0-A1/G0-A2 getrennt, parallele G0-B-Vorbereitung ohne Gate-Vorgriff erlaubt und Receipt-Exit verankert | Executive Producer / Lead QA Engineer |

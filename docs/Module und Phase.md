@@ -1,6 +1,6 @@
 # Module und Phasen – tatsächlicher Implementierungsstand
 
-**Version:** 1.4.0 | **Status:** Recovery-Baseline – G0-A aktiv, Autorisierung gesperrt | **Verantwortungsbereich:** Lead Technical Director / Producer | **Sprint:** 7
+**Version:** 1.5.0 | **Status:** Recovery-Baseline – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Lead Technical Director / Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -12,7 +12,7 @@ nicht auf vorhandenen Dateien oder APIs.
 
 - [production/ImplementationAudit_2026-07-24.md](production/ImplementationAudit_2026-07-24.md)
 - [production/MVPRecoveryPlan.md](production/MVPRecoveryPlan.md)
-- [production/DecisionLog.md](production/DecisionLog.md) – D-055 bis D-064
+- [production/DecisionLog.md](production/DecisionLog.md) – D-055 bis D-066
 - [production/Milestones.md](production/Milestones.md)
 
 ## Aktueller Gesamtstatus
@@ -49,10 +49,11 @@ nicht auf vorhandenen Dateien oder APIs.
 
 Aktiver Scope ist ausschließlich
 [MVPRecoveryPlan G0-A](production/MVPRecoveryPlan.md): der
-subject-unabhängige, nicht selbstautorisierende Trusted-Gate-Bootstrap. Schema
-1.2 prüft nur Integrität und jeder Pass-Versuch bleibt mit
-`E_AUTHORIZATION_BOOTSTRAP` gesperrt. Erst nach G0-A folgt G0-B; Feature- und
-Alpha-Expansion sind bis zum bestandenen MVP-Gate G5 gestoppt.
+fail-closed Trusted-Gate-Bootstrap. G0-A1 liefert nur Integrity; jeder
+Pass-Versuch bleibt mit `E_AUTHORIZATION_BOOTSTRAP` gesperrt. G0-A2 muss den
+zweiphasigen Receipt-Authorizer ergänzen. Erst danach darf G0-B einen
+Gate-Status belegen; Feature- und Alpha-Expansion sind bis zum bestandenen
+MVP-Gate G5 gestoppt.
 
 ## Offene Punkte
 
@@ -64,12 +65,12 @@ Alpha-Expansion sind bis zum bestandenen MVP-Gate G5 gestoppt.
 
 ## Nächste Schritte
 
-1. G0-A einschließlich Gate-Runner ohne Gate-Fortschritt geschützt mergen.
-2. Am nachfolgenden sauberen Subject in G0-B roten Netzwerkpaket-Test und
-   Build-Reproduzierbarkeit beheben und erst danach dort Schema 1.3,
-   vollständige `authorizedEvidence`-Kette und `environmentId`-Bindung
-   autorisieren.
-3. G1 erst nach bestandenem G0 öffnen.
+1. G0-A1 einschließlich Gate-Runner ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 als separaten Receipt-Authorizer implementieren und prüfen.
+3. Am nachfolgenden sauberen Subject in G0-B roten Netzwerkpaket-Test und
+   Build-Reproduzierbarkeit beheben und erst danach die vollständige Receipt-
+   Kette samt `environmentId`-Bindung autorisieren.
+4. G1 erst nach bestandenem G0 öffnen.
 
 ## Änderungsverlauf
 
@@ -80,3 +81,4 @@ Alpha-Expansion sind bis zum bestandenen MVP-Gate G5 gestoppt.
 | 1.2.0 | 2026-07-24 | D-062-Same-Subject-Gate-Kette als Statusvoraussetzung ergänzt | Lead Technical Director / Producer |
 | 1.3.0 | 2026-07-24 | D-063-autorisierte Schema-1.2-Evidence als Statusvoraussetzung ergänzt | Lead Technical Director / Producer |
 | 1.4.0 | 2026-07-24 | D-064: Schema 1.2 als Integritätsvorstufe und G0-A vor G0-B als aktive Recovery-Reihenfolge verankert | Lead Technical Director / Producer |
+| 1.5.0 | 2026-07-25 | D-066: G0-A1-Integrity und G0-A2-Receipt-Autorisierung im tatsächlichen Recovery-Status getrennt | Lead Technical Director / Producer |

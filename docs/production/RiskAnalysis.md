@@ -1,6 +1,6 @@
 # Risikoanalyse
 
-**Version:** 2.4.0 | **Status:** aktiv – G0-A offen | **Verantwortungsbereich:** Executive Producer / Lead Technical Director | **Sprint:** 7
+**Version:** 2.5.0 | **Status:** aktiv – G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Lead Technical Director | **Sprint:** 7
 
 ## Zweck
 
@@ -10,7 +10,7 @@ zugehöriges Gate bestanden ist.
 
 ## Abhängigkeiten
 
-- [DecisionLog.md](DecisionLog.md) – D-055 bis D-064
+- [DecisionLog.md](DecisionLog.md) – D-055 bis D-066
 - [MVPRecoveryPlan.md](MVPRecoveryPlan.md) – operative Gates
 - [Roadmap.md](Roadmap.md) – Schätzregeln
 - [../tech/SimulationCore.md](../tech/SimulationCore.md),
@@ -43,8 +43,8 @@ bestandenen Nachweis voraus.
 | R-14 | ARM↔x64-Determinismus scheitert | mittel | hoch | Q16.16 ab G1, identische Quellen/Defines, V1 über 10.000 Ticks mit exakten Hashes und finalen Bytes | **aktiv bis V1** |
 | R-15 | KI-generierter Code verletzt Sim-Vertrag | mittel | hoch | Architekturchecks, autoritative Float-/Unity-Verbote, Golden/Metamorphics, Coverage und Reviewer≠Writer | aktiv |
 | R-16 | keine belastbare Zeit-/Kapazitätsbasis | hoch | hoch | keine aktive 445-PT-/Kalenderannahme; Aufwandsspanne erst nach G2, Kalenderkorridor erst nach G4 | **aktiv** |
-| R-17 | falsche Fertigmeldung durch Struktur oder widersprüchliche Evidence statt Ergebnis | hoch | hoch | D-055/D-061–D-064; Schema 1.2 ist fail-closed, Ziel ist Schema 1.3 mit kanonischen Artefakten, kompletter autorisierter Gate-Kette und externem Trust | **aktiv bis Quality-Gate und G5 bewiesen** |
-| R-18 | Gate-Subject schwächt eigene Prüftools oder misst auf unzulässiger Umgebung | hoch | hoch | D-064: subject-unabhängiges Trusted Tooling, nicht selbstautorisierender Zwei-Schritt-Bootstrap, gebundene Windows-/Mac-Profile und Manipulations-Negativtests | **aktiv bis G0-A plus nachfolgendes G0 bewiesen** |
+| R-17 | falsche Fertigmeldung durch Struktur oder widersprüchliche Evidence statt Ergebnis | hoch | hoch | D-055/D-061–D-064/D-066; G0-A1 ist fail-closed, G0-A2 verlangt abgeschlossene Receipts statt Selbstattestierung | **aktiv bis Quality-Gate und G5 bewiesen** |
+| R-18 | Gate-Subject schwächt eigene Prüftools oder misst auf unzulässiger Umgebung | hoch | hoch | D-064/D-066: getrennte Subject-/Carrier-/Trusted-Identitäten, zweiphasige Receipts, gebundene Windows-/Mac-Profile und Manipulations-Negativtests | **aktiv bis G0-A2 plus nachfolgendes G0 bewiesen** |
 
 ## Schwerpunktmaßnahmen
 
@@ -63,12 +63,12 @@ zu Architektur/Synthese; Schwellen werden nicht nachträglich als
 ### R-16 bis R-18 – Planungsintegrität
 
 Durchsatz wird nur aus tatsächlich abgeschlossenen Gate-Arbeiten ermittelt.
-Schema 1.2 prüft Integrität, bleibt aber durch
+Schema 1.2/1.3 und G0-A1 prüfen Integrität, bleiben aber durch
 `E_AUTHORIZATION_BOOTSTRAP` von jeder Pass-Autorisierung ausgeschlossen.
-G0-A muss Schema 1.3 aus einem subject-unabhängigen Trusted-Tool-Checkout
-ausführen, die vollständige Gate-Kette autorisieren und jede
-Performance-Messung an das exakte Windows- oder Mac-Profil binden. Erst ein
-nachfolgender sauberer Subject-Commit darf damit G0 belegen.
+G0-A2 muss Subject, Evidence-Carrier und Trusted Tooling trennen, die
+vollständige Receipt-Kette aus bereits abgeschlossenen Läufen autorisieren
+und jede Performance-Messung an das exakte Windows- oder Mac-Profil binden.
+Erst ein nachfolgender sauberer Subject-Commit darf damit G0 belegen.
 Relevante Änderungen entwerten ältere Nachweise. Statusänderung ohne diese
 Kette ist ein P1-Prozessdefekt.
 
@@ -80,10 +80,10 @@ Kette ist ein P1-Prozessdefekt.
 
 ## Nächste Schritte
 
-1. G0-A mit Trusted-Tool-Checkout, Schema 1.3, vollständiger
-   Autorisierungskette, Umgebungsbindung und Negativkontrollen implementieren.
+1. G0-A1 geschützt mergen und G0-A2 mit zweiphasigem Receipt,
+   Umgebungsbindung und Negativkontrollen separat implementieren.
 2. R-03/R-14 nach V1/V4/V5a mit Rohdaten neu bewerten.
-3. R-18 erst nach G0-A plus nachfolgendem G0, R-16 erst nach G2 und R-17
+3. R-18 erst nach G0-A2 plus nachfolgendem G0, R-16 erst nach G2 und R-17
    erst nach produktivem `quality-gate` abstufen.
 
 ## Änderungsverlauf
@@ -103,3 +103,4 @@ Kette ist ein P1-Prozessdefekt.
 | 2.2.0 | 2026-07-24 | R-17 mit D-062-Subject-Blob-, Szenariometrik- und Same-Subject-Gate-Ketten-Mitigation gehärtet | Executive Producer / Lead QA Engineer |
 | 2.3.0 | 2026-07-24 | R-17 mit D-063-Check-Artefakten, Drei-Lauf-Messung, rekursivem Ajv und Protected-CI-Trust gehärtet | Executive Producer / Lead QA Engineer |
 | 2.4.0 | 2026-07-24 | R-18 für selbstautorisierende Prüftools und ungebundene Messumgebungen aufgenommen; D-064-G0-A als Mitigation festgelegt | Executive Producer / Lead QA Engineer |
+| 2.5.0 | 2026-07-25 | D-066: zirkuläre Selbstattestierung als aktiven R-17/R-18-Pfad erfasst und zweiphasige G0-A2-Receipts als Mitigation festgelegt | Executive Producer / Lead QA Engineer |

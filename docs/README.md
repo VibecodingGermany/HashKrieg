@@ -1,10 +1,10 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.11.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A aktiv | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.12.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
-Zentraler Einstieg in das versionierte Project-Nova-Wiki. Die Version 0.11.0
+Zentraler Einstieg in das versionierte Project-Nova-Wiki. Die Version 0.12.0
 rebaselined Planung und technische Verträge; sie ist kein Game-Release und
 kein bestandenes Gate.
 
@@ -22,7 +22,7 @@ kein bestandenes Gate.
 |---|---|
 | Sprint 6 | durch D-055 beendet und durch den Recovery-Plan ersetzt |
 | Sprint 7 | gestartet; nur G0-A zur Implementierung freigegeben |
-| G0 | G0-A aktiv, G0-B gesperrt |
+| G0 | G0-A1 Mergekandidat; G0-A2 und G0-B offen |
 | MS-0 | nicht erreicht |
 | MS-1 / MVP | nicht erreicht |
 | Alpha | nicht begonnen |
@@ -32,7 +32,8 @@ Closed-Core MS-1 ist D-056; deterministischer Kern D-057; Capacity/FoW D-058;
 Branching D-059; Engine D-060; Evidence/Acceptance D-061; durchgesetzte
 Szenario-/Subject-/Gate-Kette D-062.
 Schema-1.2-/Check-Härtung D-063; subject-unabhängiger
-Trusted-Gate-Bootstrap und Schema-1.3-Ziel D-064.
+Trusted-Gate-Bootstrap und Schema-1.3-Ziel D-064; fail-closed Trennung von
+G0-A1 und zweiphasigem Receipt-Authorizer D-066.
 
 ## Meta und Analyse
 
@@ -56,7 +57,7 @@ Trusted-Gate-Bootstrap und Schema-1.3-Ziel D-064.
 - [Asset-Store-Landschaft](research/AssetStore_Landschaft.md)
 
 Research ist historischer Entscheidungsinput. Bei Versions- oder Scopekonflikt
-führen D-056–D-064.
+führen D-056–D-066.
 
 ## Vision und Game Design
 
@@ -166,18 +167,18 @@ gelisteten Kernverträge.
 - [`quality/scenarios/mvp-v1.json`](../quality/scenarios/mvp-v1.json) –
   Workloads, Kadenz, Schwellen und gesperrter Autorisierungsstatus
 - [`quality/schemas/GateEvidence.schema.json`](../quality/schemas/GateEvidence.schema.json) –
-  Integritätsvorstufe Schema 1.2; kein Pass-Autorisierer
+  Integritätsvorstufe Schema 1.3; kein Pass-Autorisierer
 - [`quality/scripts/validate_gate_evidence.py`](../quality/scripts/validate_gate_evidence.py) –
   Cross-Field-, Artefakt-, SHA-/Pfad- und Gate-Profil-Prüfung mit
-  fail-closed D-064-Bootstrap-Sperre
+  fail-closed D-066-Bootstrap-Sperre
 - [`quality/scripts/validate_evidence_schema.mjs`](../quality/scripts/validate_evidence_schema.mjs)
   mit [`quality/package-lock.json`](../quality/package-lock.json) – gepinnte
   Draft-2020-12-Prüfung für aktuelle und rekursive Evidence
 
 `quality/evidence/` entsteht nur aus realen Versuchen. Es gibt keine
-Platzhalter-Evidence. G0-A muss den subject-unabhängigen Schema-1.3-
-Authorize-Pfad erst implementieren; bis dahin kann keine Datei einen
-Gate-Pass erzeugen.
+Platzhalter-Evidence. G0-A1 liefert ausschließlich Integrity. G0-A2 muss den
+zweiphasigen `GateAuthorization.json`-Pfad erst implementieren; bis dahin
+kann keine Datei einen Gate-Pass erzeugen.
 
 ## Quelldokumente
 
@@ -189,14 +190,14 @@ Gate-Pass erzeugen.
 ## Offene Punkte
 
 - Q-018 und Q-019 bleiben offen und nicht MS-1-blockierend.
-- G0-A und damit Gate G0 sind noch nicht nachgewiesen.
+- G0-A2 und damit Gate G0 sind noch nicht nachgewiesen.
 
 ## Nächste Schritte
 
-1. G0-A als nicht selbstautorisierende Bootstrap-Änderung implementieren.
-2. Am nachfolgenden sauberen Subject G0-B belegen.
-3. G1/V1–V5a erst nach bestandenem G0 sequenziell umsetzen.
-4. Wiki-Status nur zusammen mit Gate- und Changelog-Update ändern.
+1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
+2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren.
+3. Am nachfolgenden sauberen Subject G0-B belegen.
+4. G1/V1–V5a erst nach bestandenem G0 sequenziell umsetzen.
 
 ## Änderungsverlauf
 
@@ -216,3 +217,4 @@ Gate-Pass erzeugen.
 | 0.9.0 | 2026-07-24 | D-062-Evidence-Härtung und lokale MS-1-Overrides für Victory, MatchConfig und Commander indexiert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.10.0 | 2026-07-24 | D-063-Schema 1.2, gepinntes Ajv, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trust indexiert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.11.0 | 2026-07-24 | D-064 Trusted-Gate-Bootstrap, Schema-1.3-Ziel und fail-closed G0-A-Start indexiert | Executive Producer / Technical Writer / Lead QA Engineer |
+| 0.12.0 | 2026-07-25 | D-066: G0-A1 Integrity von G0-A2 Receipt-Autorisierung getrennt und zirkulären Authorize-Pfad zurückgezogen | Executive Producer / Technical Writer / Lead QA Engineer |

@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.13.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.15.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -996,7 +996,7 @@ nachfolgenden sauberen Subject bewiesen ist, sind G0–G5 zwingend offen.
 D-064 ergänzt D-063 und ersetzt dessen Autorisierungsanspruch für Schema 1.2;
 alle übrigen D-063-Prüfungen bleiben verbindliche Vorstufe.
 
-### D-065 | verbindlich | Sprint 7 (Authorize-Run-Bindung der Evidence-Kette)
+### D-065 | ersetzt durch D-066 | Sprint 7 (Authorize-Run-Bindung der Evidence-Kette)
 
 **Kontext:** Das unabhängige Re-Review von G0-A fand (Befund N-1), dass die
 GitHub-Verifikation der `authorizedEvidence`-Kette replay- und reuse-anfällig
@@ -1038,12 +1038,79 @@ fügt aber neue Angriffsfläche (Artifact-Retention/-Substitution) und
 Komplexität im geschützten Job hinzu. (c) schließt den Pfad mit bereits
 vorhandenen API-Feldern und hält den geschützten Job minimal.
 
-**Konsequenzen:** D-065 ergänzt D-064 und ändert weder Evidence-Schema 1.3
-noch Trust-Kontext 2.0.0 strukturell (außer der `ci.jobName`-Konstante, die
-ohnehin noch keine reale Evidence betrifft). `generate_trust_context.py`,
-der Authorize-Workflow und die Negativkontrollen (PR-Event-Run,
-Integrity-Job statt Authorize-Job, wiederverwendete Run-ID) sind gemeinsam
-führend.
+**Konsequenzen:** Durch D-066 ersetzt. Die Event-/Job-Prüfungen bleiben als
+Anforderungen für bereits abgeschlossene Vorgänger-Receipts erhalten, dürfen
+aber nicht auf den noch laufenden aktuellen Authorize-Job angewendet werden.
+
+### D-066 | verbindlich | Sprint 7 (Fail-Closed-Foundation und zweiphasige Autorisierung)
+
+**Kontext:** Zwei unabhängige Merge-Reviews fanden im G0-A-Entwurf einen
+logischen Kreis: Der laufende `gate-evidence-authorize`-Job sollte bereits
+`conclusion=success` belegen, bevor er die aktuelle Evidence validierte.
+Zugleich setzte der Entwurf Subject-Commit, Evidence-Carrier-Commit und
+Trusted-Tool-Commit gleich. Eine eingecheckte Evidence kann weder ihre eigene
+zukünftige Carrier-SHA noch die IDs eines später gestarteten Authorize-Runs
+enthalten. Der erste echte G0-Lauf wäre deshalb unmöglich gewesen, obwohl die
+Offline-Selbsttests grün waren.
+
+**Alternativen:** (a) Den zirkulären Entwurf trotz des Befunds mergen und auf
+einen späteren Laufzeitfix hoffen; (b) die technischen Bindungen entfernen
+und Gate-Pässe allein per manuellem Review erklären; (c) nur die
+Integritätsgrundlage fail-closed mergen, den unmöglichen Authorize-Pfad
+entfernen und die Autorisierung als zweiphasigen, append-only Receipt-Vertrag
+mit getrennten Identitäten neu aufbauen.
+
+**Entscheidung:** (c):
+
+1. Der aktuelle `quality-gate` führt ausschließlich den PR-Job `integrity`
+   aus. Es gibt bis zur Receipt-Implementierung keinen
+   `workflow_dispatch`-Authorizer und keinen Trust-Kontext-Generator.
+   `verdict=pass` endet unabhängig von übergebenen Trust-Argumenten mit
+   `E_AUTHORIZATION_BOOTSTRAP`.
+2. GateEvidence-Schema 1.3 bleibt eine unveröffentlichte
+   Integritätsvorstufe. `ci` beschreibt den Evidence-erzeugenden
+   beziehungsweise prüfenden CI-Job und darf nicht
+   `gate-evidence-authorize` bezeichnen. Der spätere Autorisierer ist eine
+   getrennte Identität.
+3. Der Folgebaustein G0-A2 trennt mindestens
+   `subjectCommitSha`, `evidenceCarrierCommitSha` und
+   `trustedToolCommitSha`. Sein Autorisierungsvertrag startet ohne Migration
+   vorhandener Artefakte mit GateEvidence 1.4.0 und Trust-Kontext 3.0.0;
+   ältere Pass-Artefakte bleiben fail-closed. Autoritative Szenarioprofile
+   und Schwellen werden aus dem Trusted-Tool-Stand geladen, nie aus einem
+   vom Subject änderbaren Vertrag.
+4. Ein erfolgreicher geschützter Lauf erzeugt
+   `GateAuthorization.json` als hashgebundenen Kandidaten neben der
+   unveränderten `GateEvidence.json`. Das Receipt bindet Gate, Subject-
+   Commit/-Tree, Evidence-Carrier, Evidence-Pfad/-Hash, Trusted-Tool-Commit,
+   Repository, Workflow sowie Run-/Attempt-/Job-ID. Es wird als Artefakt
+   transportiert und nach erfolgreichem Lauf unverändert per kleinem
+   Folge-PR append-only versioniert.
+5. Der aktuelle Lauf wird aus seinem geschützten Runtime-Kontext gebunden,
+   aber nie gegen seine noch unmögliche eigene Erfolgs-Conclusion geprüft.
+   Erst spätere Gates akzeptieren frühere Receipts und verlangen per GitHub-
+   API den exakten `workflow_dispatch`-Run/-Attempt, Workflow, Gate,
+   Evidence-Hash und erfolgreichen Authorize-Job. Run-IDs sind über die
+   Kette eindeutig.
+6. Alle fremden GitHub Actions im Integrity-Pfad werden auf vollständige
+   Commit-SHAs gepinnt. Das geschützte Environment wird erst vor dem ersten
+   realen Authorize-Lauf als Root of Trust benötigt und darf dessen fehlende
+   Implementierung nicht vortäuschen.
+
+**Begründung:** (a) würde eine nachweislich unerreichbare Sicherheitszusage
+veröffentlichen. (b) würde die reproduzierten Falschfreigabe-Pfade wieder
+öffnen. (c) lässt die bereits nützlichen Schema-, Semantik-, Topologie- und
+Runner-Prüfungen nutzbar, hält jeden Gate-Pass technisch gesperrt und schafft
+einen implementierbaren Übergang von laufender Validierung zu dauerhaft
+prüfbarer Autorisierung.
+
+**Konsequenzen:** G0-A wird in G0-A1 (Integritätsgrundlage; dieser PR) und
+G0-A2 (zweiphasiger Receipt-Authorizer; Folge-PR) geteilt. G0-A insgesamt,
+G0-B, G0 und alle folgenden Gates bleiben offen. Plattformarbeit darf
+parallel vorbereitet werden, aber keinen Gate-Status beanspruchen, bevor
+G0-A2 gemergt und an einem späteren sauberen Subject bewiesen ist. D-066
+ersetzt D-065 und präzisiert D-064; es gibt weiterhin keine reale
+Gate-Evidence und keinen Game-Release.
 
 ---
 
@@ -1058,7 +1125,7 @@ führend.
 ## Nächste Schritte
 
 - Zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis herstellen.
-- Entscheidungen D-056–D-064 über die Gates G0–G5 umsetzen, ohne Gate-Status
+- Entscheidungen D-056–D-066 über die Gates G0–G5 umsetzen, ohne Gate-Status
   vorwegzunehmen.
 
 ## Änderungsverlauf
@@ -1084,3 +1151,4 @@ führend.
 | 1.12.0 | 2026-07-24 | D-063: Evidence-Schema 1.2, kanonische Check-Artefakte, geschützten Trust-Kontext, rekursive Draft-2020-12-Prüfung und Drei-Lauf-Messmethode entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.13.0 | 2026-07-24 | D-064: Pass-Autorisierung bis zum subject-unabhängigen Trusted-Gate-Bootstrap gesperrt und Schema-1.3-Zielvertrag entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.14.0 | 2026-07-25 | D-065: Authorize-Run-Bindung der Evidence-Kette (workflow_dispatch-Event, exklusiver Authorize-Job, eindeutige Run-IDs) nach Re-Review-Befund N-1 entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
+| 1.15.0 | 2026-07-25 | D-066: zirkulären Authorize-Vertrag durch fail-closed G0-A1 und zweiphasigen Receipt-Vertrag für G0-A2 ersetzt | Project Owner / Lead Technical Director / Lead QA Engineer |
