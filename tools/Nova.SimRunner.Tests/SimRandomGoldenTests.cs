@@ -118,6 +118,27 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void NextInt_RejectsEmptyOrInvertedRange()
+        {
+            var rng = new SimRandom(7UL);
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => rng.NextInt(5, 5));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => rng.NextInt(9, -2));
+        }
+
+        [Test]
+        public void NextFloat_StaysWithinUnitInterval_AndIsDeterministic()
+        {
+            var first = new SimRandom(99UL);
+            var second = new SimRandom(99UL);
+            for (int i = 0; i < 1000; i++)
+            {
+                float value = first.NextFloat();
+                Assert.That(value, Is.GreaterThanOrEqualTo(0.0f).And.LessThan(1.0f));
+                Assert.That(second.NextFloat(), Is.EqualTo(value), $"float stream diverged at index {i}");
+            }
+        }
+
+        [Test]
         public void SetState_RejectsDegenerateZeroState()
         {
             var rng = new SimRandom(1UL);
