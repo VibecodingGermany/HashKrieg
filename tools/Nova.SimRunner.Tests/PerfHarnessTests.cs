@@ -181,8 +181,16 @@ namespace Nova.SimRunner.Tests
             ScenarioArtifacts.WriteScenarioArtifacts(options, dir, result);
 
             Assert.That(result.NoCrash, Is.True, "no-crash assertion");
-            Assert.That(result.MemoryGrowthBounded, Is.True, "no-unbounded-memory-growth assertion");
+            // 2 s measurement window < 30 s: the memory assertion is honestly
+            // reported as not-applicable (short windows measure allocator/GC
+            // warm-up, not the workload); the artifact still carries [1]
+            // without any gate claim.
+            Assert.That(result.MemoryAssertion, Is.EqualTo(MemoryAssertionVerdict.NotApplicable),
+                "memory assertion must be not-applicable below 30 s measurement");
+            Assert.That(result.MemoryGrowthBounded, Is.True, "not-applicable must not count as failure");
             Assert.That(result.Runs.Count, Is.EqualTo(2));
+            // The retained probes exist even for short windows (diagnosis).
+            Assert.That(result.Runs[0].RetainedProbes.Length, Is.GreaterThan(0), "retained probes recorded");
 
             const string prefix = "scenario.SCALE_500_PRECOMBAT";
             string[] expectedFiles =
@@ -234,6 +242,81 @@ namespace Nova.SimRunner.Tests
             using JsonDocument assertion = JsonDocument.Parse(
                 File.ReadAllText(Path.Combine(dir, prefix + ".assertion.no-crash.json")));
             Assert.That(assertion.RootElement.GetProperty("samples")[0].GetInt32(), Is.EqualTo(1));
+        }
+
+        // ----------------------------------------------------------
+        // Memory window rule (EvaluateMemoryGrowthBounded):
+        // median of the last tenth of retained probes (at least the
+        // last 10) vs. retained baseline after warmup, tolerance 1.10x
+        // ----------------------------------------------------------
+
+        [Test]
+        public void MemoryRule_SustainedLinearGrowth_Fails()
+        {
+            const long baseline = 100_000_000;
+            var probes = new long[120];
+            for (int i = 0; i < probes.Length; i++)
+            {
+                // +20% sustained linear growth — a real leak signature.
+                probes[i] = baseline + (long)(20_000_000.0 * i / (probes.Length - 1));
+            }
+
+            bool pass = Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, probes, out long median);
+
+            Assert.That(pass, Is.False, "sustained growth through the window end must fail");
+            Assert.That(median, Is.GreaterThan((long)(baseline * Scale500PrecombatScenario.MemoryGrowthTolerance)));
+        }
+
+        [Test]
+        public void MemoryRule_WarmupSpikeThenFlat_Passes()
+        {
+            const long baseline = 100_000_000;
+            var probes = new long[120];
+            for (int i = 0; i < probes.Length; i++)
+            {
+                // Early residue spike (warmup leftovers), then flat — the
+                // evaluation window (last 12 of 120) never sees the spike.
+                probes[i] = i < 20 ? 150_000_000 : 105_000_000;
+            }
+
+            bool pass = Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, probes, out long median);
+
+            Assert.That(pass, Is.True, "an early spike with a flat window must pass");
+            Assert.That(median, Is.EqualTo(105_000_000));
+        }
+
+        [Test]
+        public void MemoryRule_ToleranceBoundary_IsStrict()
+        {
+            const long baseline = 1_000_000;
+            var atCap = new long[30];
+            Array.Fill(atCap, 1_100_000); // exactly 1.10x
+            var aboveCap = new long[30];
+            Array.Fill(aboveCap, 1_100_001); // 1 byte above 1.10x
+
+            Assert.That(
+                Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, atCap, out _),
+                Is.True, "exactly 1.10x passes");
+            Assert.That(
+                Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, aboveCap, out _),
+                Is.False, "above 1.10x fails");
+        }
+
+        [Test]
+        public void MemoryRule_FewerThanTenProbes_UsesAllAvailable()
+        {
+            const long baseline = 100_000_000;
+            // 5 probes: the window covers ALL of them; median = 105M -> pass.
+            var probes = new long[] { 200_000_000, 105_000_000, 105_000_000, 105_000_000, 105_000_000 };
+            bool pass = Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, probes, out long median);
+            Assert.That(pass, Is.True);
+            Assert.That(median, Is.EqualTo(105_000_000));
+
+            // 3 probes, majority above the cap: median 120M > 110M -> fail.
+            var bad = new long[] { 120_000_000, 105_000_000, 120_000_000 };
+            Assert.That(
+                Scale500PrecombatScenario.EvaluateMemoryGrowthBounded(baseline, bad, out _),
+                Is.False);
         }
 
         // ----------------------------------------------------------
