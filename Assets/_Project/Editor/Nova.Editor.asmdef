@@ -4,7 +4,9 @@
     "references": [
         "Nova.Core",
         "Nova.Data",
-        "Nova.Gameplay"
+        "Nova.Gameplay",
+        "Nova.Presentation",
+        "Nova.Presentation.UI"
     ],
     "includePlatforms": [
         "Editor"
