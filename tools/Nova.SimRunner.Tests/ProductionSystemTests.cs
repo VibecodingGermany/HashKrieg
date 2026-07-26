@@ -327,6 +327,32 @@ namespace Nova.SimRunner.Tests
             Assert.That(restored.TryValidateState(longer), Is.False);
         }
 
+        [Test]
+        public void SetRallyPoint_OffMap_IsRejected_RallyUnchanged_QueueContinues()
+        {
+            var f = new Fixture();
+            uint barracks = f.SpawnBarracks(0);
+            f.Production.SetRallyPoint(barracks, SimFixed.FromInt(30), SimFixed.FromInt(30));
+
+            Assert.That(f.Production.ValidateSetRallyPoint(0, barracks, SimFixed.FromInt(200), SimFixed.FromInt(30)),
+                Is.EqualTo(CommandResultCode.RejectedInvalidTarget), "200 is outside the 128x128 map");
+            Assert.That(f.Production.ValidateSetRallyPoint(0, barracks, SimFixed.FromInt(-1), SimFixed.FromInt(30)),
+                Is.EqualTo(CommandResultCode.RejectedInvalidTarget), "negative targets floor below the map");
+            Assert.That(f.Production.ValidateSetRallyPoint(0, barracks, SimFixed.FromInt(127), SimFixed.FromInt(127)),
+                Is.EqualTo(CommandResultCode.Applied), "the map corner is legal");
+
+            Assert.That(f.Production.TryGetProducer(barracks, out _, out int rallyX, out int rallyY), Is.True);
+            Assert.That(rallyX, Is.EqualTo(SimFixed.FromInt(30).RawValue), "a rejected rally leaves the existing one unchanged");
+            Assert.That(rallyY, Is.EqualTo(SimFixed.FromInt(30).RawValue));
+
+            // The queue is unaffected by the rejected rally (no parking).
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 3, 1), Is.True);
+            f.Step(100);
+            EntityId unit = FindRole(f, UnitRole.BasicInfantry);
+            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
+            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+        }
+
         private static int CountRole(Fixture f, UnitRole role)
         {
             int count = 0;

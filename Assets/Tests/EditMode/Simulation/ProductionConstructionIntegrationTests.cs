@@ -472,6 +472,35 @@ namespace Nova.Simulation.Tests
                 "playback of the recorded construction/production intents must reproduce the end state hash");
         }
 
+        [Test]
+        public void SetRallyPoint_OffMapCommand_IsRejected_ProductionContinuesNormally()
+        {
+            var host = ProdHost.Create(Seed);
+            host.SpawnStartState(0, 4, 4);
+            host.StepTick(); // commit the start balance
+            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 5, 20, 20);
+            uint barracksRaw = UnitCommandStateView.ToRawEntityId(barracks);
+
+            // Off-map rally through the sealed intake: rejected
+            // state-dependently, mutates nothing.
+            host.Submit(new SetRallyPointPayload(barracksRaw, SimFixed.FromInt(200), SimFixed.FromInt(30)));
+            host.StepTick();
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedInvalidTarget));
+            Assert.That(host.Production.TryGetProducer(barracksRaw, out _, out _, out _), Is.False,
+                "no producer row was created by the rejected command");
+
+            // Production continues normally: queue applies and the unit
+            // spawns at the DEFAULT rally (two cells east of the center).
+            host.Submit(new QueueUnitPayload(barracksRaw, 3, 1));
+            host.StepTick();
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
+            for (int i = 0; i < 100; i++) host.StepTick();
+            Assert.That(host.CountRole(0, UnitRole.BasicInfantry), Is.EqualTo(1));
+            EntityId infantry = FindRole(host, 0, UnitRole.BasicInfantry);
+            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(23)));
+            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(21)));
+        }
+
         private static uint BarracksRaw(ProdHost host)
         {
             UnitState[] units = host.Entities.RawUnits;
