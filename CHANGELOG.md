@@ -18,6 +18,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Hashkrieg-Weltentwurf (Entwurf, kein Gate-Nachweis):**
+  [docs/vision/Lore.md](docs/vision/Lore.md) (0.1.0) beschreibt Vorgeschichte,
+  Aetherium-Ökonomie, die Fraktionen Allianz und Legion sowie den Grund ihres
+  Konflikts als Quelle für Fraktionsidentität, Formensprache, Farbwelt und
+  Einheitennamen. Neuer Arbeitstitel *Hashkrieg* beschlossen, im Bestand dieses
+  Repositories aber noch nicht vollzogen — Repo, Code und übriger Wiki-Bestand
+  laufen weiterhin unter *Project Nova*.
+- **Concept-Art-Bildstandard (Entwurf, kein Gate-Nachweis):**
+  [docs/assets/ConceptArtStyleGuide.md](docs/assets/ConceptArtStyleGuide.md)
+  (0.1.0) legt Bildformat, Lichtsetzung, Farbwelt, Renderstil, Formensprache je
+  Fraktion, Silhouetten- und Maßstabsregeln, eine wiederverwendbare Prompt-Vorlage
+  und Abnahmekriterien für alle Hashkrieg-Concept-Art-Bilder fest.
+- **34 Concept-Art-Entwürfe samt Herkunftsnachweis (Entwurf, kein Gate-Nachweis,
+  keine Produktionsassets):** [docs/assets/concept-art/](docs/assets/concept-art/README.md)
+  enthält je einen Entwurf pro Fraktion (Allianz/Legion) und Rolle (neun Gebäude,
+  acht Einheiten) als PNG (`full/`, 1024 × 1024) und JPG (`web/`), einen
+  Kontaktbogen, die verwendeten Prompts (`prompts.json`,
+  `prompts-scrimage.txt`), zwei Reproduktionsskripte (`tools/`) und zwei
+  Stilplatten (`style/`). Herkunft: KI-generiert mit OpenAI `gpt-image-1` über
+  `v1/images/edits`, mit einer Materialtafel als Stilreferenz statt eines
+  Objektbilds, um unerwünschte Silhouettenvereinheitlichung zu vermeiden;
+  vollständiger Nachweis je Bild inklusive SHA-256, Prompt und Lizenzlage in
+  `PROVENANCE.json`. Bekannte Schwächen offen dokumentiert: Farbdrift zwischen
+  zwei Legion-Erzeugungsläufen, leichte Räumlichkeit statt strenger Frontalität
+  bei Legion-Radar und Legion-Bauarbeiter. Es existiert weiterhin kein einziges
+  3D-Asset im Projekt.
 - **Graybox-Slice: das Spiel ist erstmals sicht- und bedienbar (Diagnosestand,
   ohne Gate-Status, ohne Evidence):** `Bootstrap.unity` enthielt bis dahin nur
   Kamera und Licht, und im Repo existierte keine Zeile Eingabecode; der

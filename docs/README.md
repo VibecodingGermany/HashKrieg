@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.13.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.14.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -64,6 +64,9 @@ führen D-056–D-066.
 - Vision: [Vision](vision/Vision.md), [USP](vision/USP.md),
   [TargetAudience](vision/TargetAudience.md),
   [CoreGameplay](vision/CoreGameplay.md), [GameLoop](vision/GameLoop.md)
+- [Lore](vision/Lore.md) (0.1.0, Entwurf) – Weltentwurf für den neuen Arbeitstitel
+  *Hashkrieg*: Vorgeschichte, Ökonomie, Fraktionen; Umbenennung im Bestand noch
+  nicht vollzogen
 - Fraktionen/Content: [Factions](gamedesign/Factions.md),
   [Buildings](gamedesign/Buildings.md), [Infantry](gamedesign/Infantry.md),
   [Vehicles](gamedesign/Vehicles.md), [Aircraft](gamedesign/Aircraft.md)
@@ -150,6 +153,10 @@ gelisteten Kernverträge.
   Provenienz- und Lizenznachweisverfahren je Asset
 - [VerticalSlice_MS1](assets/VerticalSlice_MS1.md) (0.2.0, Entwurf) –
   Vertical-Slice-Spezifikation der vier Erst-Assets
+- [ConceptArtStyleGuide](assets/ConceptArtStyleGuide.md) (0.1.0, Entwurf) –
+  verbindlicher Bildstandard für Hashkrieg-Concept-Art
+- [concept-art/README](assets/concept-art/README.md) (0.1.0, Entwurf) – 34
+  Concept-Art-Entwürfe samt Herkunftsnachweis, keine Produktionsassets
 
 ## Production und Recovery
 
@@ -232,3 +239,4 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.12.0 | 2026-07-25 | D-066: G0-A1 Integrity von G0-A2 Receipt-Autorisierung getrennt und zirkulären Authorize-Pfad zurückgezogen | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.12.1 | 2026-07-25 | Art-Strang MS-1 (D-069–D-073) indexiert: ArtAssetStandard, ArtManifest_MS1, SourceCatalog_MS1, Provenance, VerticalSlice_MS1 – kein Gate-Status, kein Asset im Repository | Technical Writer |
 | 0.13.0 | 2026-07-26 | Graybox-Spur indexiert: GrayboxLog und ScopeLedger aufgenommen; Art-Strang-D-IDs nach der Merge-Kollision auf D-069–D-073 nachgeführt | Technical Writer |
+| 0.14.0 | 2026-07-26 | Hashkrieg-Weltentwurf und Concept-Art-Strang indexiert: Lore.md, ConceptArtStyleGuide.md und concept-art/README.md aufgenommen; kein Gate-Status | Technical Writer |
