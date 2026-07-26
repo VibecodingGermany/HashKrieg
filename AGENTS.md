@@ -1,5 +1,7 @@
 # AGENTS.md – Arbeitsregeln für KI-Agenten & Mitwirkende
 
+**Dokumentversion:** 3.7.0 | **Status:** verbindlich | **Verantwortungsbereich:** Orchestrator | **Sprint:** 7
+
 Diese Datei ist die **verbindliche Betriebsanleitung** für jeden KI-Coding-Agenten
 (Kimi, Claude, Cursor, Codex u. a.) und jede Person, die an *Project Nova* arbeitet.
 **Lies diese Datei zuerst, bevor du irgendeine Änderung machst.** Sie wird von den
@@ -39,6 +41,11 @@ der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md) und das
 4. **CHANGELOG immer mitpflegen.** Jede inhaltliche Änderung ergänzt einen Eintrag unter
    `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (siehe §6). Undokumentierte Änderungen
    gelten als nicht erfolgt.
+   *Befristete Ausnahme:* D-067 (**Entwurf**) definiert für die Graybox-Spur einen
+   zeitlich begrenzten Dokumentationsschuld-Modus. Der `[Unreleased]`-Eintrag bleibt
+   Pflicht; aufschiebbar sind ausschließlich die DoD-Punkte 1–2 aus §8, und nur gegen
+   Registrierung im [ScopeLedger](docs/production/ScopeLedger.md) und im
+   [GrayboxLog](docs/production/GrayboxLog.md).
 5. **Dem Dokumentationsstandard folgen.** Alle Doku-Änderungen halten sich an
    [docs/meta/DocumentationStandard.md](docs/meta/DocumentationStandard.md) (siehe §4).
 6. **Entscheiden statt raten – und eskalieren.** Bei echten Design-/Architektur-
@@ -192,6 +199,13 @@ Eine Änderung ist erst „fertig", wenn **alle** Punkte erfüllt sind:
 - [ ] Inhalt geändert **und** der `Änderungsverlauf` im betroffenen Dokument ergänzt (+Version-Bump)
 - [ ] Bei Struktur-/Status-Änderung: [docs/README.md](docs/README.md)-Index **und** die
       Root-[README.md](README.md) (Sprint-/Versionsstatus) aktualisiert
+- **Zu Punkt 1–2, befristet:** D-067 (**Entwurf**) erlaubt der Graybox-Spur, genau diese
+  beiden Punkte je Einzeländerung aufzuschieben – nur gegen Registerzeile im
+  [ScopeLedger](docs/production/ScopeLedger.md) und Sitzungseintrag im
+  [GrayboxLog](docs/production/GrayboxLog.md), und nur bis zum Verfall nach D-067 K5.
+  Alle übrigen Punkte gelten unverändert. Diese Datei selbst nimmt am Schuldmodus nicht
+  teil: Jede Agenten-Sitzung lädt AGENTS.md automatisch, also muss die Abweichung genau
+  hier sichtbar sein statt aufgeschoben.
 - [ ] Entscheidung? → im [DecisionLog](docs/production/DecisionLog.md) mit ≥3 Alternativen
 - [ ] Eintrag unter `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
 - [ ] Interne Links geprüft (keine toten relativen Links; CI `docs-check` grün)
@@ -249,3 +263,4 @@ gh pr create --fill --base main
 | 3.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Gate-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Orchestrator |
 | 3.5.0 | 2026-07-25 | D-066: G0-A1-Integrity von G0-A2-Receipt-Autorisierung getrennt und `integrity` als Quality-Vertragscheck verankert | Orchestrator |
 | 3.6.0 | 2026-07-25 | G0-A2-Umsetzungsstand: Schema-Verzeichnis auf Evidence 1.4 plus GateAuthorization-Receipt-Schema aktualisiert | Orchestrator |
+| 3.7.0 | 2026-07-26 | Verweis auf den befristeten Dokumentationsschuld-Modus der Graybox-Spur (D-067, Entwurf) in §2 Regel 4 und §8 DoD 1–2 ergänzt; Dokumentversion in die Kopfzeile aufgenommen | Technical Writer |

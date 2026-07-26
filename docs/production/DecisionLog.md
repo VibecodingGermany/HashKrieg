@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.15.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.16.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -1114,6 +1114,188 @@ Gate-Evidence und keinen Game-Release.
 
 ---
 
+### D-067 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 7 (Graybox-Spur ohne Gate-Autorität)
+
+**Status:** ENTWURF — Inhaberentscheidung ausstehend. Dieser Eintrag ist
+**nicht in Kraft**. Entscheidender Autor ist **Dennis Westermann (Project
+Owner)**; nach AGENTS.md §2 Regel 6 legt ein Agent Optionen samt Empfehlung
+vor und entscheidet nicht selbst. Bis zur Ratifizierung gilt der Status quo:
+Die Graybox-Arbeit hat ohnehin keine Gate-Autorität, und die
+Dokumentationsschuld unten ist offen ausgewiesen statt stillschweigend
+genommen.
+
+**Kontext:** Der Simulationskern ist headless verifiziert, war aber unsichtbar
+und unbedienbar: `Bootstrap.unity` enthielt nur Kamera und Licht, im Repo
+existierte keine Zeile Eingabecode. Eine Graybox-Spur hat in einer Sitzung
+Präsentations- und Bedienschicht ergänzt (Kamerarig, Szenengenerator-Wiring,
+Auswahl/Befehle, Debug-HUD, Einheitenproxies) und erzeugt damit Artefakte, die
+wie Gate-Fortschritt aussehen — eine spielbare Szene und zwei Player-Builds —
+obwohl [MVPRecoveryPlan.md](MVPRecoveryPlan.md) §5 Debug-UI, Inspector-
+Manipulation und direkte State-Aufrufe für G2 ausdrücklich ausschließt.
+Gleichzeitig kollidiert die Sitzungsgeschwindigkeit mit der
+Dokumentations-DoD aus AGENTS.md §8: Sechs parallel arbeitende Agenten können
+nicht pro Datei Wiki-Index, Root-README und Änderungsverläufe serialisiert
+nachziehen, ohne die Arbeit zu blockieren. Ohne explizite Regel endet das
+entweder im Stillstand oder in genau der undokumentierten Statusbehauptung,
+die D-055 zurückgenommen hat.
+
+**Alternativen:** (a) Keine eigene Spur — die Graybox-Arbeit läuft vollständig
+unter Sprint-Ritual (§7) und DoD (§8), jede Änderung zieht Index, Root-README,
+Risikoanalyse und Änderungsverläufe sofort nach; (b) Fast Lane ohne
+Registrierung — die Graybox wird als Prototyp deklariert, von den
+AGENTS.md-Regeln ausgenommen und später oder gar nicht dokumentiert;
+(c) benannte, zeitlich befristete Spur ohne Gate-Autorität mit eingefrorenem
+Schreibumfang, registrierter Dokumentationsschuld, Eskalationsregel und
+hartem Verfall.
+
+**Entscheidung:** *Vorschlag — noch nicht in Kraft.* (c), mit fünf Klauseln:
+
+1. **Keine Gate-Autorität (K1).** Kein Artefakt dieser Spur — Szene, Player-
+   Build, HUD, Smoke-Test, Screenshot — darf als Evidence oder Teilnachweis
+   für G0–G5 zitiert werden. Es ist Diagnose, kein Content- oder
+   Gate-Versprechen; dieselbe Formulierung wie bei V5b in
+   [MVPRecoveryPlan.md](MVPRecoveryPlan.md) §6. G0, MS-0 und MS-1 bleiben
+   unverändert offen.
+2. **Eingefrorener Schreibumfang (K2).** Zulässig sind
+   `Assets/_Project/Scripts/Presentation/**`,
+   `Assets/_Project/Scripts/Gameplay/{Match,Input,UI}/**`,
+   `Assets/_Project/Editor/BootstrapSceneGenerator.cs`,
+   `Assets/_Project/Scenes/Bootstrap.unity` (ausschließlich als
+   Generator-Ausgabe, nie handeditiert), die zugehörigen Testdateien beider
+   Lanes sowie die Governance-Dateien dieser Spur. Ausgeschlossen bleiben
+   `quality/**`, `.github/workflows/**` und `VERSION`. Änderungen unter
+   `Assets/_Project/Scripts/{Simulation,Core}/**` sind nur im Rahmen von
+   D-068 zulässig und verlangen je Änderung einen Test in beiden Lanes und
+   einen grünen `DETERMINISM_10000`-SelfCheck.
+3. **Zeitlich befristeter Dokumentationsschuld-Modus (K3).** Solange die Spur
+   läuft, dürfen die DoD-Punkte 1–2 aus AGENTS.md §8 (Änderungsverlauf plus
+   Versionsbump in jedem berührten Dokument; Nachziehen von
+   [../README.md](../README.md) und Root-README) je Einzeländerung
+   aufgeschoben werden — **ausschließlich**, wenn jede Verschiebung als Zeile
+   im [ScopeLedger](ScopeLedger.md) registriert und die Sitzung im
+   [GrayboxLog](GrayboxLog.md) protokolliert ist. Nicht aufschiebbar sind:
+   der `[Unreleased]`-Eintrag im CHANGELOG, eine D-ID für jede echte
+   Entscheidung, ein grüner `docs-check`, die Unberührtheit von `quality/**`
+   und das Commit-/Push-Verbot ohne ausdrückliche Anfrage. Die Schuld ist
+   Schuld, nicht Erlass: Sie wird registriert, verzinst durch den Verfall
+   nach K5 und vor dem Spurende beglichen.
+4. **Eskalationsregel (K4).** Die Spur hält an und legt dem Inhaber vor,
+   sobald eine Änderung `quality/**`, das byte-gepinnte Trust-Bundle oder
+   `.github/workflows/**` berührt; sobald eine Simulations-/Core-Änderung den
+   `DETERMINISM_10000`-SelfCheck bräche statt nur seine Hashes zu verschieben;
+   sobald ein Snapshot-/Zustandsformat nach der ersten G1-Evidence geändert
+   werden müsste (siehe D-068); sobald ein Ergebnis als Gate-Status
+   beansprucht würde; oder sobald eine neue Assembly beziehungsweise ein
+   neuer Rang in `ASSEMBLY_RANKS` nötig wäre.
+5. **Verfall (K5).** Die Spur endet mit dem Eintritt in G2 **oder** 21
+   Kalendertage nach Ratifizierung, was zuerst eintritt (bei Ratifizierung am
+   2026-07-26 also spätestens 2026-08-16). Zum Verfallstermin ist entweder
+   die im ScopeLedger registrierte Dokumentationsschuld beglichen oder die
+   Spur wird durch eine **neue** D-ID verlängert. Ein stilles Weiterlaufen
+   ist ausgeschlossen; nicht beglichene Schuld wird beim Verfall zum
+   Blocker für den nächsten Sprint-Abschluss.
+
+**Begründung:** (a) ist regelkonform, hält aber genau die Arbeit auf, die der
+Inhaber braucht, um das Spiel überhaupt erstmals zu sehen und zu bedienen —
+und erzwingt serialisierte Doku-Schreibvorgänge auf „heißen" Dateien, die
+parallele Agentenarbeit strukturell verbietet. (b) wiederholt das
+Fehlermuster, das D-055 korrigieren musste: Artefakte ohne Protokoll werden
+später als erreichter Status gelesen. (c) hält die Geschwindigkeit, macht aber
+jede Abweichung sichtbar statt still, und erst die harte K1-Klausel macht die
+aufgeschobene Dokumentation ungefährlich: Was keinen Gate-Status behaupten
+darf, kann durch fehlende Doku auch keinen vortäuschen. Der harte Verfall nach
+K5 verhindert, dass aus einer befristeten Ausnahme ein Dauerzustand wird.
+
+**Konsequenzen:** Zwei neue Dokumente unter `docs/production/`:
+[GrayboxLog.md](GrayboxLog.md) (append-only Sitzungsprotokoll) und
+[ScopeLedger.md](ScopeLedger.md) (eine Zeile je Verschiebung, zeigt auf den
+Manifest-Schlüsselpfad statt Werte zu kopieren). AGENTS.md verweist in §2
+Regel 4 und §8 auf K3 und ist von der Ausnahme ausdrücklich **nicht**
+ausgenommen — die Datei, die jede Agenten-Sitzung automatisch lädt, muss die
+Abweichung selbst tragen. Der Wiki-Index [../README.md](../README.md) und die
+Root-README-Statuszeile sind als erste registrierte Schuld offen (siehe
+ScopeLedger). Solange dieser Entwurf nicht ratifiziert ist, entsteht aus ihm
+keine Berechtigung: Die Klauseln beschreiben, was die Sitzung getan hat, und
+warten auf das Ja oder Nein des Inhabers.
+
+### D-068 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 7 (Sim-Korrekturen im offenen Pre-G1-Formatfenster)
+
+**Status:** ENTWURF — Inhaberentscheidung ausstehend. Dieser Eintrag ist
+**nicht in Kraft**. Entscheidender Autor ist **Dennis Westermann (Project
+Owner)**. Die drei beschriebenen Codeänderungen liegen im Arbeitsbaum und sind
+mit Tests in beiden Lanes und grünem SelfCheck belegt; die Entscheidung, die
+hier zur Ratifizierung vorliegt, ist nicht „ist der Code richtig", sondern
+„werden Formats- und Hash-Änderungen dieser Art jetzt genommen statt später".
+
+**Kontext:** In der Graybox-Sitzung fielen drei Korrekturen im
+Simulationskern an: (1) ein beschränkter Flow-Field-Cache mit 32 Einträgen,
+adressiert über das Ziel statt über ein einziges globales Feld — vorher
+überschrieb Befehlsgruppe B das Feld von Gruppe A; (2) `CostField.Epoch` plus
+Pathfinding-Snapshotblock v2 — vorher lag das Kostenfeld in **keinem**
+Snapshotblock, Terrain konnte sich also ändern, ohne den kanonischen
+Zustandshash zu bewegen; (3) der Harvester-Autozyklus — eine volle Ladung
+behält `HarvestFieldId` und setzt `IsReturningCargo`, sodass
+Ernte → Rückkehr → Ernte ohne Befehl weiterläuft. Alle drei verschieben
+kanonische Zustandshashes, (2) ändert zusätzlich ein Blockformat.
+[MVPRecoveryPlan.md](MVPRecoveryPlan.md) §4 fordert für G1 einen
+**einmaligen Pre-G1-Kompatibilitätsreset der Prototypformate**. Dieses Fenster
+steht exakt so lange offen, wie keine G1-Evidence existiert — und es existiert
+keine: G0 ist offen, MS-0 nicht erreicht.
+
+**Alternativen:** (a) Keine der drei Änderungen jetzt nehmen und alle hinter
+die erste G1-Evidence schieben; (b) nur die reinen Verhaltenskorrekturen (1)
+und (3) nehmen und die formatberührende Korrektur (2) verschieben; (c) alle
+drei jetzt im offenen Pre-Evidence-Fenster nehmen, je Änderung mit Test in
+beiden Lanes und grünem `DETERMINISM_10000`-SelfCheck, und das neue
+Hash-Tripel als lokale Baseline festschreiben.
+
+**Entscheidung:** *Vorschlag — noch nicht in Kraft.* (c). Neue lokale
+Baseline von `DETERMINISM_10000` nach allen drei Korrekturen: Fingerprint
+`0xB455B5E3A0752A36`, Checkpoint Tick 100 `0x75C54A435FCFAB06`, finaler
+Zustandshash `0x87F889400D1B6C8C`. Vorher galt
+`0xB1126835B5F32BCF` / `0xD1B9E0D000E0A88A` / `0x25E9E181B19B945C`. Die
+einzige Zusage, die nicht brechen darf, hält:
+„Playback reproduced every recorded result and the recorded final state
+hash." Das Tripel wurde von drei unabhängig arbeitenden Agenten und einem
+separaten Verifikationslauf identisch reproduziert.
+
+**Begründung:** Die Kosten sind asymmetrisch. Heute kostet eine
+Hash-Verschiebung eine Zeile in einem Protokoll, weil keine Evidence die alten
+Zahlen referenziert. Nach der ersten G1-Evidence entwertet jede dieselbe
+Änderung die plattformübergreifende 10.000-Tick-Pinnung (V1) und erzwingt eine
+vollständige Neumessung auf Windows-x64 **und** macOS-arm64 samt Neuaufbau der
+Evidence-Kette. Korrektur (2) ist zudem keine Optimierung, sondern das
+Schließen eines Determinismuslochs: Ohne serialisiertes Kostenfeld ist eine
+Terrain-Mutation für den kanonischen Hash unsichtbar, und genau diesen Zustand
+müsste G1 sonst zertifizieren. (a) und (b) trügen dieses Loch in die
+Evidenzphase; (b) verschiebt außerdem ausgerechnet die einzige Änderung, die
+das Fenster wirklich braucht, weil (1) und (3) formatneutral sind.
+
+**Konsequenzen:**
+
+- Neue lokale Baseline wie oben. Jede weitere Verschiebung dieser Zahlen
+  verlangt dieselbe Behandlung: Test in beiden Lanes, grüner SelfCheck,
+  protokollierte Zahlen.
+- **Vor dem G1-Freeze zu klären, eigene D-ID nötig:** Der Restore von
+  Pathfinding-Block v2 erzwingt Gleichheit von serialisierter Epoche und
+  lebender `CostField.Epoch`. Heute ruft im Kernelpfad nichts `SetCost`, die
+  Epoche ist immer 0 und die Prüfung kostenlos. Sobald der Bau zur Laufzeit
+  Terrain verändert, lädt ein Snapshot nur noch in einen Host mit identischer
+  Mutationszahl — dann muss entweder das Kostenfeld selbst ein serialisierter
+  Block werden oder die Prüfung beginnt, legitime Ladevorgänge abzulehnen.
+- Das Fenster schließt mit der ersten G1-Evidence. Danach braucht jede
+  Formatänderung eine eigene Entscheidung samt vollständiger Neumessung auf
+  beiden Plattformen; die Eskalationsklausel K4 aus D-067 greift ab diesem
+  Zeitpunkt automatisch.
+- Der Harvester-Autozyklus ist notwendig, aber nicht hinreichend: `EconomySystem`
+  erzeugt keine Bewegung, und im kanonischen Layout liegen Feld (7,7) und
+  Raffinerie-Ursprung (8,4) drei Zellen auseinander. Ein Harvester füllt sich,
+  schaltet auf Rückkehr und hält. Das Schließen des Kreises ist G2-Arbeit.
+- Kein Artefakt dieser Korrekturen beansprucht Gate-Status; `quality/**` und
+  `.github/workflows/**` bleiben unberührt. G0, MS-0 und MS-1 bleiben offen.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -1121,6 +1303,21 @@ Gate-Evidence und keinen Game-Release.
 - Q-031–Q-034 sowie Q-038/Q-039 sind durch D-056–D-061 geschlossen;
   D-062–D-064 härten deren Evidence-Nachweis.
 - Sprint 5 (Asset Audit): D-053/D-054 ratifiziert; **Budget-Obergrenze ist mit 0 € geschlossen (Q-035, D-054)**; Seat-Planung (Q-036) entfällt/gegenstandslos; Bundle-Fenster-Monitoring (Q-037) entfällt zugunsten CC0/KI-Pipeline.
+- **D-ID-Kollision, vorbestehend, Klärung durch den Inhaber nötig:** Der
+  `[Unreleased]`-Abschnitt „Entschieden" in [../../CHANGELOG.md](../../CHANGELOG.md)
+  führt D-066 bis D-070 für den Art-Strang (Art-Mask-Kanäle, 0-€-Beschaffung,
+  Grid-Zellgröße, Fraktionspaletten, Sonniss-Lizenzlesart). Keine dieser
+  Entscheidungen steht in diesem Protokoll, und D-066 ist hier bereits durch
+  die Fail-Closed-Autorisierung belegt. Dieses Dokument ist nach D-001/D-005
+  die maßgebliche Registerstelle, deshalb sind D-067 und D-068 hier als
+  nächste freie IDs vergeben. Der Art-Strang braucht entweder eigene
+  eindeutige D-IDs oder eine eigene Registerstelle; bis dahin sind die
+  CHANGELOG-Nummern D-066 bis D-070 mehrdeutig.
+- **D-067 und D-068 sind ENTWÜRFE und nicht in Kraft**; sie warten auf die
+  Inhaberentscheidung (Dennis Westermann). Bis dahin gilt für die
+  Graybox-Spur der Status quo ohne Gate-Autorität, und die im
+  [ScopeLedger](ScopeLedger.md) registrierte Dokumentationsschuld ist offen
+  ausgewiesen, nicht erlassen.
 
 ## Nächste Schritte
 
@@ -1152,3 +1349,4 @@ Gate-Evidence und keinen Game-Release.
 | 1.13.0 | 2026-07-24 | D-064: Pass-Autorisierung bis zum subject-unabhängigen Trusted-Gate-Bootstrap gesperrt und Schema-1.3-Zielvertrag entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.14.0 | 2026-07-25 | D-065: Authorize-Run-Bindung der Evidence-Kette (workflow_dispatch-Event, exklusiver Authorize-Job, eindeutige Run-IDs) nach Re-Review-Befund N-1 entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.15.0 | 2026-07-25 | D-066: zirkulären Authorize-Vertrag durch fail-closed G0-A1 und zweiphasigen Receipt-Vertrag für G0-A2 ersetzt | Project Owner / Lead Technical Director / Lead QA Engineer |
+| 1.16.0 | 2026-07-26 | D-067 und D-068 als **Entwürfe** aufgenommen (Graybox-Spur ohne Gate-Autorität mit befristetem Dokumentationsschuld-Modus; Sim-Korrekturen im offenen Pre-G1-Formatfenster) – nicht in Kraft, Inhaberentscheidung ausstehend | Technical Writer (Entwurf) / Entscheid: Dennis Westermann |

@@ -18,6 +18,45 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Graybox-Slice: das Spiel ist erstmals sicht- und bedienbar (Diagnosestand,
+  ohne Gate-Status, ohne Evidence):** `Bootstrap.unity` enthielt bis dahin nur
+  Kamera und Licht, und im Repo existierte keine Zeile Eingabecode; der
+  vollständige `MatchRunner` wurde von nichts instanziiert. Neu sind ein
+  RTS-Kamerarig (Pfeiltasten/Randschwenk, Rad-Zoom, `Z`/`X`-Drehung), ein
+  Match-Bootstrap, der das kanonische Setup des Determinismus-Szenarios in eine
+  laufende Szene portiert, ein testbarer Intent-Dispatcher (Normalisierung,
+  Chunking an der 100er-Grenze des Command-Schemas, durchgereichte
+  Reject-Gründe), Geräteeingabe mit Auswahl/Bewegen/Stop/Angriff/Ernte/
+  Rückkehr/Bau/Produktion — jeder Befehl ausschließlich über
+  `MatchRunner.Ingress.TrySubmitIntent`, kein MonoBehaviour mutiert
+  Simulationszustand —, ein Debug-HUD und eine fog-of-war-getriebene
+  Einheitendarstellung, die für verborgene Einheiten gar keinen Proxy erzeugt
+  (Form kodiert Rolle, Farbe kodiert Spieler-Slot). `BootstrapSceneGenerator`
+  verdrahtet alles im Code; die `.unity`-Datei bleibt Maschinenausgabe.
+  Dazu drei Simulationskorrekturen im offenen Pre-G1-Formatfenster (D-068,
+  Entwurf): beschränkter Flow-Field-Cache je Ziel statt eines einzigen globalen
+  Feldes, `CostField.Epoch` mit Pathfinding-Snapshotblock v2 (Terrainänderungen
+  waren zuvor für den kanonischen Zustandshash unsichtbar) und ein
+  Harvester-Autozyklus ohne neuen Zustand. Verifiziert: Unity-Batchmode-
+  Kompilierung von 13 Assemblies ohne Fehler, 338/338 EditMode-Tests, 341/341
+  .NET-Tests, `DETERMINISM_10000`-SelfCheck grün mit neuer lokaler Baseline
+  (Fingerprint `0xB455B5E3A0752A36`, Checkpoint Tick 100
+  `0x75C54A435FCFAB06`, finaler Zustandshash `0x87F889400D1B6C8C`), macOS-
+  und Windows-Player gebaut, macOS-Player ausgeführt (zwei Läufe, null
+  Exceptions, alle sieben Systeme initialisiert). **Nicht verifiziert:** Look
+  and Feel (kein Rendering im Headless-Lauf) und der Windows-Player, der auf
+  diesem macOS-Host nicht gestartet werden konnte. **Nicht enthalten:** Kampf
+  ist mit einem flachen Schadenswert ohne Rüstung und Schadenstypen nicht
+  bewertbar, es gibt keine Siegauswertung (ein Match kann nicht enden), keine
+  KI auf Slot 1, keine Pause und kein Save/Load. Neue Governance-Dokumente
+  [docs/production/GrayboxLog.md](docs/production/GrayboxLog.md) (append-only
+  Sitzungsprotokoll) und
+  [docs/production/ScopeLedger.md](docs/production/ScopeLedger.md) (21
+  Registerzeilen, die auf Manifest-Schlüsselpfade zeigen statt Werte zu
+  kopieren); die Root-README erklärt Editor-Start, Steuerung und beide Player
+  einschließlich Gatekeeper- und SmartScreen-Hinweis. `quality/**`,
+  `.github/workflows/**` und `VERSION` blieben unberührt; G0, MS-0 und MS-1
+  bleiben offen.
 - **G1-Determinismus-Harness DETERMINISM_10000 (macOS-arm64-Hälfte der V1-Messung,
   ohne Gate-Status, ohne Evidence):** `tools/Nova.SimRunner` führt jetzt das
   Szenario `DETERMINISM_10000` aus
