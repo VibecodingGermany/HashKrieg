@@ -77,25 +77,35 @@ namespace Nova.Simulation.Economy
     /// <para>
     /// Scope (G2 reservation, D-010): fields are finite and never regrow,
     /// spread or take overharvest damage; there is no mother node and no
-    /// depletion warning. Faction differences are not modeled: every
-    /// harvester uses <see cref="UnitState.DefaultCargoCapacityAE"/> (330;
-    /// the Legion value 300 of quality/content/mvp-v1.json awaits the
-    /// faction slice — Q-040 candidate).
+    /// depletion warning. The slot faction (<see cref="PlayerEconomyState.Faction"/>)
+    /// IS modeled — it selects the definition row behind every cost, build
+    /// time, power figure and weapon profile. Harvester cargo capacity is the
+    /// one remaining flat value: every harvester uses
+    /// <see cref="UnitState.DefaultCargoCapacityAE"/> (330), the Legion value
+    /// 300 of quality/content/mvp-v1.json factions[1].identity.harvesterCargoAE
+    /// is registered ScopeLedger debt with return gate G4.
     /// </para>
     /// <para>
-    /// State (snapshot block <see cref="SnapshotBlockIds.Economy"/>, v1):
-    /// per slot credits/provided/required plus every field's id, position and
-    /// remaining reserve. Cargo and harvest orders live with the entities
+    /// State (snapshot block <see cref="SnapshotBlockIds.Economy"/>, v2):
+    /// per slot credits/provided/required plus the slot faction, plus every
+    /// field's id, position and remaining reserve. Cargo and harvest orders
+    /// live with the entities
     /// (entity store block, v4) — exactly one home per value, nothing
     /// duplicated. Hash-sensitive by construction; restore is two-phase and
-    /// validates credits &gt;= 0, reserves &gt;= 0 and unique nonzero field
+    /// validates credits &gt;= 0, reserves &gt;= 0, declared faction values
+    /// and unique nonzero field
     /// ids (entity-side cargo bounds are validated by the entity store).
     /// </para>
     /// </summary>
     public sealed class EconomySystem : IStatefulSimSystem
     {
-        /// <summary>Serialization version of the economy snapshot block.</summary>
-        public const byte StateVersion = 1;
+        /// <summary>
+        /// Serialization version of the economy snapshot block. v2 adds the
+        /// per-slot <see cref="FactionId"/> byte (faction identity slice);
+        /// v1 blocks are rejected, not migrated — the pre-G1 format reset is
+        /// deliberate and free of evidence.
+        /// </summary>
+        public const byte StateVersion = 2;
 
         /// <summary>Player slots (D-058 reserves eight; MS-1 activates two).</summary>
         public const int MaxPlayers = 8;
@@ -181,6 +191,41 @@ namespace Nova.Simulation.Economy
             }
             field = default;
             return false;
+        }
+
+        /// <summary>
+        /// The faction one slot plays (economy block v2). Part of the hashed
+        /// state, so every consumer of faction-differentiated content —
+        /// power figures, build costs, weapon profiles — reads it here rather
+        /// than carrying a second copy.
+        /// </summary>
+        public FactionId GetSlotFaction(byte playerId)
+        {
+            if (playerId >= MaxPlayers)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playerId), $"PlayerId must be between 0 and {MaxPlayers - 1}.");
+            }
+            return _players[playerId].Faction;
+        }
+
+        /// <summary>
+        /// Assigns a slot's faction at match setup (host content wiring, same
+        /// contract as <see cref="TryAddField"/>): call before the first tick,
+        /// so the faction is bound into the hashed initial state and the match
+        /// fingerprint. Values outside the declared <see cref="FactionId"/>
+        /// range are rejected.
+        /// </summary>
+        public void SetSlotFaction(byte playerId, FactionId faction)
+        {
+            if (playerId >= MaxPlayers)
+            {
+                throw new ArgumentOutOfRangeException(nameof(playerId), $"PlayerId must be between 0 and {MaxPlayers - 1}.");
+            }
+            if (faction != FactionId.Alliance && faction != FactionId.Legion)
+            {
+                throw new ArgumentOutOfRangeException(nameof(faction), faction, "unknown faction");
+            }
+            _players[playerId].Faction = faction;
         }
 
         /// <summary>
@@ -387,12 +432,14 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
-        /// Block content v1: version, then per slot (ascending) credits
-        /// int64, power provided/required int32, then the field count and per
-        /// field (ascending registration order) id uint16, grid x/y uint16
-        /// and remaining reserve int64. Hash-sensitive by construction: any
-        /// credit, power or reserve change moves the block bytes and
-        /// therefore the canonical state hash.
+        /// Block content v2: version, then per slot (ascending) credits
+        /// int64, power provided/required int32 and the faction uint8, then
+        /// the field count and per field (ascending registration order) id
+        /// uint16, grid x/y uint16 and remaining reserve int64. Hash-sensitive
+        /// by construction: any credit, power, faction or reserve change moves
+        /// the block bytes and therefore the canonical state hash — the
+        /// faction assignment is part of the initial state hash by exactly
+        /// this mechanism.
         /// </summary>
         public void WriteState(SnapshotBlockWriter writer)
         {
@@ -402,6 +449,7 @@ namespace Nova.Simulation.Economy
                 writer.WriteInt64(_players[p].AetheriumCredits);
                 writer.WriteInt32(_players[p].PowerProvided);
                 writer.WriteInt32(_players[p].PowerRequired);
+                writer.WriteUInt8((byte)_players[p].Faction);
             }
             writer.WriteUInt16(unchecked((ushort)_fieldCount));
             for (int i = 0; i < _fieldCount; i++)
@@ -444,7 +492,8 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Parses and fully validates block content — exact lengths, slot
-        /// invariants (credits &gt;= 0, power values &gt;= 0) and field
+        /// invariants (credits &gt;= 0, power values &gt;= 0, faction a
+        /// declared <see cref="FactionId"/>) and field
         /// invariants (nonzero unique ids, valid positions, reserves
         /// &gt;= 0) — into a commit-ready intermediate. Never mutates this
         /// system.
@@ -461,7 +510,8 @@ namespace Nova.Simulation.Economy
                 if (!reader.TryReadInt64(out long credits) || credits < 0) return false;
                 if (!reader.TryReadInt32(out int provided) || provided < 0) return false;
                 if (!reader.TryReadInt32(out int required) || required < 0) return false;
-                players[p] = new PlayerEconomyState((byte)p, credits)
+                if (!reader.TryReadUInt8(out byte factionRaw) || factionRaw > (byte)FactionId.Legion) return false;
+                players[p] = new PlayerEconomyState((byte)p, credits, (FactionId)factionRaw)
                 {
                     PowerProvided = provided,
                     PowerRequired = required,

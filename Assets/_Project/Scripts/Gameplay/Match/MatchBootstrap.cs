@@ -191,6 +191,13 @@ namespace Nova.Gameplay.Match
             Runner.InitializeMatch(_seed, _mapWidth, _mapHeight, _entityCapacity);
             Runner.StartMatch();
 
+            // Faction assignment (economy block v2): slot 0 plays Alliance,
+            // slot 1 plays Legion. Set BEFORE the opening position so the
+            // faction bytes are part of the hashed initial state — the
+            // scenario's SetupMatch does the same, in the same order.
+            Runner.Economy.SetSlotFaction(LocalSlot, FactionId.Alliance);
+            Runner.Economy.SetSlotFaction(EnemySlot, FactionId.Legion);
+
             // Slot order is load-bearing for entity ids: slot 0 first.
             SetupSlot(LocalLayout);
             SetupSlot(EnemyLayout);

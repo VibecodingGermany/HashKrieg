@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
@@ -313,7 +314,7 @@ namespace Nova.Simulation.Tests
             Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
             byte[] valid = SerializeBlock(economy);
 
-            // Layout v1: version(1) + 8 slots x (i64 + i32 + i32) = 1 + 128
+            // Layout v2: version(1) + 8 slots x (i64 + i32 + i32 + u8) = 1 + 136
             // bytes of slot state, then fieldCount u16, then the field record.
             byte[] negativeCredits = (byte[])valid.Clone();
             negativeCredits[8] = 0xFF; // slot 0 credits: highest byte -> negative
@@ -335,7 +336,7 @@ namespace Nova.Simulation.Tests
             Assert.That(economy2.TryAddField(2, new GridPos2D(50, 50), 15000), Is.True);
             byte[] twoFields = SerializeBlock(economy2);
             byte[] duplicate = (byte[])twoFields.Clone();
-            int secondFieldIdOffset = 1 + EconomySystem.MaxPlayers * 16 + 2 + 14; // second field record starts with its id
+            int secondFieldIdOffset = 1 + EconomySystem.MaxPlayers * 17 + 2 + 14; // second field record starts with its id
             duplicate[secondFieldIdOffset] = 1;
             duplicate[secondFieldIdOffset + 1] = 0;
             var victim2 = new EconomySystem(CreateEntities());
@@ -351,6 +352,96 @@ namespace Nova.Simulation.Tests
             byte[] after = SerializeBlock(economy);
             Assert.That(after, Is.Not.EqualTo(before),
                 "one AE of credits must move the block bytes and therefore the canonical state hash");
+        }
+
+        // ----------------------------------------------------------------
+        // Faction axis (economy block v2)
+        // ----------------------------------------------------------------
+
+        [Test]
+        public void SlotFaction_DefaultsToAlliance_OnEverySlot()
+        {
+            var economy = new EconomySystem(CreateEntities());
+            for (byte slot = 0; slot < EconomySystem.MaxPlayers; slot++)
+            {
+                Assert.That(economy.GetSlotFaction(slot), Is.EqualTo(FactionId.Alliance));
+                Assert.That(economy.GetPlayerEconomy(slot).Faction, Is.EqualTo(FactionId.Alliance));
+            }
+        }
+
+        [Test]
+        public void SetSlotFaction_AssignsAndReadsBack_ValidatesInput()
+        {
+            var economy = new EconomySystem(CreateEntities());
+            economy.SetSlotFaction(0, FactionId.Alliance);
+            economy.SetSlotFaction(1, FactionId.Legion);
+
+            Assert.That(economy.GetSlotFaction(0), Is.EqualTo(FactionId.Alliance));
+            Assert.That(economy.GetSlotFaction(1), Is.EqualTo(FactionId.Legion));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => economy.SetSlotFaction(8, FactionId.Legion));
+            Assert.Throws<ArgumentOutOfRangeException>(() => economy.SetSlotFaction(0, (FactionId)2));
+            Assert.Throws<ArgumentOutOfRangeException>(() => economy.GetSlotFaction(8));
+        }
+
+        [Test]
+        public void Block104_Roundtrip_PreservesTheSlotFaction()
+        {
+            var economy = new EconomySystem(CreateEntities());
+            economy.SetSlotFaction(1, FactionId.Legion);
+            byte[] bytes = SerializeBlock(economy);
+
+            var restored = new EconomySystem(CreateEntities());
+            Assert.That(restored.TryValidateState(bytes), Is.True);
+            Assert.That(restored.TryRestoreState(bytes), Is.True);
+            Assert.That(restored.GetSlotFaction(1), Is.EqualTo(FactionId.Legion));
+            Assert.That(restored.GetSlotFaction(0), Is.EqualTo(FactionId.Alliance));
+            Assert.That(SerializeBlock(restored), Is.EqualTo(bytes),
+                "the faction byte must roundtrip byte-identical");
+        }
+
+        [Test]
+        public void Block104_RejectsUndefinedFactionBytes_AndTheRetiredV1Layout()
+        {
+            var economy = new EconomySystem(CreateEntities());
+            economy.SetSlotFaction(1, FactionId.Legion);
+            byte[] valid = SerializeBlock(economy);
+
+            // Faction byte of slot 0 sits right after its i64 + i32 + i32.
+            byte[] badFaction = (byte[])valid.Clone();
+            badFaction[1 + 16] = 2;
+            var victim = new EconomySystem(CreateEntities());
+            Assert.That(victim.TryValidateState(badFaction), Is.False, "faction 2 is not declared");
+            Assert.That(victim.TryRestoreState(badFaction), Is.False);
+            Assert.That(victim.GetSlotFaction(0), Is.EqualTo(FactionId.Alliance),
+                "a rejected restore must not mutate the system");
+
+            // The retired v1 layout (no faction bytes) is rejected, not migrated.
+            var writer = new SnapshotBlockWriter();
+            writer.WriteUInt8(1);
+            for (int p = 0; p < EconomySystem.MaxPlayers; p++)
+            {
+                writer.WriteInt64(1000);
+                writer.WriteInt32(0);
+                writer.WriteInt32(0);
+            }
+            writer.WriteUInt16(0);
+            byte[] v1Block = writer.ToArray();
+            var legacy = new EconomySystem(CreateEntities());
+            Assert.That(legacy.TryValidateState(v1Block), Is.False,
+                "v1 blocks predate the faction axis and are refused outright");
+            Assert.That(legacy.TryRestoreState(v1Block), Is.False);
+        }
+
+        [Test]
+        public void Block104_FactionChange_ChangesBlockBytes()
+        {
+            var economy = new EconomySystem(CreateEntities());
+            byte[] before = SerializeBlock(economy);
+            economy.SetSlotFaction(1, FactionId.Legion);
+            byte[] after = SerializeBlock(economy);
+            Assert.That(after, Is.Not.EqualTo(before),
+                "the faction assignment must move the block bytes and therefore the initial state hash");
         }
     }
 }

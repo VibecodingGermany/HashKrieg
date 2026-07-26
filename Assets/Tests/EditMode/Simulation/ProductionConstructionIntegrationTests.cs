@@ -432,6 +432,7 @@ namespace Nova.Simulation.Tests
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
+                new byte[CommandLimits.ReservedPlayerSlots],
                 Seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);

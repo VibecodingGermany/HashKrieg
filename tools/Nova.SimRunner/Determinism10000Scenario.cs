@@ -772,6 +772,13 @@ namespace Nova.SimRunner
         /// </summary>
         private static SlotState[] SetupMatch(Host host)
         {
+            // Faction assignment (economy block v2): slot 0 Alliance, slot 1
+            // Legion. Set BEFORE the opening position so the faction bytes are
+            // part of the hashed initial state — MatchBootstrap does the same,
+            // in the same order.
+            host.Economy.SetSlotFaction(HumanSlot, FactionId.Alliance);
+            host.Economy.SetSlotFaction(AiSlot, FactionId.Legion);
+
             var slots = new[] { new SlotState(), new SlotState() };
             for (byte slot = 0; slot < 2; slot++)
             {
@@ -864,17 +871,21 @@ namespace Nova.SimRunner
             };
         }
 
-        /// <summary>The standard match configuration fingerprint: slot 0 human, slot 1 AI, stub content hashes.</summary>
+        /// <summary>The standard match configuration fingerprint: slot 0 human/Alliance, slot 1 AI/Legion, stub content hashes.</summary>
         private static MatchFingerprint CreateFingerprint(Host host, ulong seed)
         {
             var slots = new byte[CommandLimits.ReservedPlayerSlots];
             slots[HumanSlot] = (byte)PlayerSlotOccupancy.Human;
             slots[AiSlot] = (byte)PlayerSlotOccupancy.AI;
+            var factions = new byte[CommandLimits.ReservedPlayerSlots];
+            factions[HumanSlot] = (byte)FactionId.Alliance;
+            factions[AiSlot] = (byte)FactionId.Legion;
             return MatchFingerprint.CreateCurrent(
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
+                factions,
                 seed,
                 host.Kernel.CalculateStateHash(),
                 host.Session.InputDelayTicks);

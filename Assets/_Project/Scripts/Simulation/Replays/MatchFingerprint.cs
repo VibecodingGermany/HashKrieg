@@ -41,7 +41,10 @@ namespace Nova.Simulation.Replays
     /// It covers the State/Command/Payload/Snapshot/Sidecar schema versions,
     /// the numeric model id, the tick rate, the PRNG id, the
     /// rules/definitions/map content hashes, the match configuration (eight
-    /// reserved slots with their occupancies), the input delay
+    /// reserved slots with their occupancies AND their factions — the faction
+    /// assignment selects the definition row behind every faction-specific
+    /// value, so two matches with different slot factions are different
+    /// content and must never share a fingerprint), the input delay
     /// (Commands.md section 1: part of the fingerprint, MS-1 value exactly 1),
     /// the start seed and the hash of the initial state. Any missing or
     /// diverging component refuses replay start.
@@ -57,6 +60,7 @@ namespace Nova.Simulation.Replays
     /// PrngId u32 length + ASCII bytes |
     /// RulesHash64 u64 | DefinitionsHash64 u64 | MapHash64 u64 |
     /// SlotOccupancy 8 x u8 (0=Free, 1=Human, 2=AI) |
+    /// SlotFaction 8 x u8 (0=Alliance, 1=Legion) |
     /// StartSeed u64 | InitialStateHash u64 | InputDelayTicks u32
     /// </code>
     /// </para>
@@ -115,6 +119,7 @@ namespace Nova.Simulation.Replays
         public uint InputDelayTicks { get; }
 
         private readonly byte[] _slotOccupancy;
+        private readonly byte[] _slotFactions;
 
         /// <summary>
         /// Creates a fingerprint with explicit field values. Callers
@@ -137,6 +142,7 @@ namespace Nova.Simulation.Replays
             ulong definitionsHash64,
             ulong mapHash64,
             byte[] slotOccupancy,
+            byte[] slotFactions,
             ulong startSeed,
             ulong initialStateHash,
             uint inputDelayTicks)
@@ -159,6 +165,22 @@ namespace Nova.Simulation.Replays
                         nameof(slotOccupancy));
                 }
             }
+            if (slotFactions == null) throw new ArgumentNullException(nameof(slotFactions));
+            if (slotFactions.Length != CommandLimits.ReservedPlayerSlots)
+            {
+                throw new ArgumentException(
+                    $"Exactly {CommandLimits.ReservedPlayerSlots} slot factions are required.",
+                    nameof(slotFactions));
+            }
+            for (int i = 0; i < slotFactions.Length; i++)
+            {
+                if (slotFactions[i] > (byte)State.FactionId.Legion)
+                {
+                    throw new ArgumentException(
+                        $"Slot {i} faction {slotFactions[i]} is not a defined value.",
+                        nameof(slotFactions));
+                }
+            }
 
             StateSchemaVersion = stateSchemaVersion;
             CommandSchemaVersion = commandSchemaVersion;
@@ -172,6 +194,7 @@ namespace Nova.Simulation.Replays
             DefinitionsHash64 = definitionsHash64;
             MapHash64 = mapHash64;
             _slotOccupancy = (byte[])slotOccupancy.Clone();
+            _slotFactions = (byte[])slotFactions.Clone();
             StartSeed = startSeed;
             InitialStateHash = initialStateHash;
             InputDelayTicks = inputDelayTicks;
@@ -186,6 +209,7 @@ namespace Nova.Simulation.Replays
             ulong definitionsHash64,
             ulong mapHash64,
             byte[] slotOccupancy,
+            byte[] slotFactions,
             ulong startSeed,
             ulong initialStateHash,
             uint inputDelayTicks)
@@ -195,7 +219,7 @@ namespace Nova.Simulation.Replays
                 SnapshotSchemaVersionV1, SidecarSchemaVersionV1,
                 NumericModelIdV1, TicksPerSecondV1, PrngIdV1,
                 rulesHash64, definitionsHash64, mapHash64,
-                slotOccupancy, startSeed, initialStateHash, inputDelayTicks);
+                slotOccupancy, slotFactions, startSeed, initialStateHash, inputDelayTicks);
         }
 
         /// <summary>
@@ -226,10 +250,23 @@ namespace Nova.Simulation.Replays
         /// <summary>A defensive copy of the eight slot occupancies.</summary>
         public byte[] GetSlotOccupancyCopy() => (byte[])_slotOccupancy.Clone();
 
+        /// <summary>Faction of one reserved slot (index 0..7).</summary>
+        public State.FactionId GetSlotFaction(int slot)
+        {
+            if (slot < 0 || slot >= CommandLimits.ReservedPlayerSlots)
+            {
+                throw new ArgumentOutOfRangeException(nameof(slot));
+            }
+            return (State.FactionId)_slotFactions[slot];
+        }
+
+        /// <summary>A defensive copy of the eight slot factions.</summary>
+        public byte[] GetSlotFactionCopy() => (byte[])_slotFactions.Clone();
+
         /// <summary>Serializes the canonical little-endian fingerprint bytes.</summary>
         public byte[] Serialize()
         {
-            var writer = new SnapshotBlockWriter(128);
+            var writer = new SnapshotBlockWriter(136);
             writer.WriteUInt16(StateSchemaVersion);
             writer.WriteUInt16(CommandSchemaVersion);
             writer.WriteUInt16(PayloadSchemaVersion);
@@ -242,6 +279,7 @@ namespace Nova.Simulation.Replays
             writer.WriteUInt64(DefinitionsHash64);
             writer.WriteUInt64(MapHash64);
             writer.WriteBytes(_slotOccupancy);
+            writer.WriteBytes(_slotFactions);
             writer.WriteUInt64(StartSeed);
             writer.WriteUInt64(InitialStateHash);
             writer.WriteUInt32(InputDelayTicks);
@@ -271,6 +309,7 @@ namespace Nova.Simulation.Replays
             if (!reader.TryReadUInt64(out ulong definitionsHash)) return false;
             if (!reader.TryReadUInt64(out ulong mapHash)) return false;
             if (!reader.TryReadBytes(CommandLimits.ReservedPlayerSlots, out ReadOnlySpan<byte> slots)) return false;
+            if (!reader.TryReadBytes(CommandLimits.ReservedPlayerSlots, out ReadOnlySpan<byte> factions)) return false;
             if (!reader.TryReadUInt64(out ulong startSeed)) return false;
             if (!reader.TryReadUInt64(out ulong initialStateHash)) return false;
             if (!reader.TryReadUInt32(out uint inputDelayTicks)) return false;
@@ -282,11 +321,11 @@ namespace Nova.Simulation.Replays
                     stateVersion, commandVersion, payloadVersion, snapshotVersion, sidecarVersion,
                     numericModelId, ticksPerSecond, prngId,
                     rulesHash, definitionsHash, mapHash,
-                    slots.ToArray(), startSeed, initialStateHash, inputDelayTicks);
+                    slots.ToArray(), factions.ToArray(), startSeed, initialStateHash, inputDelayTicks);
             }
             catch (ArgumentException)
             {
-                return false; // undefined slot occupancy value
+                return false; // undefined slot occupancy or faction value
             }
             return true;
         }
@@ -324,10 +363,12 @@ namespace Nova.Simulation.Replays
             hash.WriteFieldTag(12);
             hash.WriteBytes(_slotOccupancy);
             hash.WriteFieldTag(13);
-            hash.WriteUInt64(StartSeed);
+            hash.WriteBytes(_slotFactions);
             hash.WriteFieldTag(14);
-            hash.WriteUInt64(InitialStateHash);
+            hash.WriteUInt64(StartSeed);
             hash.WriteFieldTag(15);
+            hash.WriteUInt64(InitialStateHash);
+            hash.WriteFieldTag(16);
             hash.WriteUInt32(InputDelayTicks);
             return hash.Digest();
         }
@@ -349,6 +390,7 @@ namespace Nova.Simulation.Replays
                 && DefinitionsHash64 == other.DefinitionsHash64
                 && MapHash64 == other.MapHash64
                 && _slotOccupancy.AsSpan().SequenceEqual(other._slotOccupancy)
+                && _slotFactions.AsSpan().SequenceEqual(other._slotFactions)
                 && StartSeed == other.StartSeed
                 && InitialStateHash == other.InitialStateHash
                 && InputDelayTicks == other.InputDelayTicks;
@@ -375,6 +417,10 @@ namespace Nova.Simulation.Replays
                 for (int i = 0; i < _slotOccupancy.Length; i++)
                 {
                     hash = (hash * 31) ^ _slotOccupancy[i];
+                }
+                for (int i = 0; i < _slotFactions.Length; i++)
+                {
+                    hash = (hash * 31) ^ _slotFactions[i];
                 }
                 return hash;
             }
@@ -403,6 +449,10 @@ namespace Nova.Simulation.Replays
             for (int i = 0; i < _slotOccupancy.Length; i++)
             {
                 if (_slotOccupancy[i] != other._slotOccupancy[i]) return $"SlotOccupancy[{i}]";
+            }
+            for (int i = 0; i < _slotFactions.Length; i++)
+            {
+                if (_slotFactions[i] != other._slotFactions[i]) return $"SlotFaction[{i}]";
             }
             if (StartSeed != other.StartSeed) return "StartSeed";
             if (InitialStateHash != other.InitialStateHash) return "InitialStateHash";
