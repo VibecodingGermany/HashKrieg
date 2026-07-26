@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.16.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.17.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -1296,6 +1296,145 @@ das Fenster wirklich braucht, weil (1) und (3) formatneutral sind.
 
 ---
 
+### D-069 | verbindlich | Sprint 7 (Art-Strang, Kanalbelegung der Art-Mask-Textur)
+
+**Kontext:** Der MS-1-Art-Strang benötigt eine feste Kanalbelegung für die
+Maskentextur des `NovaUnit`-Materials; [ArtAssetStandard.md](../assets/ArtAssetStandard.md)
+setzt diese Festlegung voraus.
+
+**Alternativen:** (a) R=Metallic/G=Smoothness/B=Occlusion/A=TeamMask –
+verlustärmste Maske im Alpha-Block, bricht aber die URP-Lit-Kompatibilität;
+(b) separate einkanalige Team-Maskentextur – beste Qualität, verletzt die
+Ein-Textur-Set-Regel aus [AssetBudget.md](../tech/AssetBudget.md);
+(c) Team-Maske über Vertex Colors – spart eine Texturebene, ist an die
+Mesh-Auflösung gebunden und über LOD-Stufen nicht stabil; (d) R=Metallic,
+G=Occlusion, B=TeamMask, A=Smoothness.
+
+**Entscheidung:** (d) – R = Metallic · G = Occlusion · B = TeamMask ·
+A = Smoothness.
+
+**Begründung:** Metallic in R und Smoothness in A entsprechen der
+URP-Lit-Konvention, dadurch rendert jedes Asset auch ohne den
+projekteigenen `NovaUnit`-Shader auf reinem URP Lit korrekt – nur ohne
+Teamfarbe. Das entkoppelt den Art-Strang vom Shader-Strang. TeamMask in B,
+weil eine großflächige weiche Maske die BC7-Kompression im geteilten
+RGB-Block am besten verträgt.
+
+**Konsequenzen:** [ArtAssetStandard.md](../assets/ArtAssetStandard.md)
+verankert die Kanalbelegung verbindlich für alle 34 MS-1-Assets.
+
+### D-070 | verbindlich | Sprint 7 (Art-Strang, 0-€-Beschaffungspfad)
+
+**Kontext:** Der MS-1-Art-Strang braucht einen verbindlichen
+Beschaffungspfad ohne Budget; [SourceCatalog_MS1.md](../assets/SourceCatalog_MS1.md)
+und [Licenses.md](../assets/Licenses.md) benötigen eine Whitelist/Blacklist.
+
+**Alternativen:** (a) bezahlter Anbieter-Tier (~20 $/Monat) – klarste
+Rechtslage, scheitert am fehlenden Budget; (b) ausschließlich CC0 ohne KI –
+maximale Rechtssicherheit, deckt laut Recherche nur einen Teil der
+17 Rollen stilistisch ab; (c) Kauf-Kits wie Synty – einheitlicher Stil out
+of the box, kostet Geld und schränkt die Weitergabe im öffentlichen Repo
+ein; (d) 0-€-Pfad aus CC0-Quellen, Hunyuan3D 2.1 lokal/self-hosted, OpenAI
+Image API für 2D-Referenz und Sketchfab nach Einzelfallprüfung.
+
+**Entscheidung:** (d) – erlaubt: CC0-Quellen (Quaternius, Kenney,
+Poly Haven, ambientCG), Hunyuan3D 2.1 lokal/self-hosted, OpenAI Image API
+für 2D-Referenz, Sketchfab nach dokumentierter Einzelfallprüfung; gesperrt:
+Meshy Free-Tier, Tripo3D Free-Tier und jeder Anbieter ohne belegbare
+kommerzielle Nutzung und ohne Output-Eigentum im kostenlosen Tier;
+Default-Deny für neue Anbieter.
+
+**Begründung:** Kein Budget, MVP-Priorität. Hunyuan3D 2.1 ist der einzige
+Pfad, der 0 €, kommerzielle Nutzung und Output-Eigentum zusammenbringt.
+
+**Konsequenzen:** Geringere vertragliche Eigentumssicherheit als ein
+bezahlter Tier (Community License statt kommerziellem Vertrag) und eine
+Hardware-Abhängigkeit (Größenordnung 16–24 GB VRAM, als Schätzung
+markiert), ausdrücklich als erkaufter Preis benannt. Rückfallebene ist
+reiner CC0-Kitbash, **kein** bezahlter Dienst.
+[SourceCatalog_MS1.md](../assets/SourceCatalog_MS1.md) und
+[Licenses.md](../assets/Licenses.md) führen die Whitelist/Blacklist.
+
+### D-071 | verbindlich | Sprint 7 (Art-Strang, Grid-Zellgröße und Gebäude-Footprints)
+
+**Kontext:** [Buildings.md](../gamedesign/Buildings.md) lässt die
+Gebäude-Footprints offen; ohne feste Zahl ist keine Modellierung möglich.
+
+**Alternativen:** (a) 2,0-m-Zelle – feinere Basenplatzierung, macht
+Gebäude im Verhältnis zu Fahrzeugen zu klein; (b) 4,0-m-Zelle – wuchtigere
+Bauten, kostet Platzierungsflexibilität auf der Karte; (c) Modellierung
+ohne Grid-Bindung und späteres Skalieren – vermeidet die Festlegung,
+erzeugt aber Nacharbeit an jedem Asset und inkonsistente Texel-Density;
+(d) 3,0-m-Zelle mit festen Footprints Power 3×3, Refinery 4×4,
+Barracks 3×3, ResearchLab 3×3.
+
+**Entscheidung:** (d) – 1 Grid-Zelle = 3,0 m; 2×2 = 6,0 m, 3×3 = 9,0 m,
+4×4 = 12,0 m Kantenlänge; Power 3×3, Refinery 4×4, Barracks 3×3,
+ResearchLab 3×3, je Fraktion identisch.
+
+**Begründung:** `Buildings.md` markiert die Footprints selbst als offen;
+ohne feste Zahl ist keine Modellierung möglich. Die Werte sind
+art-seitige Arbeitsannahmen, die die Simulation überschreiben darf –
+Modellmaße folgen dann der Zellzahl, nicht umgekehrt.
+
+**Konsequenzen:** [ArtAssetStandard.md](../assets/ArtAssetStandard.md) und
+[VerticalSlice_MS1.md](../assets/VerticalSlice_MS1.md) legen die
+Footprints als Art-Arbeitsannahme zugrunde, überschreibbar durch die
+Simulation.
+
+### D-072 | verbindlich | Sprint 7 (Art-Strang, Fraktionspaletten MS-1)
+
+**Kontext:** [Factions.md](../gamedesign/Factions.md) nennt nur
+Farbnamen; der Art-Strang benötigt verbindliche Hex-Werte für Allianz und
+Legion.
+
+**Alternativen:** (a) Farbnamen ohne Hex-Werte belassen – maximale
+Flexibilität, macht jedes Asset unvergleichbar; (b) kräftigere,
+gesättigtere Töne – höherer Wiedererkennungswert, kollidiert mit der
+Spielerfarbe, die laut [CoreGameplay.md](../vision/CoreGameplay.md)
+Vorrang hat; (c) Farbwahl erst nach dem ersten fertigen Asset –
+realitätsnäher, blockiert aber den parallelen Start an mehreren Assets;
+(d) feste Hex-Paletten je Fraktion, jetzt entschieden.
+
+**Entscheidung:** (d) – Allianz Grundton `#8A9199`, Sekundär `#2C6E9E`,
+Akzent `#4FD8FF`. Legion Grundton `#7A3524`, Sekundär `#B08430`,
+Akzent `#2B2018`.
+
+**Begründung:** Die Werte sind auf Lesbarkeit bei 18–90 m Kameradistanz
+und auf Unterscheidbarkeit bei Deuteranopie/Protanopie ausgelegt; die
+Blau-gegen-Rot-Schwäche wird über Helligkeitskontrast und Formensprache
+aufgefangen.
+
+**Konsequenzen:** [ArtAssetStandard.md](../assets/ArtAssetStandard.md) und
+[VerticalSlice_MS1.md](../assets/VerticalSlice_MS1.md) führen die
+Fraktionspaletten als verbindlich für MS-1.
+
+### D-073 | verbindlich | Sprint 7 (Art-Strang, Sonniss-Weitergabe)
+
+**Kontext:** [Licenses.md](../assets/Licenses.md) §1 und
+[AssetRegister.md](../assets/AssetRegister.md) §3.11 widersprachen sich
+zur Weitergabe von Sonniss-GDC-Bundle-Rohdateien im öffentlichen
+Repository.
+
+**Alternativen:** (a) permissive Lesart, Rohdateien ins Repo – bequem,
+riskiert einen Lizenzverstoß im öffentlichen Repository; (b) Rohdateien
+in ein separates privates Repository auslagern – sauber, erhöht die
+Einrichtungs- und Pflegekomplexität; (c) Sonniss ganz streichen und nur
+CC0-Audio nutzen – maximale Sicherheit, verkleinert die verfügbare
+Klangbibliothek deutlich; (d) restriktive Lesart: Sonniss-GDC-Bundles
+royalty-free zur Verwendung *in* Spielen, nicht zur Weitergabe als
+Sammlung im öffentlichen Repo.
+
+**Entscheidung:** (d) – die restriktive Lesart gilt.
+
+**Begründung:** Bei Lizenzunsicherheit gilt die engere Auslegung.
+
+**Konsequenzen:** [Licenses.md](../assets/Licenses.md) korrigiert die
+Weitergaberegel; Sonniss-Rohdateien werden nicht ins öffentliche
+Repository eingecheckt.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -1303,16 +1442,21 @@ das Fenster wirklich braucht, weil (1) und (3) formatneutral sind.
 - Q-031–Q-034 sowie Q-038/Q-039 sind durch D-056–D-061 geschlossen;
   D-062–D-064 härten deren Evidence-Nachweis.
 - Sprint 5 (Asset Audit): D-053/D-054 ratifiziert; **Budget-Obergrenze ist mit 0 € geschlossen (Q-035, D-054)**; Seat-Planung (Q-036) entfällt/gegenstandslos; Bundle-Fenster-Monitoring (Q-037) entfällt zugunsten CC0/KI-Pipeline.
-- **D-ID-Kollision, vorbestehend, Klärung durch den Inhaber nötig:** Der
-  `[Unreleased]`-Abschnitt „Entschieden" in [../../CHANGELOG.md](../../CHANGELOG.md)
-  führt D-066 bis D-070 für den Art-Strang (Art-Mask-Kanäle, 0-€-Beschaffung,
-  Grid-Zellgröße, Fraktionspaletten, Sonniss-Lizenzlesart). Keine dieser
-  Entscheidungen steht in diesem Protokoll, und D-066 ist hier bereits durch
-  die Fail-Closed-Autorisierung belegt. Dieses Dokument ist nach D-001/D-005
-  die maßgebliche Registerstelle, deshalb sind D-067 und D-068 hier als
-  nächste freie IDs vergeben. Der Art-Strang braucht entweder eigene
-  eindeutige D-IDs oder eine eigene Registerstelle; bis dahin sind die
-  CHANGELOG-Nummern D-066 bis D-070 mehrdeutig.
+- **D-ID-Kollision beim Merge des Art-Strangs aufgelöst — vorläufig, Bestätigung
+  durch den Inhaber erbeten:** Der Art-Strang (Branch `docs/ms1-art-strand`,
+  PR #8) war vor der Governance-Familie abgezweigt und hatte D-066 bis D-070
+  unabhängig belegt. Dadurch waren D-066, D-067 und D-068 nach dem Merge je
+  zweimal mit völlig unterschiedlichem Inhalt vergeben. Aufgelöst wurde zugunsten
+  der Governance-Nummerierung: D-066 (Fail-Closed-Autorisierung) sowie die
+  Entwürfe D-067/D-068 behalten ihre IDs, der Art-Strang wurde geschlossen auf
+  **D-069 bis D-073** verschoben. Ausschlaggebend war die Referenzlast, nicht
+  der Rang: die Governance-IDs sind aus zehn Dokumenten heraus referenziert
+  (MVPRecoveryPlan, Milestones, Roadmap, Architecture, RiskAnalysis,
+  SprintPlanning und weitere), die Art-IDs außerhalb dieses Protokolls nur aus
+  `docs/README.md`. **Inhalt, Wortlaut und Verbindlichkeit der fünf
+  Art-Entscheidungen sind unverändert** — verschoben wurden ausschließlich die
+  Nummern. Der Inhaber möge die Zuordnung bestätigen oder eine andere Aufteilung
+  anweisen; eine erneute Umnummerierung ist mechanisch und billig.
 - **D-067 und D-068 sind ENTWÜRFE und nicht in Kraft**; sie warten auf die
   Inhaberentscheidung (Dennis Westermann). Bis dahin gilt für die
   Graybox-Spur der Status quo ohne Gate-Autorität, und die im
@@ -1350,3 +1494,4 @@ das Fenster wirklich braucht, weil (1) und (3) formatneutral sind.
 | 1.14.0 | 2026-07-25 | D-065: Authorize-Run-Bindung der Evidence-Kette (workflow_dispatch-Event, exklusiver Authorize-Job, eindeutige Run-IDs) nach Re-Review-Befund N-1 entschieden | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.15.0 | 2026-07-25 | D-066: zirkulären Authorize-Vertrag durch fail-closed G0-A1 und zweiphasigen Receipt-Vertrag für G0-A2 ersetzt | Project Owner / Lead Technical Director / Lead QA Engineer |
 | 1.16.0 | 2026-07-26 | D-067 und D-068 als **Entwürfe** aufgenommen (Graybox-Spur ohne Gate-Autorität mit befristetem Dokumentationsschuld-Modus; Sim-Korrekturen im offenen Pre-G1-Formatfenster) – nicht in Kraft, Inhaberentscheidung ausstehend | Technical Writer (Entwurf) / Entscheid: Dennis Westermann |
+| 1.17.0 | 2026-07-26 | Art-Strang MS-1 aus PR #8 aufgenommen (Art-Mask-Kanalbelegung, 0-€-Beschaffungspfad mit Whitelist/Blacklist, Grid-Zellgröße 3,0 m mit Gebäude-Footprints, Fraktionspaletten Allianz/Legion, restriktive Sonniss-Weitergaberegel). Beim Merge kollidierten die dort unabhängig vergebenen IDs D-066–D-070 mit D-066/D-067/D-068; der Art-Strang wurde inhaltsgleich auf **D-069–D-073** verschoben, siehe „Offene Punkte" | Technical Art / Producer / Project Owner |

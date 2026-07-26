@@ -871,16 +871,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   konfiguriertes `quality-gate`-Environment; G0-A und G0 bleiben offen.
 
 ### Entschieden
-- **D-066:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
+- **D-069:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
   B=TeamMask/A=Smoothness (URP-Lit-kompatibel).
-- **D-067:** 0-€-Beschaffungspfad für den Art-Strang mit Anbieter-Whitelist
+- **D-070:** 0-€-Beschaffungspfad für den Art-Strang mit Anbieter-Whitelist
   (CC0-Quellen, Hunyuan3D 2.1 lokal, OpenAI Image API, Sketchfab per
   Einzelfallprüfung) und Blacklist (Meshy/Tripo3D Free-Tier, Default-Deny).
-- **D-068:** Art-seitige Grid-Zellgröße 3,0 m und feste MS-1-Gebäude-
+- **D-071:** Art-seitige Grid-Zellgröße 3,0 m und feste MS-1-Gebäude-
   Footprints (Power 3×3, Refinery 4×4, Barracks 3×3, ResearchLab 3×3).
-- **D-069:** Fraktionspaletten Allianz (`#8A9199`/`#2C6E9E`/`#4FD8FF`) und
+- **D-072:** Fraktionspaletten Allianz (`#8A9199`/`#2C6E9E`/`#4FD8FF`) und
   Legion (`#7A3524`/`#B08430`/`#2B2018`) für MS-1 verbindlich.
-- **D-070:** Sonniss-GDC-Bundle-Rohdateien werden gemäß restriktiver
+- **D-073:** Sonniss-GDC-Bundle-Rohdateien werden gemäß restriktiver
   Lizenzlesart nicht ins öffentliche Repository eingecheckt.
 - **D-066 (Fail-Closed-Foundation und zweiphasige Autorisierung):** D-065
   wurde ersetzt. G0-A1 umfasst nur die mergefähige Integritätsgrundlage;
@@ -923,7 +923,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Gate-Status, ohne Evidence):** Hunyuan3D-Lizenzangabe in
   [docs/assets/Licenses.md](docs/assets/Licenses.md) nach Version
   differenziert und um Anbieter-Whitelist/Blacklist ergänzt;
-  Sonniss-Weitergaberegel korrigiert (restriktive Lesart, D-070);
+  Sonniss-Weitergaberegel korrigiert (restriktive Lesart, D-073);
   Synty-Zuordnungen in
   [docs/assets/AssetRegister.md](docs/assets/AssetRegister.md) als durch
   D-054 ersetzt markiert und um eine MS-1-Strategiespalte ergänzt;

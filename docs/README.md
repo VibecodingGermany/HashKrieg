@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.12.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.13.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -140,6 +140,16 @@ gelisteten Kernverträge.
 - [AssetRegister](assets/AssetRegister.md)
 - [Licenses](assets/Licenses.md)
 - [BuildBacklog](assets/BuildBacklog.md)
+- [ArtAssetStandard](assets/ArtAssetStandard.md) (0.2.0, Entwurf) –
+  Art-Standard (Ordner, Namen, Import, Material, Masken)
+- [ArtManifest_MS1](assets/ArtManifest_MS1.md) (0.3.0, Entwurf) –
+  Spezifikationsblätter der 34 MS-1-Art-Assets
+- [SourceCatalog_MS1](assets/SourceCatalog_MS1.md) (0.2.0, Entwurf) –
+  CC0-/KI-Beschaffungskatalog und Lizenzbefunde
+- [Provenance](assets/Provenance.md) (0.1.0, Entwurf) –
+  Provenienz- und Lizenznachweisverfahren je Asset
+- [VerticalSlice_MS1](assets/VerticalSlice_MS1.md) (0.2.0, Entwurf) –
+  Vertical-Slice-Spezifikation der vier Erst-Assets
 
 ## Production und Recovery
 
@@ -152,6 +162,8 @@ gelisteten Kernverträge.
 - [DecisionLog](production/DecisionLog.md)
 - [OpenQuestions](production/OpenQuestions.md)
 - [RiskAnalysis](production/RiskAnalysis.md)
+- [GrayboxLog](production/GrayboxLog.md) – Sitzungsprotokoll der Graybox-Spur (D-067, Entwurf)
+- [ScopeLedger](production/ScopeLedger.md) – Zurückstellungen der Graybox-Spur, verweist auf Manifest-Schlüsselpfade
 - Sprintberichte: [0](production/sprints/Sprint00_Report.md),
   [1](production/sprints/Sprint01_Report.md),
   [2](production/sprints/Sprint02_Report.md),
@@ -218,3 +230,5 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.10.0 | 2026-07-24 | D-063-Schema 1.2, gepinntes Ajv, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trust indexiert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.11.0 | 2026-07-24 | D-064 Trusted-Gate-Bootstrap, Schema-1.3-Ziel und fail-closed G0-A-Start indexiert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.12.0 | 2026-07-25 | D-066: G0-A1 Integrity von G0-A2 Receipt-Autorisierung getrennt und zirkulären Authorize-Pfad zurückgezogen | Executive Producer / Technical Writer / Lead QA Engineer |
+| 0.12.1 | 2026-07-25 | Art-Strang MS-1 (D-069–D-073) indexiert: ArtAssetStandard, ArtManifest_MS1, SourceCatalog_MS1, Provenance, VerticalSlice_MS1 – kein Gate-Status, kein Asset im Repository | Technical Writer |
+| 0.13.0 | 2026-07-26 | Graybox-Spur indexiert: GrayboxLog und ScopeLedger aufgenommen; Art-Strang-D-IDs nach der Merge-Kollision auf D-069–D-073 nachgeführt | Technical Writer |

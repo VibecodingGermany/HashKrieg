@@ -1,6 +1,6 @@
 # Asset-Register (Asset Audit)
 
-**Version:** 1.2.1 | **Status:** sprint-freigegeben – MS-1 rebaselined | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 5
+**Version:** 1.3.0 | **Status:** sprint-freigegeben – MS-1 rebaselined | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 5
 
 ## Zweck
 
@@ -12,6 +12,7 @@ Die Bedarfsmengen folgen der **Single-Source-of-Truth-Regel** (D-047): jede Zahl
 
 - [ProcurementStrategy.md](ProcurementStrategy.md) – Strategie B (D-053), Klassifikations-Rubrik, Bewertungsdimensionen
 - [Licenses.md](Licenses.md) – Lizenz-Register (Seats/Attribution/Weitergabe je Quelle)
+- [SourceCatalog_MS1.md](SourceCatalog_MS1.md) §5 – Rollen-zu-Quelle-Zuordnung für die MS-1-Strategien (CC0-Base/AI-Generated/Hybrid) in §3.3–3.5
 - [BuildBacklog.md](BuildBacklog.md) – Detail zu allen BUILD/MODIFY-Eigenbauten
 - [../tech/AssetBudget.md](../tech/AssetBudget.md) – Polycount-/Textur-/LOD-Budgets, Kauf-Prüfung §6
 - [../research/AssetStore_Landschaft.md](../research/AssetStore_Landschaft.md) – Marktquellen und Preisniveaus
@@ -25,6 +26,8 @@ Einheitenrollen und Glutrinne aus
 [MVPContentManifest.md](../production/MVPContentManifest.md) produziert.
 Evolvierte, Luft, Eliten, Superwaffen, Drohnen, Commander und weitere Biome
 sind Post-MVP.
+
+**Ergänzung 2026-07-25 (ersetzt durch D-054):** Die Synty-/Kauf-Zuordnungen in §3.3–3.5 (Kandidatenquelle, Kosten, BUY/MODIFY) sind das historische Vollspiel-Beschaffungsinventar aus Sprint 5 und bleiben unverändert stehen (keine stille Umschreibung). Für MS-1 sind sie **überholt und ersetzt durch D-054** (0-€-Strategie: CC0 + KI-Generierung, kein Kauf-Tier). Die verbindliche MS-1-Zuordnung steht in der jeweils neu ergänzten Spalte „MS-1-Strategie (D-054)" der drei Tabellen und folgt der Rollen-zu-Quelle-Recherche in [SourceCatalog_MS1.md](SourceCatalog_MS1.md) §5.
 
 ## 1. Fraktionen (Kontext für alle Einheiten-Kategorien)
 
@@ -83,11 +86,13 @@ Aetherium ist das **Signature-Element** (D-010) und funktional einzigartig (Nach
 
 Führend: [Buildings.md](../gamedesign/Buildings.md) (D-008). Modulare Sci-Fi-Baukästen + fraktionsspezifisches Kit-Bashing sind der Kohärenz-Weg (größter Einzelposten der Pipeline).
 
-| Fraktion | Bedarf | Kandidatenquelle | Kosten | Aufwand | Klasse |
-|---|---|---|---|---|---|
-| Allianz | 12 | Synty Sci-Fi City/Outpost (modular) | in Packs | 0,5–1 PT/Gebäude Dach-/Detail-Kitbash | **MODIFY** |
-| Legion | 12 | Synty Sci-Fi + Apocalypse (industriell/roh) | in Packs | 0,5–1 PT/Gebäude | **MODIFY** |
-| Evolvierte | 12 | — kaum Store-Deckung (organisch) — | – | 1,5–3 PT/Gebäude Eigenbau | **BUILD** |
+| Fraktion | Bedarf | Kandidatenquelle (Vollspiel, ersetzt durch D-054) | Kosten | Aufwand | Klasse | MS-1-Strategie (D-054)[^ms1] |
+|---|---|---|---|---|---|---|
+| Allianz | 12 | Synty Sci-Fi City/Outpost (modular) *(ersetzt durch D-054)* | in Packs | 0,5–1 PT/Gebäude Dach-/Detail-Kitbash | **MODIFY** | **Hybrid** (CC0-Kitbashing Quaternius/Kenney + KI-Nachgenerierung je Rolle) |
+| Legion | 12 | Synty Sci-Fi + Apocalypse (industriell/roh) *(ersetzt durch D-054)* | in Packs | 0,5–1 PT/Gebäude | **MODIFY** | **Hybrid** (CC0-Kitbashing Quaternius/Kenney + KI-Nachgenerierung je Rolle) |
+| Evolvierte | 12 | — kaum Store-Deckung (organisch) — | – | 1,5–3 PT/Gebäude Eigenbau | **BUILD** | n/a (Post-MVP, D-056 – nicht Teil des MS-1-Bedarfs) |
+
+[^ms1]: MS-1 umfasst nur die neun Gebäuderollen aus [MVPContentManifest.md](../production/MVPContentManifest.md) (HQ, Reaktor, Raffinerie, Kaserne, Fahrzeugfabrik, Radar, Geschützstellung u. a.); die 12/Fraktion-Zahl bleibt das Vollspiel-Maß. Rollen-genaue Quellenzuordnung: [SourceCatalog_MS1.md](SourceCatalog_MS1.md) §5.
 
 Bau-/Trümmer-Zustände (D-012) liegen im selben Polycount-Budget ([AssetBudget.md](../tech/AssetBudget.md) §1), sind aber je Gebäude als Material-/Mesh-Swap zu erstellen (im Aufwand enthalten).
 
@@ -95,11 +100,13 @@ Bau-/Trümmer-Zustände (D-012) liegen im selben Polycount-Budget ([AssetBudget.
 
 Führend: [Infantry.md](../gamedesign/Infantry.md). Humanoid-Rig ⇒ Animationen zwischen Packs retargetbar (senkt Mischrisiko).
 
-| Fraktion | Bedarf | Kandidatenquelle | Kosten | Aufwand | Klasse |
-|---|---|---|---|---|---|
-| Allianz | 8 | Synty Military/Sci-Fi (fully rigged), Sidekick-Varianten | 35–150 USD/Pack | Teamfarben-/Material-Pass 0,25 PT/Typ | **BUY** |
-| Legion | 8 | Synty Military (rau/Masse) | in Packs | Material-Pass | **BUY** |
-| Evolvierte | 8 | — organisch, nicht abgedeckt — | – | 1–2 PT/Typ Eigenbau + Rig | **BUILD** |
+| Fraktion | Bedarf | Kandidatenquelle (Vollspiel, ersetzt durch D-054) | Kosten | Aufwand | Klasse | MS-1-Strategie (D-054)[^ms1-inf] |
+|---|---|---|---|---|---|---|
+| Allianz | 8 | Synty Military/Sci-Fi (fully rigged), Sidekick-Varianten *(ersetzt durch D-054)* | 35–150 USD/Pack | Teamfarben-/Material-Pass 0,25 PT/Typ | **BUY** | **AI-Generated** (Bauarbeiter, Infanterie Standard) |
+| Legion | 8 | Synty Military (rau/Masse) *(ersetzt durch D-054)* | in Packs | Material-Pass | **BUY** | **AI-Generated** (Bauarbeiter, Infanterie Standard) |
+| Evolvierte | 8 | — organisch, nicht abgedeckt — | – | 1–2 PT/Typ Eigenbau + Rig | **BUILD** | n/a (Post-MVP, D-056 – nicht Teil des MS-1-Bedarfs) |
+
+[^ms1-inf]: MS-1 umfasst nur die acht Einheitenrollen aus [MVPContentManifest.md](../production/MVPContentManifest.md); CC0-Quellen decken vollständige Militär-Einheiten-Roster nicht ab, daher AI-Generated (KI-3D-Generierung) als primäre Strategie. Rollen-genaue Quellenzuordnung: [SourceCatalog_MS1.md](SourceCatalog_MS1.md) §5.
 
 Capture-Einheiten (Engineer/Saboteur/Tunnelgräber, D-022) sind Teil der 8/Fraktion, kein Zusatz.
 
@@ -107,11 +114,13 @@ Capture-Einheiten (Engineer/Saboteur/Tunnelgräber, D-022) sind Teil der 8/Frakt
 
 Führend: [Vehicles.md](../gamedesign/Vehicles.md). Rig-los (Code-Animation) ⇒ kein Rigging-Aufwand.
 
-| Fraktion | Bedarf | Kandidatenquelle | Kosten | Aufwand | Klasse |
-|---|---|---|---|---|---|
-| Allianz | 12 | Synty Sci-Fi/Military/Mech Packs | 50–150 USD/Pack | Material-/LOD-Pass 0,25–0,5 PT/Typ | **BUY** |
-| Legion | 12 | Synty Military | in Packs | Material-/LOD-Pass | **BUY/MODIFY** |
-| Evolvierte | 12 | biologische Entsprechungen — nicht abgedeckt | – | 1,5–2,5 PT/Typ Eigenbau | **BUILD** |
+| Fraktion | Bedarf | Kandidatenquelle (Vollspiel, ersetzt durch D-054) | Kosten | Aufwand | Klasse | MS-1-Strategie (D-054)[^ms1-veh] |
+|---|---|---|---|---|---|---|
+| Allianz | 12 | Synty Sci-Fi/Military/Mech Packs *(ersetzt durch D-054)* | 50–150 USD/Pack | Material-/LOD-Pass 0,25–0,5 PT/Typ | **BUY** | **Hybrid** (Harvester, Buggy, Leichter Panzer, Artillerie); **AI-Generated** (Schwerer Panzer) |
+| Legion | 12 | Synty Military *(ersetzt durch D-054)* | in Packs | Material-/LOD-Pass | **BUY/MODIFY** | **Hybrid** (Harvester, Buggy, Leichter Panzer, Artillerie); **AI-Generated** (Schwerer Panzer) |
+| Evolvierte | 12 | biologische Entsprechungen — nicht abgedeckt | – | 1,5–2,5 PT/Typ Eigenbau | **BUILD** | n/a (Post-MVP, D-056 – nicht Teil des MS-1-Bedarfs) |
+
+[^ms1-veh]: MS-1-Fahrzeugrollen (Harvester, Buggy, Leichter Panzer, Schwerer Panzer, Artillerie) sind Teil der acht Einheitenrollen aus [MVPContentManifest.md](../production/MVPContentManifest.md); die 12/Fraktion-Zahl bleibt das Vollspiel-Maß. Rollen-genaue Quellenzuordnung: [SourceCatalog_MS1.md](SourceCatalog_MS1.md) §5.
 
 ### 3.6 Luftfahrzeuge (21 = 7/Fraktion)
 
@@ -246,3 +255,4 @@ verschiebt Commander-Portraits, Key Art und Voice vollständig hinter MS-1.
 | 1.1.0 | 2026-07-24 | Update auf D-054 (0 € Open-Source & KI-Pipeline), Q-035 geschlossen (0 € Budget), Kostenschätzung angepasst | Project Owner / Producer |
 | 1.2.0 | 2026-07-24 | Vollspielinventar vom verbindlichen Allianz-/Legion-MS-1-Produktionsumfang gemäß D-056 getrennt | Technical Art Director / Lead Environment Artist |
 | 1.2.1 | 2026-07-24 | Commander-Art und -Voice im Detailregister eindeutig als Post-MVP-Bedarf markiert | Technical Art Director / Lead Environment Artist |
+| 1.3.0 | 2026-07-25 | Synty-/Kauf-Zuordnungen in §3.3–3.5 als „ersetzt durch D-054" markiert (stehen gelassen, nicht gelöscht); neue Spalte „MS-1-Strategie (D-054)" mit CC0-Base/AI-Generated/Hybrid je Fraktion ergänzt, Rollen-Zuordnung übernommen aus SourceCatalog_MS1.md §5 | Producer |

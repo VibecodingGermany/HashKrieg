@@ -1,6 +1,6 @@
 # Naming Convention – Benennungsregeln für Project Nova
 
-**Version:** 0.4.0 | **Status:** Entwurf – MS-1 rebaselined | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Entwurf – MS-1 rebaselined | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
 
 ## Zweck
 
@@ -17,6 +17,7 @@ größeren Vollspielentwurf sind reserviert, aber keine Implementierungspflicht.
 - [../research/Unity_BestPractices.md](../research/Unity_BestPractices.md) – §3 (Registry-Pattern, stabile IDs)
 - [./FolderStructure.md](./FolderStructure.md) – Ordner-/Assembly-Struktur, der die Namespaces folgen
 - [./CodingGuidelines.md](./CodingGuidelines.md) – Regeln, deren Rollen hier benannt werden
+- [../assets/ArtAssetStandard.md](../assets/ArtAssetStandard.md) – Art-Ebene der Namenskonvention (Mesh/Textur/Material/Prefab-Präfixe, §4.1)
 
 ## 1. Allgemeine C#-Regeln
 
@@ -97,6 +98,32 @@ Muster: `<PREFIX>_<Fraktion>_<Name>.asset`
 | `DB_` | Registry-Assets | Dokumentierte Ausnahme: Registry-Dateien tragen **kein** `DB_`-Präfix, sondern liegen in `Data/Registries/` als `<Kategorie>Registry.asset` plus generiertem `GameDatabaseMaster.asset` (D-049, s. FolderStructure §4) |
 
 Ablage: `Assets/_Project/Data/<Typ>/<Fraktion>/` (vgl. FolderStructure §4).
+
+### 4.1 Verhältnis zur Art-Ebene
+
+Die Präfixe in §4 bezeichnen ausschließlich die **Daten-Ebene**
+(ScriptableObject-Assets in `Assets/_Project/Data/`). Daneben existiert eine
+separate **Art-Ebene** für Mesh-, Textur-, Material- und Prefab-Dateien in
+`Assets/_Project/Art/`, spezifiziert in
+[../assets/ArtAssetStandard.md](../assets/ArtAssetStandard.md). Die beiden
+Ebenen sind bewusst getrennte Namensräume mit unterschiedlichen
+Fraktions-Token (Daten-Ebene: deutsche GDD-Token `Allianz`/`Legion`/
+`Evolvierte`/`Neutral`/`Shared`, s. o.; Art-Ebene: englische PascalCase-Token
+`Alliance`/`Legion`) und referenzieren dieselbe `<Fraktion>/<Rolle>`-
+Kombination nur über den Rollennamen, nicht über einen gemeinsamen Präfix:
+
+| Präfix | Ebene | Asset-Typ |
+|---|---|---|
+| `SM_` | Art | Mesh (`SM_BLDG_<Faction>_<Role>.fbx`, LOD-Suffixe `_LOD0`/`_LOD1`/`_LOD2` in derselben FBX) |
+| `T_` | Art | Textur (`T_UNIT_<Faction>_<Role>_BC.png`; Suffixe `_BC`, `_N`, `_MSK`) |
+| `M_` | Art | Material (`M_BLDG_<Faction>_<Role>.mat`) |
+| `PF_` | Art | Prefab (`PF_UNIT_<Faction>_<Role>.prefab`) |
+
+Rollennamen (`<Role>`) auf der Art-Ebene entsprechen exakt der kanonischen
+Rollenliste aus [`quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json)
+(`buildings[].role` / `units[].role`), nicht den hier in §4 verwendeten
+GDD-Namen. Details, Ordnerstruktur und Begründung: siehe
+[../assets/ArtAssetStandard.md](../assets/ArtAssetStandard.md) §1–§2.
 
 ## 5. Ordnernamen
 
@@ -184,3 +211,4 @@ Jede handgeschriebene `.cs`-Datei beginnt mit:
 | 0.2.1 | 2026-07-21 | Restfehler behoben: Altrest `Nova.Simulation.Ai` als Sim-Namespace entfernt (D-043 – KI ist eigene Assembly `Nova.AI`/`.Strategy`/`.Tactics`/`.Squads`, kein zweiter Namespace mehr in `Nova.Simulation`) | Lead Technical Director |
 | 0.3.0 | 2026-07-24 | Benennungsumfang und Command-Typen auf D-056/D-057/D-061 rebaselined | Lead Technical Director |
 | 0.4.0 | 2026-07-24 | Authoring-String-Keys sauber von kanonischem `DefinitionId uint16` und Persistence getrennt | Lead Technical Director |
+| 0.5.0 | 2026-07-25 | §4.1 ergänzt: Verweis auf die Art-Ebene (`SM_`/`T_`/`M_`/`PF_`-Präfixe) in [../assets/ArtAssetStandard.md](../assets/ArtAssetStandard.md), Abgrenzung zur bestehenden Daten-Ebene (§4) klargestellt | Technical Art |
