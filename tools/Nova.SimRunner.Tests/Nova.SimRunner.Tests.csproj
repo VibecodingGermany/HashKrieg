@@ -26,6 +26,16 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="4.2.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <!-- Line coverage for the linked Core/Simulation sources (they compile into
+         this assembly, so the collector instruments it directly; Cobertura
+         filenames carry the original Assets paths). Diagnostic only, consumed
+         by tools/Nova.Coverage — not gate evidence. coverlet.msbuild hooks the
+         build (/p:CollectCoverage=true); the in-proc XPlat collector produced
+         empty reports on this host. -->
+    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
