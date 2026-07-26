@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.13.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Dokumentversion:** 0.14.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 > Modernes Echtzeitstrategiespiel mit Basisbau und der lebendigen
 > Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
@@ -162,6 +162,26 @@ Die vollständige Liste der Verschiebungen steht im
 [ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll samt
 Messzahlen im [GrayboxLog](docs/production/GrayboxLog.md).
 
+## Neuer Arbeitstitel: Hashkrieg (Weltentwurf und Concept-Art)
+
+Für das Spiel ist der neue Arbeitstitel *Hashkrieg* beschlossen: ein
+postapokalyptisches Setting, in dem Rechenleistung die letzte verlässliche Währung
+ist und zwei Fraktionen aus demselben Zusammenbruch gegensätzliche Lehren gezogen
+haben. Der vollständige Weltentwurf steht in
+[docs/vision/Lore.md](docs/vision/Lore.md).
+
+Dazu liegt ein erster Satz Concept-Art vor: 34 Bilder je Fraktion und Rolle, siehe
+[docs/assets/concept-art/README.md](docs/assets/concept-art/README.md) sowie der
+Kontaktbogen [docs/assets/concept-art/KONTAKTBOGEN.jpg](docs/assets/concept-art/KONTAKTBOGEN.jpg).
+Der zugrundeliegende Bildstandard steht in
+[docs/assets/ConceptArtStyleGuide.md](docs/assets/ConceptArtStyleGuide.md).
+
+**Status:** Weltentwurf und Concept-Art sind Entwürfe zur Formfindung, keine
+Produktionsassets. Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses
+Repositories noch nicht vollzogen — Repo, Code und der übrige Wiki-Bestand laufen
+weiterhin unter dem Arbeitstitel *Project Nova*. Dies ist keine Gate- oder
+Meilensteinaussage.
+
 ## Closed-Core MS-1
 
 D-056 begrenzt MS-1 auf:
@@ -256,3 +276,4 @@ Weiterverbreitung als eigenes Werk ist nicht freigegeben.
 | 0.11.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt, G0-A vor G0-B gestellt und subject-unabhängigen Schema-1.3-Bootstrap verankert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.12.0 | 2026-07-25 | D-066: G0-A1-Integritätsgrundlage vom zweiphasigen G0-A2-Receipt-Authorizer getrennt und zirkulären Pass-Pfad entfernt | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.13.0 | 2026-07-26 | Abschnitt „Das Spiel ausprobieren" mit Editor-Start, echter Steuerungslegende, Player-Anleitung für macOS/Windows und ehrlicher Abgrenzung des Graybox-Stands ergänzt; GrayboxLog und ScopeLedger verlinkt | Technical Writer |
+| 0.14.0 | 2026-07-26 | Abschnitt zum neuen Arbeitstitel *Hashkrieg* ergänzt: Weltentwurf, Concept-Art-Satz und Style-Guide verlinkt, Umbenennung im Bestand ausdrücklich als noch nicht vollzogen markiert | Technical Writer |
