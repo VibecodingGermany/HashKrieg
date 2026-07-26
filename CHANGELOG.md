@@ -588,6 +588,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   drei Felder bei `RawValue < 0` zurück; der Host bleibt unverändert. Tests
   in beiden Lanes (negierter MoveSpeed/Kollisionsradius/Sichtradius →
   Validate und Restore false, Store unverändert; valider Block weiterhin ok).
+- **Builder-Rollenprüfung am Construction-Restore (Review-Befund P2-2):**
+  `ConstructionSystem.TryParseState` akzeptierte `AssignedBuilderRaw` ohne
+  Rollenprüfung — ein manipulierter Block konnte eine Kampfeinheit als
+  Bauarbeiter einschleusen. Die Validate-Phase prüft jetzt jede im aktuellen
+  Entity Store sichtbare Zuweisung auf `Role == Builder` und
+  Slot-Gleichheit mit der Baustelle (Verstoß → Restore lehnt ab, Host
+  unverändert); beim Restore in einen frischen Host ist die Entity-Referenz
+  zum Validate-Zeitpunkt nicht beurteilbar (Kernel validiert jeden Block
+  gegen den Pre-Restore-Stand) — dieser Fall ist durch dieselbe Rollen-/
+  Owner-Prüfung als Defense-in-depth in `ProgressSites` abgedeckt, die eine
+  unbrauchbare Zuweisung deterministisch neu auflöst. Tests in beiden Lanes
+  (Kampfeinheit als AssignedBuilder → Validate und Restore false, Host
+  unverändert; Live-Rollenwechsel → Reassign, Baustelle pausiert).
+- **Off-Map-RallyPoint wird zustandsabhängig abgelehnt (Review-Befund
+  P2-3):** `SetRallyPoint` akzeptierte Ziele außerhalb der Karte. Die
+  Domain-Validierung prüft das SimFixed-Ziel jetzt grid-gemappt (floor)
+  gegen die 128×128-Map-Grenzen — außerhalb → `RejectedInvalidTarget`, das
+  bestehende Rally bleibt unverändert und laufende Produktion parkt nicht.
+  Tests in beiden Lanes (Off-Map/negativ → Reject, Rally unverändert, Queue
+  spawnt normal am bisherigen/Default-Rally; Map-Ecke legal; Command-Pfad
+  über den versiegelten Intake).
 
 ### Entschieden
 - **D-066:** Kanalbelegung der Art-Mask-Textur — R=Metallic/G=Occlusion/
@@ -775,6 +796,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Allokationsreihenfolge des geteilten Allocators offenbaren; die
   Datenschutzgrenze nach FogOfWar.md §4 liegt auf View-Ebene, ID-Metadaten
   sind nicht Teil des MS-1-Datenschutzmodells (Härtung Post-MS-1).
+- **Construction-Timing-Provisorien dokumentiert (Review-Befunde P2-1/P2-4,
+  OpenQuestions 1.11.6):** Q-040 um (k) erweitert — (k1) Same-Tick-Power-Stacking:
+  die Power-Deckungsprüfung liest die committed Balance des Vorticks,
+  mehrere power-ziehende Placements im selben Tick können die Deckung
+  kollektiv überziehen (deterministisch, selbstbestraffend via
+  Low-Power-Multiplikator; Kandidat: Placement-Limit pro Tick); (k2)
+  Footprint-Sweep-Timing: kampfzerstörte Footprints werden erst im Sweep
+  des Folgeticks freigegeben, ein PlaceBuilding exakt im Tick nach der
+  Zerstörung findet die Zelle noch belegt (deterministisch). Beide Fakten
+  stehen zusätzlich im `ConstructionSystem`-Klassenkommentar; Ratifizierung
+  per D-ID vor dem G1-Schema-Freeze.
 
 ### Entfernt
 - **Prototyp-Command-/Hash-/Replay-/Relay-Pfade (Pre-G1-Reset, D-057;
