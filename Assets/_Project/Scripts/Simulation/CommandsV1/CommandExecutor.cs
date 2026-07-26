@@ -25,6 +25,17 @@ namespace Nova.Simulation.CommandsV1
         /// <summary>True when the player can pay the cost implied by kind and definition id.</summary>
         bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId);
 
+        /// <summary>
+        /// Domain-specific state-dependent validation beyond the generic
+        /// existence/ownership/cost checks (docs/tech/Commands.md section 4):
+        /// placement legality, prerequisites, tier gating, queue capacity and
+        /// per-kind target rules of the construction/production slice. Runs
+        /// after the generic checks in the fixed executor order, mutates
+        /// nothing and returns <see cref="CommandResultCode.Applied"/> when
+        /// the command is legal for its domain.
+        /// </summary>
+        CommandResultCode ValidateDomain(in CommandRecord record, in CommandPayloadRefs refs);
+
         /// <summary>Applies the command to the authoritative state. Called only on success.</summary>
         void Apply(in CommandRecord record);
     }
@@ -33,15 +44,16 @@ namespace Nova.Simulation.CommandsV1
     /// State-dependent evaluation of sealed records at their target tick
     /// (docs/tech/Commands.md section 4). Checks run in a fixed, deterministic
     /// order — acting entity existence, ownership, harvest field existence and
-    /// harvester role, target existence, cost — so the same record and the
-    /// same state always yield the same <see cref="CommandResult"/>. A failed
-    /// check produces the deterministic result, mutates nothing and stays in
-    /// the replay.
+    /// harvester role, target existence, cost, domain validation — so the same
+    /// record and the same state always yield the same <see cref="CommandResult"/>.
+    /// A failed check produces the deterministic result, mutates nothing and
+    /// stays in the replay.
     /// <para>
-    /// Vision, range, prerequisites and cooldowns are additional
-    /// state-dependent checks of the full contract; the schema-v1 view models
-    /// existence, ownership, harvest legality and cost, and the result codes
-    /// reserve the remaining cases for the G1 integration.
+    /// Vision, range and cooldowns are additional state-dependent checks of
+    /// the full contract; the schema-v1 view models existence, ownership,
+    /// harvest legality, cost and the construction/production domain checks
+    /// (<see cref="ICommandStateView.ValidateDomain"/>), and the result codes
+    /// reserve the remaining cases for later slices.
     /// </para>
     /// </summary>
     public static class CommandExecutor
@@ -114,11 +126,20 @@ namespace Nova.Simulation.CommandsV1
 
             if (refs.DefinitionId != 0
                 && (record.Kind == CommandKind.PlaceBuilding
-                    || record.Kind == CommandKind.QueueUnit
                     || record.Kind == CommandKind.InstallDefenseModule)
                 && !state.CanAfford(record.PlayerSlot, record.Kind, refs.DefinitionId))
             {
                 return new CommandResult(record, CommandResultCode.RejectedInsufficientResources);
+            }
+
+            // Domain-specific state-dependent checks (placement legality,
+            // prerequisites, tier gating, queue capacity and the QueueUnit
+            // count-scaled cost — the count lives in the payload, so the
+            // generic check above cannot cover it).
+            CommandResultCode domainCode = state.ValidateDomain(in record, in refs);
+            if (domainCode != CommandResultCode.Applied)
+            {
+                return new CommandResult(record, domainCode);
             }
 
             state.Apply(record);

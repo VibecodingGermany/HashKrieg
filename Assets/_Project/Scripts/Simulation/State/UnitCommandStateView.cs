@@ -1,8 +1,11 @@
 using System;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Construction;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
+using Nova.Simulation.Production;
 
 namespace Nova.Simulation.State
 {
@@ -10,9 +13,10 @@ namespace Nova.Simulation.State
     /// Adapter from the canonical command executor's state view
     /// (<see cref="ICommandStateView"/>) to the real unit state of this G1
     /// slice: the <see cref="EntityManager"/> unit store, the
-    /// <see cref="PathfindingSystem"/> flow fields and the
-    /// <see cref="EconomySystem"/> field registry. The kernel applies due
-    /// sealed batches exclusively through this view in tick phase 1
+    /// <see cref="PathfindingSystem"/> flow fields, the
+    /// <see cref="EconomySystem"/> field registry and credit balances and
+    /// the construction/production domains. The kernel applies due sealed
+    /// batches exclusively through this view in tick phase 1
     /// (docs/tech/SimulationCore.md section 2); systems never see commands.
     /// <para>
     /// Wire ids are the packed uint32 layout of SimulationCore.md section 1
@@ -24,21 +28,31 @@ namespace Nova.Simulation.State
     /// </para>
     /// <para>
     /// Slice scope: Move, Stop, AttackTarget, Harvest and ReturnCargo mutate
-    /// real unit state. Harvest assigns the standing
-    /// <see cref="UnitState.HarvestFieldId"/> order (and cancels a return
-    /// order); ReturnCargo assigns the standing
-    /// <see cref="UnitState.IsReturningCargo"/> order (and cancels a harvest
-    /// order); Stop clears both economy orders alongside the movement order.
-    /// Harvest legality is validated state-dependently by the executor before
-    /// <see cref="Apply"/> runs: an unknown field id or a non-harvester actor
-    /// is rejected with RejectedInvalidTarget and mutates nothing (review
-    /// fixes P2-1/P2-2). The remaining kinds (construction, production,
-    /// rally, module) have no canonical domain state yet — those systems stay
-    /// prototype scaffolding in this slice — so <see cref="Apply"/>
-    /// deliberately mutates nothing for them (Commands.md section 4).
-    /// <see cref="CanAfford"/> is only consulted for definition-bearing kinds
-    /// and returns true until the construction/production slices wire real
-    /// costs (Q-040 candidate).
+    /// unit state directly; the construction/production kinds
+    /// (PlaceBuilding, CancelConstruction, Repair, Sell, QueueUnit,
+    /// CancelProduction, SetRallyPoint) are validated state-dependently and
+    /// applied through the canonical <see cref="ConstructionSystem"/> and
+    /// <see cref="ProductionSystem"/>. Harvest legality is validated
+    /// state-dependently by the executor before <see cref="Apply"/> runs
+    /// (review fixes P2-1/P2-2). InstallDefenseModule carries a schema-v1
+    /// payload, but defense modules are G2/G4 content — it is rejected
+    /// deterministically with RejectedPrerequisitesNotMet in this slice and
+    /// mutates nothing. A host that does not wire the construction and
+    /// production systems (optional constructor arguments) rejects every
+    /// construction/production kind with RejectedPrerequisitesNotMet
+    /// (documented "domain not wired" result).
+    /// </para>
+    /// <para>
+    /// Cost model: <see cref="CanAfford"/> covers the single-definition
+    /// kinds (PlaceBuilding; InstallDefenseModule stays free until G2/G4)
+    /// against the canonical definition table
+    /// (<see cref="SimDefinitions"/>). The QueueUnit cost scales with the
+    /// payload count, so it is checked inside
+    /// <see cref="ValidateDomain"/> where the count is available. An
+    /// UNKNOWN definition id is never reported as unaffordable —
+    /// <see cref="CanAfford"/> returns true for it and the domain check
+    /// rejects it as RejectedInvalidTarget, keeping the deterministic
+    /// result honest.
     /// </para>
     /// </summary>
     public sealed class UnitCommandStateView : ICommandStateView
@@ -46,12 +60,21 @@ namespace Nova.Simulation.State
         private readonly EntityManager _entityManager;
         private readonly PathfindingSystem _pathfindingSystem;
         private readonly EconomySystem _economySystem;
+        private readonly ConstructionSystem _constructionSystem;
+        private readonly ProductionSystem _productionSystem;
 
-        public UnitCommandStateView(EntityManager entityManager, PathfindingSystem pathfindingSystem, EconomySystem economySystem)
+        public UnitCommandStateView(
+            EntityManager entityManager,
+            PathfindingSystem pathfindingSystem,
+            EconomySystem economySystem,
+            ConstructionSystem constructionSystem = null,
+            ProductionSystem productionSystem = null)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _pathfindingSystem = pathfindingSystem ?? throw new ArgumentNullException(nameof(pathfindingSystem));
             _economySystem = economySystem ?? throw new ArgumentNullException(nameof(economySystem));
+            _constructionSystem = constructionSystem;
+            _productionSystem = productionSystem;
         }
 
         /// <summary>Converts a packed wire id to a prototype handle; invalid when the generation does not fit.</summary>
@@ -107,18 +130,98 @@ namespace Nova.Simulation.State
         }
 
         /// <summary>
-        /// Always true in this slice: no canonical cost state is wired for
-        /// the definition-bearing kinds yet (construction/production stay
-        /// prototype scaffolding). Consulted only for definition-bearing
-        /// kinds (executor contract).
+        /// Generic cost check of the single-definition kinds against the
+        /// canonical definition table: PlaceBuilding costs the building's
+        /// full price; InstallDefenseModule stays free until the G2/G4
+        /// module slice wires module costs. Unknown definition ids report
+        /// true here and fail as RejectedInvalidTarget in the domain check
+        /// (see class remarks). QueueUnit is deliberately NOT consulted by
+        /// the executor — its count-scaled cost is a domain check.
         /// </summary>
-        public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId) => true;
+        public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId)
+        {
+            if (kind == CommandKind.PlaceBuilding
+                && SimDefinitions.TryGetBuilding(definitionId, out SimBuildingDefinition building))
+            {
+                return _economySystem.GetPlayerEconomy(playerSlot).AetheriumCredits >= building.CostAE;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Domain-specific state-dependent validation of the
+        /// construction/production kinds in each kind's documented fixed
+        /// order (see <see cref="ConstructionSystem"/> and
+        /// <see cref="ProductionSystem"/>); every other kind has no domain
+        /// checks in this slice.
+        /// </summary>
+        public CommandResultCode ValidateDomain(in CommandRecord record, in CommandPayloadRefs refs)
+        {
+            switch (record.Kind)
+            {
+                case CommandKind.PlaceBuilding:
+                {
+                    if (_constructionSystem == null) return CommandResultCode.RejectedPrerequisitesNotMet;
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!PlaceBuildingPayload.TryParse(ref reader, out PlaceBuildingPayload place))
+                    {
+                        throw new InvalidOperationException("Sealed PlaceBuilding payload failed to parse.");
+                    }
+                    return _constructionSystem.ValidatePlacement(
+                        record.PlayerSlot, place.BuildingDefId, place.GridX, place.GridY);
+                }
+                case CommandKind.CancelConstruction:
+                    return _constructionSystem == null
+                        ? CommandResultCode.RejectedPrerequisitesNotMet
+                        : _constructionSystem.ValidateCancel(record.PlayerSlot, refs.SingleEntityId);
+                case CommandKind.Sell:
+                    return _constructionSystem == null
+                        ? CommandResultCode.RejectedPrerequisitesNotMet
+                        : _constructionSystem.ValidateSell(record.PlayerSlot, refs.SingleEntityId);
+                case CommandKind.Repair:
+                    return _constructionSystem == null
+                        ? CommandResultCode.RejectedPrerequisitesNotMet
+                        : _constructionSystem.ValidateRepair(record.PlayerSlot, refs.ActingEntities, refs.TargetEntityId);
+                case CommandKind.QueueUnit:
+                {
+                    if (_productionSystem == null) return CommandResultCode.RejectedPrerequisitesNotMet;
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!QueueUnitPayload.TryParse(ref reader, out QueueUnitPayload queue))
+                    {
+                        throw new InvalidOperationException("Sealed QueueUnit payload failed to parse.");
+                    }
+                    return _productionSystem.ValidateQueueUnit(
+                        record.PlayerSlot, queue.BuildingEntityId, queue.UnitDefId, queue.Count);
+                }
+                case CommandKind.CancelProduction:
+                {
+                    if (_productionSystem == null) return CommandResultCode.RejectedPrerequisitesNotMet;
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!CancelProductionPayload.TryParse(ref reader, out CancelProductionPayload cancel))
+                    {
+                        throw new InvalidOperationException("Sealed CancelProduction payload failed to parse.");
+                    }
+                    return _productionSystem.ValidateCancelProduction(
+                        record.PlayerSlot, cancel.BuildingEntityId, cancel.QueueIndex);
+                }
+                case CommandKind.SetRallyPoint:
+                    return _productionSystem == null
+                        ? CommandResultCode.RejectedPrerequisitesNotMet
+                        : _productionSystem.ValidateSetRallyPoint(record.PlayerSlot, refs.SingleEntityId);
+                case CommandKind.InstallDefenseModule:
+                    // Schema-v1 payload exists, but defense modules are G2/G4
+                    // content (mvp-v1.json defenseModules): deterministic
+                    // rejection, no mutation, the record stays in the stream.
+                    return CommandResultCode.RejectedPrerequisitesNotMet;
+                default:
+                    return CommandResultCode.Applied;
+            }
+        }
 
         /// <summary>
         /// Applies a sealed, fully checked record. Move/Stop/AttackTarget and
-        /// the economy orders Harvest/ReturnCargo mutate the unit store;
-        /// kinds without canonical domain state in this slice deliberately
-        /// mutate nothing (see class remarks).
+        /// the economy orders Harvest/ReturnCargo mutate the unit store; the
+        /// construction/production kinds mutate their domain systems.
         /// </summary>
         public void Apply(in CommandRecord record)
         {
@@ -148,10 +251,11 @@ namespace Nova.Simulation.State
                         {
                             ref UnitState unit = ref _entityManager.GetUnitRef(id);
                             unit.Stop();
-                            // Stop cancels every standing order, economy
-                            // orders included; the unit keeps its cargo.
+                            // Stop cancels every standing order, economy and
+                            // repair orders included; the unit keeps its cargo.
                             unit.HarvestFieldId = 0;
                             unit.IsReturningCargo = false;
+                            _constructionSystem?.ClearRepairOrder(stop.EntityIds[i]);
                         }
                     }
                     break;
@@ -220,12 +324,86 @@ namespace Nova.Simulation.State
                     }
                     break;
                 }
+                case CommandKind.PlaceBuilding:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!PlaceBuildingPayload.TryParse(ref reader, out PlaceBuildingPayload place))
+                    {
+                        throw new InvalidOperationException("Sealed PlaceBuilding payload failed to parse.");
+                    }
+                    // Validated by CanAfford + ValidateDomain immediately
+                    // before; a false return here is a broken view contract.
+                    _constructionSystem?.TryPlaceBuilding(
+                        record.PlayerSlot, place.BuildingDefId, place.GridX, place.GridY);
+                    break;
+                }
+                case CommandKind.CancelConstruction:
+                    _constructionSystem?.CancelConstruction(ParseSingleEntityId(record));
+                    break;
+                case CommandKind.Sell:
+                    _constructionSystem?.SellBuilding(ParseSingleEntityId(record));
+                    break;
+                case CommandKind.Repair:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!RepairPayload.TryParse(ref reader, out RepairPayload repair))
+                    {
+                        throw new InvalidOperationException("Sealed Repair payload failed to parse.");
+                    }
+                    for (int i = 0; i < repair.EntityIds.Length; i++)
+                    {
+                        _constructionSystem?.AssignRepairOrder(repair.EntityIds[i], repair.TargetEntityId);
+                    }
+                    break;
+                }
+                case CommandKind.QueueUnit:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!QueueUnitPayload.TryParse(ref reader, out QueueUnitPayload queue))
+                    {
+                        throw new InvalidOperationException("Sealed QueueUnit payload failed to parse.");
+                    }
+                    _productionSystem?.TryQueueUnit(
+                        record.PlayerSlot, queue.BuildingEntityId, queue.UnitDefId, queue.Count);
+                    break;
+                }
+                case CommandKind.CancelProduction:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!CancelProductionPayload.TryParse(ref reader, out CancelProductionPayload cancel))
+                    {
+                        throw new InvalidOperationException("Sealed CancelProduction payload failed to parse.");
+                    }
+                    _productionSystem?.CancelProduction(cancel.BuildingEntityId, cancel.QueueIndex);
+                    break;
+                }
+                case CommandKind.SetRallyPoint:
+                {
+                    var reader = new CommandPayloadReader(record.Payload.Span);
+                    if (!SetRallyPointPayload.TryParse(ref reader, out SetRallyPointPayload rally))
+                    {
+                        throw new InvalidOperationException("Sealed SetRallyPoint payload failed to parse.");
+                    }
+                    _productionSystem?.SetRallyPoint(rally.BuildingEntityId, rally.TargetX, rally.TargetY);
+                    break;
+                }
                 default:
-                    // No canonical domain state for this kind in the G1 kernel
-                    // slice (construction/production stay prototype
-                    // scaffolding): deliberately no mutation.
+                    // No executable domain state for this kind in this slice
+                    // (InstallDefenseModule is G2/G4 content and was already
+                    // rejected by the domain check): deliberately no mutation.
                     break;
             }
+        }
+
+        private static uint ParseSingleEntityId(in CommandRecord record)
+        {
+            // CancelConstruction/Sell payloads are a single uint32 entity id.
+            var reader = new CommandPayloadReader(record.Payload.Span);
+            if (!reader.TryReadUInt32(out uint rawId))
+            {
+                throw new InvalidOperationException("Sealed single-entity payload failed to parse.");
+            }
+            return rawId;
         }
 
         private void ApplyMove(in MovePayload move)

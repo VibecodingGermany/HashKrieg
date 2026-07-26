@@ -58,6 +58,10 @@ namespace Nova.SimRunner.Tests
 
             public bool CanAfford(byte playerSlot, CommandKind kind, ushort definitionId) => Affordable;
 
+            public CommandResultCode DomainCode = CommandResultCode.Applied;
+
+            public CommandResultCode ValidateDomain(in CommandRecord record, in CommandPayloadRefs refs) => DomainCode;
+
             public void Apply(in CommandRecord record)
             {
                 ApplyCallCount++;
@@ -118,7 +122,7 @@ namespace Nova.SimRunner.Tests
         public void Rejection_InsufficientResources_MutatesNothing()
         {
             uint building = CommandTestUtil.EntityId(4, 1);
-            CommandRecord record = SealSingleRecord(new QueueUnitPayload(building, 3, 2), out _);
+            CommandRecord record = SealSingleRecord(new PlaceBuildingPayload(1, 10, 10), out _);
 
             var state = new FakeStateView(localSlot: 0) { Affordable = false };
             state.AddEntity(building, ownedByLocal: true);
