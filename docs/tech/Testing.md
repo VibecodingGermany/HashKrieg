@@ -1,6 +1,6 @@
 # Teststrategie
 
-**Version:** 1.9.2 | **Status:** verbindlich für MS-1 – G0-A1, G0-A2-Receipt-Vertrag und geschützter Authorize-Workflow implementiert, `quality-gate`-Environment, erster realer Lauf und Gate-Pass offen | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
+**Version:** 1.9.3 | **Status:** verbindlich für MS-1 – G0-A1, G0-A2-Receipt-Vertrag und geschützter Authorize-Workflow implementiert, `quality-gate`-Environment, erster realer Lauf und Gate-Pass offen | **Verantwortungsbereich:** Lead QA Engineer | **Sprint:** 7
 
 ## Zweck
 
@@ -61,7 +61,10 @@ darf den abgeschlossenen Trustpfad für G0-B verwenden.
 G0-B implementiert und belegt:
 
 - exakte Unity-, .NET- und Paketpins,
-- Windows-x64-/macOS-arm64-Clean-Build,
+- Windows-x64-/macOS-arm64-Clean-Build — der Gate-Check
+  (`G0-BUILD-WINDOWS`/`G0-BUILD-MACOS` in `run_gate_check.py`) führt den
+  Player-Build real aus (`Nova.Editor.BuildScript` via Unity-Batchmode) und
+  verifiziert das Artefakt; reine Voraussetzungen gelten nicht als Nachweis,
 - .NET- und EditMode-Suiten,
 - asmdef-/Architekturcheck,
 - Architektur-Negative-Control, die bei absichtlicher verbotener Kante
@@ -368,3 +371,4 @@ menschlichen Maintainers ist eine zweite menschliche Freigabe Pflicht.
 | 1.9.0 | 2026-07-25 | Geschützten Authorize-Job `gate-evidence-authorize` (Dispatch-Inputs, Guards, Artefakt-Name, Folge-PR) in §10 dokumentiert; `quality-gate`-Environment-Anlage als Voraussetzung vermerkt | Lead QA Engineer |
 | 1.9.1 | 2026-07-25 | Review-Härtung: GitHub-API-Verifikation der Vorgänger-Receipts im `--authorize`-Modus, Trusted-Szenarioprofile/-Schwellen mit Vertragsdigest, `GITHUB_SHA == trustedSha` als main-HEAD-Bindung (stale-by-design) präzisiert | Lead QA Engineer |
 | 1.9.2 | 2026-07-25 | Review-N3: Restrisiko Attempt-Substitution dokumentiert; append-only-Guard für `quality/authorizations/` in `check_docs.py` und fehlendes `GH_TOKEN` am Authorize-Step ergänzt | Lead QA Engineer |
+| 1.9.3 | 2026-07-26 | Build-Checks führen echte Player-Builds aus (Unity-Batchmode + Artefakt-Verifikation) statt nur Voraussetzungen zu prüfen; Build-Module Mac-IL2CPP/Windows-Mono dokumentiert | Lead QA Engineer |

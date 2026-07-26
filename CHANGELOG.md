@@ -623,6 +623,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Snapshot-Roundtrip + Fortsetzung, Replay-Kompatibilität.
 
 ### Behoben
+- **G0-B-Build-Nachweis echt gemacht (alle 10 G0-Checks grün):**
+  `G0-BUILD-WINDOWS`/`G0-BUILD-MACOS` in `run_gate_check.py` führten bislang
+  nur Voraussetzungs-Prüfungen aus und scheiterten per Design; sie führen
+  jetzt den Player-Build real aus (`Nova.Editor.BuildScript` via
+  Unity-Batchmode) und verifizieren das Artefakt — für macOS inklusive
+  Bundle-Vollständigkeit (`Contents/MacOS`-Executable), nachdem ein
+  fehlgeschlagener Build eine irreführende `.app`-Shell hinterlassen hatte.
+  Die fehlenden Unity-Build-Module wurden nachinstalliert (Mac-IL2CPP- und
+  Windows-Mono-Modul plus die in der Editor-Installation fehlende
+  macOS-Mono-Player-Variation aus dem Basis-Editor-Paket). Damit laufen
+  erstmals echte, saubere Windows-x64- und macOS-arm64-Builds reproduzierbar
+  aus dem Repository ([docs/tech/Testing.md](docs/tech/Testing.md) 1.9.3).
 - **Flaky Memory-Assertion im Perf-Harness (`SCALE_500_PRECOMBAT`):** die
   reine Endpunkt-Regel (Retained nach vollem GC: Fensterende ≤ 1,10×
   Baseline nach Warmup) war für Mini-Läufe mit wenigen Sekunden Messfenster

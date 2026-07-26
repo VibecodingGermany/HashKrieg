@@ -304,8 +304,24 @@ def check_architecture() -> tuple[bool, list[str]]:
     )
 
 
-def _build_prerequisites(platform_label: str) -> tuple[bool, list[str]]:
-    """Inspect prerequisites but never substitute them for a real G0-B build."""
+def _find_unity() -> Path | None:
+    candidates = [
+        Path(
+            "/Applications/Unity/Hub/Editor"
+            f"/{UNITY_VERSION}/Unity.app/Contents/MacOS/Unity"
+        ),
+        Path(
+            f"C:/Program Files/Unity/Hub/Editor/{UNITY_VERSION}/Editor/Unity.exe"
+        ),
+        Path.home() / f"Unity/Hub/Editor/{UNITY_VERSION}/Editor/Unity",
+    ]
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def _run_player_build(
+    platform_label: str, build_method: str, artifact: str
+) -> tuple[bool, list[str]]:
+    """G0-B.4: execute the real player build and verify its artifact."""
     reasons: list[str] = []
     settings = ROOT / "ProjectSettings/EditorBuildSettings.asset"
     try:
@@ -315,32 +331,83 @@ def _build_prerequisites(platform_label: str) -> tuple[bool, list[str]]:
     else:
         if re.search(r"m_Scenes:\s*\[\s*\]", settings_text):
             reasons.append("EditorBuildSettings scene list is empty")
-    build_script = None
-    for path in sorted((ROOT / "Assets").rglob("*.cs")):
+    unity = _find_unity()
+    if unity is None:
+        reasons.append(
+            f"Unity Editor {UNITY_VERSION} not installed; cannot build for "
+            f"{platform_label}"
+        )
+    if reasons:
+        return (False, reasons)
+    with tempfile.TemporaryDirectory(prefix="nova-build-") as scratch:
+        log_path = Path(scratch) / "build.log"
+        result = _run(
+            [
+                str(unity),
+                "-batchmode",
+                "-nographics",
+                "-projectPath",
+                str(ROOT),
+                "-executeMethod",
+                build_method,
+                "-quit",
+                "-logFile",
+                str(log_path),
+            ],
+            timeout=5400,
+        )
+        artifact_path = ROOT / artifact
+        log_tail = ""
         try:
-            source = path.read_text(encoding="utf-8", errors="replace")
+            log_tail = log_path.read_text(encoding="utf-8", errors="replace")[-400:]
         except OSError:
-            continue
-        if "BuildPipeline.BuildPlayer" in source or "BuildPlayerOptions" in source:
-            build_script = path
-            break
-    if build_script is None:
-        reasons.append("no build script using BuildPipeline.BuildPlayer found")
-    reasons.append(
-        f"real {platform_label} build was not executed; prerequisites alone "
-        "cannot satisfy G0-B.4"
+            pass
+        if result.returncode != 0:
+            return (
+                False,
+                [
+                    f"Unity build for {platform_label} failed with exit "
+                    f"{result.returncode}: {log_tail}"
+                ],
+            )
+        if artifact.endswith(".app"):
+            # A failed macOS build leaves an incomplete .app shell behind;
+            # require the actual executable inside the bundle.
+            complete = any((artifact_path / "Contents" / "MacOS").glob("*")) if (
+                artifact_path / "Contents" / "MacOS"
+            ).is_dir() else False
+        else:
+            complete = artifact_path.is_file() and artifact_path.stat().st_size > 0
+        if not complete:
+            return (
+                False,
+                [
+                    f"Unity build for {platform_label} produced no complete "
+                    f"artifact at {artifact}: {log_tail}"
+                ],
+            )
+    return (
+        True,
+        [f"real {platform_label} build succeeded, artifact at {artifact}"],
     )
-    return (False, reasons)
 
 
 def check_build_windows() -> tuple[bool, list[str]]:
-    """G0-B.4 (Windows x64): fail closed until the real build is wired."""
-    return _build_prerequisites("Windows-x64")
+    """G0-B.4 (Windows x64): run the real player build."""
+    return _run_player_build(
+        "Windows-x64",
+        "Nova.Editor.BuildScript.BuildWindows64",
+        "Builds/Windows64/ProjectNova.exe",
+    )
 
 
 def check_build_macos() -> tuple[bool, list[str]]:
-    """G0-B.4 (macOS arm64): fail closed until the real build is wired."""
-    return _build_prerequisites("macOS-arm64")
+    """G0-B.4 (macOS arm64): run the real player build."""
+    return _run_player_build(
+        "macOS-arm64",
+        "Nova.Editor.BuildScript.BuildMacOSArm64",
+        "Builds/MacOSArm64/ProjectNova.app",
+    )
 
 
 def check_test_dotnet() -> tuple[bool, list[str]]:
