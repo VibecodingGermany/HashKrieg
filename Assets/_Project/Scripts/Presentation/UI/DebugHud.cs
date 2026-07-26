@@ -208,8 +208,19 @@ namespace Nova.Presentation.UI
             PlayerEconomyState economy = _runner.Economy.GetPlayerEconomy(slot);
             string power = economy.IsLowPower ? "LOW POWER" : "ok";
             GUILayout.Label(
-                $"Slot {slot}: {economy.AetheriumCredits} AE | power {economy.PowerProvided}/{economy.PowerRequired} ({power})",
+                $"Slot {slot} ({economy.Faction}): {economy.AetheriumCredits} AE | power {economy.PowerProvided}/{economy.PowerRequired} ({power})",
                 _labelStyle);
+
+            // Both slot factions at a glance: with the faction axis live the
+            // same role plays differently per side, so the assignment must be
+            // visible without selecting anything first.
+            _builder.Clear();
+            _builder.Append("Factions:");
+            for (byte s = 0; s < CensusSlots; s++)
+            {
+                _builder.Append("  slot ").Append(s).Append(' ').Append(_runner.Economy.GetSlotFaction(s).ToString());
+            }
+            GUILayout.Label(_builder.ToString(), _labelStyle);
         }
 
         /// <summary>
@@ -288,16 +299,18 @@ namespace Nova.Presentation.UI
                 return;
             }
 
+            FactionId leadFaction = _runner.Economy != null
+                ? _runner.Economy.GetSlotFaction(lead.PlayerId)
+                : FactionId.Alliance;
+
             _builder.Clear();
-            _builder.Append("  lead: ").Append(lead.Role.ToString());
+            _builder.Append("  lead: ").Append(lead.Role.ToString())
+                .Append(" (").Append(leadFaction.ToString()).Append(')');
             if (selected.Length > 1) _builder.Append(" (+").Append(selected.Length - 1).Append(" more selected)");
             _builder.Append("   hp ").Append(lead.CurrentHealth).Append('/').Append(lead.MaxHealth);
             if (lead.WeaponCooldownTicks > 0) _builder.Append("   reloading ").Append(lead.WeaponCooldownTicks).Append('t');
             GUILayout.Label(_builder.ToString(), _labelStyle);
 
-            FactionId leadFaction = _runner.Economy != null
-                ? _runner.Economy.GetSlotFaction(lead.PlayerId)
-                : FactionId.Alliance;
             GUILayout.Label(ProfileTextFor(leadFaction, lead.Role), _labelStyle);
         }
 
