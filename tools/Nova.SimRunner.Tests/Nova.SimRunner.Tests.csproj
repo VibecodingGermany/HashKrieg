@@ -14,6 +14,12 @@
   <ItemGroup>
     <Compile Include="..\..\Assets\_Project\Scripts\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\..\Assets\_Project\Scripts\Simulation\**\*.cs" Link="Simulation\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Performance harness sources under test (Program.cs entry point excluded). -->
+    <Compile Include="..\Nova.SimRunner\PerfStatistics.cs" Link="SimRunner\PerfStatistics.cs" />
+    <Compile Include="..\Nova.SimRunner\ScenarioArtifacts.cs" Link="SimRunner\ScenarioArtifacts.cs" />
+    <Compile Include="..\Nova.SimRunner\TimedSimSystem.cs" Link="SimRunner\TimedSimSystem.cs" />
+    <Compile Include="..\Nova.SimRunner\TimedPathfindingSystem.cs" Link="SimRunner\TimedPathfindingSystem.cs" />
+    <Compile Include="..\Nova.SimRunner\Scale500PrecombatScenario.cs" Link="SimRunner\Scale500PrecombatScenario.cs" />
   </ItemGroup>
 
   <ItemGroup>
