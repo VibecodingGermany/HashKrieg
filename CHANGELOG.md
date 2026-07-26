@@ -411,6 +411,70 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Zwei-Kernel-Determinismus 300 Ticks, Hash-Sensitivität auf Credits,
   Snapshot-Roundtrip + 300-Tick-Fortsetzung, Replay mit Harvest-/Return-
   Intents und End-Hash-Verifikation.
+- **G1-Production/Construction (ohne Gate-Status, ohne Evidence):** kanonische
+  Produktions- und Bau-Domäne (SimulationCore.md §2 Phasen 4/5) als letzter
+  G1-Domain-Slice. `SimDefinitions`
+  (`Assets/_Project/Scripts/Simulation/Definitions/`): statische, engine-freie
+  Tabelle für die 9 MS-1-Gebäude- und 8 MS-1-Einheitenrollen aus
+  [quality/content/mvp-v1.json](quality/content/mvp-v1.json) (je `CostAE`,
+  `BuildTicks`, `PowerProvided/Required`, `PrerequisiteRole`, Tier,
+  Produzentenzuordnung HQ→Builder/Harvester, Barracks→Infanterie,
+  VehicleFactory→Fahrzeuge; Footprint provisorisch 3×3) — alle Werte
+  dokumentierte Q-040-Provisorien, bis GameDatabase/Definitions angebunden
+  sind; `UnitRole` um die fehlenden Manifest-Rollen erweitert (Entity-Store-
+  Block v4 unverändert, nur Validierungsobergrenze); die Power-Rechnung der
+  Economy liest die Rollenwerte jetzt aus `SimDefinitions`.
+  `ConstructionSystem` (`IStatefulSimSystem`, Block 105): PlaceBuilding mit
+  zustandsabhängiger Validierung in fester Reihenfolge (Kosten über
+  `TrySpendCredits` → `RejectedInsufficientResources`; unbekannte Definition,
+  Footprint außerhalb/belegt → `RejectedInvalidTarget`; Prerequisite-Rolle
+  und Power-Regel → `RejectedPrerequisitesNotMet` — Power-Regel: Gebäude mit
+  `PowerRequired > 0` nur bei ausreichend freiem Power der zuletzt
+  committed Balance, Ausnahme Start-Refinery gemäß Manifest strukturell über
+  `PlaceCompletedBuilding` ohne Vorgriff auf Bauvalidierung), Baustellen als
+  `Unit`-Rollen-Entities mit 1 HP (Power wirkt erst ab Fertigstellung im
+  nächsten Economy-Recompute), Builder-Auto-Zuweisung (kleinster Index),
+  Fortschritt exakt Q16.16 (LowPower-Faktor exakt 0,5 raw 32768, keine
+  Rundung), Pause bei Builder weg/statt Reichweite (Chebyshev ≤ 1),
+  Fertigstellung → Rollen-Entity mit voller HP, ResearchLab-Fertigstellung
+  setzt `T2Unlocked[slot]` (Phase 5, Flag liegt dokumentiert im
+  Construction-Block), CancelConstruction 75 % Erstattung (Floor), Sell 50 %
+  (Floor), Repair durch Builder 10 HP/Tick in Reichweite (provisorisch);
+  Belegungs-Grid als abgeleiteter Cache (Rebuild aus Placements, Roundtrip-
+  Test). `ProductionSystem` (`IStatefulSimSystem`, Block 106): QueueUnit auf
+  fertige Produzenten-Gebäude, Kosten = `CostAE × Count` bei Enqueue, T2-
+  Gating (`RejectedPrerequisitesNotMet` vor Freischaltung), Queue max. 5
+  Einträge (provisorisch), Fortschritt exakt Q16.16 mit LowPower-Halbierung,
+  Spawn am RallyPoint (Default: zwei Zellen östlich der Gebäude-Mitte;
+  dokumentierter Ring-Scan 0..8 in aufsteigender (y,x)-Reihenfolge), Pause
+  bei vollem Entity Store (Cap) ohne Verlust, `SetRallyPoint`,
+  `CancelProduction(Index)` mit voller Erstattung der Restanzahl (Aktion
+  selbst kostenlos); Queue auf verkauftem/zerstörtem Gebäude verfällt ohne
+  Erstattung (dokumentiert). Kein Forschungsbaum: `ResearchTreeSystem`- und
+  `ProductionQueueSystem`-Scaffolding ehrlich entfernt (mvp-v1.json:
+  ResearchLab-Fertigstellung = T2, keine Upgrades/Queue, kein T3).
+  `CommandExecutor`/`ICommandStateView`: neuer Domain-Hook `ValidateDomain`
+  nach den generischen Prüfungen in dokumentierter fester Reihenfolge;
+  QueueUnit-Kosten wegen der Count im Payload als Domain-Prüfung;
+  `InstallDefenseModule` wird deterministisch mit
+  `RejectedPrerequisitesNotMet` abgelehnt (G2/G4-Content); Hosts ohne
+  verdrahtete Domänen lehnen diese Kinds ebenso ab. Registrierung in
+  `MatchRunner` und `Nova.SimRunner`: Economy → Construction → Production →
+  Pathfinding/Movement (Phasen 2/3, 4/5 vor 6) — eine frisch gespawnte
+  Einheit trägt im Spawn-Tick noch keine Movement-Order und bewegt sich
+  frühestens in Tick T+1 (dokumentiert); `SkirmishAiSystem`-Scaffolding auf
+  die kanonischen APIs umgestellt. Golden-Hashes ändern sich erwartbar
+  (ehrlich neu). Tests in beiden Lanes (`ConstructionSystemTests`,
+  `ProductionSystemTests`, `ProductionConstructionIntegrationTests`):
+  Definitions-Integrität, exakter Kostenabzug, Insufficient-Funds-/Belegung-/
+  Prerequisite-/Power-Regel-Rejects inkl. Start-Refinery-Ausnahme, Fortschritt
+  mit exakter LowPower-Halbierung und Builder-Weg-Pause, Fertigstellung →
+  Power ab nächstem Tick, ResearchLab → T2 → T2-Einheit queuebar (vorher
+  Reject), Queue-Kosten/Max-Queue/Spawn am RallyPoint/Cancel-Erstattung,
+  Entity-Cap-Pause, Sell/Repair-Regeln, Manifest-Startzustand-Fixture
+  (HQ+Refinery fertig, 1 Builder, 2 Harvester, 1000 AE, Refinery ohne Power),
+  Zwei-Kernel-Determinismus 400 Ticks, Hash-Sensitivität (Blöcke 105/106),
+  Snapshot-Roundtrip + Fortsetzung, Replay-Kompatibilität.
 
 ### Behoben
 - **Harvest-Orders ohne zustandsabhängige Validierung (Review-Befunde
