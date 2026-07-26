@@ -18,6 +18,54 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **G1-Determinismus-Harness DETERMINISM_10000 (macOS-arm64-Hälfte der V1-Messung,
+  ohne Gate-Status, ohne Evidence):** `tools/Nova.SimRunner` führt jetzt das
+  Szenario `DETERMINISM_10000` aus
+  [quality/scenarios/mvp-v1.json](quality/scenarios/mvp-v1.json) aus — CLI
+  `--scenario DETERMINISM_10000 [--verify <andere-plattform.json>] [--out <dir>]
+  [--platform <tag>] [--ticks 10000] [--checkpoint-interval 100]` (Defaults =
+  Vertragswerte; 100er-Checkpoint-Intervall ist die dokumentierte Harness-Wahl,
+  SimulationCore.md §9 sagt „je Checkpoint" ohne Zahl: 100 Checkpoints +
+  Finalzustand = 101 Hash-Pins). Zweiphasig: Ein dokumentierter, im Code
+  deterministischer Generator baut ein kanonisches Match (MS-1-Manifest-
+  Startzustand pro Slot plus dokumentiertes Vier-Einheiten-Scharmützel im
+  Mittelfeld) und treibt über 10.000 Ticks ein fixes Skript über beide aktiven
+  Slots (Slot 0 Mensch via Intents, Slot 1 „KI" via Wire-Records: Ernte/
+  Rückkehr-Zyklen, Bau inkl. Abbruch, Produktion inkl. T2 nach Labor und
+  Stornierung, Rallypunkte, Bewegung, Fokusfeuer-Angriffe — alle Domänen,
+  kein Zufall außerhalb des Sim-PRNG) und zeichnet jeden Tick als kanonischen
+  NOVA_REPLAY_CHAIN_V1-Container auf; die gemessene Wiedergabe stellt den
+  eingebetteten Startsnapshot auf frischem Host wieder her, spielt jeden Tick
+  über denselben versiegelten Pfad wie `ReplayPlayer` (inkl. wertexakter
+  Ergebnis-Verifikation) und pinnt alle 100 Ticks `kernel.CalculateStateHash()`
+  sowie am Ende `kernel.SaveSnapshot()` (Länge + SHA-256). Artefakte strikt
+  nach D-062-Namensschema unter `output/` (gitignoriert, **keine Evidence**):
+  Plattform-Profil `scenario.DETERMINISM_10000.<plattform>.json` (dokumentierte
+  Wahl, da D-062 keine Metrik für Hash-Serien festlegt — u64 als Hex-Strings,
+  Plattformblock in der Vokabular der Evidence-`environments` plus
+  `runtimeVersion`/`dotnetSdk` aus global.json) und die Bool-Assertions
+  `managed-path-only` (in dieser Managed-.NET-Lane trivial wahr, dokumentierte
+  Selbstauskunft) und `same-sources-and-determinism-defines`
+  (`#if NOVA_FIXED_POINT`-Selbstauskunft des Builds; Quellidentität per
+  csproj-Compile-Include derselben `Assets/_Project`-Quellen). Vergleichsmodus
+  `--verify`: lädt das Profil der anderen Plattform, Assertions
+  `exact-state-hash-every-checkpoint` und `exact-final-snapshot-bytes` sind
+  [1] nur bei vollständiger Gleichheit, sonst [0] mit erster Abweichungsstelle
+  und Exit ≠ 0 — Workflow für die spätere Windows-x64-Referenzmessung.
+  Gemessene macOS-arm64-Hälfte (Apple M4 Max, .NET 8.0.21, SDK 8.0.318,
+  Release): Generator 0,6 s + Wiedergabe 0,2 s (Prozess gesamt ~1,0 s),
+  Fingerprint `0xB1126835B5F32BCF`, 100/100 eindeutige Checkpoint-Hashes
+  (Tick 100 `0xD1B9E0D000E0A88A` … Tick 10000 `0x25E9E181B19B945C`), finales
+  Snapshot 41.839 Bytes, SHA-256
+  `1b85b1c166f216b9ab080e3a741b26da8e9412abfbf54818f62f57d7a3d63bb3`;
+  dreimaliger Selbstvergleich über Prozessgrenzen hinweg byte- und hash-exakt
+  (lokale Determinismus-Baseline, Replay-SHA-256 identisch). **Die
+  Windows-x64-Hälfte auf Referenzhardware steht noch aus; V1 ist damit NICHT
+  belegt.** .NET-Lane: 9 neue Harness-Tests (Kurz-Determinismus über 100
+  Ticks, Generator-Reproduktion, Tamper-Erkennung mit Abweichungsstelle,
+  striktes Artefakt-Schema); der vorbestehende SCALE_500-MiniRun-
+  Speicher-Assertions-Test schlägt auf diesem Host weiterhin fehl (auch ohne
+  diese Änderung, unverändert offen).
 - **G1-Coverage-Messinfrastruktur (Diagnose, ohne Gate-Status, ohne Evidence):**
   `tools/Nova.Coverage/coverage.py` führt die .NET-Test-Lane mit
   Coverlet-Instrumentierung aus (`coverlet.msbuild` 6.0.4 als
