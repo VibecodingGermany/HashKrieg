@@ -280,7 +280,7 @@ namespace Nova.Simulation.State
                 if (!reader.TryReadEntityId(out EntityId id)) return false;
                 if (!reader.TryReadUInt8(out byte playerId)) return false;
                 if (!reader.TryReadUInt8(out byte roleRaw)) return false;
-                if (roleRaw > (byte)UnitRole.Power) return false; // unknown role value
+                if (roleRaw > (byte)UnitRole.Artillery) return false; // unknown role value
                 if (!reader.TryReadInt32(out int posX)) return false;
                 if (!reader.TryReadInt32(out int posY)) return false;
                 if (!reader.TryReadUInt16(out ushort rotation)) return false;

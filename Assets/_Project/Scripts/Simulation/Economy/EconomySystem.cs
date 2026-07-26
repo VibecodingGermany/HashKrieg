@@ -24,11 +24,13 @@ namespace Nova.Simulation.Economy
     /// <para>
     /// Phase 2 (economy and power): provided/required are recomputed from
     /// the living building-role entities in strict ascending entity-index
-    /// order. Provisional values (Q-040 candidates, not ratified balancing):
-    /// HQ provides 30, a Power plant provides 100, a Refinery requires 20,
-    /// every other building role requires 10; mobile roles draw nothing.
-    /// Buildings-as-role-entities is the documented minimal building model of
-    /// this slice (no canonical construction output exists yet).
+    /// order. The per-role power figures come from the canonical definition
+    /// table <see cref="Definitions.SimDefinitions"/> (provisional Q-040
+    /// values, not ratified balancing): HQ provides 30, a Power plant
+    /// provides 100, a Refinery requires 20; mobile roles draw nothing.
+    /// Buildings-as-role-entities is the documented minimal building model
+    /// of this slice; construction output becomes a building-role entity on
+    /// completion (construction domain, phase 4).
     /// </para>
     /// <para>
     /// Phase 3 (Aetherium): every harvester with a standing
@@ -86,18 +88,6 @@ namespace Nova.Simulation.Economy
 
         /// <summary>Provisional harvest rate in AE per tick per harvester (Q-040 candidate).</summary>
         public const int HarvestRateAE = 2;
-
-        /// <summary>Provisional power provided by an HQ (Q-040 candidate; covers the MS-1 start without a power plant).</summary>
-        public const int HqPowerProvided = 30;
-
-        /// <summary>Provisional power provided by a Power plant (Q-040 candidate).</summary>
-        public const int PowerPlantPowerProvided = 100;
-
-        /// <summary>Provisional power required by a Refinery (Q-040 candidate).</summary>
-        public const int RefineryPowerRequired = 20;
-
-        /// <summary>Provisional power required by any other building role (Q-040 candidate).</summary>
-        public const int DefaultBuildingPowerRequired = 10;
 
         private readonly EntityManager _entityManager;
         private readonly PlayerEconomyState[] _players;
@@ -195,6 +185,9 @@ namespace Nova.Simulation.Economy
         /// <summary>
         /// Phase 2: provided/required per slot from the living building-role
         /// entities (ascending index; provisional values, see class remarks).
+        /// The power figures come from the canonical definition table
+        /// (<see cref="Definitions.SimDefinitions"/>); mobile roles and
+        /// construction sites (role <see cref="UnitRole.Unit"/>) draw nothing.
         /// </summary>
         private void RecomputePower()
         {
@@ -211,25 +204,13 @@ namespace Nova.Simulation.Economy
                 ref readonly UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.PlayerId >= MaxPlayers) continue;
 
-                switch (unit.Role)
+                if (Definitions.SimDefinitions.TryGetBuilding(unit.Role, out Definitions.SimBuildingDefinition building))
                 {
-                    case UnitRole.HQ:
-                        _players[unit.PlayerId].PowerProvided += HqPowerProvided;
-                        break;
-                    case UnitRole.Power:
-                        _players[unit.PlayerId].PowerProvided += PowerPlantPowerProvided;
-                        break;
-                    case UnitRole.Refinery:
-                        _players[unit.PlayerId].PowerRequired += RefineryPowerRequired;
-                        break;
-                    case UnitRole.Unit:
-                    case UnitRole.Builder:
-                    case UnitRole.Harvester:
-                        break; // mobile roles draw no power in this slice
-                    default:
-                        _players[unit.PlayerId].PowerRequired += DefaultBuildingPowerRequired;
-                        break;
+                    _players[unit.PlayerId].PowerProvided += building.PowerProvided;
+                    _players[unit.PlayerId].PowerRequired += building.PowerRequired;
                 }
+                // Mobile roles (Unit, Builder, Harvester and the combat unit
+                // roles) draw no power in this slice.
             }
         }
 
