@@ -8,9 +8,10 @@
     "D-061",
     "D-062",
     "D-063",
-    "D-064"
+    "D-064",
+    "D-066"
   ],
-  "authorizationStatus": "trusted-tool-checkout-authorization",
+  "authorizationStatus": "integrity-only-d066",
   "contentManifest": "quality/content/mvp-v1.json",
   "validHeadlessMatchRequirements": [
     "state-hashes",
