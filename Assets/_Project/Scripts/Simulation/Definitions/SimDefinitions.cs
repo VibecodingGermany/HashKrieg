@@ -182,11 +182,22 @@ namespace Nova.Simulation.Definitions
         /// </summary>
         public int AttackCooldownTicks { get; }
 
+        /// <summary>
+        /// Aetherium cargo capacity in AE. Meaningful ONLY on the Harvester
+        /// row — the faction identity split of quality/content/mvp-v1.json
+        /// (factions[0].identity.harvesterCargoAE 330,
+        /// factions[1].identity.harvesterCargoAE 300; the manifest is the
+        /// byte-immutable authority, the values are restated from the GDD
+        /// prose). Every other unit role carries 0: no cargo, no capacity.
+        /// </summary>
+        public int CargoCapacityAE { get; }
+
         public SimUnitDefinition(
             ushort definitionId, FactionId faction, UnitRole role, int costAE, int buildTicks,
             byte tier, UnitRole producerRole, int maxHealth, SimFixed moveSpeed,
             ArmorClass armorClass, DamageType damageType,
-            int attackDamage, int attackRangeTiles, int attackCooldownTicks)
+            int attackDamage, int attackRangeTiles, int attackCooldownTicks,
+            int cargoCapacityAE = 0)
         {
             DefinitionId = definitionId;
             Faction = faction;
@@ -202,6 +213,7 @@ namespace Nova.Simulation.Definitions
             AttackDamage = attackDamage;
             AttackRangeTiles = attackRangeTiles;
             AttackCooldownTicks = attackCooldownTicks;
+            CargoCapacityAE = cargoCapacityAE;
         }
     }
 
@@ -258,15 +270,15 @@ namespace Nova.Simulation.Definitions
     /// (Buildings.md section 3).
     /// </para>
     /// <para>
-    /// DELIBERATELY STILL FLAT (documented provisionals, NOT faction
+    /// DELIBERATELY STILL FLAT (documented provisional, NOT faction
     /// content): <see cref="SimUnitDefinition.MoveSpeed"/> — the GDD speeds
     /// are authored in m/s while the simulation runs the m/tick domain, the
     /// conversion is unratified, and faction identity (Factions.md) does not
     /// differentiate speed. Both factions carry the existing provisional
     /// values so the canonical opening position keeps its move speeds.
-    /// Harvester cargo capacity stays flat at
-    /// <see cref="UnitState.DefaultCargoCapacityAE"/> (330; the Legion 300 of
-    /// mvp-v1.json is ScopeLedger debt, return gate G4).
+    /// Harvester cargo capacity is NOT flat: it is faction content
+    /// (<see cref="SimUnitDefinition.CargoCapacityAE"/>, Allianz 330 / Legion
+    /// 300 — quality/content/mvp-v1.json factions[i].identity.harvesterCargoAE).
     /// </para>
     /// <para>
     /// Producer assignment (documented provisional, Q-040, identical for both
@@ -312,6 +324,30 @@ namespace Nova.Simulation.Definitions
 
         /// <summary>Legion base damage as integer percent of the Alliance row where Weapons.md lists no Legion weapon line (derivation rule, see class remarks).</summary>
         public const int LegionDamagePercent = 85;
+
+        /// <summary>
+        /// Largest harvester cargo capacity over both factions (the Alliance
+        /// 330; the Legion carries 300). This is the format-level HARD CAP
+        /// the entity store's snapshot parser validates cargo against: an
+        /// entity block can hold harvesters of both factions, so the block
+        /// itself cannot judge the per-faction bound — it rejects only what
+        /// no faction could ever carry.
+        /// </summary>
+        public const int MaxHarvesterCargoCapacityAE = 330;
+
+        /// <summary>
+        /// The harvester cargo capacity of one faction, resolved from its
+        /// canonical Harvester definition row (Allianz 330, Legion 300) —
+        /// the single source the economy clamps gathering against.
+        /// </summary>
+        public static int HarvesterCargoCapacityAE(FactionId faction)
+        {
+            if (TryGetUnit(faction, UnitRole.Harvester, out SimUnitDefinition harvester))
+            {
+                return harvester.CargoCapacityAE;
+            }
+            throw new ArgumentOutOfRangeException(nameof(faction), faction, "unknown faction");
+        }
 
         /// <summary>
         /// Neutral damage-type placeholder for unarmed entities. Never
@@ -362,7 +398,7 @@ namespace Nova.Simulation.Definitions
         {
             // --- Alliance (factions[0]) ---
             new SimUnitDefinition(1,  FactionId.Alliance, UnitRole.Builder,            costAE: 800,  buildTicks: 300, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 350,  moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimUnitDefinition(2,  FactionId.Alliance, UnitRole.Harvester,          costAE: 700,  buildTicks: 250, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 800,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0), // 2.5
+            new SimUnitDefinition(2,  FactionId.Alliance, UnitRole.Harvester,          costAE: 700,  buildTicks: 250, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 800,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 330), // 2.5
             new SimUnitDefinition(12, FactionId.Alliance, UnitRole.BasicInfantry,      costAE: 120,  buildTicks: 100, tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 90,   moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 9),
             new SimUnitDefinition(13, FactionId.Alliance, UnitRole.AntiArmorInfantry,  costAE: 250,  buildTicks: 150, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 100,  moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 50,  attackRangeTiles: 10, attackCooldownTicks: 25), // 3.5
             new SimUnitDefinition(14, FactionId.Alliance, UnitRole.ScoutVehicle,       costAE: 300,  buildTicks: 120, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 220,  moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 12,  attackRangeTiles: 8,  attackCooldownTicks: 10),
@@ -391,7 +427,7 @@ namespace Nova.Simulation.Definitions
             // Vehicles.md names that concrete value; the derivation only
             // applies where the GDDs are silent. ---
             new SimUnitDefinition(18, FactionId.Legion,   UnitRole.Builder,            costAE: 650,  buildTicks: 240, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 320,  moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimUnitDefinition(19, FactionId.Legion,   UnitRole.Harvester,          costAE: 550,  buildTicks: 200, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 750,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0), // 2.5
+            new SimUnitDefinition(19, FactionId.Legion,   UnitRole.Harvester,          costAE: 550,  buildTicks: 200, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 750,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 300), // 2.5
             new SimUnitDefinition(29, FactionId.Legion,   UnitRole.BasicInfantry,      costAE: 60,   buildTicks: 80,  tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 55,   moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 8,   attackRangeTiles: 6,  attackCooldownTicks: 10),
             new SimUnitDefinition(30, FactionId.Legion,   UnitRole.AntiArmorInfantry,  costAE: 200,  buildTicks: 120, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 90,   moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 40,  attackRangeTiles: 9,  attackCooldownTicks: 25), // 3.5
             new SimUnitDefinition(31, FactionId.Legion,   UnitRole.ScoutVehicle,       costAE: 220,  buildTicks: 90,  tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 180,  moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 10),
@@ -496,12 +532,13 @@ namespace Nova.Simulation.Definitions
         /// NOVA_DEFINITIONS_V1 domain (SimulationCore.md section 5) over ids
         /// 1..<see cref="MaxDefinitionId"/> in ascending order; each
         /// definition contributes a field tag (its id) followed by a uniform
-        /// 20-field layout in canonical order: kind u8 (0 = building, 1 =
+        /// 21-field layout in canonical order: kind u8 (0 = building, 1 =
         /// unit), faction u8, role u8, costAE i32, buildTicks i32,
         /// powerProvided i32, powerRequired i32, hasPrerequisite u8,
         /// prerequisiteRole u8, tier u8, producerRole u8, maxHealth i32,
         /// moveSpeed raw i32, armorClass u8, damageType u8, attackDamage i32,
-        /// attackRangeTiles i32, attackCooldownTicks i32. Fields a kind does
+        /// attackRangeTiles i32, attackCooldownTicks i32, cargoCapacityAE i32.
+        /// Fields a kind does
         /// not have hash as 0, so the layout is identical for every row and a
         /// value change anywhere — a weapon value included — moves the hash
         /// and therefore refuses replay start (SimulationCore.md section 6).
@@ -566,6 +603,7 @@ namespace Nova.Simulation.Definitions
             hash.WriteInt32(def.AttackDamage);
             hash.WriteInt32(def.AttackRangeTiles);
             hash.WriteInt32(def.AttackCooldownTicks);
+            hash.WriteInt32(0); // cargoCapacityAE: buildings have none
         }
 
         private static void WriteUnitRow(SimHashWriter hash, in SimUnitDefinition def)
@@ -589,6 +627,7 @@ namespace Nova.Simulation.Definitions
             hash.WriteInt32(def.AttackDamage);
             hash.WriteInt32(def.AttackRangeTiles);
             hash.WriteInt32(def.AttackCooldownTicks);
+            hash.WriteInt32(def.CargoCapacityAE);
         }
 
         private static bool TryFindBuilding(ReadOnlySpan<SimBuildingDefinition> buildings, ushort id, out SimBuildingDefinition definition)

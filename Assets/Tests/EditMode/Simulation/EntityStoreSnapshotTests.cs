@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using Nova.Core;
+using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
@@ -194,6 +196,66 @@ namespace Nova.Simulation.Tests
             Assert.That(host.TryValidateState(valid), Is.True);
             Assert.That(host.TryRestoreState(valid), Is.True);
             Assert.That(host.ActiveCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Cargo_AboveTheCrossFactionHardCap_IsRejected_EvenWithoutAFactionLookup()
+        {
+            var store = new EntityManager(64);
+            EntityId harvester = store.SpawnUnit(
+                1,
+                new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)),
+                SimFixed.FromInt(4),
+                role: UnitRole.Harvester);
+            store.GetUnitRef(harvester).CargoAE = SimDefinitions.MaxHarvesterCargoCapacityAE + 1; // 331
+            byte[] bytes = Serialize(store);
+
+            var victim = new EntityManager(64);
+            Assert.That(victim.TryValidateState(bytes), Is.False,
+                "331 exceeds every faction's capacity — the block-level hard cap rejects it");
+            Assert.That(victim.TryRestoreState(bytes), Is.False);
+            Assert.That(victim.ActiveCount, Is.EqualTo(0), "a rejected restore must not mutate the store");
+        }
+
+        [Test]
+        public void Cargo_PerEntityFactionBound_Legion320Rejected_Alliance320Accepted()
+        {
+            // 320 fits under the cross-faction hard cap (330) but exceeds the
+            // Legion capacity (300): the precise bound is decidable only per
+            // entity, with the slot factions known (the overload contract —
+            // the canonical kernel restore stays on the hard cap because its
+            // two-phase validation has no cross-block faction view).
+            var store = new EntityManager(64);
+            EntityId harvester = store.SpawnUnit(
+                1,
+                new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)),
+                SimFixed.FromInt(4),
+                role: UnitRole.Harvester);
+            store.GetUnitRef(harvester).CargoAE = 320;
+            byte[] bytes = Serialize(store);
+
+            var hardCapOnly = new EntityManager(64);
+            Assert.That(hardCapOnly.TryValidateState(bytes), Is.True,
+                "320 is under the cross-faction hard cap — without a lookup nothing tighter applies");
+
+            // An unregistered economy is unguarded (no kernel): it serves as
+            // the faction lookup for the overload.
+            var legionFactions = new EconomySystem(new EntityManager(64));
+            legionFactions.SetSlotFaction(1, FactionId.Legion);
+            var legionVictim = new EntityManager(64);
+            Assert.That(legionVictim.TryValidateState(bytes, legionFactions), Is.False,
+                "a Legion harvester carrying 320 exceeds the Legion capacity of 300");
+            Assert.That(legionVictim.TryRestoreState(bytes, legionFactions), Is.False);
+            Assert.That(legionVictim.ActiveCount, Is.EqualTo(0),
+                "a rejected restore must not mutate the store");
+
+            var allianceFactions = new EconomySystem(new EntityManager(64)); // every slot defaults to Alliance
+            var allianceHost = new EntityManager(64);
+            Assert.That(allianceHost.TryValidateState(bytes, allianceFactions), Is.True,
+                "an Alliance harvester may carry up to 330");
+            Assert.That(allianceHost.TryRestoreState(bytes, allianceFactions), Is.True);
+            Assert.That(allianceHost.TryGetUnit(harvester, out UnitState restored), Is.True);
+            Assert.That(restored.CargoAE, Is.EqualTo(320));
         }
 
         /// <summary>Returns a copy of <paramref name="block"/> with the first little-endian occurrence of <paramref name="raw"/> replaced by its negation.</summary>

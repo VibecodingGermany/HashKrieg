@@ -79,11 +79,11 @@ namespace Nova.Simulation.Economy
     /// spread or take overharvest damage; there is no mother node and no
     /// depletion warning. The slot faction (<see cref="PlayerEconomyState.Faction"/>)
     /// IS modeled — it selects the definition row behind every cost, build
-    /// time, power figure and weapon profile. Harvester cargo capacity is the
-    /// one remaining flat value: every harvester uses
-    /// <see cref="UnitState.DefaultCargoCapacityAE"/> (330), the Legion value
-    /// 300 of quality/content/mvp-v1.json factions[1].identity.harvesterCargoAE
-    /// is registered ScopeLedger debt with return gate G4.
+    /// time, power figure and weapon profile, AND the harvester cargo
+    /// capacity: gathering clamps at the owner faction's
+    /// <see cref="Definitions.SimUnitDefinition.CargoCapacityAE"/> (Allianz
+    /// 330, Legion 300 — quality/content/mvp-v1.json
+    /// factions[i].identity.harvesterCargoAE).
     /// </para>
     /// <para>
     /// State (snapshot block <see cref="SnapshotBlockIds.Economy"/>, v2):
@@ -115,6 +115,20 @@ namespace Nova.Simulation.Economy
 
         /// <summary>Provisional harvest rate in AE per tick per harvester (Q-040 candidate).</summary>
         public const int HarvestRateAE = 2;
+
+        /// <summary>
+        /// Faction-resolved harvester cargo capacities, indexed by raw
+        /// <see cref="FactionId"/> and resolved once from
+        /// <see cref="Definitions.SimDefinitions"/>: the tick path never
+        /// re-scans the definition table, and a slot's faction cannot change
+        /// after kernel start (the <see cref="SetSlotFaction"/> guard), so a
+        /// static cache cannot go stale.
+        /// </summary>
+        private static readonly int[] CargoCapacityByFaction =
+        {
+            Definitions.SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance),
+            Definitions.SimDefinitions.HarvesterCargoCapacityAE(FactionId.Legion),
+        };
 
         private readonly EntityManager _entityManager;
         private readonly PlayerEconomyState[] _players;
@@ -312,7 +326,10 @@ namespace Nova.Simulation.Economy
             for (int i = 0; i < capacity; i++)
             {
                 ref UnitState unit = ref units[i];
-                if (!unit.IsActive || unit.Role != UnitRole.Harvester) continue;
+                // PlayerId bounds: the cargo ceiling and the deposit both
+                // index the per-slot state, so an out-of-range owner harvests
+                // nothing (same guard as RecomputePower).
+                if (!unit.IsActive || unit.Role != UnitRole.Harvester || unit.PlayerId >= MaxPlayers) continue;
 
                 // The return leg wins the dispatch: during an auto-cycle the
                 // harvester carries BOTH a returning flag and its retained
@@ -356,7 +373,10 @@ namespace Nova.Simulation.Economy
 
             if (!IsInReach(in unit, field.GridPos)) return; // held, not dropped
 
-            long freeCargo = UnitState.DefaultCargoCapacityAE - unit.CargoAE;
+            // The cargo ceiling is the OWNER FACTION's, not a flat constant:
+            // an Alliance harvester loads 330, a Legion one 300.
+            int cargoCapacity = CargoCapacityByFaction[(int)_players[unit.PlayerId].Faction];
+            long freeCargo = cargoCapacity - unit.CargoAE;
             long gathered = Math.Min(HarvestRateAE, Math.Min(field.RemainingAE, freeCargo));
             if (gathered <= 0)
             {
@@ -370,7 +390,7 @@ namespace Nova.Simulation.Economy
             unit.CargoAE += (int)gathered;
             field.RemainingAE -= gathered;
 
-            if (unit.CargoAE >= UnitState.DefaultCargoCapacityAE)
+            if (unit.CargoAE >= cargoCapacity)
             {
                 // Full cargo: return first, then auto-resume THIS field. The
                 // retained field id is the entire auto-cycle mechanism — it

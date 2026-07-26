@@ -18,15 +18,6 @@ namespace Nova.Simulation.State
         /// </summary>
         public static readonly SimFixed DefaultSightRadius = SimFixed.FromInt(10);
 
-        /// <summary>
-        /// Provisional harvester cargo capacity in AE (Q-040 candidate): the
-        /// canonical manifest distinguishes Allianz 330 / Legion 300
-        /// (quality/content/mvp-v1.json harvesterCargoAE), but factions are
-        /// not modeled in this slice, so every harvester carries the Allianz
-        /// value 330 until the faction slice ratifies the split.
-        /// </summary>
-        public const int DefaultCargoCapacityAE = 330;
-
         public EntityId Id;
         public byte PlayerId;
 

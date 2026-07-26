@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
@@ -178,11 +179,11 @@ namespace Nova.Simulation.Tests
             EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
             ref UnitState unit = ref entities.GetUnitRef(harvester);
             unit.HarvestFieldId = 1;
-            unit.CargoAE = UnitState.DefaultCargoCapacityAE - 1; // 329 of 330
+            unit.CargoAE = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance) - 1; // 329 of 330
 
             kernel.StepTick();
             unit = ref entities.GetUnitRef(harvester);
-            Assert.That(unit.CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
+            Assert.That(unit.CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
                 "only the free cargo space is gathered");
             Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)1), "the field id is retained for the auto-cycle");
             Assert.That(unit.IsReturningCargo, Is.True, "a full cargo starts the return leg");
@@ -190,8 +191,43 @@ namespace Nova.Simulation.Tests
             Assert.That(field.RemainingAE, Is.EqualTo(8999L));
 
             kernel.StepTick();
-            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(UnitState.DefaultCargoCapacityAE),
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
                 "no further gathering while the return leg holds without a refinery in reach");
+        }
+
+        [Test]
+        public void Harvest_StopsAtFactionCapacity_Legion300_Alliance330()
+        {
+            // The capacities come from the canonical definition rows
+            // (factions[i].identity.harvesterCargoAE of mvp-v1.json).
+            Assert.That(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance), Is.EqualTo(330));
+            Assert.That(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Legion), Is.EqualTo(300));
+            Assert.That(SimDefinitions.MaxHarvesterCargoCapacityAE, Is.EqualTo(330),
+                "the hard cap is the larger of the two faction capacities");
+
+            // A Legion harvester clamps at 300, NOT at the Alliance 330.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities);
+            kernel.RegisterSystem(economy);
+            economy.SetSlotFaction(0, FactionId.Legion); // before Start — the guard requires it
+            kernel.Start();
+            Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
+
+            EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
+            ref UnitState unit = ref entities.GetUnitRef(harvester);
+            unit.HarvestFieldId = 1;
+            unit.CargoAE = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Legion) - 1; // 299 of 300
+
+            kernel.StepTick();
+            unit = ref entities.GetUnitRef(harvester);
+            Assert.That(unit.CargoAE, Is.EqualTo(300),
+                "the Legion harvester clamps at the Legion capacity, not the Alliance 330");
+            Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)1), "the field id is retained for the auto-cycle");
+            Assert.That(unit.IsReturningCargo, Is.True,
+                "a full Legion cargo starts the return leg at 300");
+            Assert.That(economy.TryGetField(1, out AetheriumField field), Is.True);
+            Assert.That(field.RemainingAE, Is.EqualTo(8999L), "only the single free AE was gathered");
         }
 
         [Test]
