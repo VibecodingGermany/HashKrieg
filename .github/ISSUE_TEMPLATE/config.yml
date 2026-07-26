@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Weltentwurf und Fraktionen
+    url: https://github.com/VibecodingGermany/Project_Nova/blob/main/docs/vision/Lore.md
+    about: Warum die beiden Fraktionen gegeneinander kaempfen.
+  - name: Die offene Wirtschaftsentscheidung
+    url: https://github.com/VibecodingGermany/Project_Nova/blob/main/docs/vision/Konzept_Hashkrieg.md
+    about: Soll die oekonomische Grundschleife umgedreht werden? Meinungen erwuenscht.
+  - name: Sicherheitsluecke melden
+    url: https://github.com/VibecodingGermany/Project_Nova/security/advisories/new
+    about: Bitte nicht als oeffentliches Issue.

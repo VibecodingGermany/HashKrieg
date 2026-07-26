@@ -1,0 +1,37 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie beschrieben.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fuers Melden. Der Graybox-Stand ist ausdruecklich unfertig — was er
+        bewusst noch nicht kann, steht in der README unter "Was die Graybox zeigt".
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Beobachtung, nicht Vermutung.
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hattest du erwartet?
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachvollziehen
+      placeholder: |
+        1. Bootstrap.unity oeffnen
+        2. Play druecken
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: umgebung
+    attributes:
+      label: Umgebung
+      placeholder: "macOS 15 / Unity 6000.5.4f1 / Editor oder Player"

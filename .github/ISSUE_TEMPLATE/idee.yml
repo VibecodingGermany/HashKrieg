@@ -1,0 +1,36 @@
+name: Idee, Feedback oder Gegenmeinung
+description: Design, Spielgefuehl, Richtung — auch Widerspruch.
+labels: ["design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Widerspruch ist willkommen. Jede Entscheidung im Projekt steht mit
+        mindestens drei geprueften Alternativen im DecisionLog.
+  - type: textarea
+    id: idee
+    attributes:
+      label: Worum geht es?
+    validations:
+      required: true
+  - type: textarea
+    id: warum
+    attributes:
+      label: Warum haeltst du das fuer besser als den jetzigen Stand?
+      description: Ein bis zwei Saetze genuegen.
+    validations:
+      required: true
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Bereich
+      options:
+        - Wirtschaft und Ressourcen
+        - Kampf und Balance
+        - Fraktionen und Lore
+        - Steuerung und Spielgefuehl
+        - Art und Praesentation
+        - Technik und Architektur
+        - Sonstiges
+    validations:
+      required: true

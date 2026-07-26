@@ -1,50 +1,125 @@
 # Project Nova
 
-**Dokumentversion:** 0.14.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Dokumentversion:** 0.15.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
-> Modernes Echtzeitstrategiespiel mit Basisbau und der lebendigen
-> Kristallressource **Aetherium**. *Project Nova* ist der Arbeitstitel.
+> Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
+> Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
+> **Arbeitstitel in Umstellung: _Hashkrieg_.**
+
+| Allianz | | Legion | |
+|---|---|---|---|
+| ![Allianz Kommandozentrale](docs/assets/concept-art/web/alliance_building_HQ.jpg) | ![Allianz Lynx](docs/assets/concept-art/web/alliance_unit_LightTank.jpg) | ![Legion Gefechtsstand](docs/assets/concept-art/web/legion_building_HQ.jpg) | ![Legion Räuber](docs/assets/concept-art/web/legion_unit_LightTank.jpg) |
+
+<sub>Concept-Art, keine Bildschirmfotos aus dem Spiel. Der komplette Satz: [Kontaktbogen](docs/assets/concept-art/KONTAKTBOGEN.jpg)</sub>
 
 ## Zweck
 
 Diese Seite ist der Einstieg in Repository, Projektstatus und Dokumentation.
 Sie unterscheidet bewusst zwischen vorhandenem Prototypcode und bestandenen
-Gates.
+Gates — und sie sagt offen, welche Entscheidung als Nächstes ansteht.
 
 ## Abhängigkeiten
 
 - [AGENTS.md](AGENTS.md) – verbindliche Arbeitsregeln
 - [CONTRIBUTING.md](CONTRIBUTING.md) – Branch-, PR- und Review-Ablauf
 - [docs/README.md](docs/README.md) – vollständiger Wiki-Index
+- [docs/vision/Lore.md](docs/vision/Lore.md) – Weltentwurf *Hashkrieg*
+- [docs/vision/Konzept_Hashkrieg.md](docs/vision/Konzept_Hashkrieg.md) – die
+  Mechanik-Variante, über die entschieden werden muss
 - [docs/production/MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) –
   Gates G0 bis G5
 - [docs/production/MVPContentManifest.md](docs/production/MVPContentManifest.md) –
   exakter MS-1-Inhalt
-- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – D-064
-  und D-066 zum fail-closed Trusted-Gate-Bootstrap
-- [docs/production/GrayboxLog.md](docs/production/GrayboxLog.md) –
-  Sitzungsprotokoll der Graybox-Spur
+- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – alle
+  Entscheidungen mit Alternativen
 - [docs/production/ScopeLedger.md](docs/production/ScopeLedger.md) – Register
   aller Verschiebungen gegenüber dem MS-1-Inhalt
 
-## Projektstatus
+## 1. Die Richtung: Hashkrieg
 
-**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7, G0-A offen ·
-**Wiki:** 0.12.0 unveröffentlicht
+Die Welt ist nicht an einem Krieg zugrunde gegangen, sondern an einer
+**Abrechnung**. Als Rechenleistung die einzige Größe wurde, die noch Wert
+bemaß, verfiel am Tag des Großen Abschlusses jeder Anspruch, der nicht durch
+nachgewiesene Rechenleistung gedeckt war. Renten, Anleihen, Grundbücher. Nicht
+gestohlen — nur nicht abgerechnet. Es war eine korrekt ausgeführte Regel, und
+genau daran zerbricht die Welt bis heute: **Es gibt niemanden, den man dafür
+hängen könnte.**
+
+Beide Fraktionen haben denselben Tag erlebt und entgegengesetzte Lehren gezogen:
+
+| | **Allianz** | **Legion** |
+|---|---|---|
+| Lehre | *Es war ein Buchhaltungsfehler* | *Genau so fängt es wieder an* |
+| Ziel | eine verlässliche Abrechnungsinstanz | die Kette dauerhaft umkämpft halten |
+| Baut | für die Ewigkeit: versiegelt, teuer, symmetrisch | für morgen früh: offen, billig, ersetzbar |
+| Widerspruch | braucht dafür ein Monopol | braucht dafür den ewigen Krieg |
+
+**Frieden ist nicht Unwille, sondern Arithmetik.** Einkommen ist Anteil, nicht
+Ertrag: Wer nicht wächst, schrumpft. Und die 51-Prozent-Mehrheit ist für die
+Allianz der Sieg und für die Legion das Weltende — beide haben recht.
+
+Der vollständige Weltentwurf inklusive Kampagnen-Anker steht in
+[docs/vision/Lore.md](docs/vision/Lore.md).
+
+## 2. Die offene Entscheidung — hier lohnt sich Mitreden
+
+Das ist gerade die **wichtigste ungeklärte Frage** des Projekts, und sie ist
+bewusst offen: Ändern wir die ökonomische Grundschleife, oder nicht?
+
+**Heute (und in jedem RTS seit 1995):** Ressourcen fließen **nach innen**.
+Harvester fahren raus, sammeln Aetherium, bringen es heim. Die Basis verbraucht.
+
+**Die Variante „Hashkrieg":** Energie fließt **nach außen**. Du erzeugst Strom
+im Zentrum deiner Basis und lieferst ihn per Konvoi an Rechenfarmen an der
+Peripherie, die Ertrag erwirtschaften. Jedes Watt ist eine Entscheidung —
+**rechnet es, oder schießt es?**
+
+Was daran hängt:
+
+| | bleibt gleich | ändert sich |
+|---|---|---|
+| Sammler-Loop | Ladung, Ladezeit, Docks, verwundbare Konvois | die **Richtung** kehrt sich um |
+| Biome | Karten und Gelände | bekommen eine **wirtschaftliche** Identität (Kühlung) |
+| Wirtschaftsknick | Taktgeber ins Endgame | wird zum angekündigten **Halving** |
+| Superwaffe | teuer, sichtbar, sabotierbar | wird zur **51-Prozent-Attacke** |
+| Fog of War | gilt für die Karte | gilt **nicht** für die Konten: jeder sieht die Einnahmen aller |
+
+Die vollständige Analyse mit Mechanik-Mapping, Match-Bogen und drei bewerteten
+Optionen steht in
+[docs/vision/Konzept_Hashkrieg.md](docs/vision/Konzept_Hashkrieg.md).
+Kurzfassung der dortigen Empfehlung: **MS-1 wie geplant fertigstellen** — die
+Mechanik ist mechanisch fast identisch und validiert sich dabei selbst —, den
+Hashkrieg-Umbau **danach** als Prototyp erproben.
+
+Gegenmeinungen sind ausdrücklich erwünscht. Wenn du dazu etwas zu sagen hast:
+[ein Issue aufmachen](https://github.com/VibecodingGermany/Project_Nova/issues/new)
+und in zwei Sätzen begründen, welche Option du für richtig hältst.
+
+## 3. Projektstatus
+
+**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7 · **G0-A:** offen
 
 | Ergebnisstufe | Status |
 |---|---|
 | Sprint 6 | durch D-055 beendet; Recovery-Rebaseline ersetzt die alte Planung |
-| Sprint 7 | gestartet; zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis |
+| Sprint 7 | läuft: zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis |
 | G0 | offen |
 | MS-0 | nicht erreicht |
 | MS-1 / MVP | nicht erreicht |
 | Alpha | nicht begonnen |
 
+Was seither entstanden ist, **ohne dass es einen Gate-Status begründet**:
+
+- **Graybox-Slice** — die Simulation ist erstmals sicht- und bedienbar (siehe §4)
+- **Fraktionsidentität** — Allianz und Legion spielen sich unterschiedlich:
+  Schadensmatrix, Waffenwerte, Siegbedingungen, fraktionsaufgelöste
+  Definitionstabelle und Harvester-Kapazität
+- **Weltentwurf und Concept-Art** — 34 Bilder, ein Bildstandard, eine Lore (§5)
+
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis. Führend sind der
 [Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md)
-und schema- sowie semantikvalide Gate-Evidence; in diesem Rebaseline werden keine
+und schema- sowie semantikvalide Gate-Evidence; es werden keine
 Evidence-Platzhalter erzeugt.
 
 Schema 1.2 prüft aktuell ausschließlich Integrität und autorisiert keinen
@@ -55,12 +130,12 @@ zweiphasigen D-066-Receipt-Vertrag mit getrenntem Subject, Evidence-Carrier
 und Trusted Tooling implementieren. Erst ein nachfolgender sauberer
 Subject-Commit darf damit G0 nachweisen.
 
-## Das Spiel ausprobieren (Graybox – kein Gate-Nachweis)
+## 4. Das Spiel ausprobieren (Graybox — kein Gate-Nachweis)
 
 Seit dem Graybox-Slice ist das Spiel zum ersten Mal **sicht- und bedienbar**.
 Das ist ein Diagnosestand, kein Fortschritt an einem Gate: Er belegt weder G0
-noch MS-0 oder MS-1 (D-067 K1, Entwurf). Was er zeigt und was nicht, steht
-weiter unten – bitte vor dem ersten Start lesen.
+noch MS-0 oder MS-1. Was er zeigt und was nicht, steht weiter unten — bitte vor
+dem ersten Start lesen.
 
 ### Variante 1: im Editor (empfohlen)
 
@@ -69,7 +144,7 @@ weiter unten – bitte vor dem ersten Start lesen.
 3. Das Match startet von selbst: 128×128-Karte, zwei Slots, du bist Slot 0.
 
 Die Szene ist **Maschinenausgabe**. Wenn sie beschädigt oder veraltet ist, wird
-sie über das Menü `Tools/Project Nova/Create Bootstrap Scene` neu erzeugt – die
+sie über das Menü `Tools/Project Nova/Create Bootstrap Scene` neu erzeugt — die
 `.unity`-Datei wird nie von Hand bearbeitet.
 
 ### Steuerung
@@ -82,7 +157,7 @@ Verbindlich ist der Code (`RtsDeviceInput`); das HUD zeigt dieselbe Legende an.
 | Linke Maustaste, Ziehen | Box-Auswahl eigener Einheiten |
 | Rechte Maustaste | Bewegen zum Zielpunkt |
 | `S` | Stop |
-| `A` | Angriff: Gegner unter dem Cursor wird echtes Angriffsziel, sonst Bewegung dorthin (Attack-Move-Annäherung – Schema v1 kennt kein Attack-Move) |
+| `A` | Angriff: Gegner unter dem Cursor wird echtes Angriffsziel, sonst Bewegung dorthin |
 | `H` | Nächstes nicht erschöpftes Aetherium-Feld ernten |
 | `R` | Ladung zur Raffinerie zurückbringen |
 | `B` / `Shift`+`B` | Gebäude platzieren: Kraftwerk / Kaserne |
@@ -97,8 +172,7 @@ Bedienschicht.
 ### Variante 2: fertige Player
 
 Beide Player entstehen im Verzeichnis `Builds/`, das **gitignoriert** ist. Sie
-liegen also nur auf der Maschine, die sie gebaut hat, und sind nicht Teil eines
-frischen Clones. Neu bauen im Batchmode:
+liegen also nur auf der Maschine, die sie gebaut hat. Neu bauen im Batchmode:
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.5.4f1/Unity.app/Contents/MacOS/Unity \
@@ -106,83 +180,82 @@ frischen Clones. Neu bauen im Batchmode:
   -executeMethod Nova.Editor.BuildScript.BuildMacOSArm64   # oder BuildWindows64
 ```
 
-**macOS – `Builds/MacOSArm64/ProjectNova.app`.** Der Build ist ein **unsigniertes,
-lokales Artefakt** ohne Notarisierung; Gatekeeper blockiert ihn beim ersten
-Start. Quarantäne-Attribut einmalig entfernen, dann starten:
+**macOS** — `Builds/MacOSArm64/ProjectNova.app` ist ein **unsigniertes, lokales
+Artefakt** ohne Notarisierung; Gatekeeper blockiert den ersten Start:
 
 ```bash
 xattr -dr com.apple.quarantine "Builds/MacOSArm64/ProjectNova.app"
 open "Builds/MacOSArm64/ProjectNova.app"
 ```
 
-Dieser Player wurde tatsächlich ausgeführt: zwei Läufe (40 s und 90 s) ohne eine
-einzige Exception, alle sieben Simulationssysteme initialisiert, Kernel
-gestartet.
+**Windows** — `Builds/Windows64/ProjectNova.exe` ist ein unsignierter
+Mono-Player, **von macOS aus gebaut**. SmartScreen warnt beim ersten Start.
+Ehrliche Einschränkung: Der Build ist abgeschlossen, wurde aber **nie
+ausgeführt** — der erste Windows-Start ist gleichzeitig der erste echte Test.
 
-**Windows – `Builds/Windows64/ProjectNova.exe`.** Das ist der **erste
-Windows-Player, der überhaupt getestet werden kann**. Er ist ein unsignierter
-Mono-Player, der **von macOS aus** gebaut wurde; Windows SmartScreen wird beim
-ersten Start warnen („Der Computer wurde durch Windows geschützt" →
-*Weitere Informationen* → *Trotzdem ausführen*). Ehrliche Einschränkung: Der
-Build ist erfolgreich abgeschlossen und sein Inhalt ist frisch, aber er wurde
-**nie ausgeführt** – der Host dieser Sitzung ist ein Mac. Der erste Windows-Start
-ist damit gleichzeitig der erste echte Test dieses Artefakts.
+### Was die Graybox zeigt — und was nicht
 
-### Was die Graybox zeigt – und was nicht
-
-**Zu sehen und zu prüfen:**
-
-- der Lockstep-Kern läuft mit 10 Hz, Befehle gehen ausschließlich durch den
-  versiegelten Command-Pfad;
-- Auswahl, Bewegung, Flow-Field-Pathfinding, Bau, Produktion;
-- Fog of War: verborgene Einheiten haben keinen Proxy in der Szene;
-- Ökonomie-Grundlagen (Ernte, Kredite, Energiebilanz) im Debug-HUD;
-- Form kodiert Rolle, Farbe kodiert Spieler – bewusst redundant.
+**Zu sehen und zu prüfen:** Lockstep-Kern mit 10 Hz, Befehle ausschließlich
+durch den versiegelten Command-Pfad; Auswahl, Bewegung, Flow-Field-Pathfinding,
+Bau, Produktion; Fog of War; Ökonomie-Grundlagen im Debug-HUD; Form kodiert
+Rolle, Farbe kodiert Spieler.
 
 **Ausdrücklich nicht beurteilbar:**
 
-- **Kampf ist nicht bewertbar.** Jede Einheit verursacht denselben flachen
-  Schadenswert; es gibt keine Rüstung, keine Schadenstypen und keine
-  Waffenprofile. Wer auf diesem Stand über Kampfbalance urteilt, urteilt über
-  einen Platzhalter.
-- **Ein Match kann nicht enden.** Es gibt keine Siegauswertung und kein
-  Zeitlimit – kein Sieg, keine Niederlage, kein Unentschieden.
 - **Der Gegner spielt nicht.** Slot 1 bekommt eine Startbasis und sonst nichts;
   es gibt noch keine KI.
-- **Der Harvester-Kreislauf schließt sich nicht** von allein: Ein Harvester
-  füllt sich, schaltet auf Rückkehr und hält an, weil die Ökonomie keine
-  Bewegung erzeugt. Manuell (`H`, dann `R`, dann fahren) funktioniert der Zyklus.
+- **Der Harvester-Kreislauf schließt sich nicht** von allein. Manuell (`H`,
+  dann `R`, dann fahren) funktioniert der Zyklus.
 - **Das HUD ist eine Debug-Überlagerung**, keine UI. Keine Pause, kein
-  Save/Load, kein Rebinding, keine UI-Skalierung.
+  Save/Load, kein Rebinding.
 - **Look and Feel ist unverifiziert.** Ob die Graybox lesbar ist und sich die
-  Steuerung richtig anfühlt, konnte automatisiert niemand prüfen – das ist
+  Steuerung richtig anfühlt, konnte automatisiert niemand prüfen — das ist
   genau die Frage, die der erste menschliche Durchlauf beantwortet.
 
 Die vollständige Liste der Verschiebungen steht im
-[ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll samt
-Messzahlen im [GrayboxLog](docs/production/GrayboxLog.md).
+[ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll im
+[GrayboxLog](docs/production/GrayboxLog.md).
 
-## Neuer Arbeitstitel: Hashkrieg (Weltentwurf und Concept-Art)
+## 5. Concept-Art
 
-Für das Spiel ist der neue Arbeitstitel *Hashkrieg* beschlossen: ein
-postapokalyptisches Setting, in dem Rechenleistung die letzte verlässliche Währung
-ist und zwei Fraktionen aus demselben Zusammenbruch gegensätzliche Lehren gezogen
-haben. Der vollständige Weltentwurf steht in
-[docs/vision/Lore.md](docs/vision/Lore.md).
+[![Kontaktbogen aller 34 Concept-Art-Entwürfe](docs/assets/concept-art/KONTAKTBOGEN.jpg)](docs/assets/concept-art/KONTAKTBOGEN.jpg)
 
-Dazu liegt ein erster Satz Concept-Art vor: 34 Bilder je Fraktion und Rolle, siehe
-[docs/assets/concept-art/README.md](docs/assets/concept-art/README.md) sowie der
-Kontaktbogen [docs/assets/concept-art/KONTAKTBOGEN.jpg](docs/assets/concept-art/KONTAKTBOGEN.jpg).
-Der zugrundeliegende Bildstandard steht in
-[docs/assets/ConceptArtStyleGuide.md](docs/assets/ConceptArtStyleGuide.md).
+34 Entwürfe, 17 Rollen je Fraktion, alle im selben Format und derselben
+Lichtsetzung. Der Leuchtakzent trägt die Fraktionsidentität — Cyan gegen
+Orange — und entspricht der Teamfarben-Maske im späteren Spielasset.
 
-**Status:** Weltentwurf und Concept-Art sind Entwürfe zur Formfindung, keine
-Produktionsassets. Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses
-Repositories noch nicht vollzogen — Repo, Code und der übrige Wiki-Bestand laufen
-weiterhin unter dem Arbeitstitel *Project Nova*. Dies ist keine Gate- oder
-Meilensteinaussage.
+- [Bildstandard](docs/assets/ConceptArtStyleGuide.md) – Rahmung, Licht, Palette,
+  Formensprache, Maßstabsanker, Abnahmekriterien
+- [Ordner und Herkunftsnachweis](docs/assets/concept-art/README.md) – Provenienz
+  je Bild inklusive Modell, Prompt und SHA-256
 
-## Closed-Core MS-1
+**Status:** Entwürfe zur Formfindung, **keine Produktionsassets**. Es existiert
+kein 3D-Asset im Projekt.
+
+## 6. Mitmachen
+
+Das Projekt ist offen und wird gerade von sehr wenigen Leuten getragen.
+Mithilfe ist willkommen — besonders in diesen Bereichen:
+
+| Du kannst… | Dann schau hier |
+|---|---|
+| **mitentscheiden**, ob die Wirtschaft umgedreht wird | §2 und [Konzept_Hashkrieg.md](docs/vision/Konzept_Hashkrieg.md) |
+| **die Graybox spielen** und sagen, wie sie sich anfühlt | §4 — Look and Feel ist bisher von niemandem beurteilt |
+| **3D-Assets bauen** aus den Concept-Art-Vorlagen | [Bildstandard](docs/assets/ConceptArtStyleGuide.md) und [AssetBudget](docs/tech/AssetBudget.md) |
+| **an der Simulation arbeiten** (C#, deterministisch, Unity-frei) | [SimulationCore](docs/tech/SimulationCore.md) und [CodingGuidelines](docs/tech/CodingGuidelines.md) |
+| **KI schreiben** — Slot 1 spielt bisher gar nicht | [SkirmishAi_Spec](docs/tech/modules/SkirmishAi_Spec.md) |
+| **Doku verbessern** | [DocumentationStandard](docs/meta/DocumentationStandard.md) |
+
+Zwei Dinge, die den Einstieg leichter machen: Der Simulationskern ist
+**Unity-frei** und läuft headless über `tools/Nova.SimRunner` — man braucht
+Unity nur für die Darstellung. Und jede Entscheidung im Projekt steht mit
+mindestens drei geprüften Alternativen im
+[DecisionLog](docs/production/DecisionLog.md); nichts wird still geändert.
+
+Ablauf steht in [CONTRIBUTING.md](CONTRIBUTING.md). Fragen gern als
+[Issue](https://github.com/VibecodingGermany/Project_Nova/issues).
+
+## 7. Closed-Core MS-1
 
 D-056 begrenzt MS-1 auf:
 
@@ -196,7 +269,7 @@ D-056 begrenzt MS-1 auf:
 Evolvierte, Luft, T3, Zusatzkarten, Multiplayer, Kampagne, Telemetrie,
 Steam/Cloud und finale Art/Audio sind Post-MVP.
 
-## Tech-Stack
+## 8. Tech-Stack
 
 - **Engine:** Unity `6000.5.4f1`, Revision `d550df8bd089`
 - **Rendering:** URP
@@ -208,51 +281,58 @@ Steam/Cloud und finale Art/Audio sind Post-MVP.
 Automatische Editor-Upgrades sind verboten. Eine Re-Evaluierung benötigt nach
 G5 oder bei einem belegten Engine-Blocker eine neue D-ID.
 
-## Repository-Struktur
+## 9. Repository-Struktur
 
 ```text
 Project Nova/
 ├── Assets/                Unity-Projekt und Prototypcode
 ├── docs/                  Living-Documents-Wiki
+│   ├── vision/            Weltentwurf, Kernspielgefühl, Zielgruppe
 │   ├── gamedesign/        Vollspiel-GDD mit MS-1-Overrides
 │   ├── tech/              technische Verträge
+│   ├── assets/            Art-Standard und Concept-Art
 │   └── production/        Entscheidungen, Gates, Risiken, Planung
 ├── quality/
 │   ├── content/           maschinenlesbares MVP-Manifest
 │   ├── scenarios/         kanonische Abnahmeszenarien
 │   ├── schemas/           Evidence-Schema; keine Platzhalter-Evidence
-│   ├── scripts/           Schema-, Semantik- und Integritätsprüfung
-│   └── package-lock.json  gepinnte Ajv-Abhängigkeiten
+│   └── scripts/           Schema-, Semantik- und Integritätsprüfung
 ├── tools/                 unter anderem Nova.SimRunner
 ├── AGENTS.md
 ├── CONTRIBUTING.md
 └── CHANGELOG.md
 ```
 
-## Arbeitsweise
+## 10. Arbeitsweise
 
 `main` ist PR-only. Arbeit erfolgt auf kurzen
 `feat/`, `fix/`, `docs/`, `chore/`, `refactor/` oder `codex/`-Branches,
 gefolgt von Squash-Merge und linearer Historie. Es gibt keinen dauerhaften
-Integrationsbranch. Agenten committen oder pushen nur nach ausdrücklicher
-Anfrage für die jeweilige Aktion.
+Integrationsbranch.
 
 Pflichtchecks sind `docs-check` und für Quality-Verträge `integrity`. Dieser
 Teil des `quality-gate` prüft nur Verträge und Negative Controls. Ein
-Authorize-Job existiert bis G0-A2 bewusst nicht. Eine Änderung am Trust-
-Bundle wird ohne Gate-Fortschritt gemergt und kann sich nicht selbst
-autorisieren.
+Authorize-Job existiert bis G0-A2 bewusst nicht. Eine Änderung am Trust-Bundle
+wird ohne Gate-Fortschritt gemergt und kann sich nicht selbst autorisieren.
 
-## Lizenz
+## 11. Lizenz
 
-© 2026 VibecodingGermany / Dennis Westermann. Bis eine formale Lizenz
-vorliegt, sind Ansehen und Mitwirken per Pull Request erwünscht; eine
-Weiterverbreitung als eigenes Werk ist nicht freigegeben.
+© 2026 VibecodingGermany / Dennis Westermann. **Alle Rechte vorbehalten.**
+
+Es liegt derzeit **keine Open-Source-Lizenz** vor. Ansehen, Ausprobieren und
+Mitwirken per Pull Request sind ausdrücklich erwünscht; eine Weiterverbreitung
+als eigenes Werk ist nicht freigegeben. Wer beitragen möchte, kann das tun —
+die Lizenzfrage wird vor einer Veröffentlichung geklärt und ist als offener
+Punkt geführt.
 
 ## Offene Punkte
 
+- **Die Wirtschaftsfrage aus §2** ist die wichtigste offene Entscheidung.
+- Eine formale Lizenz ist noch festzulegen. Sie entscheidet, unter welchen
+  Bedingungen Beiträge Dritter angenommen werden können.
+- Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses Repositories
+  noch nicht vollzogen — Repo, Code und Wiki laufen weiter unter *Project Nova*.
 - Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
-- Eine formale Lizenz ist noch festzulegen.
 
 ## Nächste Schritte
 
@@ -275,5 +355,6 @@ Weiterverbreitung als eigenes Werk ist nicht freigegeben.
 | 0.10.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, Drei-Lauf-Messung und Protected-CI-Trustpfad aufgenommen | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.11.0 | 2026-07-24 | D-064: Schema 1.2 auf Integrität begrenzt, G0-A vor G0-B gestellt und subject-unabhängigen Schema-1.3-Bootstrap verankert | Executive Producer / Technical Writer / Lead QA Engineer |
 | 0.12.0 | 2026-07-25 | D-066: G0-A1-Integritätsgrundlage vom zweiphasigen G0-A2-Receipt-Authorizer getrennt und zirkulären Pass-Pfad entfernt | Executive Producer / Technical Writer / Lead QA Engineer |
-| 0.13.0 | 2026-07-26 | Abschnitt „Das Spiel ausprobieren" mit Editor-Start, echter Steuerungslegende, Player-Anleitung für macOS/Windows und ehrlicher Abgrenzung des Graybox-Stands ergänzt; GrayboxLog und ScopeLedger verlinkt | Technical Writer |
-| 0.14.0 | 2026-07-26 | Abschnitt zum neuen Arbeitstitel *Hashkrieg* ergänzt: Weltentwurf, Concept-Art-Satz und Style-Guide verlinkt, Umbenennung im Bestand ausdrücklich als noch nicht vollzogen markiert | Technical Writer |
+| 0.13.0 | 2026-07-26 | Abschnitt „Das Spiel ausprobieren" mit Editor-Start, Steuerungslegende, Player-Anleitung und ehrlicher Abgrenzung des Graybox-Stands ergänzt | Technical Writer |
+| 0.14.0 | 2026-07-26 | Abschnitt zum neuen Arbeitstitel *Hashkrieg* ergänzt: Weltentwurf, Concept-Art-Satz und Style-Guide verlinkt | Technical Writer |
+| 0.15.0 | 2026-07-26 | Neu gegliedert und bebildert: Hashkrieg-Richtung nach vorn gezogen, die offene Wirtschaftsentscheidung als eigener Abschnitt sichtbar gemacht, Mitmach-Abschnitt mit Einstiegspunkten ergänzt, Projektstatus um Graybox und Fraktionsidentität aktualisiert, Lizenzlage präzisiert | Technical Writer |
