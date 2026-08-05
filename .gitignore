@@ -74,6 +74,29 @@ tools/**/out/
 /[Aa]ssets/Resources/BillingMode.json
 /[Aa]ssets/Resources/BillingMode.json.meta
 
+# ── Art-Assets: leben als Paket ausserhalb des Repos ───────────────────────
+# Die produzierten 3D-Assets (rund 105 MB) wuerden das Repository mehr als
+# verdoppeln und liessen sich spaeter nur per History-Rewrite entfernen. Sie
+# werden deshalb als Asset-Paket verteilt: docs/assets/AssetPackage.md.
+#
+# Ausgeschlossen wird der VOLLSTAENDIGE Art-Inhalt, nicht nur die Binaries:
+# bliebe das Prefab im Repo und fehlte sein Mesh, haette ein frischer Clone
+# unsichtbare Einheiten statt Graybox-Primitiven. Ohne Prefab faellt
+# UnitViewManager sauber auf Primitive zurueck — ein Clone ist damit immer
+# spielbar, und ein Paket-Drop-in schaltet die Art per ArtAssetAutoSync frei.
+#
+# Bewusst NICHT ignoriert: PROVENANCE.json (Lizenz-/Herkunftsnachweis bleibt
+# im Repo, auch wenn das Asset es nicht tut), .gitkeep und Ordner-Metas.
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.fbx
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.fbx.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.png
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.png.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.mat
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.mat.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.prefab
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.prefab.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/[Ss]ource/
+
 # ── Node / Tooling (falls Build-Skripte hinzukommen) ───────────────────────
 node_modules/
 npm-debug.log*

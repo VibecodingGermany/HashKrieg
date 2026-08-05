@@ -123,6 +123,28 @@ namespace Nova.Gameplay.Match
         // Alliance-HQ instance must never resurface as a Legion-Harvester.
         private readonly Dictionary<GameObject, Stack<GameObject>> _prefabPools = new Dictionary<GameObject, Stack<GameObject>>();
         private MaterialPropertyBlock _propertyBlock;
+        // Scratch for the all-renderers tint upload (no per-call allocation).
+        private readonly List<Renderer> _tintScratch = new List<Renderer>(8);
+        // Shared runtime material for graybox primitives: Unity's primitive
+        // default material is a built-in-RP resource and renders magenta
+        // under URP (GB-004 finding), so primitives carry this URP Lit
+        // instance and keep the per-instance faction tint on the property
+        // block. Lazy, never saved, destroyed with the component.
+        private static Material _primitiveMaterial;
+
+        private static Material PrimitiveMaterial
+        {
+            get
+            {
+                if (_primitiveMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    _primitiveMaterial = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                }
+                return _primitiveMaterial;
+            }
+        }
         private int _frameStamp;
         private bool _fogUnavailableLogged;
 
@@ -372,6 +394,7 @@ namespace Nova.Gameplay.Match
                     instance = GameObject.CreatePrimitive(primitive);
                     instance.transform.SetParent(transform, false);
                     instance.name = "UnitView_" + primitive;
+                    instance.GetComponent<Renderer>().sharedMaterial = PrimitiveMaterial;
                 }
                 instance.transform.localScale = scale;
             }
@@ -522,8 +545,8 @@ namespace Nova.Gameplay.Match
 
         private void ApplyTint(int slot, byte playerId, int healthStep)
         {
-            Renderer renderer = _viewRenderers[slot];
-            if (renderer == null) return;
+            GameObject instance = _viewInstances[slot];
+            if (instance == null) return;
 
             Color color = TintFor(playerId, healthStep);
             _propertyBlock.Clear();
@@ -531,7 +554,20 @@ namespace Nova.Gameplay.Match
             // keeps the graybox tinted through the pipeline migration instead
             // of falling back to magenta / untinted white.
             FactionTint.ApplyToPropertyBlock(_propertyBlock, color);
-            renderer.SetPropertyBlock(_propertyBlock);
+
+            // EVERY renderer of the view gets the block: a prefab's LODGroup
+            // switches between its _LOD0/1/2 renderers with camera distance,
+            // and tinting only the first would drop the faction colour
+            // exactly when the player zooms out.
+            instance.GetComponentsInChildren(includeInactive: true, _tintScratch);
+            for (int i = 0; i < _tintScratch.Count; i++)
+            {
+                if (_tintScratch[i] != null)
+                {
+                    _tintScratch[i].SetPropertyBlock(_propertyBlock);
+                }
+            }
+            _tintScratch.Clear();
         }
 
         /// <summary>
@@ -750,6 +786,12 @@ namespace Nova.Gameplay.Match
                 }
             }
             _prefabPools.Clear();
+
+            if (_primitiveMaterial != null)
+            {
+                Destroy(_primitiveMaterial);
+                _primitiveMaterial = null;
+            }
         }
     }
 }

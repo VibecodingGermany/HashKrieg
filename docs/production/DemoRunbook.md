@@ -1,6 +1,6 @@
 # Demo-Runbook – erste spielbare Runde (Glutrinne-Graybox)
 
-**Version:** 0.1.0 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.2.0 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -30,7 +30,7 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
 - Nach dem Öffnen des Projekts einmal Play drücken: Das Match startet von
   selbst (`MatchBootstrap.AutoStart`).
 
-## 2. Was die Demo zeigt (Spielstand GB-003)
+## 2. Was die Demo zeigt (Spielstand GB-004)
 
 - **Karte „Glutrinne" (Blockout):** Wüstengetönte 128×128-Ebene, dunkler
   Kartenrand-Rahmen, Aetherium-Kristallmarker (cyan) auf den beiden Feldern,
@@ -39,8 +39,9 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
   1 Builder, 4 Basis-Infanterie. Slot 0 (Mensch) = Allianz, Slot 1 = Legion.
 - **Wirtschaft:** Die beiden eigenen Harvester ernten ab Tick 1 automatisch;
   Aetherium-Stand und Fraktionen sind im Debug-HUD sichtbar.
-- **Bau und Produktion:** Kraftwerk (B), Kaserne (Shift+B), Harvester (Q),
-  Basis-Infanterie (Shift+Q) – alles über den kanonischen Command-Pfad.
+- **Bau und Produktion:** Das volle MS-1-Roster ist per Tastatur erreichbar
+  (8 Gebäude-Rollen, 8 Einheiten-Rollen; nur das HQ ist bewusst unbelegt) –
+  alles über den kanonischen Command-Pfad.
 - **Fog of War:** Gerendert wird ausschließlich die committed Teamsicht;
   Gegner ohne Aufklärung haben keinen Proxy.
 - **Kampf und Sieg:** Schadensmatrix (D-074) mit Panzerungsklassen,
@@ -56,14 +57,24 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
 | LMB Klick / Drag | Auswahl einzeln / Box |
 | RMB | Bewegen |
 | S | Stopp |
-| A | Angriff (Gegner unter dem Cursor), sonst Move als A-Move-Annäherung |
+| A | Angriff auf Gegner unter dem Cursor (sonst schlichtes Move — **keine** Zielerfassung bei Ankunft) |
 | H | Nächstes freies Aetherium-Feld abernten |
 | R | Ladung abliefern |
-| B / Shift+B | Kraftwerk / Kaserne platzieren (3×3-Footprint, Ursprung = linke untere Zelle) |
-| Q / Shift+Q | Harvester / Basis-Infanterie in Auftrag geben |
+| P | Pause / Fortsetzen |
+| B / Shift+B | Kraftwerk / Kaserne bauen |
+| C / V / T | Lager / Fahrzeugfabrik / Forschungslabor (Forschung schaltet T2 frei) |
+| G / F / Y | Radar / Verteidigungsplattform / Raffinerie bauen |
+| Q / Shift+Q | Harvester / Basis-Infanterie produzieren |
+| U / N | Builder / Panzerabwehr-Infanterie (T2) produzieren |
+| E / Shift+E | Spähfahrzeug / Leichter Panzer (Fahrzeugfabrik nötig) |
+| D / Shift+D | Kampfpanzer / Artillerie (T2 nötig) |
 | Pfeiltasten / Bildschirmrand | Kamera schwenken |
 | Mausrad | Zoom (12–90 m Höhe) |
 | Z, X | Kamera rotieren |
+
+Alle Platzierungs-/Produktionsbefehle zeigen ihr Ergebnis (`accepted` /
+Ablehnungsgrund) in der HUD-Zeile „Last command". Das HQ ist bewusst
+**nicht** belegt — MS-1 baut es nur zum Matchstart.
 
 ## 4. Ablaufvorschlag (ca. 15 Minuten)
 
@@ -71,10 +82,10 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
    Allianz). Sandfläche, Kristallfeld, HQ-/Raffinerie-Proxies zeigen.
 2. **Wirtschaft (0:30):** Harvester-Kreis am cyanen Feld beobachten;
    Aetherium-Stand im HUD steigt.
-3. **Ausbau (2:00):** Kraftwerk (B) und Kaserne (Shift+B) setzen, Harvester
-   nachbestellen (Q), Infanterie (Shift+Q) produzieren.
-4. **Aufklärung (5:00):** Infanterie per Box auswählen und Richtung Kartenmitte
-   schicken; Nebel lichtet sich nur entlang der Sicht.
+3. **Ausbau (2:00):** Kraftwerk (B), Kaserne (Shift+B) und Fahrzeugfabrik (V)
+   setzen; Harvester nachbestellen (Q); Forschungslabor (T) für T2.
+4. **Aufklärung (5:00):** Spähfahrzeuge (E) oder Infanterie per Box auswählen
+   und Richtung Kartenmitte schicken; Nebel lichtet sich nur entlang der Sicht.
 5. **Gefecht (8:00):** Mit A auf eine gegnerische Einheit klicken; Schaden,
    Konterwerte und Gesundheits-Tint im HUD zeigen.
 6. **Gegnerbasis (12:00):** Bis (120,120) vordringen; die Legion-Basis ist
@@ -82,29 +93,34 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
    der KI-Slot erhält noch keine Befehle (G3).
 7. **Abschluss:** Siegcodes im HUD erklären (Elimination / Zeitlimit 45 Min).
 
-## 5. Bekannte Grenzen (ehrlich, Stand GB-003)
+## 5. Bekannte Grenzen (ehrlich, Stand GB-004)
 
 - **Der KI-Slot ist untätig** – keine Gegenwehr, keine gegnerische Expansion.
 - **Keine Zielerfassung:** Einheiten erwidern kein Feuer; die
-  Verteidigungsplattform kann nie schießen; A-Move ist eine Move-Annäherung.
-- **Nur 4 von 17 Rollen belegt** (B, Shift+B, Q, Shift+Q): 33 der 36
-  Matrixzellen sind ohne weitere Tastenbelegung unerreichbar.
+  Verteidigungsplattform kann nie schießen; A ohne Gegner unter dem Cursor
+  ist ein schlichtes Move.
 - `Stop` löscht das Angriffsziel nicht; Angriffe auf eigene Einheiten sind zulässig.
-- Pause existiert (`MatchRunner.PauseMatch()`), ist aber an keine Taste gebunden;
-  kein Save/Load in der Bedienschicht.
 - Nach Siegentscheid tickt der Host weiter; es gibt keinen Ergebnisbildschirm
   (nur HUD-Codes).
 - Aetherium-Felder sind endlich, aber statisch (kein Nachwachsen, keine
   Warnung); das Manifest-Layout mit 5 Feldern und 2 Angriffswegen ist G4-Scope
   – der Blockout zeigt bewusst nur die zwei real registrierten Felder.
-- Look & Feel ist bis zum ersten menschlichen Durchlauf unverifiziert
-  (alle bisherigen Läufe headless).
+- Erledigt seit GB-004 (hier nur als Historie): Pause ist jetzt an P gebunden;
+  alle 17 MS-1-Rollen sind per Tastatur erreichbar (zuvor 4, womit 33 der 36
+  Schadensmatrix-Zellen unerreichbar waren); und der Harvester-Kreis schließt
+  sich jetzt – zuvor maß die Rückhol-Reichweite vom Footprint-Zentrum statt
+  vom Footprint, die Start-Harvester blieben mit voller Fracht ewig stehen und
+  die Credits froren bei 1.000 AE (GB-001-Befund).
 
 ## 6. Assets ablegen – so funktioniert die Drop-Zone
 
-**Status:** Es liegt noch **kein einziges 3D-Asset** im Projekt. Die Ablage
-ist vorbereitet; alles, was konventionkonform hineinfällt, wird automatisch
-registriert und erscheint im Spiel anstelle des Primitivs.
+**Status:** Die ersten 34 Assets sind produziert, liegen aber **als Paket
+ausserhalb des Repositories** — siehe [../assets/AssetPackage.md](../assets/AssetPackage.md).
+Ein frischer Clone zeigt deshalb Graybox-Primitive; wer das Paket entpackt,
+sieht die Modelle. Beides ist ein gültiger Stand, Mischbetrieb inklusive.
+
+Die Ablage ist vorbereitet: alles, was konventionkonform hineinfällt, wird
+automatisch registriert und erscheint im Spiel anstelle des Primitivs.
 
 1. **Zielordner** nach [../assets/ArtAssetStandard.md](../assets/ArtAssetStandard.md) §1:
    `Assets/_Project/Art/Units/<Faction>/<Role>/` bzw.
@@ -148,3 +164,4 @@ registriert und erscheint im Spiel anstelle des Primitivs.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-08-05 | Erstfassung: Demo-Ablauf, Steuerung, bekannte Grenzen, Asset-Ablage-Anleitung (Stand GB-003) | Technical Writer |
+| 0.2.0 | 2026-08-05 | Stand GB-004: volle Tastenbelegung aller 17 Rollen, Pause auf P, Wirtschaftskreislauf nach dem Footprint-Fix als funktional vermerkt, Ablauf auf Fahrzeugfabrik/Forschung ausgeweitet | Technical Writer |

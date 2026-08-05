@@ -1,6 +1,6 @@
 # Graybox-Log
 
-**Version:** 0.3.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.4.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -447,6 +447,146 @@ nicht existiert. Die Altschulden aus GB-001/GB-002 bleiben unverändert offen.
   Sync vollständig neu geschrieben; sie ist Build-Artefakt, kein
   Handarbeits-Dokument.
 
+## Sitzung GB-004 – 2026-08-05 – Demo-Beweis, Wirtschaftsfix, Asset-Ankunft
+
+**Branch:** `feat/glutrinne-demo-prep` · **Commit:** vorerst keiner
+(Arbeitsbaum; GB-003 liegt als `577f5be` vor) · **Besetzung:** ein
+Orchestrierungs-Agent; parallel lieferte ein zweiter Strang den
+Tripo-Asset-Drop samt `Editor/ArtAssetPrefabBuilder.cs` und Import-Protokoll.
+
+### Ziel
+
+Der Inhaber meldete das Eintreffen der Assets „in wenigen Minuten" und
+beauftragte: Restvorbereitung, ein Unity-Testlauf als sichtbarer Beweis, dass
+es läuft, und nach Möglichkeit Verbesserungen an der Spielsimulation.
+
+### Schreibumfang der Sitzung
+
+Innerhalb D-067 K2: `Scripts/Presentation/UI/RtsDeviceInput.cs`,
+`Scripts/Gameplay/Match/UnitViewManager.cs`. Darüber hinaus (vom
+Inhaberauftrag „Simulation verbessern" gedeckt, nach D-068-Regeln mit Tests
+in beiden Lanes und Determinismuslauf): `Scripts/Simulation/Economy/
+EconomySystem.cs` (eine Methode) samt gespiegelten Tests in
+`Assets/Tests/EditMode/Simulation/EconomySystemTests.cs` und
+`tools/Nova.SimRunner.Tests/EconomySystemTests.cs`. Neu: die PlayMode-
+Testinfrastruktur (`Assets/Tests/PlayMode/`), `Editor/UrpProjectSetup.cs`,
+Projekt-Renderpipeline-Zuordnung (siehe Ergebnis), kleine Reparaturen an der
+parallel gelieferten `Editor/ArtAssetPrefabBuilder.cs` (fehlendes
+`using Nova.Data;`, Simulations-freie Parser-Variante). `quality/**`,
+Workflows, `VERSION` unberührt.
+
+### Ergebnis
+
+- **Wirtschaftskreislauf repariert (D-068-Regeln).** Befund aus GB-001
+  bestätigt und geschlossen: `EconomySystem.HasOwnRefineryInReach` maß die
+  Abgabe-Reichweite vom **Footprint-Zentrum** der Raffinerie (die Entität
+  spawnt bei origin+1), nicht vom Footprint. Die Start-Harvester standen
+  Chebyshev 2 vom Zentrum entfernt, die Rückhol-Phase löste nie aus, volle
+  Fracht blieb ewig liegen, die Credits froren bei 1.000 AE. Fix: Reichweite
+  = 1 + Footprint-Radius (3×3 → 2). Zwei Regressionstests je Lane: Abgabe
+  über den echten Platzierungspfad bei Zentrumsdistanz 2, und der volle
+  Autozyklus (165 Ticks laden, Abgabe, Wiederaufnahme) in kanonischer
+  Eröffnungsgeometrie.
+- **Hash-Bewegung getrennt gemessen statt behauptet** (Verfahren aus GB-002,
+  Stash-Überlagerung): Fingerprint `0x71045DC037C10250` und Checkpoint
+  Tick 100 `0x9A2B01F88C03599D` sind mit und ohne Fix **identisch** (vor der
+  ersten vollen Ladung um Tick 165; Eingaben unverändert); nur der finale
+  Zustandshash wandert `0x29DE64BD1B6A9000 → 0xF25B56F8C3553AAC`. Die
+  Differenz zum GB-002-Tripel stammt vollständig aus dem Fraktions-Merge
+  (#11), nicht aus dieser Sitzung.
+- **Bedienung:** Alle 17 MS-1-Rollen sind per Tastatur erreichbar (bisher 4;
+  HQ bewusst unbelegt), Pause/Fortsetzen auf P (Tick-Stopp, kein
+  Simulationszugriff), irreführender „attack-move"-Kommentar ersetzt durch
+  die ehrliche Bezeichnung (keine Zielerfassung bei Ankunft).
+- **Asset-Ankunft und Integration:** Alle 34 MS-1-Assets (Tripo,
+  LOD0/1/2, BaseColor) landeten konventionkonform unter `Assets/_Project/Art/`
+  samt `PROVENANCE.json`, Import-Protokoll
+  `docs/assets/AssetImport_Tripo_2026-08-06.md` und
+  `docs/assets/provenance-ledger.json`. Headless-Lauf von
+  `ArtAssetPrefabBuilder.BuildMenu`: **34/34 Materialien + Prefabs gebaut,
+  Registry synchronisiert.** Einschränkungen stehen im Import-Protokoll §4:
+  Provenienz **nicht** erfüllt (Lizenzfelder leer), kein `_MSK`/TeamMask,
+  kein Legion-Emissive, zwei sehr hohe Türme (Allianz-HQ 21,1 m, Radar 20,0 m),
+  Restsplitter an beiden DefensePlatforms.
+- **URP-Befund geschlossen:** Das Projekt hatte nie ein Pipeline-Asset
+  zugeordnet (`GraphicsSettings.m_CustomRenderPipeline: {fileID: 0}`, alle
+  Quality-Stufen leer) und renderte Built-in; die URP-Lit-Materialien der
+  Assets liefen magenta (Unity-Defaultmaterialien von Boden/Kristallen
+  blieben unauffällig, weil pipeline-agnostisch). `UrpProjectSetup`
+  (reflection-basiert, weil der asmdef-Vertrag D-061 keine URP-Referenz
+  zulässt) hat `Assets/_Project/Settings/NovaUrp(Renderer).asset` erzeugt
+  und allen Quality-Stufen samt GraphicsSettings zugeordnet. Nach der
+  Umstellung kippte das Spiegelbild auf: Unitys eingebautes
+  Primitive-Defaultmaterial rendert unter URP magenta — Blockout
+  (`GlutrinneBlockoutView`) und Graybox-Primitive (`UnitViewManager`,
+  Baustellen) tragen seither Laufzeit-URP-Lit-Materialien (keine
+  Asset-Dateien, `HideAndDontSave`).
+- **Startkamera gerahmt:** Fokus von (4,4)/34 m auf (8,6)/42 m — die erste
+  Ansicht zeigt die Basis als Ganzes statt nur den 21-m-HQ-Turm.
+- **Sichtbarer Beweis:** PlayMode-Beweistest lädt die Bootstrap-Szene,
+  prüft Match-Start, Tickfortschritt, sichtbare Views und wachsende Credits
+  und schreibt Screenshots (RenderTexture-Capture;
+  `ScreenCapture.CaptureScreenshot` ist unter `-batchmode` ein No-Op) nach
+  `output/demo/`: Start, Wirtschaft, Übersicht, beide Basen.
+
+### Verifikation (echte Zahlen, ausgeführt)
+
+| Prüfung | Ergebnis |
+|---|---|
+| .NET-Tests (`tools/Nova.SimRunner.Tests`, Release) | **408/408 grün** (Basis 406, +2 Economy-Regression) |
+| EditMode-Tests (Unity) | **412/412 grün** (Basis 410, +2 gespiegelte Economy-Tests) |
+| `DETERMINISM_10000` SelfCheck | grün („Playback reproduced every recorded result and the recorded final state hash") |
+| Hash-Tripel (neu) | Fingerprint `0x71045DC037C10250`, Checkpoint Tick 100 `0x9A2B01F88C03599D`, finaler Zustandshash `0xF25B56F8C3553AAC` |
+| PlayMode-Tests (Unity) | **2/2 grün** (`BootstrapMatch_RunsRendersAndHarvests`, `SceneViews_RenderOverviewAndBothBases`) |
+| Wirtschaftsnachweis im PlayMode-Log | `tick 30→200, credits 1000→1660 AE, visible views 13` |
+| Prefab-Bau (headless) | 34/34, Registry-Sync 34 Einträge |
+| Screenshots | 5 Dateien in `output/demo/`, vom Agenten eingesehen (siehe Grenzen) |
+
+### Ehrliche Grenzen dieser Verifikation
+
+- **Kein Team-Farb-Autorentest:** Der FactionTint multipliziert per
+  Property-Block auf die BaseColor-Textur (ganzkörper-Tint statt
+  TeamMask-Arealen); das ersetzt das fehlende `_MSK` nicht, ist aber als
+  Zwischenlesbarkeit gedacht. Bewertung der Bildebene bleibt dem menschlichen
+  Blick vorbehalten; der Agent hat die fünf PNGs eingesehen und den
+  Magenta-Befund (URP) damit erst gefunden und dann als behoben verifiziert.
+- **Die zwei sehr hohen Türme** (Import-Protokoll §4.5) sind im Render
+  sichtbar und dominieren die Startkamera; Höhendeckel ist Art-Entscheid,
+  nicht diese Spur.
+- **HUD bleibt ungerendert** (IMGUI zeichnet nicht in RenderTextures);
+  Spieler-Builds wurden in dieser Sitzung nicht neu gebaut.
+- Der Windows-Player wurde wie in GB-001/002 nicht ausgeführt.
+
+### Aufgeschobene Dokumentation
+
+Keine neue. DoD-Punkte 1–2 sind sofort erledigt (Änderungsverläufe,
+Versionen, Index, `[Unreleased]`). Die Altschulden aus GB-001/GB-002 bleiben
+unverändert offen.
+
+### Offene Befunde aus der Sitzung
+
+- **Provenienz blockiert Repo-Aufnahme der Assets.** Die 34 Datensätze sind
+  belegbar, aber lizenzseitig leer (`_TODO` je Datensatz). Die ~107 MB unter
+  `Assets/_Project/Art/**` (plus generierte `.mat`/`.prefab`) bleiben bis
+  zur Vervollständigung und Vier-Augen-Prüfung uncommittet — die Entscheidung
+  liegt beim Inhaber (siehe auch Frage nach Git-LFS für Binärassets).
+- **`Assets/Tests/PlayMode/Nova.PlayMode.Tests.asmdef` durfte nur Ränge < 4
+  referenzieren** (Test-Regel des Architekturchecks); der erste Entwurf
+  referenzierte Presentation und wurde korrigiert.
+- **`ArtAssetPrefabBuilder` kam ohne `using Nova.Data;` und mit einer
+  Simulations-referenzierenden Parser-Variante** (kompilierte nicht, weil
+  Nova.Editor Nova.Simulation nicht referenziert); beides repariert, die
+  Architektur-Referenzliste blieb unangetastet.
+- **Parallele Schreibzugriffe:** Der Asset-Drop und der Prefab-Builder
+  landeten mitten in laufenden Verifikationsläufen dieser Sitzung. Gutartig
+  (neue Dateien, keine Überschreibungen), aber der Grund für zwei
+  Fehlläufe; bei parallelen Strängen sollten Läufe und Drops zeitlich
+  abgesprochen werden.
+- **Bild-Ersteindruck (kein Befund, eine Beobachtung):** Ohne `_MSK` wirken
+  die Modelle flächig; die Fraktionsunterscheidung trägt aktuell der Tint,
+  nicht das Modell. Priorität für die nächste Art-Runde: `_MSK` für die
+  vier Vertical-Slice-Assets (steht auch so im Import-Protokoll).
+
 ## Offene Punkte
 
 - D-067 und D-068 sind Entwürfe. Ohne Ratifizierung existiert der
@@ -483,3 +623,4 @@ nicht existiert. Die Altschulden aus GB-001/GB-002 bleiben unverändert offen.
 | 0.1.0 | 2026-07-26 | Erstfassung mit Protokollregeln und Sitzung GB-001 (sichtbarer und bedienbarer Graybox-Slice) | Technical Writer |
 | 0.2.0 | 2026-07-26 | Sitzung GB-002 (Schadensmatrix nach D-074, Siegauswertung nach D-056, HUD-Sichtbarkeit) angehängt – einschließlich Branch-Befund, getrennter Hash-Zuordnung, Fingerprint-Stub-Befund und elf offenen Befunden | Technical Writer |
 | 0.3.0 | 2026-08-05 | Sitzung GB-003 (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Runbook, Status-Snapshot) angehängt – einschließlich K2-Abweichungsdeklaration, Asset-Inventur (null 3D-Assets) und fünf offenen Befunden | Technical Writer |
+| 0.4.0 | 2026-08-05 | Sitzung GB-004 (Wirtschaftsfix nach D-068-Regeln, volle Tastenbelegung, URP-Zuordnung, Tripo-Asset-Integration 34/34, PlayMode-Sichtbeweis mit Screenshots) angehängt – einschließlich getrennter Hash-Zuordnung und fünf offenen Befunden | Technical Writer |

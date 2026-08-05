@@ -42,10 +42,10 @@ namespace Nova.Presentation
         [SerializeField] private float _pitchDegrees = 55f;
         [SerializeField] private float _rotationSpeed = 90f;
 
-        [Header("Start Focus (human player HQ sits at tile 4,4)")]
-        [SerializeField] private float _startFocusX = 4f;
-        [SerializeField] private float _startFocusZ = 4f;
-        [SerializeField] private float _startHeight = 34f;
+        [Header("Start Focus (frames the human base: HQ 5,5 + refinery 9,5 + field 7,7)")]
+        [SerializeField] private float _startFocusX = 8f;
+        [SerializeField] private float _startFocusZ = 6f;
+        [SerializeField] private float _startHeight = 42f;
         [SerializeField] private float _startYawDegrees = 45f;
 
         private Camera _camera;

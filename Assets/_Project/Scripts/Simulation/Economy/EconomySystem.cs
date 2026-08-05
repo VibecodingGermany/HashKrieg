@@ -439,10 +439,23 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// True when an active own refinery stands in reach of the unit
-        /// (Chebyshev rule; ascending entity-index scan, first hit decides).
+        /// (ascending entity-index scan, first hit decides). Reach is measured
+        /// against the building FOOTPRINT, not its entity cell: the entity
+        /// sits at the footprint centre (ConstructionSystem.SpawnBuildingEntity
+        /// spawns at origin+1), so the old centre-cell Chebyshev-1 check
+        /// demanded the harvester stand INSIDE the building — the canonical
+        /// opening (harvesters at (7,6)/(7,7), refinery footprint (8,4)-(10,6),
+        /// centre (9,5)) could never deposit, and the full-cargo return leg
+        /// held forever with credits frozen. The footprint rule widens the
+        /// centre distance by the footprint radius, so "adjacent to any
+        /// footprint cell" is the same Chebyshev-1 rule the field side uses.
         /// </summary>
         private bool HasOwnRefineryInReach(in UnitState unit)
         {
+            // Footprint radius around the centre cell for odd footprint sizes
+            // (MS-1 pins 3x3, Q-040 candidate): reach 1 + (3-1)/2 = 2.
+            int reach = 1 + (Definitions.SimDefinitions.BuildingFootprintCells - 1) / 2;
+
             UnitState[] units = _entityManager.RawUnits;
             int capacity = _entityManager.Capacity;
             for (int i = 0; i < capacity; i++)
@@ -455,7 +468,7 @@ namespace Nova.Simulation.Economy
                 int ry = Math.Max(0, SimFixed.WorldToGrid(candidate.Transform.PositionY));
                 int ux = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionX));
                 int uy = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionY));
-                if (Math.Abs(ux - rx) <= 1 && Math.Abs(uy - ry) <= 1)
+                if (Math.Abs(ux - rx) <= reach && Math.Abs(uy - ry) <= reach)
                 {
                     return true;
                 }

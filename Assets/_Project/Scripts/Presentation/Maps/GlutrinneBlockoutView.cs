@@ -56,8 +56,6 @@ namespace Nova.Presentation.Maps
             1.10f, 0.65f, 0.80f, 0.55f, 0.70f, 0.50f, 0.60f,
         };
 
-        private MaterialPropertyBlock _tintBlock;
-
         private void Start()
         {
             if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
@@ -68,8 +66,6 @@ namespace Nova.Presentation.Maps
                 return;
             }
 
-            _tintBlock = new MaterialPropertyBlock();
-
             TintGround();
             Vector2Int size = _bootstrap.MapSize;
             BuildEdgeFrame(size);
@@ -77,7 +73,23 @@ namespace Nova.Presentation.Maps
             BuildFieldMarker(_bootstrap.EnemyFieldCell, "Enemy");
         }
 
-        /// <summary>Desert tint on the shared ground plane, via property block — no material asset is created or modified.</summary>
+        /// <summary>
+        /// Runtime URP Lit material for blockout pieces. Unity's primitive
+        /// default material is a built-in-RP resource and renders magenta
+        /// under URP (GB-004 finding), so the blockout carries its own —
+        /// created at Play, never saved, no asset file. Falls back to the
+        /// built-in Standard shader in non-URP contexts.
+        /// </summary>
+        private static Material CreateRuntimeMaterial(Color color)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+            var material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+            material.color = color;
+            return material;
+        }
+
+        /// <summary>Desert ground via a runtime material — no asset is created or modified.</summary>
         private void TintGround()
         {
             if (_groundRenderer == null)
@@ -85,7 +97,7 @@ namespace Nova.Presentation.Maps
                 Debug.LogWarning("[GlutrinneBlockoutView] No ground renderer wired — ground keeps its default grey.");
                 return;
             }
-            ApplyTint(_groundRenderer, _sandColor);
+            _groundRenderer.sharedMaterial = CreateRuntimeMaterial(_sandColor);
         }
 
         private void BuildFieldMarker(Vector2Int cell, string label)
@@ -94,6 +106,7 @@ namespace Nova.Presentation.Maps
             marker.transform.SetParent(transform, false);
             marker.transform.position = new Vector3(cell.x + 0.5f, 0f, cell.y + 0.5f);
 
+            Material crystalMaterial = CreateRuntimeMaterial(_crystalColor);
             for (int i = 0; i < ClusterOffsets.Length; i++)
             {
                 float height = ClusterHeights[i];
@@ -106,7 +119,7 @@ namespace Nova.Presentation.Maps
 
                 // Pure marker: no collider, so nothing can ever pick or block a crystal.
                 Destroy(shard.GetComponent<Collider>());
-                ApplyTint(shard.GetComponent<Renderer>(), _crystalColor);
+                shard.GetComponent<Renderer>().sharedMaterial = crystalMaterial;
             }
         }
 
@@ -117,35 +130,21 @@ namespace Nova.Presentation.Maps
             float w = size.x;
             float d = size.y;
 
-            BuildEdgeBeam("EdgeFrame_South", new Vector3(w * 0.5f, h * 0.5f, -t * 0.5f), new Vector3(w + 2f * t, h, t));
-            BuildEdgeBeam("EdgeFrame_North", new Vector3(w * 0.5f, h * 0.5f, d + t * 0.5f), new Vector3(w + 2f * t, h, t));
-            BuildEdgeBeam("EdgeFrame_West", new Vector3(-t * 0.5f, h * 0.5f, d * 0.5f), new Vector3(t, h, d));
-            BuildEdgeBeam("EdgeFrame_East", new Vector3(w + t * 0.5f, h * 0.5f, d * 0.5f), new Vector3(t, h, d));
+            Material edgeMaterial = CreateRuntimeMaterial(_edgeColor);
+            BuildEdgeBeam("EdgeFrame_South", new Vector3(w * 0.5f, h * 0.5f, -t * 0.5f), new Vector3(w + 2f * t, h, t), edgeMaterial);
+            BuildEdgeBeam("EdgeFrame_North", new Vector3(w * 0.5f, h * 0.5f, d + t * 0.5f), new Vector3(w + 2f * t, h, t), edgeMaterial);
+            BuildEdgeBeam("EdgeFrame_West", new Vector3(-t * 0.5f, h * 0.5f, d * 0.5f), new Vector3(t, h, d), edgeMaterial);
+            BuildEdgeBeam("EdgeFrame_East", new Vector3(w + t * 0.5f, h * 0.5f, d * 0.5f), new Vector3(t, h, d), edgeMaterial);
         }
 
-        private void BuildEdgeBeam(string name, Vector3 position, Vector3 scale)
+        private void BuildEdgeBeam(string name, Vector3 position, Vector3 scale, Material material)
         {
             GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
             beam.name = name;
             beam.transform.SetParent(transform, false);
             beam.transform.position = position;
             beam.transform.localScale = scale;
-            ApplyTint(beam.GetComponent<Renderer>(), _edgeColor);
-        }
-
-        /// <summary>
-        /// Sets both the URP (<c>_BaseColor</c>) and the built-in
-        /// (<c>_Color</c>) tint slots, the same dual-write the unit tint uses —
-        /// blockout pieces stay correctly coloured regardless of which shader
-        /// the primitive material resolves to.
-        /// </summary>
-        private void ApplyTint(Renderer target, Color color)
-        {
-            if (target == null) return;
-            _tintBlock.Clear();
-            _tintBlock.SetColor("_BaseColor", color);
-            _tintBlock.SetColor("_Color", color);
-            target.SetPropertyBlock(_tintBlock);
+            beam.GetComponent<Renderer>().sharedMaterial = material;
         }
     }
 }

@@ -151,6 +151,10 @@ gelisteten Kernverträge.
   CC0-/KI-Beschaffungskatalog und Lizenzbefunde
 - [Provenance](assets/Provenance.md) (0.1.0, Entwurf) –
   Provenienz- und Lizenznachweisverfahren je Asset
+- [AssetPackage](assets/AssetPackage.md) (1.0.0) – warum die 3D-Assets als
+  Paket ausserhalb des Repos liegen, Inhalt und Installationsablauf
+- [AssetImport_Tripo_2026-08-06](assets/AssetImport_Tripo_2026-08-06.md) –
+  Importprotokoll der 34 Tripo-Assets (GLB → FBX, LODs, Texturen)
 - [VerticalSlice_MS1](assets/VerticalSlice_MS1.md) (0.2.0, Entwurf) –
   Vertical-Slice-Spezifikation der vier Erst-Assets
 - [ConceptArtStyleGuide](assets/ConceptArtStyleGuide.md) (0.1.0, Entwurf) –
