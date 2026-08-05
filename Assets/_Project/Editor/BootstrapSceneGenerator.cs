@@ -3,8 +3,10 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Nova.Data;
 using Nova.Gameplay.Match;
 using Nova.Presentation;
+using Nova.Presentation.Maps;
 using Nova.Presentation.UI;
 
 namespace Nova.Editor
@@ -57,9 +59,16 @@ namespace Nova.Editor
 
             Camera camera = CreateCamera();
             CreateDirectionalLight();
-            CreateGroundPlane();
+            GameObject ground = CreateGroundPlane();
             MatchRunner runner = CreateMatchObject();
+            CreateMapObject(runner, ground);
             CreateUiObject(runner, camera);
+            EnsureGlutrinneMapAsset();
+
+            // The drop-in registry is rebuilt from whatever PF_* prefabs
+            // currently exist under Assets/_Project/Art (usually zero — the
+            // sync is a no-op until the first asset lands).
+            ArtAssetAutoSync.SyncRegistry();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -72,7 +81,7 @@ namespace Nova.Editor
 
             AssetDatabase.SaveAssets();
             Debug.Log($"Bootstrap scene created at {ScenePath} and registered " +
-                      "in EditorBuildSettings (camera rig, ground, Match, UI).");
+                      "in EditorBuildSettings (camera rig, ground, Match, Map, UI).");
         }
 
         /// <summary>
@@ -111,10 +120,10 @@ namespace Nova.Editor
         /// Ground quad covering the whole 128x128 map, top face exactly on the
         /// y = 0 plane that RtsDeviceInput and RtsCameraController project onto.
         /// It keeps Unity's built-in default material (neutral grey) — the
-        /// sprint forbids creating material assets, and the graybox needs no
-        /// tint here because unit views carry the player colours.
+        /// sprint forbids creating material assets, and the GlutrinneBlockoutView
+        /// tints it at Play through a property block instead.
         /// </summary>
-        private static void CreateGroundPlane()
+        private static GameObject CreateGroundPlane()
         {
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
@@ -123,11 +132,14 @@ namespace Nova.Editor
             float scale = MapCells / PlanePrimitiveExtent;
             ground.transform.position = new Vector3(MapCells * 0.5f, 0f, MapCells * 0.5f);
             ground.transform.localScale = new Vector3(scale, 1f, scale);
+            return ground;
         }
 
         /// <summary>
         /// The simulation host: kernel driver, graybox match setup and the view
-        /// layer, all on one GameObject.
+        /// layer, all on one GameObject. The view layer additionally receives
+        /// the shared art-mapping registry, so registered PF_* prefabs replace
+        /// their graybox primitives the moment they land under Assets/_Project/Art.
         /// </summary>
         private static MatchRunner CreateMatchObject()
         {
@@ -142,8 +154,54 @@ namespace Nova.Editor
 
             UnitViewManager views = matchObject.AddComponent<UnitViewManager>();
             WireReference(views, "_matchRunner", runner);
+            WireReference(views, "_assetMappings", ArtAssetAutoSync.LoadOrCreateRegistry());
 
             return runner;
+        }
+
+        /// <summary>
+        /// The Glutrinne blockout: desert ground tint, aetherium field markers
+        /// and the map edge frame. It reads the MatchBootstrap layout at Play,
+        /// so the rendered map always matches the registered match state.
+        /// </summary>
+        private static void CreateMapObject(MatchRunner runner, GameObject ground)
+        {
+            var mapObject = new GameObject("Map");
+
+            var blockout = mapObject.AddComponent<GlutrinneBlockoutView>();
+            WireReference(blockout, "_bootstrap", runner.GetComponent<MatchBootstrap>());
+            WireReference(blockout, "_groundRenderer", ground.GetComponent<Renderer>());
+        }
+
+        /// <summary>
+        /// The data-layer map asset. It records exactly the graybox-accurate
+        /// subset of the Glutrinne manifest layout — the two spawn points and
+        /// the two aetherium fields the canonical match actually registers.
+        /// The full five-field layout with both primary routes is G4 scope
+        /// (docs/production/ScopeLedger.md) and is deliberately not invented here.
+        /// </summary>
+        private static void EnsureGlutrinneMapAsset()
+        {
+            const string mapPath = "Assets/_Project/Data/Maps/MAP_Glutrinne.asset";
+
+            MapDefinitionSO map = AssetDatabase.LoadAssetAtPath<MapDefinitionSO>(mapPath);
+            if (map == null)
+            {
+                ArtAssetAutoSync.EnsureFolder("Assets/_Project/Data/Maps");
+                map = ScriptableObject.CreateInstance<MapDefinitionSO>();
+                AssetDatabase.CreateAsset(map, mapPath);
+            }
+
+            map.Initialize(
+                "Glutrinne",
+                MapBiomeType.Desert,
+                128,
+                128,
+                // HQ footprint centres of the canonical opening (4,4)+(3x3) and its 180° mirror.
+                new[] { new Vector2(5f, 5f), new Vector2(121f, 121f) },
+                // The two fields MatchBootstrap registers: local (7,7), enemy (119,119).
+                new[] { new Vector2(7f, 7f), new Vector2(119f, 119f) });
+            EditorUtility.SetDirty(map);
         }
 
         /// <summary>Input sampling and the read-only debug overlay.</summary>

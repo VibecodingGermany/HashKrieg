@@ -1,6 +1,6 @@
 # Scope-Ledger der Graybox-Spur
 
-**Version:** 0.3.0 | **Status:** Entwurf – Register (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.5.0 | **Status:** Entwurf – Register (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -40,8 +40,8 @@ funktionalen Anteil, das genannte Gate den vollständigen Inhalt.
 | Manifest-Schlüsselpfad | Graybox-Substitut | Rückkehr-Gate | D-ID-Klausel |
 |---|---|---|---|
 | `startStatePerPlayer.unitRoles` | Startaufstellung des Determinismus-Szenarios portiert; zusätzlich vier Infanterieeinheiten je Slot, damit überhaupt etwas zu sehen ist | G4 | D-067 K1, K2 |
-| `map.id`, `map.biome` | unbenannte flache Ebene ohne Terrain, Biom oder Hindernisse; nur die Kantenlänge stimmt | G4 (G2: technisch korrektes Testlayout) | D-067 K1, K2 |
-| `map.aetheriumFields` | zwei Felder an festen Zellen nahe den Startbasen statt der im Manifest festgelegten Feldliste | G4 (G2) | D-067 K1, K2 |
+| `map.id`, `map.biome` | die Karte heißt seit GB-003 Glutrinne und zeigt einen Wüsten-Blockout (Sandtönung, Kartenrand-Rahmen, Kristallmarker – reine Präsentation über `GlutrinneBlockoutView` plus Datenasset `MAP_Glutrinne.asset`); weiterhin kein Terrain-/Biom-System und keine Hindernisse, nur die Kantenlänge stimmt | G4 (G2: technisch korrektes Testlayout) | D-067 K1, K2 |
+| `map.aetheriumFields` | zwei Felder an festen Zellen nahe den Startbasen statt der im Manifest festgelegten Feldliste; seit GB-003 als Kristallmarker sichtbar, Reserven und Verhalten unverändert | G4 (G2) | D-067 K1, K2 |
 | `map.primaryRouteCount` | keine Routenführung; die Ebene ist überall passierbar | G4 (G2) | D-067 K1, K2 |
 | `factions[1]` | seit dieser Sitzung Simulationswirklichkeit: 34 fraktionsaufgelöste Definitionen (`SimDefinitions`, Id-Regel und Provenienz per D-075), Slot-Fraktion im Economy-Snapshotblock v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Kosten/Bauzeiten/Energie/Waffenwerte, Graybox-Farben aus den D-072-Paletten im `UnitViewManager` und Slot-Fraktionen im Debug-HUD. Verbleibend: das `weaponProfile` der Identität (eigene Zeile) und der untätige KI-Slot (eigene Zeile). Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
 | `factions[1].identity.harvesterCargoAE` | seit dieser Sitzung im Code erfüllt: die Kapazität lebt in der Harvester-Definitionszeile (`SimUnitDefinition.CargoCapacityAE`), das `EconomySystem` klammert die Ernte fraktionsaufgelöst; die Entity-Store-Snapshotvalidierung deckelt auf das fraktionsübergreifende Maximum und bietet die pro-Entity-Fraktionsgrenze als Überladung. Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
@@ -49,7 +49,7 @@ funktionalen Anteil, das genannte Gate den vollständigen Inhalt.
 | `mode.aiSlotCount` | Slot 1 erhält keine Befehle und bleibt untätig; die Ingress stempelt nur den lokalen Slot | G3 | D-067 K1, K2 |
 | `victory.evaluationPoint`, `victory.validResultCodes`, `victory.timeLimitTicks` | seit dieser Sitzung in der Simulation erfüllt (`VictorySystem`, achtes und letztes System, alle drei Ergebniscodes, Tick 27.000, Snapshotblock 107). Offen bleibt die **Auswertung außerhalb der Simulation**: der Host tickt nach der Entscheidung unverändert weiter, es gibt keinen Ergebnisbildschirm, und das Ergebnis erscheint nur als Zeile im Debug-HUD. Kein Gate-Nachweis – die Zeile bleibt bis zur auflösenden Evidence stehen | G2 | D-067 K1, K2 |
 | `victory.lastUnitReveal.visibleAndTargetable` | der 600-Tick-Zähler nach D-056 ist implementiert, serialisiert und korrekt (`VictorySystem.IsRevealed`), aber **nichts konsumiert ihn**: die enthüllten Einheiten werden weder sichtbar noch zielbar, weil dafür `FogOfWarSystem` (Maskenüberschreibung) und/oder die Zielerfassung des `CombatSystem` das Flag lesen müssten | G2 | D-067 K1, K2 |
-| `persistence.pauseRequired` | `MatchRunner.PauseMatch()` existiert, ist aber an keine Eingabe gebunden | G2 | D-067 K1, K2 |
+| `persistence.pauseRequired` | `MatchRunner.PauseMatch()` ist seit GB-004 an die Taste P gebunden (Toggle über `StartMatch()` zurück); kein Pausenmenü, keine Eingabesperre jenseits des Tick-Stopps | G2 | D-067 K1, K2 |
 | `persistence.manualSlotCount`, `persistence.quicksaveRotation`, `persistence.autosaveSlotCount`, `persistence.backupRecoveryRequired` | kein Save/Load in der Bedienschicht; der Kernel kann Snapshots, es gibt keine Slot-Verwaltung | G4 (G3: identische Fortsetzung) | D-067 K1, K2 |
 | `accessibility.inputRebindingRequired` | feste Tastenbelegung im Code (Legacy-Input) | G4 | D-067 K1, K2 |
 | `accessibility.uiScalePercent` | Debug-HUD skaliert die GUI-Matrix mit einem festen Faktor, ohne einstellbaren Bereich | G4 | D-067 K1, K2 |
@@ -123,3 +123,5 @@ außerhalb davon. Dieses Register führt nur Rückstände gegenüber MS-1.
 | 0.1.0 | 2026-07-26 | Erstfassung mit 21 Registerzeilen aus Sitzung GB-001 | Technical Writer |
 | 0.2.0 | 2026-07-26 | Sitzung GB-002: Zeile `victory.lastUnitReveal.visibleAndTargetable` ergänzt; die Zeilen zu `victory.*` und `weaponProfile` auf den durch Kampf- und Siegsystem veränderten Stand fortgeschrieben (nicht entfernt – es gibt keinen auflösenden Gate-Nachweis); Anhang mit vier Zeilen ohne Manifest-Schlüsselpfad aus D-074 („Kristall", `Heavy`, `Air`, Feuer/Bio/Strahlung) | Technical Writer |
 | 0.3.0 | 2026-07-26 | Fraktions-Sitzung: Zeilen `factions[1]`, `factions[1].identity.harvesterCargoAE` und `weaponProfile` auf den Stand der Fraktions-Achse (D-075) fortgeschrieben — Cargo und Waffentabelle sind implementiert, `salvo`/`splash` bleibt als bewusster Konflikt registriert; drei Anhang-Zeilen ergänzt (Tempo-Umrechnung m/s ↔ m/tick, Harvester-Panzerungsklasse Vehicles vs. Simulationszuordnung, Allianz-Schadenstyp Energie vs. Kinetisch — D-047 gewinnt derzeit); Anhang-Einleitung über D-074 hinaus auf D-047/D-075 verbreitert | Technical Writer |
+| 0.4.0 | 2026-08-05 | Sitzung GB-003: Zeilen `map.id`/`map.biome` und `map.aetheriumFields` auf den Stand des Glutrinne-Blockouts fortgeschrieben (Wüsten-Präsentation und Kristallmarker, weiterhin kein Terrain-System und nur zwei registrierte Felder; nicht entfernt – es gibt keinen auflösenden Gate-Nachweis) | Technical Writer |
+| 0.5.0 | 2026-08-05 | Sitzung GB-004: Zeile `persistence.pauseRequired` fortgeschrieben (Pause an P gebunden; kein Pausenmenü – Zeile bleibt bis G2) | Technical Writer |

@@ -45,6 +45,21 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
     GrayboxLog verliert seine Pflicht, der [ScopeLedger](docs/production/ScopeLedger.md)
     bleibt als ehrliche Lückenliste.
 
+### Geändert
+- **3D-Assets liegen als Paket ausserhalb des Repositories.** Der MS-1-Art-Stand
+  umfasst rund 105 MB Binärdaten (92 MB PNG, 13,7 MB FBX) und hätte das 77 MB
+  grosse Repository mehr als verdoppelt — dauerhaft, da Git-Historie Binärdaten
+  nicht vergisst und ein späterer Ausbau einen auf `main` verbotenen
+  History-Rewrite bräuchte. Ausgeschlossen wird der **vollständige** Art-Inhalt
+  (`*.fbx`, `*.png`, `*.mat`, `*.prefab` samt `.meta`), nicht nur die Binaries:
+  Bliebe ein Prefab ohne sein Mesh im Repo, hätte ein frischer Clone unsichtbare
+  Einheiten — ohne Prefab fällt `UnitViewManager` sauber auf Graybox-Primitive
+  zurück und ein Clone bleibt immer spielbar. `AssetMappingRegistry.asset` wird
+  wieder leer eingecheckt (Maschinenausgabe des Imports). Im Repo bleiben die
+  34 `PROVENANCE.json` als Lizenz- und Herkunftsnachweis. Paketinhalt,
+  SHA-256, Installations- und Erweiterungsablauf:
+  [docs/assets/AssetPackage.md](docs/assets/AssetPackage.md).
+
 ### Hinzugefügt
 - **CI führt erstmals die Spieltests aus.** Neuer Pflicht-Workflow
   [`tests`](.github/workflows/tests.yml): Simulationstests aus
@@ -57,6 +72,48 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - `docs-check` prüft weiterhin hart tote interne Links, UTF-8 und die
   Parsebarkeit der Quality-JSONs, erzwingt aber keinen Dokument-Pflichtaufbau
   und keinen Versionsbump mehr; Node/Ajv ist aus diesem Job entfallen.
+- **Demo-Beweis, Wirtschaftsfix und Asset-Integration (Graybox-Sitzung
+  GB-004, Diagnosestand, ohne Gate-Status, ohne Evidence):** Erstens ist der
+  Harvester-Kreis repariert — `EconomySystem.HasOwnRefineryInReach` misst die
+  Abgabe-Reichweite jetzt am Gebäude-Footprint statt am Footprint-Zentrum
+  (die Start-Harvester standen Chebyshev 2 vom Zentrum, ihre volle Fracht
+  blieb ewig liegen und die Credits froren bei 1.000 AE); zwei
+  Regressionstests je Lane, Fingerprint/Checkpoint-Tick-100 bleiben
+  unverändert (`0x71045DC037C10250` / `0x9A2B01F88C03599D`), nur der finale
+  Zustandshash wandert (`0x29DE64BD1B6A9000` → `0xF25B56F8C3553AAC`).
+  Zweitens ist das Projekt jetzt wirklich URP: `UrpProjectSetup` erzeugt und
+  verankert `Assets/_Project/Settings/NovaUrp(Renderer).asset` in
+  GraphicsSettings und allen Quality-Stufen (zuvor nie zugeordnet — URP-Lit-
+  Materialien liefen magenta); Blockout und Graybox-Primitive nutzen
+  Laufzeit-URP-Lit-Materialien. Drittens sind alle 34 Tripo-Assets integriert
+  (34/34 Materialien + LOD-Prefabs via `ArtAssetPrefabBuilder`,
+  Registry-Sync) und alle 17 MS-1-Rollen per Tastatur erreichbar (Pause auf P;
+  HQ bewusst unbelegt). PlayMode-Beweistest neu (`Assets/Tests/PlayMode/`):
+  lädt die Bootstrap-Szene, prüft Match-Start, Ticks, sichtbare Views und
+  wachsende Credits (Log: `tick 30→200, credits 1000→1660 AE`) und schreibt
+  fünf Screenshots (`output/demo/`). Verifiziert: 412/412 EditMode-,
+  408/408 .NET-, 2/2 PlayMode-Tests, `DETERMINISM_10000` SelfCheck grün.
+- **Asset-Bereitschaft, erste Karte und Demo-Vorbereitung (Graybox-Sitzung
+  GB-003, Diagnosestand, ohne Gate-Status, ohne Evidence):** Die Art-Ablage
+  `Assets/_Project/Art/` existiert jetzt vollständig nach ArtAssetStandard
+  (2 Fraktionen × 9 Gebäude- und 8 Einheiten-Rollen, `Shared/`, `Source/`),
+  und ein Drop-in-Pfad macht jedes konventionkonform abgelegte Asset sofort
+  spielbar: `ArtAssetNaming` (Nova.Data) parst `PF_UNIT_/PF_BLDG_<Faction>_<Role>`
+  auf die kanonische Definitions-Id, `ArtAssetAutoSync` (Editor) registriert
+  jedes solche Prefab beim Import automatisch in der neuen
+  `AssetMappingRegistry.asset` und stempelt die Standard-Import-Settings
+  (Scale 1.0, keine FBX-Materialien, BC7, Masken linear) auf `Art/`-Importe;
+  der `UnitViewManager` rendert eine registrierte Definitions-Id als Prefab
+  (Fraktion×Rolle aufgelöst, Pooling pro Prefab), alles andere bleibt
+  Graybox-Primitiv. Erste Karte: `GlutrinneBlockoutView` (Wüstentönung,
+  Kartenrand, Kristallmarker auf den zwei real registrierten Feldern) plus
+  Datenasset `MAP_Glutrinne.asset` (Graybox-Teilmenge des Manifest-Layouts).
+  Doku: `docs/production/DemoRunbook.md` (Demo-Ablauf, Steuerung, bekannte
+  Grenzen, Ablage-Anleitung) und `docs/production/StatusSnapshot_2026-08-05.md`
+  (datierter Projektstand; Inventur: noch kein einziges 3D-Asset vorhanden).
+  Verifiziert: 410/410 EditMode-Tests (+5 neue Namenskonventions-Tests),
+  406/406 .NET-Tests, Szenen-Regenerierung headless grün; Simulation/Core
+  unberührt, `quality/**` unberührt.
 - **Fraktionswirtschaft und Sichtbarkeit der Fraktionsachse (Paket 3+4 der
   Fraktions-Sitzung, Diagnosestand, ohne Gate-Status, ohne Evidence):**
   Erstens ist die Harvester-Ladekapazität kein flaches Provisorium mehr:

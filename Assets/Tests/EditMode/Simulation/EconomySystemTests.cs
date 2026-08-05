@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Pathfinding;
@@ -164,6 +165,79 @@ namespace Nova.Simulation.Tests
             Assert.That(entities.GetUnitRef(harvester).IsReturningCargo, Is.False, "the deposit resolves the order");
             Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1020L),
                 "credits rise by exactly the cargo");
+        }
+
+        [Test]
+        public void ReturnOrder_RefineryFootprintEdgeInReach_DepositsWithCentreTwoCellsAway()
+        {
+            // Regression for the GB-004 deposit fix: the construction path
+            // spawns the refinery entity at the footprint CENTRE (origin+1),
+            // so a harvester adjacent to the footprint edge is Chebyshev 2
+            // from the entity cell. Reach is measured against the footprint —
+            // under the old centre-cell rule the opening harvesters' full
+            // cargo never deposited (credits frozen at 1000, GB-001 finding).
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+
+            // Real placement path: entity at centre (9,5) of footprint
+            // (8,4)-(10,6) — the canonical opening layout.
+            EntityId refinery = construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Refinery), 8, 4);
+            Assert.That(refinery.IsValid, Is.True);
+
+            // Adjacent to the footprint's west edge cell (8,6), Chebyshev 2
+            // from the centre (9,5).
+            EntityId harvester = SpawnHarvester(entities, 0, 7, 6);
+            ref UnitState unit = ref entities.GetUnitRef(harvester);
+            unit.CargoAE = 100;
+            unit.IsReturningCargo = true;
+
+            kernel.StepTick();
+
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0),
+                "the footprint-adjacent refinery accepts the deposit");
+            Assert.That(entities.GetUnitRef(harvester).IsReturningCargo, Is.False);
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1100L));
+        }
+
+        [Test]
+        public void AutoCycle_CanonicalOpeningDistances_CompletesRoundTripAndResumes()
+        {
+            // End-to-end over the fixed cycle: field cell (7,7), refinery
+            // footprint (8,4)-(10,6), harvester at (7,6) — the exact opening
+            // geometry. 330 AE at 2 AE/tick fills in 165 ticks, the deposit
+            // lands the tick after, and the retained field id resumes harvest.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(economy.TryAddField(1, new GridPos2D(7, 7), 9000), Is.True);
+            construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Refinery), 8, 4);
+
+            EntityId harvester = SpawnHarvester(entities, 0, 7, 6);
+            entities.GetUnitRef(harvester).HarvestFieldId = 1;
+
+            for (int i = 0; i < 166; i++)
+            {
+                kernel.StepTick();
+            }
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1330L),
+                "full cargo delivered at footprint reach");
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0));
+
+            for (int i = 0; i < 10; i++)
+            {
+                kernel.StepTick();
+            }
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(20),
+                "the retained field id resumes the auto-cycle after the deposit");
         }
 
         [Test]

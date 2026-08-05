@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Nova.Core;
+using Nova.Data;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
@@ -30,9 +32,10 @@ namespace Nova.Gameplay.Match
     /// encodes the owning slot's FACTION (<see cref="FactionTint"/>, D-072
     /// palettes) — no longer the raw player slot. Both channels still carry
     /// the distinction twice, which is the shape/colour redundancy the
-    /// accessibility baseline requires; it is intentionally a switch plus two
-    /// colour constants and no asset, registry or material, so it deletes in
-    /// one commit once real art lands.
+    /// accessibility baseline requires. Entities whose definition id has a
+    /// registered <c>PF_*</c> prefab in <see cref="_assetMappings"/> render as
+    /// that prefab instead of a primitive (art drop-in path, ArtAssetStandard.md);
+    /// the primitive table below stays the fallback for every unmapped role.
     /// </para>
     /// <para>
     /// Health readout: brightness of that same tint carries the health
@@ -59,15 +62,22 @@ namespace Nova.Gameplay.Match
         /// </summary>
         private const int HealthTintSteps = 16;
 
-        /// <summary>Shape key of a view instantiated from <see cref="_unitPrefab"/> instead of a primitive.</summary>
+        /// <summary>Shape key of a view instantiated from a prefab instead of a primitive.</summary>
         private const int PrefabShapeKey = -1;
 
-        /// <summary>Render height of a prefab view; the prefab owns its own pivot and scale.</summary>
-        private const float PrefabGroundOffset = 0.5f;
+        /// <summary>
+        /// Render height of a prefab view. Zero: the ArtAssetStandard.md
+        /// section-1 export convention puts the origin on the ground contact
+        /// plane (Y = 0), so the prefab stands on the ground unshifted.
+        /// </summary>
+        private const float PrefabGroundOffset = 0f;
 
         [Header("References")]
         [SerializeField] private MatchRunner _matchRunner;
         [SerializeField] private GameObject _unitPrefab;
+
+        [Tooltip("Optional art-pipeline registry (ArtAssetAutoSync). A definition id with a registered PF_* prefab renders as that prefab; everything without one keeps its graybox primitive.")]
+        [SerializeField] private AssetMappingRegistrySO _assetMappings;
         [SerializeField] private float _interpolationSpeed = 25f;
 
         [Header("Fog of War")]
@@ -92,6 +102,7 @@ namespace Nova.Gameplay.Match
         private EntityId[] _boundIds;
         private UnitRole[] _viewRoles;
         private int[] _viewShapeKeys;
+        private GameObject[] _viewSourcePrefabs;
         private float[] _viewGroundOffsets;
         private int[] _viewOwners;
         private int[] _viewHealthSteps;
@@ -108,8 +119,32 @@ namespace Nova.Gameplay.Match
         // valid dictionary key and the lookup semantics are unchanged.
         private readonly Dictionary<GameObject, int> _viewObjectToSlot = new Dictionary<GameObject, int>(256);
         private readonly Stack<GameObject>[] _shapePools = new Stack<GameObject>[ShapePoolCount];
-        private readonly Stack<GameObject> _prefabPool = new Stack<GameObject>();
+        // Prefab views pool per SOURCE prefab, not globally: a recycled
+        // Alliance-HQ instance must never resurface as a Legion-Harvester.
+        private readonly Dictionary<GameObject, Stack<GameObject>> _prefabPools = new Dictionary<GameObject, Stack<GameObject>>();
         private MaterialPropertyBlock _propertyBlock;
+        // Scratch for the all-renderers tint upload (no per-call allocation).
+        private readonly List<Renderer> _tintScratch = new List<Renderer>(8);
+        // Shared runtime material for graybox primitives: Unity's primitive
+        // default material is a built-in-RP resource and renders magenta
+        // under URP (GB-004 finding), so primitives carry this URP Lit
+        // instance and keep the per-instance faction tint on the property
+        // block. Lazy, never saved, destroyed with the component.
+        private static Material _primitiveMaterial;
+
+        private static Material PrimitiveMaterial
+        {
+            get
+            {
+                if (_primitiveMaterial == null)
+                {
+                    Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+                    if (shader == null) shader = Shader.Find("Standard");
+                    _primitiveMaterial = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                }
+                return _primitiveMaterial;
+            }
+        }
         private int _frameStamp;
         private bool _fogUnavailableLogged;
 
@@ -298,6 +333,7 @@ namespace Nova.Gameplay.Match
             _boundIds = new EntityId[capacity];
             _viewRoles = new UnitRole[capacity];
             _viewShapeKeys = new int[capacity];
+            _viewSourcePrefabs = new GameObject[capacity];
             _viewGroundOffsets = new float[capacity];
             _viewOwners = new int[capacity];
             _viewHealthSteps = new int[capacity];
@@ -325,18 +361,19 @@ namespace Nova.Gameplay.Match
             GameObject instance;
             int shapeKey;
             float groundOffset;
+            GameObject sourcePrefab = ResolveViewPrefab(in unit);
 
-            if (_unitPrefab != null)
+            if (sourcePrefab != null)
             {
                 shapeKey = PrefabShapeKey;
                 groundOffset = PrefabGroundOffset;
-                if (_prefabPool.Count > 0)
+                if (_prefabPools.TryGetValue(sourcePrefab, out Stack<GameObject> prefabPool) && prefabPool.Count > 0)
                 {
-                    instance = _prefabPool.Pop();
+                    instance = prefabPool.Pop();
                 }
                 else
                 {
-                    instance = Instantiate(_unitPrefab, transform);
+                    instance = Instantiate(sourcePrefab, transform);
                 }
                 instance.SetActive(true);
             }
@@ -357,6 +394,7 @@ namespace Nova.Gameplay.Match
                     instance = GameObject.CreatePrimitive(primitive);
                     instance.transform.SetParent(transform, false);
                     instance.name = "UnitView_" + primitive;
+                    instance.GetComponent<Renderer>().sharedMaterial = PrimitiveMaterial;
                 }
                 instance.transform.localScale = scale;
             }
@@ -372,6 +410,7 @@ namespace Nova.Gameplay.Match
             _boundIds[slot] = unit.Id;
             _viewRoles[slot] = unit.Role;
             _viewShapeKeys[slot] = shapeKey;
+            _viewSourcePrefabs[slot] = sourcePrefab;
             _viewGroundOffsets[slot] = groundOffset;
             _viewOwners[slot] = -1;       // forces a tint on this frame
             _viewHealthSteps[slot] = -1;  // ... including the health bucket of the recycled instance
@@ -382,6 +421,41 @@ namespace Nova.Gameplay.Match
                 _tracked[slot] = true;
                 _activeIndices.Add(slot);
             }
+        }
+
+        /// <summary>
+        /// The art prefab for this entity, or null for the graybox primitive.
+        /// Resolution order: the <see cref="_assetMappings"/> registry entry of
+        /// the entity's own faction definition id (the same lookup combat and
+        /// economy resolve through — a Legion LightTank gets the Legion prefab,
+        /// never the Alliance one), then the single legacy <see cref="_unitPrefab"/>
+        /// override. UnitRole.Unit (the construction site) maps to the invalid
+        /// definition id 0 and therefore always falls through to the primitive.
+        /// </summary>
+        private GameObject ResolveViewPrefab(in UnitState unit)
+        {
+            if (_assetMappings != null)
+            {
+                EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
+                if (economy != null && unit.PlayerId < EconomySystem.MaxPlayers)
+                {
+                    FactionId faction = economy.GetSlotFaction(unit.PlayerId);
+                    int definitionId = SimDefinitions.ToDefinitionId(faction, unit.Role);
+                    if (definitionId != 0)
+                    {
+                        GameObject prefab = _assetMappings.GetUnitPrefab(definitionId);
+                        if (prefab == null)
+                        {
+                            prefab = _assetMappings.GetBuildingPrefab(definitionId);
+                        }
+                        if (prefab != null)
+                        {
+                            return prefab;
+                        }
+                    }
+                }
+            }
+            return _unitPrefab;
         }
 
         /// <summary>
@@ -396,6 +470,7 @@ namespace Nova.Gameplay.Match
             {
                 _boundIds[slot] = EntityId.Invalid;
                 _viewRenderers[slot] = null;
+                _viewSourcePrefabs[slot] = null;
                 _viewOwners[slot] = -1;
                 _viewHealthSteps[slot] = -1;
                 return;
@@ -407,7 +482,22 @@ namespace Nova.Gameplay.Match
             int shapeKey = _viewShapeKeys[slot];
             if (shapeKey == PrefabShapeKey)
             {
-                _prefabPool.Push(instance);
+                GameObject sourcePrefab = _viewSourcePrefabs[slot];
+                if (sourcePrefab != null)
+                {
+                    if (!_prefabPools.TryGetValue(sourcePrefab, out Stack<GameObject> prefabPool))
+                    {
+                        prefabPool = new Stack<GameObject>();
+                        _prefabPools[sourcePrefab] = prefabPool;
+                    }
+                    prefabPool.Push(instance);
+                }
+                else
+                {
+                    // The registry entry vanished mid-match (asset re-import):
+                    // destroy rather than pool under a lost key.
+                    Destroy(instance);
+                }
             }
             else
             {
@@ -423,6 +513,7 @@ namespace Nova.Gameplay.Match
             _viewInstances[slot] = null;
             _viewRenderers[slot] = null;
             _boundIds[slot] = EntityId.Invalid;
+            _viewSourcePrefabs[slot] = null;
             _viewOwners[slot] = -1;
             _viewHealthSteps[slot] = -1;
         }
@@ -454,8 +545,8 @@ namespace Nova.Gameplay.Match
 
         private void ApplyTint(int slot, byte playerId, int healthStep)
         {
-            Renderer renderer = _viewRenderers[slot];
-            if (renderer == null) return;
+            GameObject instance = _viewInstances[slot];
+            if (instance == null) return;
 
             Color color = TintFor(playerId, healthStep);
             _propertyBlock.Clear();
@@ -463,7 +554,20 @@ namespace Nova.Gameplay.Match
             // keeps the graybox tinted through the pipeline migration instead
             // of falling back to magenta / untinted white.
             FactionTint.ApplyToPropertyBlock(_propertyBlock, color);
-            renderer.SetPropertyBlock(_propertyBlock);
+
+            // EVERY renderer of the view gets the block: a prefab's LODGroup
+            // switches between its _LOD0/1/2 renderers with camera distance,
+            // and tinting only the first would drop the faction colour
+            // exactly when the player zooms out.
+            instance.GetComponentsInChildren(includeInactive: true, _tintScratch);
+            for (int i = 0; i < _tintScratch.Count; i++)
+            {
+                if (_tintScratch[i] != null)
+                {
+                    _tintScratch[i].SetPropertyBlock(_propertyBlock);
+                }
+            }
+            _tintScratch.Clear();
         }
 
         /// <summary>
@@ -672,10 +776,21 @@ namespace Nova.Gameplay.Match
                 }
             }
 
-            while (_prefabPool.Count > 0)
+            foreach (KeyValuePair<GameObject, Stack<GameObject>> entry in _prefabPools)
             {
-                GameObject pooled = _prefabPool.Pop();
-                if (pooled != null) Destroy(pooled);
+                Stack<GameObject> pool = entry.Value;
+                while (pool.Count > 0)
+                {
+                    GameObject pooled = pool.Pop();
+                    if (pooled != null) Destroy(pooled);
+                }
+            }
+            _prefabPools.Clear();
+
+            if (_primitiveMaterial != null)
+            {
+                Destroy(_primitiveMaterial);
+                _primitiveMaterial = null;
             }
         }
     }

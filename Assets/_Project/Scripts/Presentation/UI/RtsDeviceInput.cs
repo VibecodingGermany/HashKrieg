@@ -58,6 +58,32 @@ namespace Nova.Presentation.UI
         [Tooltip("Shift+Q: BasicInfantry — Alliance defId 12, tier 1, produced by a Barracks you build with Shift+B.")]
         [SerializeField] private ushort _altUnitDefId = 12;
 
+        [Header("Remaining MS-1 roles (added GB-004 so the full roster is reachable)")]
+        [Tooltip("C: Storage — Alliance defId 6.")]
+        [SerializeField] private ushort _storageDefId = 6;
+        [Tooltip("V: VehicleFactory — Alliance defId 8, produces vehicles.")]
+        [SerializeField] private ushort _vehicleFactoryDefId = 8;
+        [Tooltip("T: ResearchLab — Alliance defId 9, unlocks tier 2.")]
+        [SerializeField] private ushort _researchLabDefId = 9;
+        [Tooltip("G: Radar — Alliance defId 10.")]
+        [SerializeField] private ushort _radarDefId = 10;
+        [Tooltip("F: DefensePlatform — Alliance defId 11, the only armed building.")]
+        [SerializeField] private ushort _defensePlatformDefId = 11;
+        [Tooltip("Y: Refinery — Alliance defId 4, for expansion fields. HQ is deliberately unbound: MS-1 builds it only at match start.")]
+        [SerializeField] private ushort _refineryDefId = 4;
+        [Tooltip("U: Builder — Alliance defId 1, produced by the HQ.")]
+        [SerializeField] private ushort _builderDefId = 1;
+        [Tooltip("N: AntiArmorInfantry — Alliance defId 13, tier 2, from a Barracks.")]
+        [SerializeField] private ushort _antiArmorDefId = 13;
+        [Tooltip("E: ScoutVehicle — Alliance defId 14, from a VehicleFactory.")]
+        [SerializeField] private ushort _scoutDefId = 14;
+        [Tooltip("Shift+E: LightTank — Alliance defId 15.")]
+        [SerializeField] private ushort _lightTankDefId = 15;
+        [Tooltip("D: BattleTank — Alliance defId 16, tier 2.")]
+        [SerializeField] private ushort _battleTankDefId = 16;
+        [Tooltip("Shift+D: Artillery — Alliance defId 17, tier 2.")]
+        [SerializeField] private ushort _artilleryDefId = 17;
+
         private readonly SelectionManager _selection = new SelectionManager();
         private RtsIntentDispatcher _dispatcher;
         private CommandIngress _boundIngress;
@@ -102,9 +128,12 @@ namespace Nova.Presentation.UI
             if (_runner == null) _runner = FindAnyObjectByType<MatchRunner>();
             if (_camera == null) _camera = Camera.main;
             _legend =
-                $"LMB click/drag select | RMB move | S stop | A attack (enemy under cursor, else attack-move) | " +
-                $"H harvest nearest field | R return cargo | B build {_buildingDefId} (Shift {_altBuildingDefId}) | " +
-                $"Q queue {_unitDefId} (Shift {_altUnitDefId})\n" +
+                "LMB click/drag select | RMB move | S stop | A attack enemy under cursor (else plain move — no auto-acquire yet) | " +
+                "H harvest nearest field | R return cargo | P pause/resume\n" +
+                $"Buildings: B {_buildingDefId} | Shift+B {_altBuildingDefId} | C {_storageDefId} | V {_vehicleFactoryDefId} | " +
+                $"T {_researchLabDefId} | G {_radarDefId} | F {_defensePlatformDefId} | Y {_refineryDefId}\n" +
+                $"Units: Q {_unitDefId} | Shift+Q {_altUnitDefId} | U {_builderDefId} | N {_antiArmorDefId} | " +
+                $"E {_scoutDefId} | Shift+E {_lightTankDefId} | D {_battleTankDefId} | Shift+D {_artilleryDefId}\n" +
                 "Camera: arrow keys / screen edge pan | wheel zoom | Z,X rotate";
         }
 
@@ -182,15 +211,16 @@ namespace Nova.Presentation.UI
             {
                 // Schema v1 has no attack-move register entry (see
                 // RtsIntentDispatcher.Attack): an enemy under the cursor becomes
-                // a real AttackTarget, everything else is the honest A-move
-                // approximation — Move, and Combat acquires targets on arrival.
+                // a real AttackTarget, everything else is a plain Move — Combat
+                // does NOT acquire targets on arrival yet (known gap, GB-002),
+                // so this is deliberately not labelled attack-move.
                 if (TryPickUnit(attackAt, ownedByLocalSlot: false, out EntityId enemy))
                 {
                     Report("Attack", _dispatcher.Attack(_selection.SelectedEntities, enemy));
                 }
                 else
                 {
-                    Report("Attack-move", _dispatcher.MoveTo(_selection.SelectedEntities, attackAt.x, attackAt.z));
+                    Report("Move (no target)", _dispatcher.MoveTo(_selection.SelectedEntities, attackAt.x, attackAt.z));
                 }
             }
 
@@ -211,25 +241,61 @@ namespace Nova.Presentation.UI
                 Report("ReturnCargo", _dispatcher.ReturnCargo(_selection.SelectedEntities));
             }
 
-            if (Input.GetKeyDown(KeyCode.B) && TryScreenPointToGround(mouse, out Vector3 buildAt))
+            // Pause/resume toggles the kernel clock only — simulation state is
+            // untouched, so this needs no command. StartMatch after PauseMatch
+            // simply restarts the tick pump.
+            if (Input.GetKeyDown(KeyCode.P))
             {
-                ushort defId = shift ? _altBuildingDefId : _buildingDefId;
-                // The payload cell is the lower-left origin of the 3x3 footprint.
-                Report($"PlaceBuilding {defId}",
-                    _dispatcher.PlaceBuilding(defId, ToGridCoordinate(buildAt.x), ToGridCoordinate(buildAt.z)));
-            }
-
-            if (Input.GetKeyDown(KeyCode.Q))
-            {
-                ushort defId = shift ? _altUnitDefId : _unitDefId;
-                if (TryResolveProducer(defId, out EntityId producer))
+                if (_runner.IsRunning)
                 {
-                    Report($"QueueUnit {defId}", _dispatcher.QueueUnit(producer, defId, 1));
+                    _runner.PauseMatch();
+                    _lastCommandStatus = "Match paused (P resumes)";
                 }
                 else
                 {
-                    _lastCommandStatus = $"QueueUnit {defId}: no own producer building for that definition";
+                    _runner.StartMatch();
+                    _lastCommandStatus = "Match resumed";
                 }
+            }
+
+            // Buildings: one key per MS-1 role, the payload cell is the
+            // lower-left origin of the 3x3 footprint. HQ is deliberately
+            // unbound (MS-1 builds it only at match start).
+            if (Input.GetKeyDown(KeyCode.B)) TryPlaceBuilding(shift ? _altBuildingDefId : _buildingDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.C)) TryPlaceBuilding(_storageDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.V)) TryPlaceBuilding(_vehicleFactoryDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.T)) TryPlaceBuilding(_researchLabDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.G)) TryPlaceBuilding(_radarDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.F)) TryPlaceBuilding(_defensePlatformDefId, mouse);
+            if (Input.GetKeyDown(KeyCode.Y)) TryPlaceBuilding(_refineryDefId, mouse);
+
+            // Units: one key per MS-1 role; the producer resolves by the
+            // definition's producer role (selected own building first).
+            if (Input.GetKeyDown(KeyCode.Q)) TryQueueUnit(shift ? _altUnitDefId : _unitDefId);
+            if (Input.GetKeyDown(KeyCode.U)) TryQueueUnit(_builderDefId);
+            if (Input.GetKeyDown(KeyCode.N)) TryQueueUnit(_antiArmorDefId);
+            if (Input.GetKeyDown(KeyCode.E)) TryQueueUnit(shift ? _lightTankDefId : _scoutDefId);
+            if (Input.GetKeyDown(KeyCode.D)) TryQueueUnit(shift ? _artilleryDefId : _battleTankDefId);
+        }
+
+        private void TryPlaceBuilding(ushort defId, Vector2 mouse)
+        {
+            if (TryScreenPointToGround(mouse, out Vector3 buildAt))
+            {
+                Report($"PlaceBuilding {defId}",
+                    _dispatcher.PlaceBuilding(defId, ToGridCoordinate(buildAt.x), ToGridCoordinate(buildAt.z)));
+            }
+        }
+
+        private void TryQueueUnit(ushort defId)
+        {
+            if (TryResolveProducer(defId, out EntityId producer))
+            {
+                Report($"QueueUnit {defId}", _dispatcher.QueueUnit(producer, defId, 1));
+            }
+            else
+            {
+                _lastCommandStatus = $"QueueUnit {defId}: no own producer building for that definition";
             }
         }
 
