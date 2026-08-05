@@ -1,6 +1,6 @@
 # Graybox-Log
 
-**Version:** 0.2.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.3.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -325,6 +325,128 @@ Registerzeilen im [ScopeLedger](ScopeLedger.md), grüner `docs-check`,
   „Forces [debug, ignores fog]" ausgewiesen und darf so nicht in die echte UI
   wandern.
 
+## Sitzung GB-003 – 2026-08-05 – Asset-Bereitschaft und erste Karte
+
+**Branch:** `main` · **Commit:** keiner (Arbeitsbaum; kein Commit, kein Push,
+kein Branch-Wechsel – Commit/PR als Inhaberentscheidung vorgelegt) ·
+**Besetzung:** ein Orchestrierungs-Agent mit drei Lese-Scouts (Assets,
+Code/Szenen, Produktionsdoku).
+
+### Ziel
+
+Der Inhaber hat den bevorstehenden Zufluss der 3D-Assets gemeldet und drei
+Vorbereitungen angeordnet: den aktuellen Stand festhalten, die erste Karte
+soweit vorbereiten, dass Assets eingesetzt werden können, und die erste
+Demo-Runde vorbereiten – inklusive Auskunft, wo die Assets liegen.
+
+### Schreibumfang der Sitzung
+
+Innerhalb D-067 K2: `Scripts/Presentation/Maps/GlutrinneBlockoutView.cs` (neu),
+`Scripts/Gameplay/Match/UnitViewManager.cs` (Prefab-Auflösung),
+`Editor/BootstrapSceneGenerator.cs` und die von ihm erzeugte
+`Bootstrap.unity`. **Bewusste, hiermit gemeldete Abweichungen vom K2-Weißbereich**
+(vom Inhaberauftrag gedeckt, der die Asset-Einsatzfähigkeit angeordnet hat;
+D-067 ist ohnehin unratifizierter Entwurf):
+
+- `Editor/ArtAssetAutoSync.cs` (neu) – Editor-Tooling außerhalb des
+  Generator-Weißbereichs; registriert PF_*-Prefabs und stempelt
+  Import-Settings, ohne Spiel- oder Simulationscode zu berühren.
+- `Scripts/Data/Registries/ArtAssetNaming.cs` (neu) und
+  `Scripts/Data/AssetMappingRegistrySO.cs` (additive `ClearMappings`-Methode) –
+  Nova.Data; keine Verhaltensänderung bestehender Pfade.
+- `Assets/_Project/Art/**` (leere Standard-Ordnerstruktur mit `.gitkeep`),
+  `Assets/_Project/Data/**` (zwei Datenassets: `MAP_Glutrinne.asset`,
+  `AssetMappingRegistry.asset`, beide vom Generator/Tooling erzeugt).
+- `Assets/Tests/EditMode/Data/ArtAssetNamingTests.cs` (neu, 5 Tests).
+
+`quality/**`, `.github/workflows/**`, `VERSION` und **jeglicher
+Simulations-/Core-Code** blieben unberührt – der Determinismus ist von dieser
+Sitzung nicht betroffen, kein Hash-Baseline-Thema. Kein Gate-Status beansprucht.
+
+### Ergebnis
+
+- **Stand festgehalten:** [StatusSnapshot_2026-08-05.md](StatusSnapshot_2026-08-05.md)
+  (Repo, Gates, Verifikation, Asset-Inventur).
+- **Asset-Inventur:** Es liegt **kein einziges 3D-Asset** vor – null Treffer
+  repo-weit (`*.fbx/obj/blend/gltf/glb`) und in den Ablageorten des
+  Arbeitsrechners (Downloads/Desktop/Dokumente). Vorhanden sind 33
+  Konzeptbilder (`docs/assets/concept-art/full/`) und 4 orthografische
+  Referenzen (`docs/assets/reference/`).
+- **Drop-Zone:** `Assets/_Project/Art/` exakt nach ArtAssetStandard §1
+  (Buildings/Units × Alliance/Legion × Rollen, Shared/{Materials,Textures,
+  Meshes}, Source/).
+- **Pipeline:** `ArtAssetNaming.TryParsePrefabDefinitionId` koppelt
+  `PF_UNIT_/PF_BLDG_<Faction>_<Role>` an die kanonische Definitions-Id
+  (Allianz = Rollen-Wire-Wert, Legion +17); `ArtAssetAutoSync` baut die
+  Registry bei jedem Import unter `Art/` vollständig neu auf (destruktiv-
+  idempotent: manuelle Registry-Edits überleben keinen Sync – so gewollt)
+  und setzt die §4-Import-Presets (Scale 1.0, keine FBX-Materialien, BC7,
+  Masken linear, 1024/2048-Deckel). Menü: `Tools/Project Nova/Sync Art Asset
+  Registry`.
+- **Darstellung:** `UnitViewManager` löst je Entität Fraktion×Rolle über
+  dieselbe Economy-Quelle auf wie Kampf/Wirtschaft und rendert ein
+  registriertes Prefab (Pooling pro Quell-Prefab); ohne Treffer bleibt das
+  Graybox-Primitiv. Prefab-Ground-Offset von 0,5 auf 0,0 korrigiert
+  (ArtAssetStandard-Ursprungskonvention; der Pfad war bislang ungenutzt).
+- **Erste Karte:** `GlutrinneBlockoutView` (Sandtönung, Kartenrand-Rahmen,
+  Kristallmarker auf exakt den zwei registrierten Feldern) plus
+  `MAP_Glutrinne.asset` (Graybox-Teilmenge: 2 Spawns, 2 Felder; kein
+  erfundenes 5-Felder-Layout – das ist G4).
+- **Demo:** [DemoRunbook.md](DemoRunbook.md) (Ablauf, Steuerung, Grenzen,
+  Ablage-Anleitung).
+
+### Verifikation (echte Zahlen, ausgeführt)
+
+| Prüfung | Ergebnis |
+|---|---|
+| Unity-Kompilierung (Batchmode 6000.5.4f1) | Exit 0 nach zwei Korrekturen (siehe Befunde) |
+| EditMode-Tests (Unity) | **410/410 grün**, 0 Fehler, 0 übersprungen (Basis 405, +5 Namenstests) |
+| .NET-Tests (`tools/Nova.SimRunner.Tests`, Release) | **406/406 grün** (Baseline zu Sitzungsbeginn; Sim-Quellen unberührt) |
+| Szenen-Regenerierung headless | Exit 0; `Bootstrap.unity` enthält `Map`-Objekt und `_assetMappings`-Verdrahtung |
+| `docs-check` (`.github/scripts/check_docs.py`) | grün |
+| Determinismus | nicht angetastet; letzter Fingerprint (GB-002) `0xAF9FB211B6C9CACE` |
+
+### Ehrliche Grenzen dieser Verifikation
+
+- Kein menschlicher Play-Durchlauf: ob Blockout-Tönung, Kristallmarker und
+  Kartenrand **lesbar** sind, ist unverifiziert; belegt ist Kompilierung,
+  Szenenstruktur und Tests.
+- Die Prefab-Auflösung ist ohne reales Prefab nur als Codepfad und über die
+  5 Parser-Tests belegt; der erste echte Drop-in-Test passiert mit dem
+  ersten gelieferten Asset.
+- Der Prefab-Tint färbt den ersten gefundenen Renderer einer Prefab-Hierarchie
+  (Graybox-Näherung; der NovaUnit-Shader-Pfad ersetzt das).
+- Player-Builds wurden in dieser Sitzung nicht neu gebaut.
+
+### Aufgeschobene Dokumentation
+
+Keine neue. DoD-Punkte 1–2 sind für diese Sitzung sofort erledigt
+(Änderungsverläufe und Versionsbumps in allen berührten Dokumenten,
+Wiki-Index-Einträge für DemoRunbook und StatusSnapshot, `[Unreleased]`-Eintrag,
+ScopeLedger 0.4.0), weil D-067 unratifiziert ist und der Schuldmodus formal
+nicht existiert. Die Altschulden aus GB-001/GB-002 bleiben unverändert offen.
+
+### Offene Befunde aus der Sitzung
+
+- **`-quit` frisst `-runTests`:** Der erste Testlauf (mit `-quit`) endete
+  erfolgreich, ohne einen einzigen Test auszuführen – die Ergebnisdatei blieb
+  alt. Der Fallstrick ist in `quality/scripts/run_gate_check.py:462`
+  dokumentiert, aber leicht zu übersehen; ohne den zweiten Blick auf den
+  Zeitstempel wäre ein falscher Grün-Stand protokolliert worden.
+- **Unity-6-API-Drift:** `ModelImporterTangents.CalculateMikktspace` heißt
+  jetzt `CalculateMikk`, `ModelImporter.importAnimation` ist ein Bool.
+  Gegen die installierte Editor-Assembly verifiziert.
+- **Nova.Editor referenziert Nova.Simulation nicht.** Die Referenzliste ist
+  gate-prüfungsrelevant (Architekturcheck) und wurde **nicht** angefasst;
+  stattdessen kapselt `ArtAssetNaming.TryParsePrefabDefinitionId` die
+  Id-Auflösung vollständig in Nova.Data.
+- **`MAP_`-Präfix:** `MAP_Glutrinne.asset` erweitert die Daten-Namenskonvention
+  (`UNIT_`/`BLDG_`) um ein Karten-Präfix – als Arbeitskonvention gesetzt,
+  kein DecisionLog-Eintrag (kein Design-Konflikt, jederzeit korrigierbar).
+- **Registry ist maschinell:** `AssetMappingRegistry.asset` wird bei jedem
+  Sync vollständig neu geschrieben; sie ist Build-Artefakt, kein
+  Handarbeits-Dokument.
+
 ## Offene Punkte
 
 - D-067 und D-068 sind Entwürfe. Ohne Ratifizierung existiert der
@@ -360,3 +482,4 @@ Registerzeilen im [ScopeLedger](ScopeLedger.md), grüner `docs-check`,
 |---|---|---|---|
 | 0.1.0 | 2026-07-26 | Erstfassung mit Protokollregeln und Sitzung GB-001 (sichtbarer und bedienbarer Graybox-Slice) | Technical Writer |
 | 0.2.0 | 2026-07-26 | Sitzung GB-002 (Schadensmatrix nach D-074, Siegauswertung nach D-056, HUD-Sichtbarkeit) angehängt – einschließlich Branch-Befund, getrennter Hash-Zuordnung, Fingerprint-Stub-Befund und elf offenen Befunden | Technical Writer |
+| 0.3.0 | 2026-08-05 | Sitzung GB-003 (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Runbook, Status-Snapshot) angehängt – einschließlich K2-Abweichungsdeklaration, Asset-Inventur (null 3D-Assets) und fünf offenen Befunden | Technical Writer |

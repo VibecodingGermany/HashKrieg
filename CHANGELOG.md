@@ -18,6 +18,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; G0, MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Asset-Bereitschaft, erste Karte und Demo-Vorbereitung (Graybox-Sitzung
+  GB-003, Diagnosestand, ohne Gate-Status, ohne Evidence):** Die Art-Ablage
+  `Assets/_Project/Art/` existiert jetzt vollständig nach ArtAssetStandard
+  (2 Fraktionen × 9 Gebäude- und 8 Einheiten-Rollen, `Shared/`, `Source/`),
+  und ein Drop-in-Pfad macht jedes konventionkonform abgelegte Asset sofort
+  spielbar: `ArtAssetNaming` (Nova.Data) parst `PF_UNIT_/PF_BLDG_<Faction>_<Role>`
+  auf die kanonische Definitions-Id, `ArtAssetAutoSync` (Editor) registriert
+  jedes solche Prefab beim Import automatisch in der neuen
+  `AssetMappingRegistry.asset` und stempelt die Standard-Import-Settings
+  (Scale 1.0, keine FBX-Materialien, BC7, Masken linear) auf `Art/`-Importe;
+  der `UnitViewManager` rendert eine registrierte Definitions-Id als Prefab
+  (Fraktion×Rolle aufgelöst, Pooling pro Prefab), alles andere bleibt
+  Graybox-Primitiv. Erste Karte: `GlutrinneBlockoutView` (Wüstentönung,
+  Kartenrand, Kristallmarker auf den zwei real registrierten Feldern) plus
+  Datenasset `MAP_Glutrinne.asset` (Graybox-Teilmenge des Manifest-Layouts).
+  Doku: `docs/production/DemoRunbook.md` (Demo-Ablauf, Steuerung, bekannte
+  Grenzen, Ablage-Anleitung) und `docs/production/StatusSnapshot_2026-08-05.md`
+  (datierter Projektstand; Inventur: noch kein einziges 3D-Asset vorhanden).
+  Verifiziert: 410/410 EditMode-Tests (+5 neue Namenskonventions-Tests),
+  406/406 .NET-Tests, Szenen-Regenerierung headless grün; Simulation/Core
+  unberührt, `quality/**` unberührt.
 - **Fraktionswirtschaft und Sichtbarkeit der Fraktionsachse (Paket 3+4 der
   Fraktions-Sitzung, Diagnosestand, ohne Gate-Status, ohne Evidence):**
   Erstens ist die Harvester-Ladekapazität kein flaches Provisorium mehr:

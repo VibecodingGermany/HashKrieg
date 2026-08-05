@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.14.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.15.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -171,6 +171,8 @@ gelisteten Kernverträge.
 - [RiskAnalysis](production/RiskAnalysis.md)
 - [GrayboxLog](production/GrayboxLog.md) – Sitzungsprotokoll der Graybox-Spur (D-067, Entwurf)
 - [ScopeLedger](production/ScopeLedger.md) – Zurückstellungen der Graybox-Spur, verweist auf Manifest-Schlüsselpfade
+- [DemoRunbook](production/DemoRunbook.md) (0.1.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, bekannte Grenzen, Asset-Ablage
+- [StatusSnapshot 2026-08-05](production/StatusSnapshot_2026-08-05.md) (0.1.0) – datierter Projektstand vor dem Eintreffen der ersten 3D-Assets
 - Sprintberichte: [0](production/sprints/Sprint00_Report.md),
   [1](production/sprints/Sprint01_Report.md),
   [2](production/sprints/Sprint02_Report.md),
@@ -240,3 +242,4 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.12.1 | 2026-07-25 | Art-Strang MS-1 (D-069–D-073) indexiert: ArtAssetStandard, ArtManifest_MS1, SourceCatalog_MS1, Provenance, VerticalSlice_MS1 – kein Gate-Status, kein Asset im Repository | Technical Writer |
 | 0.13.0 | 2026-07-26 | Graybox-Spur indexiert: GrayboxLog und ScopeLedger aufgenommen; Art-Strang-D-IDs nach der Merge-Kollision auf D-069–D-073 nachgeführt | Technical Writer |
 | 0.14.0 | 2026-07-26 | Hashkrieg-Weltentwurf und Concept-Art-Strang indexiert: Lore.md, ConceptArtStyleGuide.md und concept-art/README.md aufgenommen; kein Gate-Status | Technical Writer |
+| 0.15.0 | 2026-08-05 | GB-003 indexiert: DemoRunbook.md und StatusSnapshot_2026-08-05.md aufgenommen (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Vorbereitung); ScopeLedger 0.4.0 und GrayboxLog 0.3.0 fortgeschrieben; kein Gate-Status | Technical Writer |

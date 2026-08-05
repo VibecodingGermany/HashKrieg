@@ -31,6 +31,13 @@ namespace Nova.Data
         public IReadOnlyList<UnitAssetMapping> UnitMappings => _unitMappings;
         public IReadOnlyList<BuildingAssetMapping> BuildingMappings => _buildingMappings;
 
+        /// <summary>Empties both mapping tables. The editor auto-sync rebuilds the registry from a full Art/ scan, so a dropped, renamed or deleted prefab always converges to the on-disk truth.</summary>
+        public void ClearMappings()
+        {
+            _unitMappings.Clear();
+            _buildingMappings.Clear();
+        }
+
         public void RegisterUnitMapping(int definitionId, GameObject prefab)
         {
             _unitMappings.Add(new UnitAssetMapping { DefinitionId = definitionId, ModelPrefab = prefab });
