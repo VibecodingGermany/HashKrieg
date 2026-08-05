@@ -57,9 +57,17 @@ wenn das Asset selbst es nicht tut — inklusive der offenen Punkte darin.
 | Grösse | rund 113 MB |
 | Inhalt | 272 Dateien: je 34× `.fbx`, `.png`, `.mat`, `.prefab` plus 136 `.meta` |
 | SHA-256 | `02afd4f4fd245ae6bd70d41b170b675e09948fe12ae5b529c9bd659abbf7fd68` |
-| Ablage | [Geteilter Google-Drive-Ordner](https://drive.google.com/drive/folders/1HuOLk1JuykvGxDo0Ey2FNinVXJAUtwS3?usp=sharing) |
+| Ablage | geteilter Ordner, **Zugang auf Anfrage** |
 
-Im Drive-Ordner liegt neben dem Zip eine `README.txt` mit demselben
+**Zugang:** Das Paket wird nicht öffentlich verlinkt. Wer am Projekt mitentwickelt,
+bekommt den Ordner auf Anfrage freigeschaltet — kurze Mail an
+**hey@dennis-westermann.de**, Betreff „Project Nova Art-Paket".
+
+Der Grund steht unter „Offene Punkte": Solange die Lizenzfelder der Assets
+ungeklärt sind, ist eine Weitergabe an einen unbestimmten Personenkreis nicht
+gedeckt. Freigabe an konkrete Personen ist es.
+
+Im geteilten Ordner liegt neben dem Zip eine `README.txt` mit demselben
 Installationsablauf, damit das Paket auch ohne Repository-Kontext verständlich
 ist. Nach jeder Paketaktualisierung wandern **beide** mit: Zip und README.
 
@@ -95,12 +103,6 @@ Neue Assets kommen **ins Paket, nicht ins Repo**. Ablauf:
 
 ## Offene Punkte
 
-- **Der Drive-Ordner ist per Link freigegeben und dieses Repository ist
-  öffentlich.** Damit ist das Paket faktisch für jeden abrufbar, der die
-  Repo-Seite liest — das ist eine Verbreitung an Dritte, keine interne
-  Weitergabe. Solange der nächste Punkt offen ist, sollte der Ordner entweder
-  auf konkrete Personen eingeschränkt oder der Link aus dieser Datei entfernt
-  und direkt ausgetauscht werden.
 - **Lizenzlage der Tripo-Assets ist unvollständig.** In den PROVENANCE-Datensätzen
   sind `licenseId`, `redistributionAllowed`, `commercialUseGranted` und
   `outputOwnership` leer beziehungsweise `null`, und `sourceUrl` fehlt. Solange
