@@ -1114,15 +1114,29 @@ Gate-Evidence und keinen Game-Release.
 
 ---
 
-### D-067 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 7 (Graybox-Spur ohne Gate-Autorität)
+### D-067 | gegenstandslos durch D-076 | Sprint 7 (Graybox-Spur ohne Gate-Autorität)
 
-**Status:** ENTWURF — Inhaberentscheidung ausstehend. Dieser Eintrag ist
-**nicht in Kraft**. Entscheidender Autor ist **Dennis Westermann (Project
-Owner)**; nach AGENTS.md §2 Regel 6 legt ein Agent Optionen samt Empfehlung
-vor und entscheidet nicht selbst. Bis zur Ratifizierung gilt der Status quo:
-Die Graybox-Arbeit hat ohnehin keine Gate-Autorität, und die
-Dokumentationsschuld unten ist offen ausgewiesen statt stillschweigend
-genommen.
+**Status:** **gegenstandslos durch D-076**
+(2026-08-06). Nie ratifiziert, nie in Kraft getreten — und jetzt nicht mehr
+nötig: D-067 war die Ausnahme von Regeln, die es seit D-076 nicht mehr gibt. Die
+Graybox-Spur braucht keine Sondergenehmigung, weil unter Governance-Tier 1 weder
+die Gate-Kette blockiert noch pro Änderung Wiki-Index, Root-README und
+Änderungsverläufe nachgezogen werden müssen.
+
+Der Eintrag bleibt vollständig stehen (keine stillen Umschreibungen). Praktische
+Folgen des Wegfalls:
+
+- Der [ScopeLedger](ScopeLedger.md) **bleibt** — nicht mehr als Registerpflicht
+  einer Ausnahme, sondern als ehrliche Lückenliste gegen `mvp-v1.json`. Die
+  Spalte „D-ID-Klausel" ist damit gegenstandslos und kann bei der nächsten
+  Berührung des Dokuments entfallen.
+- Der [GrayboxLog](GrayboxLog.md) ist **nicht mehr pflichtig**. Er bleibt als
+  historisches Sitzungsprotokoll GB-001 bis GB-004 erhalten; neue Sitzungen
+  müssen dort nichts mehr eintragen. Was bleibt, ist der Playtest-Nachweis aus
+  [../../GOVERNANCE.md](../../GOVERNANCE.md) — der darf hier landen, muss aber nicht.
+- Die Verfallsklausel K5 läuft ins Leere und wird nicht mehr überwacht.
+
+Der ursprüngliche Entwurf steht unverändert darunter.
 
 **Kontext:** Der Simulationskern ist headless verifiziert, war aber unsichtbar
 und unbedienbar: `Bootstrap.unity` enthielt nur Kamera und Licht, im Repo
@@ -1628,6 +1642,90 @@ Donnerkanone 60; der Scout bleibt abgeleitet (10).
 
 ---
 
+### D-076 | verbindlich | Sprint 7 (Governance-Tier-Modell, Gate-Kette schlafend)
+
+**Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis Westermann).
+
+**Kontext:** Das Repository trug ein Governance-Regime für ein Projekt, das es
+nicht ist. Messbar am Ist-Stand vor dieser Entscheidung:
+
+| Größe | Wert |
+|---|---|
+| Spielcode `Assets/_Project` | 19.508 Zeilen |
+| Dokumentation `docs/` | 19.729 Zeilen in 126 Dateien |
+| Governance-Tooling (`quality/scripts`, CI-Skripte) | 6.333 Zeilen |
+| Entscheidungen mit ≥3-Alternativen-Pflicht | 75 |
+| Commits nach Typ | 59 `docs` gegen 35 `feat` |
+| Aktive Entwickler | 2 (147 von 148 Commits von einer Person) |
+| Erzeugte Gate-Evidence in 148 Commits | **0** |
+
+Der Gate-Vertrag aus D-061 bis D-066 ist ein Supply-Chain-Provenance-Modell:
+getrennte Trusted-Tool-/Subject-Checkouts, append-only Receipts, Verifikation
+aller Vorgänger über die GitHub-API, geschütztes Environment mit Required
+Reviewers. Sein Bedrohungsmodell lautet „der Committer könnte bösartig sein".
+Bei zwei Entwicklern ohne Nutzer, Geld oder Haftung existiert dieses Modell
+nicht — und der Apparat war nicht neutral, sondern der Blocker: `quality/evidence/`
+und `quality/authorizations/` wurden nie angelegt, MS-0 und MS-1 galten per
+Definition als unerreichbar, und die einzige Arbeit, die das Spiel spielbar
+machte, lief unter D-067 — einer Ausnahme, die nie ratifiziert wurde.
+
+Gleichzeitig lief **kein einziger Spieltest in der CI**: `docs-check` prüfte
+Markdown-Links, `quality-gate` die Selbsttests des Evidence-Validators. Die
+Simulationstests liefen ausschließlich manuell auf einem Laptop. Das Regime
+prüfte sich selbst, nicht das Produkt.
+
+**Entscheidung:** Governance wird über **Tiers** geregelt statt über eine feste
+Regelmenge; Regeln höherer Tiers werden schlafen gelegt statt gelöscht. Details
+und Tier-Tabelle: [../../GOVERNANCE.md](../../GOVERNANCE.md). Aktiv ist **Tier 1**
+(zwei Entwickler, kein Publikum). Konkret:
+
+1. Die Gate-Kette G0–G5 blockiert keinen Meilensteinfortschritt mehr. Die
+   Gate-*Inhalte* bleiben als Arbeitsgliederung gültig
+   ([MVPRecoveryPlan.md](MVPRecoveryPlan.md)), der *Evidenzvertrag* schläft.
+2. Neuer Meilenstein-Nachweis: **grüne CI plus eine gespielte und protokollierte
+   Runde.** Das fängt denselben Fehler wie F-001 — ein Modul, das nur auf dem
+   Papier existiert, überlebt keine Spielrunde — ohne Beweisapparat.
+3. Neuer Pflichtcheck `tests` in der CI: die Simulationstests aus
+   `tools/Nova.SimRunner.Tests`, die dieselben Core-/Simulation-Quellen wie der
+   Unity-Host kompilieren und keine Unity-Lizenz brauchen.
+4. `integrity` läuft nur noch bei Änderungen an `quality/**`, damit der
+   schlafende Apparat lauffähig bleibt, ohne jeden PR zu belasten.
+5. Definition of Done: 13 Punkte → 4. PR-Template: 11 Checkboxen → 3.
+6. Dokument-Pflichtaufbau, Versionsbump und Änderungsverlauf-Tabelle werden
+   freiwillig; Git ist der Änderungsverlauf. Ausnahme: `quality/content/mvp-v1.json`
+   bleibt versionierter Vertrag.
+7. D-ID-Pflicht bleibt, die ≥3-Alternativen-Pflicht entfällt bis Tier 2.
+   Bestehende Einträge werden nicht zurückgebaut.
+8. Sprint-Ritual (8 Pflichtschritte) entfällt.
+9. Selbst-Merge bei grüner CI ist erlaubt. Die Regel „ab zwei aktiven Maintainern
+   ist eine zweite menschliche Freigabe Pflicht" wird gestrichen — sie hätte
+   genau jetzt gegriffen und die Arbeit zu zweit verdoppelt teuer gemacht.
+10. D-067 wird gegenstandslos; der GrayboxLog verliert seine Pflicht, der
+    ScopeLedger bleibt als Lückenliste.
+
+**Verworfen:** (a) Gate-Regime beibehalten und G0-A2 fertigbauen — schätzungsweise
+Tage bis Wochen für einen Beweisapparat, den außer den zwei Entwicklern niemand
+liest, während der KI-Gegner untätig bleibt; (b) `quality/` löschen — würde die
+tatsächlich wertvollen Teile mitnehmen (`mvp-v1.json` als Sollinhalt) und den
+Weg zu Tier 3 verbauen; (c) Regeln einfach ignorieren statt sie zu ändern — die
+Variante, in der das Repository seit D-067 faktisch schon lief, und die genau
+die undokumentierte Statusbehauptung erzeugt, die D-055 zurückgenommen hat.
+
+**Konsequenzen:**
+
+- Nicht mehr führend für den Meilensteinstatus:
+  [MVPRecoveryPlan.md](MVPRecoveryPlan.md). Führend sind
+  [Milestones.md](Milestones.md) und [../../GOVERNANCE.md](../../GOVERNANCE.md).
+- D-061 bis D-066 bleiben inhaltlich unverändert gültig **für Tier 3**. Sie sind
+  nicht widerrufen, sondern ruhen.
+- Der Weg zurück ist dokumentiert und billig: vier Schritte in
+  [../../GOVERNANCE.md](../../GOVERNANCE.md) unter „Was schläft und wie es aufwacht".
+- Risiko: Ohne Zwang zur Doku-Pflege driftet das Wiki schneller. Gegenmittel ist
+  die Playtest-Notiz, nicht ein neues Formular. Wird die Drift schmerzhaft,
+  ist das ein Anlass zur Neubewertung — nicht zur Rückkehr zum Gate-Regime.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -1703,3 +1801,4 @@ Donnerkanone 60; der Scout bleibt abgeleitet (10).
 | 1.17.0 | 2026-07-26 | Art-Strang MS-1 aus PR #8 aufgenommen (Art-Mask-Kanalbelegung, 0-€-Beschaffungspfad mit Whitelist/Blacklist, Grid-Zellgröße 3,0 m mit Gebäude-Footprints, Fraktionspaletten Allianz/Legion, restriktive Sonniss-Weitergaberegel). Beim Merge kollidierten die dort unabhängig vergebenen IDs D-066–D-070 mit D-066/D-067/D-068; der Art-Strang wurde inhaltsgleich auf **D-069–D-073** verschoben, siehe „Offene Punkte" | Technical Art / Producer / Project Owner |
 | 1.18.0 | 2026-07-26 | D-074 aufgenommen: [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md) als alleinige Autorität der Schaden-gegen-Panzerung-Matrix (6 × 6, ganzzahlige Prozentdarstellung), widersprechende Lokaltabellen in Infantry.md/Vehicles.md aufgehoben, „Kristall" und die unbespielte `Heavy`-Spalte in den ScopeLedger verschoben. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst** — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
 | 1.19.0 | 2026-07-26 | D-075 aufgenommen: Fraktions-Achse in der kanonischen Simulation (34 Definitionen in `SimDefinitions`, Id-Regel 1..17/18..34, Slot-Fraktion im Economy-Block v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Harvester-Ladekapazität); Teil-Entscheidung Legion-Fahrzeugschaden: konkrete Vehicles.md-Werte 28/50/60 schlagen die 85-%-Ableitung, Ableitung nur wo die GDDs schweigen. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden** (Teil-Entscheidung per Inhaber-Sprint-Briefing vorgegeben) — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
+| 1.20.0 | 2026-08-06 | D-076 aufgenommen: Governance-Tier-Modell. Gate-Kette G0–G5, Receipt-Verträge und Evidenzpflicht schlafen gelegt (nicht gelöscht, Weckpfad dokumentiert); Meilenstein-Nachweis auf grüne CI plus gespielte Runde umgestellt; `tests` als Pflichtcheck ergänzt; DoD 13→4, PR-Template 11→3; Doku-Ritual und ≥3-Alternativen-Pflicht bis Tier 2 ausgesetzt; D-067 dadurch gegenstandslos | Project Owner / Orchestrator |

@@ -1,13 +1,29 @@
 # MVP-Recovery-Plan
 
-**Version:** 1.5.0 | **Status:** verbindlich – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Producer / Lead Technical Director / Lead QA Engineer | **Sprint:** 7
+**Version:** 2.0.0 | **Status:** Evidenzvertrag SCHLAFEND (D-076) – Gate-Inhalte weiter gültig | **Verantwortungsbereich:** Producer / Lead Technical Director | **Sprint:** 7
+
+> **Achtung, Statuswechsel seit D-076 (2026-08-06).**
+> Der **Evidenzvertrag** dieses Plans (§2 und alles, was daran hängt: Receipt-Ketten,
+> Trusted Tooling, `environmentId`-Bindung, Autorisierungsläufe) ist unter
+> Governance-Tier 1 **nicht in Kraft**. Dieses Dokument ist **nicht mehr führend
+> für den Meilensteinstatus** – das ist [Milestones.md](Milestones.md) in
+> Verbindung mit [../../GOVERNANCE.md](../../GOVERNANCE.md).
+>
+> **Weiterhin gültig und wertvoll** sind die *inhaltlichen* Gate-Definitionen:
+> welche Fähigkeit in G0, G1, G2, G3, G4 und G5 fertig sein soll. Als
+> Arbeitsgliederung ist dieser Plan unverändert brauchbar.
+>
+> Der vollständige Evidenzvertrag bleibt hier wortgleich stehen, damit er beim
+> Wechsel auf Tier 3 wieder aktivierbar ist – siehe
+> [`../../quality/README.md`](../../quality/README.md).
 
 ## Zweck
 
-Dieser Plan führt den vorhandenen Prototyp sequenziell zu einem nachweisbaren
-MS-1. Fortschritt entsteht nur durch bestandene Gates mit reproduzierbarer
-Evidenz, nicht durch Dateien, Typen, isolierte Tests oder Berichte. Aktueller
-Stand ist **G0 offen**; MS-0 und MS-1 sind nicht erreicht.
+Dieser Plan führt den vorhandenen Prototyp sequenziell zu MS-1 und beschreibt,
+welche Fähigkeit in welchem Gate fertig sein muss. Fortschritt entsteht nicht
+durch Dateien, Typen, isolierte Tests oder Berichte, sondern durch Software, die
+läuft und die jemand benutzt hat. Aktueller Stand: MS-0 und MS-1 sind nicht
+erreicht.
 
 ## Abhängigkeiten
 
@@ -37,12 +53,14 @@ Stand ist **G0 offen**; MS-0 und MS-1 sind nicht erreicht.
 | MS-1 / MVP | nicht erreicht |
 | Alpha | nicht begonnen |
 
-Die Gates müssen in der Reihenfolge
-`G0 → G1 einschließlich V1–V5a → G2 → G3 → G4 → G5` bestanden werden.
-Ein späteres Gate kann ein früheres nicht ersetzen. Relevante Änderungen machen
-bestehende Evidenz ab dem betroffenen Gate ungültig.
+Die Reihenfolge `G0 → G1 einschließlich V1–V5a → G2 → G3 → G4 → G5` bleibt die
+**empfohlene Arbeitsreihenfolge**, weil jedes Gate auf dem vorigen aufbaut. Sie
+ist unter Tier 1 aber **keine Sperre** mehr: Arbeit an einem späteren Gate darf
+beginnen, bevor ein früheres formal abgeschlossen ist – genau so ist die
+Graybox-Spur entstanden. Was dabei hinter dem Sollinhalt zurückbleibt, gehört in
+den [ScopeLedger](ScopeLedger.md).
 
-## 2. Evidenzvertrag
+## 2. Evidenzvertrag (schlafend – siehe Kastenhinweis oben)
 
 Ein Gate gilt nur mit einer schema- und semantikvaliden Datei unter:
 

@@ -1,248 +1,150 @@
 # AGENTS.md – Arbeitsregeln für KI-Agenten & Mitwirkende
 
-**Dokumentversion:** 3.7.0 | **Status:** verbindlich | **Verantwortungsbereich:** Orchestrator | **Sprint:** 7
+**Dokumentversion:** 4.0.0 | **Governance-Tier:** 1 ([GOVERNANCE.md](GOVERNANCE.md))
 
-Diese Datei ist die **verbindliche Betriebsanleitung** für jeden KI-Coding-Agenten
-(Kimi, Claude, Cursor, Codex u. a.) und jede Person, die an *Project Nova* arbeitet.
-**Lies diese Datei zuerst, bevor du irgendeine Änderung machst.** Sie wird von den
-gängigen Agenten-Tools automatisch als Kontext geladen (`AGENTS.md`-Standard).
+Verbindliche Betriebsanleitung für jeden KI-Coding-Agenten (Claude, Kimi, Codex,
+Cursor u. a.) und jede Person, die an *Project Nova* arbeitet. **Lies diese Datei
+zuerst.** Sie wird von den gängigen Agenten-Tools automatisch als Kontext geladen.
 
-Ziel dieser Regeln: ein **dauerhaft sauberes GitHub-Repository** mit
-nachvollziehbarer Historie, gepflegtem Changelog und konsistenter Dokumentation –
-auch wenn viele verschiedene Agenten-Sessions daran arbeiten.
-
----
+Welche Regeln in welcher Projektphase gelten, steht in [GOVERNANCE.md](GOVERNANCE.md).
+Aktiv ist **Tier 1: zwei Entwickler, kein Publikum.**
 
 ## 1. Projekt in einem Absatz
 
-*Project Nova* (Arbeitstitel) ist ein Echtzeitstrategiespiel auf
-**Unity `6000.5.4f1` (Revision `d550df8bd089`), C# und URP**. Das Repository
-enthält einen unvollständig integrierten Prototyp und ein strukturiertes Wiki
-unter [`docs/`](docs/). Aktiver Stand ist Sprint 7, Implementierungs-Recovery:
-G0 ist offen, MS-0 und MS-1 sind nicht erreicht. Führend sind D-055 bis D-066,
-der [MVP-Recovery-Plan](docs/production/MVPRecoveryPlan.md) und das
-[MVP-Inhaltsmanifest](docs/production/MVPContentManifest.md).
+*Project Nova* ist ein Echtzeitstrategiespiel auf **Unity `6000.5.4f1`**
+(Revision `d550df8bd089`), C# und URP. Die Simulation ist deterministisch und
+liegt unter `Assets/_Project/Scripts/{Core,Simulation}`; dieselben Quellen
+kompilieren headless in `tools/Nova.SimRunner`. Spielbar ist ein lokales 1v1 auf
+der Glutrinne-Graybox – Ablauf und ehrliche Grenzen stehen im Demo-Runbook
+(`docs/production/DemoRunbook.md`, kommt mit dem Demo-Prep-Strang). Das
+strukturierte Wiki liegt unter [`docs/`](docs/).
 
 ## 2. Goldene Regeln (nicht verhandelbar)
 
-1. **`main` ist geschützt – Veröffentlichung ausschließlich über Pull Requests.** Direkte
-   Pushes auf `main` sind technisch gesperrt (GitHub Branch Protection) und für niemanden
-   erlaubt – auch nicht nach einem Versionsbump. Jede Änderung: kurzer Topic-Branch →
-   Pull Request → grüne CI (`docs-check`, bei Quality-Verträgen zusätzlich
-   `integrity`; Authorize erst nach G0-A2) →
-   unabhängiges Review → Squash-Merge.
-   Es gibt keinen dauerhaften Integrationsbranch. Agenten committen oder pushen
-   nur nach einer **ausdrücklichen Anfrage für die jeweilige Aktion**. Details:
-   [CONTRIBUTING.md](CONTRIBUTING.md) und D-059.
-2. **Niemals `main` mit `--force` überschreiben.** Keine History-Rewrites auf geteilten
-   Branches. `main` bleibt jederzeit in einem konsistenten Zustand.
-3. **Keine Secrets ins Repo.** Keine Tokens, Keys, `.env`-Inhalte, Passwörter oder
-   Zugangsdaten – auch nicht in Beispielen oder Commit-Messages.
-4. **CHANGELOG immer mitpflegen.** Jede inhaltliche Änderung ergänzt einen Eintrag unter
-   `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) (siehe §6). Undokumentierte Änderungen
-   gelten als nicht erfolgt.
-   *Befristete Ausnahme:* D-067 (**Entwurf**) definiert für die Graybox-Spur einen
-   zeitlich begrenzten Dokumentationsschuld-Modus. Der `[Unreleased]`-Eintrag bleibt
-   Pflicht; aufschiebbar sind ausschließlich die DoD-Punkte 1–2 aus §8, und nur gegen
-   Registrierung im [ScopeLedger](docs/production/ScopeLedger.md) und im
-   [GrayboxLog](docs/production/GrayboxLog.md).
-5. **Dem Dokumentationsstandard folgen.** Alle Doku-Änderungen halten sich an
-   [docs/meta/DocumentationStandard.md](docs/meta/DocumentationStandard.md) (siehe §4).
-6. **Entscheiden statt raten – und eskalieren.** Bei echten Design-/Architektur-
-   Alternativen: **nicht eigenmächtig entscheiden**, sondern die Optionen samt
-   Empfehlung vorlegen. Getroffene Entscheidungen wandern mit ≥3 Alternativen ins
+1. **`main` ist geschützt – Änderungen nur über Pull Requests.** Kurzer
+   Topic-Branch → PR → grüne CI → Merge. Keine direkten Pushes auf `main`.
+2. **Niemals `main` force-pushen**, keine History-Rewrites auf geteilten Branches.
+3. **Keine Secrets ins Repo** – keine Tokens, Keys, `.env`-Inhalte, Passwörter,
+   auch nicht in Beispielen oder Commit-Messages.
+4. **Agenten committen und pushen nur nach ausdrücklicher Anfrage für die
+   jeweilige Aktion.** Commit, Push, Merge und Release sind getrennte
+   Autoritätsgrenzen. Eine Freigabe gilt nie für den nächsten Schritt mit.
+5. **Nichts als fertig melden, was nicht gelaufen ist.** Dateien, Typen und
+   isolierte Unit-Tests sind kein Fertigstellungsnachweis. Wenn du etwas nicht
+   ausgeführt hast, sag das. Das ist die wichtigste Regel im Repo – sie entstand
+   aus einem realen Befund (siehe [GOVERNANCE.md](GOVERNANCE.md)).
+6. **Entscheiden statt raten – und eskalieren.** Bei echten Design- oder
+   Architekturalternativen nicht eigenmächtig entscheiden, sondern Optionen samt
+   Empfehlung vorlegen. Getroffene Entscheidungen kommen als D-ID ins
    [DecisionLog](docs/production/DecisionLog.md).
-7. **Keine Platzhalter-Dokumente oder -Evidence** für zukünftige Sprints/Gates
-   anlegen. Evidence entsteht ausschließlich aus einem realen Lauf und liegt
-   append-only unter dem in D-061 definierten Pfad.
-8. **Kleine, fokussierte Änderungen.** Ein Commit = eine logische Änderung. Keine
-   Sammel-Commits über mehrere unabhängige Themen.
-9. **Gate-Autorisierung bleibt fail-closed.** Schema 1.2/1.3 und G0-A1
-   prüfen nur Integrität und dürfen keinen Pass autorisieren. G0-A2 muss
-   Subject, Evidence-Carrier und Trusted Tooling trennen und abgeschlossene
-   Authorize-Läufe über append-only Receipts binden. Erst ein nachfolgender
-   sauberer Subject-Commit darf damit G0 belegen.
+7. **Kleine, fokussierte Änderungen.** Ein Commit = eine logische Änderung.
 
-## 3. Repository-Struktur (Schreibhoheiten)
+## 3. Definition of Done
+
+Eine Änderung ist fertig, wenn diese vier Punkte stimmen:
+
+- [ ] **Tests grün** – `dotnet test tools/Nova.SimRunner.Tests` lokal, CI bestätigt es
+- [ ] **Eintrag unter `[Unreleased]`** in [CHANGELOG.md](CHANGELOG.md) – einer pro PR genügt
+- [ ] **Sauberer Conventional Commit**
+- [ ] **Als PR eingebracht**, CI grün
+
+Zusätzlich, wenn zutreffend:
+
+- Echte Entscheidung getroffen? → D-ID im [DecisionLog](docs/production/DecisionLog.md)
+- Spielverhalten geändert? → einmal im laufenden Spiel ansehen und im PR beschreiben
+- Neues oder entferntes Dokument? → [docs/README.md](docs/README.md)-Index nachziehen
+
+Nicht mehr verlangt (Tier 1): Versionsbump und Änderungsverlauf-Tabelle in jedem
+berührten Dokument, Gate-Evidence, Receipt-Ketten, Performance-Evidenz mit
+`environmentId`-Bindung.
+
+## 4. Tests und Verifikation
+
+```bash
+# Simulationstests (rund 400, ~8 s, keine Unity-Lizenz nötig) – der kanonische Check
+dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release
+```
+
+Das Repository bringt eine lokale SDK unter `.dotnet/` mit. Falls `dotnet` nicht
+im PATH liegt:
+
+```bash
+export DOTNET_ROOT="$PWD/.dotnet"; export PATH="$DOTNET_ROOT:$PATH"
+```
+
+Die CI führt bei jedem PR die Simulationstests aus. Unity-EditMode-Tests laufen
+mangels CI-Lizenz nur lokal – wer die Präsentationsschicht anfasst, führt sie aus
+und schreibt das Ergebnis in den PR.
+
+## 5. Repository-Struktur
 
 ```
-README.md            ← Projektübersicht / GitHub-Startseite
+GOVERNANCE.md        ← welche Regeln in welcher Phase gelten
 AGENTS.md            ← diese Datei
-CHANGELOG.md         ← Änderungshistorie (Keep a Changelog) – Single Source of Truth
-.gitignore
-RTS_*.md             ← historische Quelldokumente (nicht mehr aktiv ändern)
+CHANGELOG.md         ← Änderungshistorie (Keep a Changelog)
+Assets/_Project/     ← Unity-Projekt; Scripts/{Core,Simulation} = deterministische Sim
+tools/               ← headless SimRunner, Testprojekt, Coverage
+quality/             ← Gate-Apparat, schlafend bis Tier 3 (siehe quality/README.md)
 docs/
-├── README.md        ← Wiki-Index – bei neuen/entfernten Dokumenten AKTUALISIEREN
-├── meta/            ← Dokumentationsstandard
-├── analysis/        ← Sprint 0 (abgeschlossen)
-├── research/        ← Sprint 1 (abgeschlossen)
-├── vision/          ← Sprint 2 (abgeschlossen)
-├── gamedesign/      ← Sprint 2 – GDD (abgeschlossen)
-├── tech/            ← Technical Design + aktive Recovery-Verträge
-│   └── review/      ← Sprint 4 – Architecture Review (abgeschlossen)
-├── assets/          ← Sprint 5 – Asset Audit (abgeschlossen)
-└── production/      ← Sprint-Planung, DecisionLog, OpenQuestions, RiskAnalysis, sprints/
-quality/
-├── content/          ← kanonisches, maschinenlesbares MS-1-Manifest
-├── scenarios/        ← kanonische Workloads und Schwellen
-├── schemas/          ← Evidence-Schema 1.4 + GateAuthorization-Receipt-Schema (G0-A2)
-├── scripts/          ← verpflichtende, aktuell fail-closed Schema-/Semantikprüfung
-└── package-lock.json ← gepinnte Evidence-Validator-Abhängigkeiten
+├── README.md        ← Wiki-Index – bei neuen/entfernten Dokumenten aktualisieren
+├── vision/ gamedesign/   ← GDD
+├── tech/            ← Technical Design, Modulspezifikationen
+├── production/      ← Roadmap, DecisionLog, ScopeLedger, DemoRunbook
+├── assets/          ← Art-Standard, Manifest, Provenienz
+├── analysis/ research/   ← abgeschlossene Sprints 0–1
+└── meta/            ← Dokumentationsstandard
 ```
 
-**„Heiße" Dateien mit einem einzigen Schreiber pro Änderung** (nie parallel bearbeiten):
+**„Heiße" Dateien – ein Schreiber pro Änderung, nie parallel bearbeiten:**
 `CHANGELOG.md`, `docs/README.md`, `docs/production/DecisionLog.md`,
-`docs/production/SprintPlanning.md`, `docs/production/RiskAnalysis.md`.
+`docs/production/ScopeLedger.md`.
 
-## 4. Dokumentationsregeln (Kurzfassung)
+Wer parallel arbeitet (Mensch oder Agent), nennt vorher seinen Schreibumfang.
+Überlappende Schreibumfänge laufen nacheinander oder in getrennten Worktrees.
+
+## 6. Doku-Regeln (Kurzfassung)
 
 Verbindlich ist [docs/meta/DocumentationStandard.md](docs/meta/DocumentationStandard.md).
 Das Wichtigste:
 
-- **Sprache:** Deutsch für Projektinhalte, Englisch für Code, Identifier und Dateipfade.
-- **Klein & fokussiert:** ein Dokument = ein Thema; verlinke Abhängigkeiten relativ.
-- **Pflichtaufbau jedes Dokuments:** Titel → Kopfzeile (`Version | Status |
-  Verantwortungsbereich | Sprint`) → Zweck → Abhängigkeiten → Inhalt → Offene Punkte →
-  Nächste Schritte → **Änderungsverlauf** (Tabelle).
-- **Versionierung im Dokument:** `0.x` = Entwurf im Sprint, `1.0` = sprint-freigegeben;
-  Minor-Bump bei inhaltlicher Änderung, Patch bei Korrektur. Der Änderungsverlauf ist
-  Pflicht.
-- **Entscheidungen** bekommen fortlaufende IDs (`D-001`, `D-002`, …), bleiben bei
-  Revision stehen (Status „ersetzt durch D-xxx"), keine stillen Umschreibungen.
-- **Nach jeder Struktur-Änderung** (neues/entferntes Dokument): [docs/README.md](docs/README.md)
-  als Index aktualisieren.
+- **Sprache:** Deutsch für Projektinhalte, Englisch für Code, Identifier, Pfade.
+- **Ein Dokument = ein Thema**, Abhängigkeiten relativ verlinken.
+- **Keine toten internen Links** – die CI prüft das hart.
+- **Entscheidungen** bekommen fortlaufende D-IDs, bleiben bei Revision stehen
+  (Status „ersetzt durch D-xxx"), keine stillen Umschreibungen.
+- Versionskopfzeile und Änderungsverlauf-Tabelle sind **freiwillig**; Git ist der
+  Änderungsverlauf. Ausnahme: `quality/content/mvp-v1.json` ist ein Vertrag und
+  bleibt versioniert.
 
-## 5. Git- & GitHub-Workflow
+## 7. Git-Konventionen
 
-### Branches
-- `main` ist immer stabil und konsistent.
-- Arbeit findet auf **kurzen Topic-Branches** statt und wird per **Pull Request**
-  nach `main` gebracht. Zulässige Präfixe:
-  `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`, `codex/`.
-- Es gibt keinen dauerhaften `develop`-/Integrationsbranch und keinen
-  langlebigen Recovery-Branch.
-- Merge nach `main` erfolgt als Squash bei linearer Historie.
-- **Niemals direkt auf `main` pushen** – `main` ist per Branch Protection gesperrt und
-  nimmt Änderungen ausschließlich über Pull Requests an.
+**Branches:** kurze Topic-Branches, Präfixe `feat/`, `fix/`, `docs/`, `chore/`,
+`refactor/`, `codex/`. Kein dauerhafter Integrationsbranch. Squash-Merge, lineare
+Historie, Branch nach dem Merge löschen.
 
-### Commits – Conventional Commits
-Format: `type(scope): kurze Beschreibung im Imperativ`
-
-Erlaubte `type`-Werte:
-`feat` · `fix` · `docs` · `refactor` · `chore` · `test` · `perf` · `build` · `ci`
-
-In der aktuellen Doku-Phase ist **`docs`** der häufigste Typ. Beispiele:
+**Commits:** `type(scope): kurze Beschreibung im Imperativ`, Englisch, ≤ 72 Zeichen.
+Typen: `feat` · `fix` · `docs` · `refactor` · `chore` · `test` · `perf` · `build` · `ci`.
+Der Body erklärt das **Warum** und referenziert D-IDs.
 
 ```
-docs(tech): add deterministic simulation core to Architecture.md
-docs(gamedesign): resolve flak DPS corridor between Aircraft and Weapons
-docs(production): log D-033 sim/MP model decision
-chore(repo): add root README, AGENTS.md and CHANGELOG
-fix(economy): correct Aetherium refinery energy value to match Buildings.md
+feat(economy): let harvesters cycle without a manual return order
+fix(pathfinding): pin CostField epoch when flow fields are cached
+docs(production): log D-076 governance tier model
 ```
 
-Regeln:
-- **Imperativ, Englisch, ≤ 72 Zeichen** in der Betreffzeile.
-- **Ein Commit = eine logische Änderung.** Lieber mehrere kleine Commits als ein großer.
-- Body (optional) erklärt das **Warum**, referenziert D-IDs / Q-IDs / Sprint-Nummern.
-- **Keine** „wip", „stuff", „fix" ohne Kontext, keine Debug-Reste.
+Keine „wip", „stuff", „fix" ohne Kontext, keine Debug-Reste.
 
-### Pull Requests
-- Titel im Conventional-Commit-Stil; Beschreibung listet: Was, Warum, betroffene
-  Dokumente, geänderte Entscheidungen (D-IDs), Changelog-Eintrag.
-- Bei sprintabschließenden PRs: Sprint-Bericht verlinken.
-- **Merge nach `main` nur per PR mit grüner CI:** `docs-check`, bei
-  Quality-Verträgen `integrity` und nach realem G0-A2 zusätzlich der
-  geschützte Authorize-Pfad.
-- Im Solo-/KI-Modus ersetzt ein unabhängiges read-only Review die
-  Autoren-Selbstfreigabe. Sobald mindestens zwei aktive menschliche Maintainer
-  existieren, ist eine zweite menschliche Freigabe Pflicht.
-- Agenten committen oder pushen nur nach expliziter Anfrage pro Aktion.
-  Vollständiger Ablauf: [CONTRIBUTING.md](CONTRIBUTING.md).
+**Pull Requests:** Titel im Conventional-Commit-Stil. Beschreibung nennt Was,
+Warum, betroffene Bereiche und den Changelog-Eintrag. Details:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-## 6. CHANGELOG-Disziplin (Keep a Changelog)
-
-[CHANGELOG.md](CHANGELOG.md) ist die zentrale Änderungshistorie. Ablauf:
-
-1. **Bei jeder inhaltlichen Änderung** einen Stichpunkt unter `## [Unreleased]` ergänzen,
-   in der passenden Kategorie: `Hinzugefügt`, `Geändert`, `Behoben`, `Entfernt` oder
-   `Entschieden` (für DecisionLog-Einträge).
-2. **Beim Sprint-Abschluss** wird `[Unreleased]` in eine datierte Version überführt
-   (`## [0.4.0] – JJJJ-MM-TT · Sprint N: Thema`) und ein frisches leeres `[Unreleased]`
-   darüber angelegt. Die Version folgt dem Dokumentationsstand des Wikis.
-3. Vergleichs-Links am Dateiende aktualisieren.
-
-Nie rückwirkend „glätten": bestehende Einträge bleiben stehen.
-
-## 7. Sprint-Ritual (verbindlich pro Sprint)
-
-Quelle: [docs/production/SprintPlanning.md](docs/production/SprintPlanning.md). Jeder
-Sprint endet mit:
-
-1. Vollständige Dokumentation des Ergebnisses
-2. Unabhängiges read-only Review (im Solo-/KI-Modus statt Autoren-Self-Review)
-3. Architecture Review (dokument-/architekturbezogen)
-4. Risikoanalyse-Update ([RiskAnalysis.md](docs/production/RiskAnalysis.md))
-5. Qualitätsbewertung
-6. Offene-Punkte-Update ([OpenQuestions.md](docs/production/OpenQuestions.md))
-7. Begründete GO/NO-GO-Entscheidung für den nächsten Sprint
-8. Sprint-Bericht in [docs/production/sprints/](docs/production/sprints/), Index
-   [docs/README.md](docs/README.md) und [CHANGELOG.md](CHANGELOG.md) aktualisieren
-
-Kein Sprint gilt als abgeschlossen, solange nicht alle Exit-Kriterien erfüllt sind und
-der Sprint-Bericht vorliegt.
-
-## 8. Definition of Done (für eine Änderung)
-
-Eine Änderung ist erst „fertig", wenn **alle** Punkte erfüllt sind:
-
-- [ ] Inhalt geändert **und** der `Änderungsverlauf` im betroffenen Dokument ergänzt (+Version-Bump)
-- [ ] Bei Struktur-/Status-Änderung: [docs/README.md](docs/README.md)-Index **und** die
-      Root-[README.md](README.md) (Sprint-/Versionsstatus) aktualisiert
-- **Zu Punkt 1–2, befristet:** D-067 (**Entwurf**) erlaubt der Graybox-Spur, genau diese
-  beiden Punkte je Einzeländerung aufzuschieben – nur gegen Registerzeile im
-  [ScopeLedger](docs/production/ScopeLedger.md) und Sitzungseintrag im
-  [GrayboxLog](docs/production/GrayboxLog.md), und nur bis zum Verfall nach D-067 K5.
-  Alle übrigen Punkte gelten unverändert. Diese Datei selbst nimmt am Schuldmodus nicht
-  teil: Jede Agenten-Sitzung lädt AGENTS.md automatisch, also muss die Abweichung genau
-  hier sichtbar sein statt aufgeschoben.
-- [ ] Entscheidung? → im [DecisionLog](docs/production/DecisionLog.md) mit ≥3 Alternativen
-- [ ] Eintrag unter `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
-- [ ] Interne Links geprüft (keine toten relativen Links; CI `docs-check` grün)
-- [ ] Aktuelle Schema-Evidence? → gepinntes Ajv **und**
-      `quality/scripts/validate_gate_evidence.py` prüfen nur Integrität; jeder
-      Pass-Versuch endet zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP`
-- [ ] Gate-Pass? → erst nach G0-A2 mit getrenntem Subject-, Evidence-Carrier-
-      und Trusted-Tool-Commit an einem späteren sauberen Subject autorisiert
-- [ ] Gate-Kette? → vollständige geordnete Receipt-Kette von G0 bis zum
-      aktuellen Gate samt Evidence-Hash, Subject, Carrier, CI und Review belegt
-- [ ] Performance-Evidence? → Command und Messung referenzieren dieselbe
-      `environmentId`; Windows-x64-Referenz und Mac-M2-Funktionstest verwenden
-      getrennte Methodenprofile
-- [ ] Sauberer Conventional-Commit
-- [ ] Als Pull Request eingebracht (kein direkter `main`-Push), CI grün + Review
-
-## 9. Befehls-Spickzettel
+## 8. Befehls-Spickzettel
 
 ```bash
-# Status & Historie
-git status
-git log --oneline -10
-
-# Neuer kurzer Arbeits-Branch
-git switch -c docs/<thema>
-
-# Änderungen committen (kleinschrittig)
-git add <geänderte-dateien>
-git commit -m "docs(<scope>): <imperativ>"
-
-# Interne Links auf tote Ziele prüfen (Beispiel)
-grep -rIoE '\]\(([^)]+\.md)[^)]*\)' docs | sort -u
-
-# Topic-Branch pushen (nur nach expliziter Anfrage; NIE auf main)
-git push -u origin <branch>
-
-# Pull Request öffnen (Merge nach main läuft ausschließlich so)
+git switch -c feat/<thema>              # neuer Arbeits-Branch
+dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release
+python3 .github/scripts/check_docs.py   # tote interne Links finden
+git push -u origin <branch>             # nur nach expliziter Anfrage; NIE auf main
 gh pr create --fill --base main
 ```
 
@@ -252,15 +154,8 @@ gh pr create --fill --base main
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
-| 1.0.0 | 2026-07-21 | Initiale Agenten-Arbeitsregeln (Repo-Setup) | Orchestrator |
-| 1.1.0 | 2026-07-21 | Goldene Regel 1: Push nach Versionsbump dauerhaft freigegeben (Anordnung Projektinhaber) | Orchestrator |
-| 2.0.0 | 2026-07-21 | Regel 1 auf **PR-only** umgestellt (main per Branch Protection gesperrt); Repo öffentlich; Team-Workflow + CI (`docs-check`) verankert; Status auf Sprint 4 aktualisiert; DoD um Root-README ergänzt | Orchestrator |
-| 2.1.0 | 2026-07-22 | Statusstand auf Sprint 5 abgeschlossen / Sprint 6 aktiv aktualisiert; `assets/`-Bereich in die Struktur aufgenommen | Orchestrator |
-| 3.0.0 | 2026-07-24 | D-059/D-060/D-061: Recovery-Status, exakten Unity-Pin, kurze Topic-Branches ohne Integrationsbranch, per-action Agentenautorität, unabhängiges Review und Quality-Evidence-Regeln verankert | Orchestrator |
-| 3.1.0 | 2026-07-24 | Evidence-Semantikvalidator als verbindliche Quality-Struktur und DoD-Prüfung ergänzt | Orchestrator |
-| 3.2.0 | 2026-07-24 | D-062-Same-Subject-Vorgängergate-Kette und Szenarioschwellen in Status und DoD verankert | Orchestrator |
-| 3.3.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust in Governance/DoD verankert | Orchestrator |
-| 3.4.0 | 2026-07-24 | D-064-Fail-Closed-Autorisierung, zweistufigen Trusted-Gate-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Orchestrator |
-| 3.5.0 | 2026-07-25 | D-066: G0-A1-Integrity von G0-A2-Receipt-Autorisierung getrennt und `integrity` als Quality-Vertragscheck verankert | Orchestrator |
-| 3.6.0 | 2026-07-25 | G0-A2-Umsetzungsstand: Schema-Verzeichnis auf Evidence 1.4 plus GateAuthorization-Receipt-Schema aktualisiert | Orchestrator |
-| 3.7.0 | 2026-07-26 | Verweis auf den befristeten Dokumentationsschuld-Modus der Graybox-Spur (D-067, Entwurf) in §2 Regel 4 und §8 DoD 1–2 ergänzt; Dokumentversion in die Kopfzeile aufgenommen | Technical Writer |
+| 1.0.0 | 2026-07-21 | Initiale Agenten-Arbeitsregeln | Orchestrator |
+| 2.0.0 | 2026-07-21 | Auf PR-only umgestellt, `main` per Branch Protection gesperrt | Orchestrator |
+| 3.0.0 | 2026-07-24 | D-059/D-060/D-061: Recovery-Status, Unity-Pin, kurze Topic-Branches, per-action Agentenautorität, Quality-Evidence-Regeln | Orchestrator |
+| 3.1.0–3.7.0 | 2026-07-24 – 2026-07-26 | Ausbau des Gate-Evidenzregimes (D-062 bis D-067) | Orchestrator |
+| 4.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Gate-Kette, Receipt-Verträge und Evidenzpflicht schlafen gelegt; DoD von 13 auf 4 Punkte; Doku-Ritual freiwillig; Sprint-Ritual entfernt; `dotnet test` als kanonischer CI-Check verankert | Orchestrator |
