@@ -1,9 +1,15 @@
 name: Quality Gate
 
-# D-066 two-phase quality gate.
+# D-066 two-phase quality gate. DORMANT under governance tier 1 (D-076).
 #
-# Job "integrity" runs on every pull request and validates the contracts and
-# their negative controls. It deliberately cannot authorize a gate pass.
+# The gate chain G0-G5 no longer blocks milestone progress; see GOVERNANCE.md
+# and quality/README.md. Nothing here is deleted - this workflow is the
+# wake-up path when the project reaches tier 3.
+#
+# Job "integrity" validates the contracts and their negative controls. Since
+# D-076 it runs only when a pull request touches quality/** (so the sleeping
+# apparatus cannot rot unnoticed) instead of taxing every pull request. To
+# wake it, remove the paths filter below.
 #
 # Job "gate-evidence-authorize" implements the protected authorize path of
 # the two-phase GateAuthorization receipt contract (D-066, G0-A2). It runs
@@ -23,6 +29,9 @@ name: Quality Gate
 
 on:
   pull_request:
+    paths:
+      - 'quality/**'
+      - '.github/workflows/quality-gate.yml'
   workflow_dispatch:
     inputs:
       evidencePath:

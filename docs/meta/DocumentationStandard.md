@@ -1,160 +1,138 @@
 # Dokumentationsstandard
 
-**Version:** 1.7.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
+**Version:** 2.0.0 | **Status:** verbindlich (Governance-Tier 1) | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
 
 ## Zweck
 
-Definiert den verbindlichen Standard für reviewbare Living Documents und
-maschinenlesbare Quality-Verträge. Dokumentation beschreibt Anforderungen;
-Gate-Erfolg entsteht ausschließlich durch aktuelle, reproduzierbare Evidence.
+Definiert, wie Dokumentation in diesem Repository geschrieben wird. Seit D-076
+gilt **Governance-Tier 1** ([../../GOVERNANCE.md](../../GOVERNANCE.md)): Der
+Standard beschreibt gute Praxis und erzwingt nur noch das, was maschinell
+prüfbar und wirklich teuer im Fehlerfall ist – tote Links, kaputtes UTF-8,
+unparsebare Maschinenverträge.
+
+Was früher hier stand und jetzt schläft: der Evidenz- und Gate-Vertrag. Er liegt
+unverändert in [`../../quality/README.md`](../../quality/README.md) und
+[MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md) §2.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-001,
-  D-005, D-047, D-061 bis D-066
-- [../production/MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md)
-- [`../../quality/schemas/GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json)
-- [`../../quality/scripts/validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py)
+- [../../GOVERNANCE.md](../../GOVERNANCE.md) – Tier-Modell, aktives Tier
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-001, D-005,
+  D-047, D-076
+- [`../../quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json) –
+  einziger weiterhin voll versionierter Vertrag
 
 ## 1. Grundprinzipien
 
 1. **Klein und fokussiert:** ein Dokument behandelt ein Thema.
-2. **Living Documents:** jede relevante Änderung erhöht die Version und ergänzt
-   den Änderungsverlauf.
-3. **Relative Links:** interne Abhängigkeiten werden relativ verlinkt.
-4. **Sprache:** deutsche Projektprosa; Code, Identifier und Pfade technisch/
-   englisch.
-5. **Keine Platzhalter:** weder leere Zukunftsdokumente noch Evidence-Dateien
-   ohne realen Lauf.
-6. **Single Source of Truth:** ein Zahlenwert hat genau eine führende Quelle;
-   andere Dokumente verweisen darauf.
-7. **Requirements ≠ Evidence:** Status, Plan, Datei- oder Typanwesenheit beweisen
-   kein Gate.
-8. **Maschinenlesbare Verträge:** JSON-Manifeste und Szenarien sind gemeinsam
-   mit ihrer Markdown-Erklärung zu ändern und müssen parsebar bleiben.
+2. **Relative Links:** interne Abhängigkeiten werden relativ verlinkt. Tote
+   interne Links brechen die CI – das ist die einzige harte Doku-Regel.
+3. **Sprache:** deutsche Projektprosa; Code, Identifier und Pfade englisch.
+4. **Keine Platzhalter:** keine leeren Zukunftsdokumente.
+5. **Single Source of Truth:** ein Zahlenwert hat genau eine führende Quelle;
+   andere Dokumente verweisen darauf, statt ihn zu kopieren.
+6. **Behauptung ≠ Nachweis:** Status, Plan, Datei- oder Typanwesenheit belegen
+   kein funktionierendes Feature. Was „fertig" heißt, definiert
+   [../../GOVERNANCE.md](../../GOVERNANCE.md).
+7. **Maschinenlesbare Verträge:** JSON-Manifeste und Szenarien werden gemeinsam
+   mit ihrer Markdown-Erklärung geändert und müssen parsebar bleiben.
 
-## 2. Pflichtaufbau
+## 2. Empfohlener Aufbau
 
-Jedes Wiki-Markdown-Dokument enthält in dieser Reihenfolge:
+Bewährt, aber **nicht erzwungen**:
 
 1. Titel,
 2. Kopfzeile `Version | Status | Verantwortungsbereich | Sprint`,
 3. Zweck,
 4. Abhängigkeiten,
-5. thematischen Inhalt,
+5. thematischer Inhalt,
 6. Offene Punkte,
-7. Nächste Schritte,
-8. Änderungsverlauf mit Version, Datum, Änderung und Autor.
+7. Nächste Schritte.
 
-Root-Governance-Dateien dürfen eine an ihr Format angepasste Kopfzeile nutzen,
-benötigen bei inhaltlicher Änderung aber ebenfalls einen datierten
-Änderungsverlauf.
+Die Kopfzeile ist empfohlen, weil sie beim Überfliegen des Wikis den Reifegrad
+zeigt; die CI meldet ihr Fehlen als Hinweis, nicht als Fehler. Bestehende
+Dokumente behalten ihren Aufbau – niemand muss sie umbauen.
 
-## 3. Versionierung
+## 3. Versionierung und Änderungsverlauf
 
-- `0.x`: Entwurf,
-- `1.0`: verbindlicher Erstvertrag,
-- Minor-Bump für inhaltliche Erweiterung,
-- Patch-Bump für reine Korrektur,
-- Major-Bump für grundlegendes Rebaseline.
+**Freiwillig.** Git ist der Änderungsverlauf: `git log --follow <datei>` liefert
+Datum, Autor und Begründung genauer als jede handgepflegte Tabelle, und niemand
+vergisst ihn.
 
-Wiki-Versionen sind Dokumentationsstände und keine Game-Releases. Status- oder
-Strukturänderungen ziehen Wiki-Index, Root-README und `[Unreleased]` nach.
+Wo eine Tabelle bereits existiert, darf sie stehen bleiben und weitergeführt
+werden – vor allem in Governance-Dateien, wo die Absicht hinter einer Änderung
+zählt. Sie ist nur keine Bedingung mehr für einen Merge.
+
+**Ausnahme mit Versionspflicht:**
+[`../../quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json) ist ein
+Vertrag und die einzige Autorität für MS-1-Sollwerte. Änderungen daran werden
+versioniert und begründet.
+
+Wiki-Versionen sind Dokumentationsstände und keine Game-Releases.
 
 ## 4. Entscheidungen
 
-Architektur-, Design- und Prozessentscheidungen erhalten eine D-ID mit
-mindestens drei Alternativen, Begründung und Konsequenzen. Revidierte Einträge
-bleiben sichtbar und werden `ersetzt durch D-xxx` beziehungsweise
-`teilweise ersetzt` markiert.
+Architektur-, Design- und Prozessentscheidungen erhalten eine fortlaufende D-ID
+im [DecisionLog](../production/DecisionLog.md) mit:
 
-MS-1-Overrides dürfen ein Vollspiel-Zielbild zeitweise übersteuern, müssen
-Scope und Gültigkeitsphase explizit benennen.
+- der Entscheidung,
+- der Begründung,
+- den Konsequenzen und
+- einer Zeile zu dem, was verworfen wurde und warum.
 
-## 5. Evidence-Autorität
+Die frühere Pflicht zu mindestens drei ausformulierten Alternativen entfällt in
+Tier 1 (D-076). Sie kommt ab Tier 2 zurück. Bestehende Einträge werden **nicht**
+zurückgebaut.
 
-Schema 1.2 ist ausschließlich eine Integritätsvorstufe. Evidence:
+Revidierte Einträge bleiben sichtbar und werden `ersetzt durch D-xxx`
+beziehungsweise `teilweise ersetzt` markiert. MS-1-Overrides dürfen ein
+Vollspiel-Zielbild zeitweise übersteuern, müssen Scope und Gültigkeitsphase aber
+explizit benennen.
 
-- validiert mit gepinntem Ajv Draft 2020-12 gegen Subject-Schema `1.2.0`
-  [`GateEvidence.schema.json`](../../quality/schemas/GateEvidence.schema.json),
-- besteht im selben CLI-Lauf die Cross-Field-Prüfung durch
-  [`validate_gate_evidence.py`](../../quality/scripts/validate_gate_evidence.py),
-- liegt append-only unter
-  `quality/evidence/G<N>/<subjectSha>/<attempt>/GateEvidence.json`,
-- bindet Commit, Tree, Toolchain, SHA-256 der Content-/Scenario-/Schema-/
-  Validator-Git-Blobs am Subject-Commit und Rohartefakte,
-- referenziert ab G1 das rekursiv valide unmittelbare Vorgängergate am selben
-  Commit/Tree,
-- bindet jedes Kriterium an einen kanonischen gleichnamigen Check und jedes
-  geforderte Szenario an dessen Pflichtassertions, exakte Units sowie
-  Schwellenmetriken,
-- benennt Reviewer und Implementation Writer getrennt und belegt die
-  Reviewer-Wiederholung als eigene Artefaktausführung,
-- autorisiert keinen Pass; jeder Pass-Versuch endet zusätzlich mit
-  `E_AUTHORIZATION_BOOTSTRAP`,
-- wird bei relevanten Änderungen stale und
-- wertet Skip, Cancel oder fehlendes Pflichtresultat als Fail.
+## 5. Gate-Evidenz (schlafend)
 
-Der Zielvertrag wird nach D-066 in zwei G0-A-Bausteinen hergestellt:
+Der vollständige Evidenzvertrag – Schema, Semantikvalidator, Receipt-Kette,
+Trusted Tooling, Performance-Methodenprofile – ist unter Tier 1 nicht in Kraft.
+Er steht unverändert in [`../../quality/README.md`](../../quality/README.md) und
+[MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md) §2 und wacht mit Tier 3
+wieder auf.
 
-- G0-A1 liefert Schema-, Semantik-, Trusted-Checkout-, Umgebungs- und
-  Runner-Integritätsprüfungen. Sein PR-Workflow kann keinen Pass
-  autorisieren; auch alte Trust-Kontexte enden fail-closed.
-- G0-A2 trennt Subject-Commit, Evidence-Carrier-Commit und Trusted-Tool-
-  Commit. Ein geschützter Lauf erzeugt nach der Validierung ein
-  hashgebundenes `GateAuthorization.json`-Receipt. Kein Lauf darf seinen
-  eigenen noch ausstehenden Erfolg attestieren.
-- Vorgänger-Receipts werden append-only versioniert und von späteren Gates
-  gegen den exakten erfolgreichen GitHub-Run/-Attempt/-Job geprüft.
-  Fehlende, zusätzliche, vertauschte, manipulierte oder wiederverwendete
-  Receipts sind ungültig.
-- Command und Performance-Messung referenzieren dieselbe `environmentId`.
-  Windows-x64-Referenzmessung und Mac-M2-Funktionsmessung besitzen getrennte
-  Methodenprofile und binden OS, Architektur, Hardware, Build, Managed/Burst,
-  Auflösung, Quality-Profil, VSync, Deep Profiling und Replay exakt.
-- Fehlender Node-/Ajv-Stack oder ein hängender Schema-Subprozess bleibt
-  kontrolliert fail-closed. Negative Controls decken manipuliertes Subject-
-  Tooling, unvollständige Ketten und falsche Umgebungen ab.
+Bis dahin gilt: **Dokumente behaupten keinen Gate-Status.** Sie beschreiben, was
+ist, und benennen Lücken ehrlich – so wie
+[ScopeLedger.md](../production/ScopeLedger.md) es tut.
 
-Dieses Repository legt Evidence-Verzeichnisse erst bei einem realen Versuch an.
-Beispiel- oder Platzhalter-Evidence ist verboten.
+## 6. Prüfung vor dem Merge
 
-## 6. Reviews und Links
+Die CI prüft hart:
 
-Jede Änderung prüft:
+- tote interne Links,
+- UTF-8-Gültigkeit,
+- Parsebarkeit der Quality-JSONs.
 
-- interne Links,
-- Version und History,
-- `[Unreleased]`,
-- D-ID- und Werteautorität,
-- JSON-Parsebarkeit bei Maschinenverträgen und
-- die Abwesenheit unbelegter Gate-/Meilensteinbehauptungen.
+Menschlich zu prüfen bleibt:
 
-Unabhängiges read-only Review ersetzt im Solo-/KI-Modus die
-Autoren-Selbstfreigabe. Eine zweite menschliche Freigabe wird ab mindestens
-zwei aktiven menschlichen Maintainers Pflicht.
+- Werteautorität (kopiert das Dokument Zahlen, die woanders geführt werden?),
+- `[Unreleased]`-Eintrag im CHANGELOG,
+- keine unbelegten Fertig-Behauptungen.
+
+Review-Regeln stehen in [../../CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
 
 ## Offene Punkte
 
-- Keine für den aktuellen Recovery-Vertrag.
+- Keine.
 
 ## Nächste Schritte
 
-1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
-2. G0-A2 separat implementieren und adversarial prüfen.
-3. Den vollständigen Trustpfad erst an einem nachfolgenden sauberen Subject
-   für reale G0-Evidence verwenden.
-4. Nach G5 Review-Rhythmus für Post-MVP neu bewerten.
+1. Bestehende Dokumente bei der nächsten inhaltlichen Berührung entschlacken,
+   nicht auf Vorrat.
+2. Beim Wechsel auf Tier 2 die D-ID-Alternativenpflicht und die Doku-Versionierung
+   für öffentliche Dokumente wieder aktivieren.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-07-21 | Initialer verbindlicher Standard (Sprint 0) | Technical Writer |
-| 1.1.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Grundprinzip 6 „Single Source of Truth für Werte" ergänzt (D-047) | Technical Writer |
-| 1.2.0 | 2026-07-24 | D-061-Evidence-Autorität, Requirements/Evidence-Trennung und Maschinenvertrag-Regeln ergänzt | Technical Writer |
-| 1.3.0 | 2026-07-24 | Schema- und Semantikprüfung sowie SHA-256-Dateibindung für Gate-Evidence verankert | Technical Writer |
-| 1.4.0 | 2026-07-24 | D-062-Subject-Blob-, Szenariometrik- und Same-Subject-Gate-Ketten-Regeln ergänzt | Technical Writer |
-| 1.5.0 | 2026-07-24 | D-063-Schema 1.2, kanonische Check-Artefakte, rekursive Ajv-Prüfung und Protected-CI-Trust-Autorität verankert | Technical Writer |
-| 1.6.0 | 2026-07-24 | D-064-Fail-Closed-Schema 1.2, subject-unabhängigen Schema-1.3-Bootstrap, vollständige Autorisierungskette und Umgebungsbindung verankert | Technical Writer |
-| 1.7.0 | 2026-07-25 | D-066: Integrity-Basis G0-A1 von zweiphasiger Receipt-Autorisierung G0-A2 getrennt und alle Pass-Behauptungen bis dahin gesperrt | Technical Writer |
+| 1.1.0 | 2026-07-21 | Grundprinzip „Single Source of Truth für Werte" ergänzt (D-047) | Technical Writer |
+| 1.2.0–1.7.0 | 2026-07-24 – 2026-07-25 | Ausbau der Evidence-Autorität (D-061 bis D-066) | Technical Writer |
+| 2.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Pflichtaufbau, Versionsbump und Änderungsverlauf freiwillig; Evidenzvertrag als schlafend nach `quality/README.md` verwiesen; D-ID-Alternativenpflicht bis Tier 2 ausgesetzt | Technical Writer |
