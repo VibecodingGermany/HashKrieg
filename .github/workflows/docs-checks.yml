@@ -1,29 +1,26 @@
 name: Docs Checks
 
-# Guenstige, abhaengigkeitsfreie Doku-Pruefung. Laeuft nur bei Aenderungen an
-# Markdown-Dateien und bricht laufende Durchgaenge ab -> minimale Actions-Minuten.
-# Auf oeffentlichen Repos sind GitHub Actions kostenlos.
+# Guenstige, abhaengigkeitsfreie Doku-Pruefung: tote interne Links und UTF-8.
+#
+# Seit D-076 (Governance-Tier 1) ohne Node/Ajv und ohne Kopplung an den
+# schlafenden Gate-Apparat. Die Evidence-Selbsttests sind in den
+# integrity-Job von quality-gate.yml gewandert, wo sie hingehoeren.
 
 on:
   pull_request:
     paths:
       - '**/*.md'
-      - 'quality/**'
       - '.github/scripts/check_docs.py'
       - '.github/workflows/docs-checks.yml'
   push:
     branches: [main]
     paths:
       - '**/*.md'
-      - 'quality/**'
       - '.github/scripts/check_docs.py'
       - '.github/workflows/docs-checks.yml'
 
 permissions:
   contents: read
-
-env:
-  NODE_VERSION: '24.4.1'
 
 concurrency:
   group: docs-checks-${{ github.ref }}
@@ -37,13 +34,5 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-          # Volle Historie fuer die Receipt-append-only-Pruefung (D-066) in
-          # check_docs.py (diff gegen origin/<base>).
-          fetch-depth: 0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: Gepinnte Evidence-Schema-Abhängigkeiten installieren
-        run: npm ci --ignore-scripts --no-audit --no-fund --prefix quality
       - name: Interne Doku-Links pruefen (tote Links = Fehler)
         run: python3 .github/scripts/check_docs.py

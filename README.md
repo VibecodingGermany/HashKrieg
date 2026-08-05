@@ -15,11 +15,12 @@
 ## Zweck
 
 Diese Seite ist der Einstieg in Repository, Projektstatus und Dokumentation.
-Sie unterscheidet bewusst zwischen vorhandenem Prototypcode und bestandenen
-Gates — und sie sagt offen, welche Entscheidung als Nächstes ansteht.
+Sie unterscheidet bewusst zwischen vorhandenem Prototypcode und dem, was
+tatsächlich läuft — und sie sagt offen, welche Entscheidung als Nächstes ansteht.
 
 ## Abhängigkeiten
 
+- [GOVERNANCE.md](GOVERNANCE.md) – Tier-Modell, aktives Governance-Tier
 - [AGENTS.md](AGENTS.md) – verbindliche Arbeitsregeln
 - [CONTRIBUTING.md](CONTRIBUTING.md) – Branch-, PR- und Review-Ablauf
 - [docs/README.md](docs/README.md) – vollständiger Wiki-Index
@@ -27,7 +28,7 @@ Gates — und sie sagt offen, welche Entscheidung als Nächstes ansteht.
 - [docs/vision/Konzept_Hashkrieg.md](docs/vision/Konzept_Hashkrieg.md) – die
   Mechanik-Variante, über die entschieden werden muss
 - [docs/production/MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md) –
-  Gates G0 bis G5
+  Inhalt der Stufen G0 bis G5 (Evidenzvertrag ruht)
 - [docs/production/MVPContentManifest.md](docs/production/MVPContentManifest.md) –
   exakter MS-1-Inhalt
 - [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – alle
@@ -97,18 +98,17 @@ und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 ## 3. Projektstatus
 
-**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7 · **G0-A:** offen
+**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7 · **Governance:** Tier 1
 
 | Ergebnisstufe | Status |
 |---|---|
-| Sprint 6 | durch D-055 beendet; Recovery-Rebaseline ersetzt die alte Planung |
-| Sprint 7 | läuft: zuerst G0-A Trusted-Gate-Bootstrap, danach G0-B Plattformbasis |
-| G0 | offen |
-| MS-0 | nicht erreicht |
-| MS-1 / MVP | nicht erreicht |
+| Sprint 7 | läuft |
+| Spielbar | lokales 1v1 auf der Glutrinne-Graybox (siehe §4) |
+| MS-0 | offen — Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
+| MS-1 / MVP | nicht erreicht — Lücken im [ScopeLedger](docs/production/ScopeLedger.md) |
 | Alpha | nicht begonnen |
 
-Was seither entstanden ist, **ohne dass es einen Gate-Status begründet**:
+Was zuletzt entstanden ist:
 
 - **Graybox-Slice** — die Simulation ist erstmals sicht- und bedienbar (siehe §4)
 - **Fraktionsidentität** — Allianz und Legion spielen sich unterschiedlich:
@@ -117,25 +117,22 @@ Was seither entstanden ist, **ohne dass es einen Gate-Status begründet**:
 - **Weltentwurf und Concept-Art** — 34 Bilder, ein Bildstandard, eine Lore (§5)
 
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
-Typen und isolierte Tests sind kein Fertignachweis. Führend sind der
-[Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md)
-und schema- sowie semantikvalide Gate-Evidence; es werden keine
-Evidence-Platzhalter erzeugt.
+Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
+[Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md).
+Was stattdessen als Nachweis zählt, definiert [GOVERNANCE.md](GOVERNANCE.md):
+**grüne CI plus eine gespielte und protokollierte Runde.**
 
-Schema 1.2 prüft aktuell ausschließlich Integrität und autorisiert keinen
-Gate-Pass. Jeder Pass-Versuch endet fail-closed mit
-`E_AUTHORIZATION_BOOTSTRAP`. G0-A1 liefert Schema 1.3, Trusted-Checkout-
-Topologie und Gate-Runner nur als Integritätsgrundlage. G0-A2 muss danach den
-zweiphasigen D-066-Receipt-Vertrag mit getrenntem Subject, Evidence-Carrier
-und Trusted Tooling implementieren. Erst ein nachfolgender sauberer
-Subject-Commit darf damit G0 nachweisen.
+Seit D-076 gilt **Governance-Tier 1** (zwei Entwickler, kein Publikum). Das
+Gate-Regime G0–G5 mit Evidence- und Receipt-Verträgen blockiert nichts mehr; es
+ist vollständig erhalten und ruht bis Tier 3 — siehe
+[quality/README.md](quality/README.md).
 
-## 4. Das Spiel ausprobieren (Graybox — kein Gate-Nachweis)
+## 4. Das Spiel ausprobieren (Graybox)
 
-Seit dem Graybox-Slice ist das Spiel zum ersten Mal **sicht- und bedienbar**.
-Das ist ein Diagnosestand, kein Fortschritt an einem Gate: Er belegt weder G0
-noch MS-0 oder MS-1. Was er zeigt und was nicht, steht weiter unten — bitte vor
-dem ersten Start lesen.
+Seit dem Graybox-Slice ist das Spiel **sicht- und bedienbar**: lokales 1v1 mit
+Wirtschaft, Bau, Produktion, Fog of War, Schadensmatrix und Siegauswertung. Was
+es zeigt und was noch fehlt, steht weiter unten — bitte vor dem ersten Start
+lesen.
 
 ### Variante 1: im Editor (empfohlen)
 

@@ -1,142 +1,91 @@
 # Beitragen zu Project Nova
 
-**Version:** 2.5.0 | **Status:** verbindlich | **Verantwortungsbereich:** Maintainers | **Sprint:** 7
+**Version:** 3.0.0 | **Governance-Tier:** 1 ([GOVERNANCE.md](GOVERNANCE.md))
 
-## Zweck
-
-Definiert den Branch-, PR-, Review- und Release-Ablauf für Menschen und
-KI-Agenten. Detailregeln stehen in [AGENTS.md](AGENTS.md), Dokumentregeln in
+Branch-, PR- und Review-Ablauf für Menschen und KI-Agenten. Detailregeln stehen
+in [AGENTS.md](AGENTS.md), Dokumentregeln in
 [DocumentationStandard.md](docs/meta/DocumentationStandard.md).
-
-## Abhängigkeiten
-
-- [AGENTS.md](AGENTS.md)
-- [DecisionLog D-059, D-064 und D-066](docs/production/DecisionLog.md)
-- [MVPRecoveryPlan.md](docs/production/MVPRecoveryPlan.md)
-- [PR-Vorlage](.github/pull_request_template.md)
 
 ## 1. Branch-Modell
 
-`main` ist geschützt und PR-only. Es gibt keinen dauerhaften
-Integrationsbranch. Zulässige kurze Topic-Branches:
+`main` ist geschützt und PR-only. Es gibt keinen dauerhaften Integrationsbranch.
+Zulässige kurze Topic-Branches: `feat/`, `fix/`, `docs/`, `chore/`, `refactor/`,
+`codex/`.
 
-- `feat/<thema>`
-- `fix/<thema>`
-- `docs/<thema>`
-- `chore/<thema>`
-- `refactor/<thema>`
-- `codex/<thema>`
-
-Branches werden nach Squash-Merge gelöscht; die Historie auf `main` bleibt
-linear. Keine direkten Pushes oder Force-Pushes auf `main`, keine
-History-Rewrites auf geteilten Branches und keine langlebigen Recovery-Branches.
+Squash-Merge, lineare Historie, Branch danach löschen. Keine direkten Pushes oder
+Force-Pushes auf `main`, keine History-Rewrites auf geteilten Branches.
 
 ## 2. Ablauf
 
-1. Aktuelles `main` holen und kurzen Topic-Branch anlegen.
-2. Kleine, fokussierte Änderung mit passenden Tests/Dokumentation erstellen.
-3. Dokumentversion, Änderungsverlauf und `[Unreleased]` pflegen.
-4. Conventional Commit vorbereiten.
-5. Branch pushen und PR nach `main` öffnen.
-6. Pflichtchecks und unabhängiges Review abwarten.
-7. Squash-Merge bei grünen Checks und Freigabe.
+1. Aktuelles `main` holen, kurzen Topic-Branch anlegen.
+2. Kleine, fokussierte Änderung mit passenden Tests bauen.
+3. `dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release`
+   lokal grün bekommen.
+4. Zeile unter `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) ergänzen.
+5. Conventional Commit, Branch pushen, PR nach `main` öffnen.
+6. CI abwarten, mergen.
 
-Commit, Push, Merge, Release und Tag sind getrennte Autoritätsgrenzen.
-KI-Agenten committen oder pushen nur nach einer **ausdrücklichen Anfrage für
-die konkrete Aktion**.
+Commit, Push, Merge und Release sind getrennte Autoritätsgrenzen. **KI-Agenten
+committen oder pushen nur nach einer ausdrücklichen Anfrage für die konkrete
+Aktion.**
 
 ## 3. Checks
 
-Pflicht ist:
+Pflicht auf jedem PR:
 
-- `docs-check`,
-- `integrity` für Änderungen an Quality-Verträgen und
-- der Authorize-Teil des `quality-gate` erst nach seiner realen
-  G0-A2-Implementierung.
+- **`tests`** – die Simulationstests aus `tools/Nova.SimRunner.Tests`. Das ist
+  der Check, der euch schützt.
+- **`docs-check`** – tote interne Links und UTF-8 in Markdown.
 
-Docs-only-PRs deklarieren ihren Scope explizit. `docs-check` läuft auch für
-`quality/**` und installiert die gepinnten Ajv-Abhängigkeiten. Der aktuelle
-`quality-gate` führt nur den PR-Job `integrity` aus; er enthält bewusst keinen
-Dispatch-Authorizer und erzeugt keine Evidence-Platzhalter.
+Zusätzlich nur bei Änderungen an `quality/**`:
 
-Schema 1.2 ist nur eine Integritätsvorstufe. Jeder Pass-Versuch muss aktuell
-zusätzlich mit `E_AUTHORIZATION_BOOTSTRAP` fehlschlagen. G0-A1 etabliert
-Schema 1.3, Trusted-Checkout-Topologie und Gate-Runner als Integrity-Basis.
-G0-A2 implementiert separat den zweiphasigen D-066-Receipt-Vertrag. Beide
-werden ohne Gate-Fortschritt gemergt; erst danach darf ein nachfolgender
-sauberer Subject-Commit geprüft werden. Danach folgt G0-B.
+- **`integrity`** – Selbsttests des schlafenden Gate-Apparats, damit er nicht
+  unbemerkt verrottet. Siehe [GOVERNANCE.md](GOVERNANCE.md) und
+  [quality/README.md](quality/README.md).
 
-## 4. Reviews
+Unity-EditMode-Tests laufen mangels CI-Lizenz nicht automatisch. Wer die
+Präsentationsschicht (`Assets/_Project/Scripts/{Presentation,Gameplay}`) anfasst,
+führt sie lokal aus und schreibt das Ergebnis in den PR.
 
-Im Solo-/KI-Modus ersetzt ein unabhängiges, read-only Review die unmögliche
-Autoren-Selbstfreigabe. Der Reviewer ist nicht der Implementation Writer und
-reproduziert mindestens einen kanonischen Check als eigene artefaktgebundene
-Ausführung. Ein lokales Evidence-Dokument und die G0-A1-Integritätsprüfungen
-autorisieren keinen Pass. G0-A2 muss Subject, Evidence-Carrier und Trusted
-Tooling trennen und erfolgreiche Vorgänger über append-only
-`GateAuthorization.json`-Receipts plus GitHub-API-Verifikation binden.
+## 4. Reviews (Tier 1)
 
-Sobald mindestens zwei aktive menschliche Maintainer existieren, wird eine
-zweite menschliche Freigabe zwingend. CODEOWNERS und Branch Protection dürfen
-diese Regel verschärfen.
+Bei zwei Entwicklern, die sich kennen, ist Pflicht-Review teurer als er nützt:
+
+- **Selbst-Merge ist erlaubt**, sobald die CI grün ist.
+- **Review anfordern, wenn** die Änderung fremdes Terrain berührt, du unsicher
+  bist, oder sie Simulationsdeterminismus, Speicherformat oder das
+  Commandprotokoll anfasst.
+- Was ein Agent geschrieben hat, liest vor dem Merge ein Mensch. Nicht als
+  Formalie – als der Punkt, an dem Regel 5 aus [AGENTS.md](AGENTS.md) greift.
+
+Ab Tier 2 (erster PR von außerhalb) braucht jeder fremde PR ein
+Maintainer-Review. Ab Tier 3 zwei Freigaben. Auslöser und Umschaltung:
+[GOVERNANCE.md](GOVERNANCE.md).
 
 ## 5. Commit-Konvention
 
 Format: `type(scope): imperative summary`, Englisch, höchstens 72 Zeichen.
-Typen: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`, `build`,
-`ci`.
+Typen: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`, `build`, `ci`.
 
 Ein Commit entspricht einer logischen Änderung. Keine Secrets, generierten
 Binärdateien oder Debug-Artefakte einchecken.
 
 ## 6. Pull Requests
 
-Die Beschreibung nennt:
-
-- Was und warum,
-- betroffene Bereiche,
-- neue/geänderte D-IDs,
-- Changelog-Eintrag,
-- ausgeführte Checks und
-- bei Gate-Behauptungen den Evidence-Pfad.
-
-Schema 1.2/1.3 und G0-A1 autorisieren keinen Gate-Pass. Ein PR darf ein Gate
-erst dann als bestanden bezeichnen, wenn G0-A2 gemergt ist und ein
-nachfolgender sauberer Subject-Commit mit vollständiger Receipt-Kette samt
-Subject-, Carrier-, CI- und Review-Bindung geprüft wurde. Eine
-Trust-Bundle-Änderung darf sich nicht selbst autorisieren. Performance-
-Command und -Messung müssen dieselbe `environmentId` referenzieren;
-Windows-x64-Referenz und Mac-M2-Funktionslauf verwenden getrennte
-Methodenprofile.
+Die Beschreibung nennt: was und warum, betroffene Bereiche, neue oder geänderte
+D-IDs, den Changelog-Eintrag und – bei Änderungen am Spielverhalten – was du im
+laufenden Spiel gesehen hast.
 
 ## 7. Releases
 
-Nur ein Maintainer darf nach expliziter Freigabe Tag/Release erzeugen.
-Wiki-Versionen sind nicht automatisch Game-Releases. Aktuell ist 0.12.0 ein
-unveröffentlichter Dokumentationsstand; G0, MS-0 und MS-1 sind offen.
-
-## Offene Punkte
-
-- G0-A1 ist eine Integrity-Basis. G0-A2, das geschützte Environment und der
-  reale Receipt-Lauf sind offen; es gibt keine Gate-Autorität.
-
-## Nächste Schritte
-
-1. `docs-check` und `integrity` für G0-A1 als Required Checks verwenden.
-2. G0-A1 ohne Gate-Fortschritt geschützt mergen.
-3. G0-A2 als separaten Receipt-Authorizer implementieren und prüfen.
-4. G0-B am nachfolgenden sauberen Subject herstellen und erst danach mit
-   dem vollständigen Trustpfad autorisieren.
+Nur ein Maintainer erzeugt nach expliziter Freigabe Tag und Release. Wiki-Versionen
+sind keine Game-Releases. Es gibt bisher kein veröffentlichtes Release.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-07-21 | PR-only-Community-Workflow eingeführt | Maintainers |
-| 2.0.0 | 2026-07-24 | D-059: kurze Topic-Branches, kein dauerhafter Integrationsbranch, per-action Agentenautorität und gestuftes Review/quality-gate festgelegt | Maintainers |
-| 2.1.0 | 2026-07-24 | Semantikvalidierte Gate-Evidence und Wiki-Stand 0.8.1 verankert | Maintainers |
-| 2.1.1 | 2026-07-24 | Unveröffentlichten Wiki-Stand auf 0.8.2 fortgeschrieben | Maintainers |
-| 2.2.0 | 2026-07-24 | D-062-Same-Subject-Gate-Kette, artefaktgebundene Szenarioschwellen und Wiki-Stand 0.9.0 als PR-Pflicht ergänzt | Maintainers |
-| 2.3.0 | 2026-07-24 | D-063-Schema 1.2, Check-Artefakte, Protected-CI-Trust und Wiki-Stand 0.10.0 als PR-Pflicht ergänzt | Maintainers |
-| 2.4.0 | 2026-07-24 | D-064-Fail-Closed-Schema 1.2, zweistufigen Trusted-Gate-Bootstrap und Wiki-Stand 0.11.0 als PR-Pflicht ergänzt | Maintainers |
-| 2.5.0 | 2026-07-25 | D-066: G0-A1-Integrity und G0-A2-Receipt-Autorisierung getrennt, Required-Check-Regeln und Wiki-Stand 0.12.0 synchronisiert | Maintainers |
+| 2.0.0 | 2026-07-24 | D-059: kurze Topic-Branches, per-action Agentenautorität, gestuftes Review | Maintainers |
+| 2.1.0–2.5.0 | 2026-07-24 – 2026-07-25 | Gate-Evidenzregime D-062 bis D-066 als PR-Pflicht verankert | Maintainers |
+| 3.0.0 | 2026-08-06 | D-076: auf Tier 1 zurückgeschnitten. Gate- und Evidenzpflichten entfernt, `tests` als Pflichtcheck ergänzt, `integrity` auf `quality/**` begrenzt, Selbst-Merge erlaubt | Maintainers |

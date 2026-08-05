@@ -11,29 +11,28 @@ kein bestandenes Gate.
 ## Abhängigkeiten
 
 - [../README.md](../README.md) – Repository-Einstieg
+- [../GOVERNANCE.md](../GOVERNANCE.md) – Tier-Modell, aktives Governance-Tier
 - [../AGENTS.md](../AGENTS.md) und
   [../CONTRIBUTING.md](../CONTRIBUTING.md) – Arbeits- und PR-Regeln
 - [meta/DocumentationStandard.md](meta/DocumentationStandard.md) –
-  Dokumentations- und Evidence-Autorität
+  Dokumentationsstandard
 
 ## Projektstatus
 
 | Stufe | Status |
 |---|---|
-| Sprint 6 | durch D-055 beendet und durch den Recovery-Plan ersetzt |
-| Sprint 7 | gestartet; nur G0-A zur Implementierung freigegeben |
-| G0 | G0-A1 Mergekandidat; G0-A2 und G0-B offen |
-| MS-0 | nicht erreicht |
-| MS-1 / MVP | nicht erreicht |
+| Governance | **Tier 1** – zwei Entwickler, kein Publikum (D-076) |
+| Sprint 7 | aktiv |
+| Spielbar | lokales 1v1 auf der Glutrinne-Graybox (Ablauf: `production/DemoRunbook.md`) |
+| MS-0 | offen – Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
+| MS-1 / MVP | nicht erreicht – Lücken in [ScopeLedger](production/ScopeLedger.md) |
 | Alpha | nicht begonnen |
 
 Verbindlicher Stack: Unity `6000.5.4f1`, Revision `d550df8bd089`, URP, C#.
 Closed-Core MS-1 ist D-056; deterministischer Kern D-057; Capacity/FoW D-058;
-Branching D-059; Engine D-060; Evidence/Acceptance D-061; durchgesetzte
-Szenario-/Subject-/Gate-Kette D-062.
-Schema-1.2-/Check-Härtung D-063; subject-unabhängiger
-Trusted-Gate-Bootstrap und Schema-1.3-Ziel D-064; fail-closed Trennung von
-G0-A1 und zweiphasigem Receipt-Authorizer D-066.
+Branching D-059; Engine D-060. Die Evidenz- und Gate-Entscheidungen D-061 bis
+D-066 bleiben gültig, ruhen aber bis Tier 3 – siehe
+[../GOVERNANCE.md](../GOVERNANCE.md) und [../quality/README.md](../quality/README.md).
 
 ## Meta und Analyse
 

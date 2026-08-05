@@ -1,0 +1,49 @@
+name: Tests
+
+# Der kanonische Check des Projekts (Governance-Tier 1, D-076).
+#
+# Nova.SimRunner.Tests kompiliert dieselben Core-/Simulation-Quellen wie der
+# Unity-Host (siehe csproj: Compile Include ..\..\Assets\_Project\Scripts\...)
+# und braucht deshalb keine Unity-Lizenz. Damit laufen die Simulationstests
+# erstmals automatisch statt nur auf einem Laptop.
+#
+# Bewusst ohne Pfadfilter: Ein uebersprungener Job zaehlt in der Branch
+# Protection nicht als bestanden, und ein Required Check, der manchmal fehlt,
+# ist schlimmer als eine Minute Laufzeit.
+#
+# Unity-EditMode-Tests laufen hier nicht (keine CI-Lizenz). Wer die
+# Praesentationsschicht anfasst, fuehrt sie lokal aus - siehe CONTRIBUTING.md.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Tag-gepinnt statt SHA-gepinnt: die exakte SDK-Version kommt aus
+      # global.json (8.0.318, rollForward disable), die Runner-Images liefern
+      # sie nicht zuverlaessig mit.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj
+      - name: Test
+        run: >
+          dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj
+          -c Release --no-restore --nologo
+          --logger "console;verbosity=normal"

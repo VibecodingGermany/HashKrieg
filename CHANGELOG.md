@@ -7,17 +7,56 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 ([docs/README.md](docs/README.md)). Kategorien: `Hinzugefügt`, `Geändert`, `Behoben`,
 `Entfernt`, `Entschieden` (projektspezifisch für DecisionLog-Einträge).
 
-> **Pflege-Regel:** Jede inhaltliche Änderung ergänzt einen Eintrag unter `[Unreleased]`.
-> Beim Abschluss eines Sprints wird `[Unreleased]` in eine datierte Version überführt.
-> Details siehe [AGENTS.md](AGENTS.md).
+> **Pflege-Regel:** Jeder PR ergänzt einen Eintrag unter `[Unreleased]` (einer pro PR
+> genügt, nicht pro Einzeländerung). Beim Abschluss eines Sprints wird `[Unreleased]`
+> in eine datierte Version überführt. Details siehe [AGENTS.md](AGENTS.md).
 
 ## [Unreleased]
 
 > **Dokumentationsstand 0.12.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
-> erzeugt; G0, MS-0 und MS-1 bleiben offen.
+> erzeugt; MS-0 und MS-1 bleiben offen.
+
+### Geändert
+- **Governance auf Tier 1 zurückgeschnitten (D-076).** Das Repository trug ein
+  Regelwerk für ein Projekt mit fremden Beitragenden, Nutzern und Haftung –
+  bei zwei Entwicklern war es der Blocker statt das Netz. Zahlen zum Ist-Stand:
+  19.729 Zeilen Doku gegen 19.508 Zeilen Spielcode, 6.333 Zeilen
+  Governance-Tooling, 59 `docs`- gegen 35 `feat`-Commits und **null** erzeugte
+  Gate-Evidence in 148 Commits.
+  - Neu: [GOVERNANCE.md](GOVERNANCE.md) regelt die Prozessstrenge über drei
+    **Tiers** mit benannten Auslösern. Regeln höherer Tiers werden schlafen
+    gelegt statt gelöscht, inklusive dokumentiertem Weckpfad.
+  - Die Gate-Kette G0–G5 blockiert keinen Meilensteinfortschritt mehr. Der
+    Evidenzvertrag (Receipts, Trusted Tooling, `environmentId`-Bindung) ruht bis
+    Tier 3; die Gate-*Inhalte* bleiben als Arbeitsgliederung gültig.
+    `quality/` ist vollständig erhalten – siehe [quality/README.md](quality/README.md).
+  - Neuer Meilenstein-Nachweis: grüne CI plus eine gespielte und protokollierte
+    Runde, statt einer autorisierten Receipt-Kette.
+  - Definition of Done 13 → 4 Punkte, PR-Template 11 → 3 Checkboxen.
+  - Dokument-Pflichtaufbau, Versionsbump und Änderungsverlauf-Tabelle sind
+    freiwillig (Git ist der Änderungsverlauf); `quality/content/mvp-v1.json`
+    bleibt versionierter Vertrag. Die ≥3-Alternativen-Pflicht je D-ID ruht bis
+    Tier 2, das Sprint-Ritual entfällt.
+  - Selbst-Merge bei grüner CI erlaubt. Die Regel „ab zwei aktiven Maintainern
+    zweite menschliche Freigabe Pflicht" ist gestrichen – sie hätte genau jetzt
+    gegriffen.
+  - D-067 (Graybox-Ausnahme, nie ratifiziert) ist damit gegenstandslos; der
+    GrayboxLog verliert seine Pflicht, der [ScopeLedger](docs/production/ScopeLedger.md)
+    bleibt als ehrliche Lückenliste.
 
 ### Hinzugefügt
+- **CI führt erstmals die Spieltests aus.** Neuer Pflicht-Workflow
+  [`tests`](.github/workflows/tests.yml): Simulationstests aus
+  `tools/Nova.SimRunner.Tests`, das dieselben Core-/Simulation-Quellen wie der
+  Unity-Host kompiliert und keine Unity-Lizenz braucht (~8 s lokal). Bis dahin
+  prüfte die CI ausschließlich Markdown-Links und die Selbsttests des
+  Evidence-Validators – also die Governance, nicht das Spiel.
+- `integrity` läuft nur noch bei Änderungen an `quality/**`, statt jeden PR zu
+  belasten; so bleibt der schlafende Apparat lauffähig.
+- `docs-check` prüft weiterhin hart tote interne Links, UTF-8 und die
+  Parsebarkeit der Quality-JSONs, erzwingt aber keinen Dokument-Pflichtaufbau
+  und keinen Versionsbump mehr; Node/Ajv ist aus diesem Job entfallen.
 - **Fraktionswirtschaft und Sichtbarkeit der Fraktionsachse (Paket 3+4 der
   Fraktions-Sitzung, Diagnosestand, ohne Gate-Status, ohne Evidence):**
   Erstens ist die Harvester-Ladekapazität kein flaches Provisorium mehr:
