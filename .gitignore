@@ -43,6 +43,9 @@ crashlytics-build.properties
 ExportedObj/
 sysinfo.txt
 
+# Mono-Absturzberichte, die der Editor in den Projektstamm schreibt
+mono_crash.*.json
+
 # Unity generierte Solution-/Projektdateien (nur Repo-Root; handgeschriebene
 # Tool-Projektdateien wie tools/Nova.SimRunner/Nova.SimRunner.csproj bleiben
 # versionierbar)
