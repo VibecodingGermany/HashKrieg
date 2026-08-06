@@ -1,6 +1,6 @@
 # Graybox-Log
 
-**Version:** 0.4.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.5.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -587,6 +587,68 @@ unverändert offen.
   nicht das Modell. Priorität für die nächste Art-Runde: `_MSK` für die
   vier Vertical-Slice-Assets (steht auch so im Import-Protokoll).
 
+## Sitzung GB-005 – 2026-08-06 – Spielbarer Core-Loop (D-077)
+
+**Branch:** vorerst keiner (Arbeitsbaum auf `main` @ `15dfe73`) ·
+**Besetzung:** ein Orchestrierungs-Agent mit drei abgegrenzten
+Umsetzungs-Subagenten (Sim-Loop, Sieg-Regel, KI).
+
+### Ziel
+
+Der Inhaber meldete die GB-004-Demo als nicht spielbar (Vollbild-Debug-Overlay,
+alle 3D-Assets übereinander, kein erkennbarer Spielablauf) und beauftragte:
+zuerst den Bestand vollständig analysieren und reparieren, dann den klassischen
+C&C-Kernloop spielbar machen (HQ → Raffinerie → Harvester → Feld → Geld →
+Kaserne → Einheiten → KI-Gegner → Sieg bei HQ-Zerstörung) — ohne paralleles
+Zweitsystem.
+
+### Befund
+
+- **Overlay:** `DebugHud` (OnGUI) auf dem `UI`-Objekt, `_visible: 1`,
+  `_uiScale: 2` — dokumentiertes Substitut, kein Versehen, aber als Default
+  untauglich.
+- **„Gestapelte" Assets:** kein Spawn-Fehler, sondern Maßstabskonflikt —
+  Exportkonvention 1 Zelle = 3,0 m (D-071) gegen Sim-Welt 1 Zelle = 1 WE;
+  ~9 m breite Gebäude standen 4 m auseinander, Einheiten unsichtbar in den
+  Meshes.
+- **Sim-Kern trug den Loop bereits** (Wirtschaft, Autozyklus, Bau, Produktion,
+  Kampf, Sieg); die echten Lücken waren: KI-Stub nicht registriert, Start mit
+  gratis Raffinerie/Harvestern, Harvester aus dem HQ, Sieg nur bei
+  Totalvernichtung.
+
+### Ergebnis (alle Punkte: D-077)
+
+- Start je Slot HQ + 1 Builder + 3.000 AE; Harvester-Produzent = Raffinerie;
+  Raffinerie ohne Kraftwerk-Prereq (Power-Bedarf bleibt); Sieg zusätzlich bei
+  HQ-Verlust (Victory-Snapshot v2, Clean Break); `SkirmishAiSystem` registriert
+  und spielend (Intent-Pfad, FoW-legal, Infanterie-Wellen); `DebugHud`
+  standardmäßig aus (F3), Statusleiste immer an; `UnitViewManager` normiert
+  Prefab-Views zur Laufzeit aus den Mesh-Bounds auf den Sim-Footprint.
+- Folgefix: `ProductionSystem` liest Produzentenrollen aus der
+  Definitionstabelle (Rally-Point auf der Raffinerie wurde sonst abgelehnt).
+- Vertrag `quality/content/mvp-v1.json` 1.0.0 → 1.2.0; D-056 Klausel 2
+  teilweise ersetzt.
+
+### Verifikation (tatsächlich gelaufen)
+
+- `dotnet test tools/Nova.SimRunner.Tests`: 420/420 grün; SimRunner-Default
+  und DETERMINISM_10000 PASS (End-to-End: KI besiegt passiven Slot bei Tick
+  2.242, VictoryElimination, deterministisch).
+- Unity Batchmode: `Bootstrap.unity` regeneriert (`_visible: 0`); EditMode
+  **425/425** (erstmals inklusive InitialStateHash-Parität Bootstrap ==
+  Szenario im Editor); PlayMode **2/2** mit frischen Screenshots
+  (`output/demo/`, Skalierung visuell bestätigt: keine Überlagerung mehr,
+  Baustelle der Raffinerie sichtbar).
+- **Fallstrick protokolliert (Wiederholung des GB-004-Befundes):** Ein
+  Batchmode-Lauf mit `-quit` neben `-runTests` endete „erfolgreich", ohne
+  einen Test auszuführen — die Result-XMLs blieben alt und zeigten
+  irreführende Grün-Stände. Erst der Zeitstempel-Check entlarvte es. Die
+  Notiz in `quality/scripts/run_gate_check.py` (kein `-quit` mit `-runTests`)
+  gilt weiterhin; ohne `-nographics` für PlayMode (Screenshot-Capture braucht
+  die GPU).
+- Erster **menschlicher** Play-Durchlauf steht weiter aus (Runbook §4 ist auf
+  GB-005 aktualisiert).
+
 ## Offene Punkte
 
 - D-067 und D-068 sind Entwürfe. Ohne Ratifizierung existiert der
@@ -623,4 +685,6 @@ unverändert offen.
 | 0.1.0 | 2026-07-26 | Erstfassung mit Protokollregeln und Sitzung GB-001 (sichtbarer und bedienbarer Graybox-Slice) | Technical Writer |
 | 0.2.0 | 2026-07-26 | Sitzung GB-002 (Schadensmatrix nach D-074, Siegauswertung nach D-056, HUD-Sichtbarkeit) angehängt – einschließlich Branch-Befund, getrennter Hash-Zuordnung, Fingerprint-Stub-Befund und elf offenen Befunden | Technical Writer |
 | 0.3.0 | 2026-08-05 | Sitzung GB-003 (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Runbook, Status-Snapshot) angehängt – einschließlich K2-Abweichungsdeklaration, Asset-Inventur (null 3D-Assets) und fünf offenen Befunden | Technical Writer |
+| 0.4.0 | 2026-08-05 | Sitzung GB-004 (Demo-Beweis, Harvester-Footprint-Fix, URP-Verdrahtung, 34 Tripo-Assets integriert) angehängt – Kopfzeile war ohne Tabellenzeile geblieben, hier nachgezogen | Technical Writer |
+| 0.5.0 | 2026-08-06 | Sitzung GB-005 (spielbarer Core-Loop nach D-077) angehängt – Befund Overlay/Maßstab, Sieg bei HQ-Verlust, KI-Slot aktiv, Verifikation 420/425/2 grün, `-quit`-Fallstrick erneut protokolliert | Agent |
 | 0.4.0 | 2026-08-05 | Sitzung GB-004 (Wirtschaftsfix nach D-068-Regeln, volle Tastenbelegung, URP-Zuordnung, Tripo-Asset-Integration 34/34, PlayMode-Sichtbeweis mit Screenshots) angehängt – einschließlich getrennter Hash-Zuordnung und fünf offenen Befunden | Technical Writer |

@@ -502,7 +502,7 @@ Architekturlast. Ein FMOD-Termin erfordert eine neue Post-MVP-Entscheidung.
 **Begründung:** Diese Einstufung trennt überprüfbare Laufzeit-Evidenz von erzeugter Struktur und verhindert, dass weitere Planung auf falschen Fertigmeldungen aufbaut.
 **Konsequenzen:** Der Sprint-6-Abschluss und das Sprint-7-GO werden zurückgezogen. Roadmap und Meilensteine sind bis zur Neu-Schätzung nicht terminverbindlich. Alpha-Erweiterungen bleiben gesperrt, bis G5 bestanden ist. Der Projektinhaber entscheidet Q-038; Q-039 muss vor Abschluss von G1 technisch und dokumentarisch aufgelöst sein.
 
-### D-056 | verbindlich | Sprint 7 (Closed-Core MS-1; Q-031/Q-038)
+### D-056 | verbindlich — Klausel 2 (Niederlagen-Bedingung) teilweise ersetzt durch D-077 | Sprint 7 (Closed-Core MS-1; Q-031/Q-038)
 
 **Kontext:** Der Audit und Q-038 verlangen einen eindeutigen MVP-Zuschnitt. Der
 alte Vollumfang war nicht dependency-closed; der 6/6-Recovery-Vorschlag ließ
@@ -1726,6 +1726,92 @@ die undokumentierte Statusbehauptung erzeugt, die D-055 zurückgenommen hat.
 
 ---
 
+### D-077 | verbindlich | Spielbarer RTS-Core-Loop (Demo-Reparatur und Vertical Slice)
+
+**Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis Westermann).
+Startaufstellung (HQ + 1 Builder) und Raffinerie-Prereq (gestrichen) im Dialog
+ausdrücklich gewählt; HQ-Sieg-Regel und KI-Aktivierung aus dem Arbeitsauftrag
+derselben Sitzung.
+
+**Kontext:** Die erste Demo (GB-004) startete, war aber nicht sinnvoll
+spielbar: ein `DebugHud`-OnGUI-Overlay bedeckte fast den gesamten Bildschirm;
+die neuen `PF_*`-Modelle (Exportkonvention 1 Zelle = 3,0 m, D-071) standen in
+einer Welt mit 1 Zelle = 1 Welt-Einheit und überlagerten sich sämtlich
+(Gebäude ~9 m breit, 4 m auseinander, Einheiten unsichtbar in den Meshes);
+der KI-Slot war ein nicht registrierter Stub; und die Startaufstellung
+(HQ + fertige Raffinerie + 2 Harvester + Builder + 4 Infanterie, 1.000 AE)
+schenkte dem Spieler genau den Kernloop, den er spielen sollte.
+
+**Entscheidung:**
+
+1. **Startaufstellung pro Slot: HQ + 1 Builder + 3.000 AE.** Ersetzt das
+   bisherige MS-1-Opening. Baustellen brauchen einen Builder in Reichweite —
+   strikt „nur HQ" hätte den ersten Kauf (Builder, 800 AE) erzwungen; der
+   Inhaber wählte HQ + Builder.
+2. **Der Harvester wird von der Raffinerie produziert** (vorher HQ), beide
+   Fraktionen. Folgefix: Produzentenrollen liest `ProductionSystem` jetzt aus
+   der Definitionstabelle statt aus einer harten Liste — die Rally-Point-
+   Validierung hatte die Raffinerie sonst weiter abgelehnt.
+3. **Die Raffinerie verliert das Kraftwerk-Prereq** (beide Fraktionen). Ihr
+   Power-Bedarf (20/15) bleibt: HQ 30 Power gegen Raffinerie + Kaserne 35
+   macht das Kraftwerk ab dem zweiten Gebäude nötig — der Loop startet direkt,
+   das Energiemanagement bleibt erhalten.
+4. **Sieg zusätzlich bei HQ-Verlust.** Wer ein HQ besaß und es verliert, ist
+   besiegt — auch mit Resttruppen (ersetzt Teile von D-056 Klausel 2; die
+   Totalvernichtungs-Regel bleibt daneben bestehen). Gleichzeitiger
+   HQ-Verlust beider Seiten bleibt Draw.MutualAnnihilation. Kein neuer
+   Ergebniscode; Victory-Snapshotblock v1 → v2 (Clean Break, v1 wird
+   abgelehnt).
+5. **Der KI-Slot spielt.** `SkirmishAiSystem` (Legion, Slot 1) ist in
+   `MatchRunner` registriert (nach Combat, vor Victory) und handelt
+   ausschließlich über den kanonischen Intent-Pfad — eigene Peer-Session,
+   eigene versiegelte Batches, keine direkten State-Writes. Umfang:
+   Build-Order Raffinerie → Kaserne (Kraftwerk bei negativem Power-Margin),
+   2 Harvester mit Harvest-Orders, Infanterie bis 12, Angriff ab 6
+   Kampfeinheiten mit expliziten Attack-Orders nur auf für das KI-Team
+   sichtbare Ziele (FoW-legal). Deterministisch, zustandsbasiert,
+   20-Tick-Entscheidungskadenz. Füllt `mode.aiSlotCount` in Mindestform.
+6. **Präsentations-Reparatur an der View-Grenze, nicht an den Assets.**
+   `DebugHud` ist standardmäßig aus (F3 togglet das Diagnose-Panel; eine
+   einzeilige Statusleiste mit Credits/Power/Ergebnis bleibt immer sichtbar).
+   Prefab-Views normalisiert `UnitViewManager` zur Laufzeit aus den
+   Mesh-Bounds auf den Sim-Footprint (Gebäude 3 WE, Einheiten
+   Graybox-Tabellengröße, nur Verkleinerung). Die 3,0-m-Exportkonvention
+   (D-071) bleibt — Modelle sind austauschbar, ohne Spiellogik oder Prefabs
+   anzufassen.
+
+**Verworfen:** (a) die Welt auf 3 m/Zelle umstellen — hätte Sim, Kamera,
+Input und Ground angefasst und die testverriegelte Deterministik gefährdet,
+nur um Mesh-Größen zu retten; (b) strikt nur HQ ohne Builder — erzwingt eine
+Zwangsphase vor dem ersten Bau, vom Inhaber gegen Variante 1 entschieden;
+(c) das Raffinerie-Prereq behalten — der Ziel-Loop (HQ → Raffinerie →
+Harvester) verlangt den direkten Schritt.
+
+**Konsequenzen:**
+
+- `quality/content/mvp-v1.json`: 1.0.0 → 1.2.0 (Startzustand,
+  `harvesterProducer: Refinery`, `refineryPrerequisite: none`,
+  `victory.defeatTriggers`).
+- D-056 Klausel 2 ist teilweise ersetzt (zusätzlicher Niederlagen-Trigger);
+  der Rest von D-056 gilt unverändert.
+- `Determinism10000Scenario` fährt den Loop jetzt selbst (Raffinerie
+  platzieren, Harvester produzieren, Harvest-Orders); die goldene
+  Laufzeit-Hashwerte verschieben sich — im Repo stehen keine Hash-Literale,
+  alle Vergleiche rechnen zur Laufzeit.
+- Die KI liest ihren eigenen Slot-Zustand direkt statt über die in
+  AIArchitecture.md geplanten Sidecar-/TeamWorldView-Typen (dokumentierte
+  G1-Vereinfachung); die KI-Peer-Session ist nicht snapshot-serialisiert.
+- Bekannt und unverändert offen (ScopeLedger): kein Attack-Move/Auto-Acquire
+  (GB-002) — die KI umgeht das mit expliziten Orders, für den Menschen bleibt
+  `A` zielpflichtig; nach Sieg tickt der Host weiter, kein
+  Ergebnisbildschirm; echte UI statt OnGUI bleibt G4.
+- Nachweis: 420/420 .NET-Simulationstests, 425/425 Unity-EditMode-Tests,
+  2/2 PlayMode-Tests mit frischen Demo-Screenshots, DETERMINISM_10000
+  Self-Check PASS; End-to-End besiegt die KI einen passiven Slot bei Tick
+  2242 deterministisch (VictoryElimination, Slot 1).
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -1802,3 +1888,4 @@ die undokumentierte Statusbehauptung erzeugt, die D-055 zurückgenommen hat.
 | 1.18.0 | 2026-07-26 | D-074 aufgenommen: [../gamedesign/ArmorSystem.md](../gamedesign/ArmorSystem.md) als alleinige Autorität der Schaden-gegen-Panzerung-Matrix (6 × 6, ganzzahlige Prozentdarstellung), widersprechende Lokaltabellen in Infantry.md/Vehicles.md aufgehoben, „Kristall" und die unbespielte `Heavy`-Spalte in den ScopeLedger verschoben. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden, nicht vom Inhaber selbst** — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
 | 1.19.0 | 2026-07-26 | D-075 aufgenommen: Fraktions-Achse in der kanonischen Simulation (34 Definitionen in `SimDefinitions`, Id-Regel 1..17/18..34, Slot-Fraktion im Economy-Block v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Harvester-Ladekapazität); Teil-Entscheidung Legion-Fahrzeugschaden: konkrete Vehicles.md-Werte 28/50/60 schlagen die 85-%-Ableitung, Ableitung nur wo die GDDs schweigen. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden** (Teil-Entscheidung per Inhaber-Sprint-Briefing vorgegeben) — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
 | 1.20.0 | 2026-08-06 | D-076 aufgenommen: Governance-Tier-Modell. Gate-Kette G0–G5, Receipt-Verträge und Evidenzpflicht schlafen gelegt (nicht gelöscht, Weckpfad dokumentiert); Meilenstein-Nachweis auf grüne CI plus gespielte Runde umgestellt; `tests` als Pflichtcheck ergänzt; DoD 13→4, PR-Template 11→3; Doku-Ritual und ≥3-Alternativen-Pflicht bis Tier 2 ausgesetzt; D-067 dadurch gegenstandslos | Project Owner / Orchestrator |
+| 1.21.0 | 2026-08-06 | D-077 aufgenommen: spielbarer RTS-Core-Loop — Start HQ + 1 Builder + 3.000 AE, Harvester aus der Raffinerie, Raffinerie ohne Kraftwerk-Prereq, Sieg zusätzlich bei HQ-Verlust (D-056 Klausel 2 teilersetzt), Skirmish-KI für Slot 1 registriert und spielend, Debug-HUD standardmäßig aus (F3), Prefab-Views zur Laufzeit auf den Sim-Footprint normalisiert | Project Owner / Agent (Umsetzung) |

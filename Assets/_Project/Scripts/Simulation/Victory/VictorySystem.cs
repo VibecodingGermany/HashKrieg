@@ -49,6 +49,25 @@ namespace Nova.Simulation.Victory
     /// </list>
     /// </para>
     /// <para>
+    /// D-077 SECOND DEFEAT TRIGGER — HQ LOSS. Since D-077 every slot starts
+    /// with a completed HQ (the match loop rework: HQ + 1 Builder + 3.000 AE,
+    /// harvesters come from the Refinery), and destroying a side's HQ ends
+    /// the game for that side. An ENGAGED slot is therefore defeated when
+    /// EITHER it owns no living entity at all (the D-056 rule of clause 2,
+    /// unchanged) OR it has lost its last living HQ building after owning at
+    /// least one — the per-slot latch <see cref="HadHq"/> — even if it still
+    /// owns other buildings or units. Both triggers feed the same defeated
+    /// count, so <see cref="MatchOutcome.VictoryElimination"/> now has two
+    /// triggers (no new outcome code: the wire format and the HUD texts stay
+    /// stable) and <see cref="MatchOutcome.DrawMutualAnnihilation"/> covers
+    /// any same-tick mix of them. A slot that never owned an HQ — fixtures
+    /// that spawn only units — is unaffected by the HQ trigger and is judged
+    /// by the D-056 rule alone. Only COMPLETED buildings carry
+    /// <see cref="UnitRole.HQ"/>; a construction site carries
+    /// <see cref="UnitRole.Unit"/> and never counts, so an unfinished HQ
+    /// rebuild does not postpone the defeat.
+    /// </para>
+    /// <para>
     /// ONCE DECIDED, FINAL. The first tick that produces a decided
     /// <see cref="Outcome"/> latches it together with
     /// <see cref="WinnerSlot"/> and <see cref="DecidedTick"/>; every later
@@ -73,13 +92,13 @@ namespace Nova.Simulation.Victory
     /// DETERMINISM. Pure integer counting over the entity store in ascending
     /// entity-index order, ascending slot order, no wall clock, no floating
     /// point, no allocation per tick. The match outcome, the engagement
-    /// latches and the reveal holds are authoritative state and serialize
-    /// into snapshot block
+    /// latches, the had-HQ latches and the reveal holds are authoritative
+    /// state and serialize into snapshot block
     /// <see cref="SnapshotBlockIds.Victory"/>, so they are part of the
     /// canonical state hash (SimulationCore.md sections 5 and 7).
     /// </para>
     /// <para>
-    /// DERIVED, NOT STORED: the per-slot living unit/building counts are
+    /// DERIVED, NOT STORED: the per-slot living unit/building/HQ counts are
     /// recomputed from the entity store on every read
     /// (<see cref="CountLiving"/>). They are intentionally NOT serialized —
     /// storing a second copy of a value the entity store already owns would
@@ -97,8 +116,14 @@ namespace Nova.Simulation.Victory
     /// </summary>
     public sealed class VictorySystem : IStatefulSimSystem
     {
-        /// <summary>Serialization version of the victory snapshot block.</summary>
-        public const byte StateVersion = 1;
+        /// <summary>
+        /// Serialization version of the victory snapshot block. v2 (D-077)
+        /// adds the per-slot had-HQ latch byte. v1 blocks are REJECTED, not
+        /// migrated — a deliberate clean break under the pre-release
+        /// format-reset precedent: no shipped snapshot exists that must keep
+        /// loading, and a single canonical layout keeps the parser small.
+        /// </summary>
+        public const byte StateVersion = 2;
 
         /// <summary>
         /// Format capacity for player slots — the same reservation the
@@ -137,12 +162,20 @@ namespace Nova.Simulation.Victory
         /// <summary>Latched: the slot has owned at least one living entity at some point.</summary>
         private readonly bool[] _engaged = new bool[MaxSlots];
 
+        /// <summary>
+        /// Latched: the slot has owned at least one living COMPLETED HQ at
+        /// some point (D-077). Only a latched slot can be defeated by the
+        /// HQ-loss trigger; implies the engagement latch.
+        /// </summary>
+        private readonly bool[] _hadHq = new bool[MaxSlots];
+
         /// <summary>Consecutive ticks the D-056 reveal condition held, saturating at <see cref="RevealHoldTicks"/>.</summary>
         private readonly int[] _revealHold = new int[MaxSlots];
 
         /// <summary>Per-tick scratch for the single counting pass; derived, never serialized.</summary>
         private readonly int[] _scratchUnits = new int[MaxSlots];
         private readonly int[] _scratchBuildings = new int[MaxSlots];
+        private readonly int[] _scratchHq = new int[MaxSlots];
 
         private INovaLogger _logger = NullNovaLogger.Instance;
 
@@ -178,7 +211,7 @@ namespace Nova.Simulation.Victory
             }
             _logger.LogInfo(
                 $"[{Name}] Initialized MS-1 victory contract (D-056: elimination, mutual annihilation, " +
-                $"time limit at tick {TimeLimitTick}).");
+                $"time limit at tick {TimeLimitTick}; D-077: losing the last HQ also defeats).");
         }
 
         public void Shutdown()
@@ -191,6 +224,14 @@ namespace Nova.Simulation.Victory
 
         /// <summary>True once the slot has owned at least one living entity (latched, serialized).</summary>
         public bool IsEngaged(byte slot) => slot < MaxSlots && _engaged[slot];
+
+        /// <summary>
+        /// True once the slot has owned at least one living COMPLETED HQ
+        /// (latched, serialized). D-077: only a latched slot can be defeated
+        /// by losing its last HQ; a slot that never had one is judged by the
+        /// D-056 total-annihilation rule alone.
+        /// </summary>
+        public bool HadHq(byte slot) => slot < MaxSlots && _hadHq[slot];
 
         /// <summary>
         /// Consecutive ticks the D-056 reveal condition ("no buildings and at
@@ -239,10 +280,10 @@ namespace Nova.Simulation.Victory
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Evaluates the D-056 contract for this tick. Runs last in the
+        /// Evaluates the D-056/D-077 contract for this tick. Runs last in the
         /// canonical order, so the state it reads is post-combat. A decided
         /// match short-circuits: the outcome is final and no later tick may
-        /// touch it, the engagement latches or the reveal holds.
+        /// touch it, the engagement or had-HQ latches or the reveal holds.
         /// </summary>
         public void ExecuteTick(Tick tick)
         {
@@ -263,6 +304,10 @@ namespace Nova.Simulation.Victory
                 {
                     _engaged[slot] = true;
                 }
+                if (_scratchHq[slot] > 0)
+                {
+                    _hadHq[slot] = true;
+                }
                 if (!_engaged[slot])
                 {
                     _revealHold[slot] = 0;
@@ -272,6 +317,16 @@ namespace Nova.Simulation.Victory
                 if (units + buildings == 0)
                 {
                     // D-056 defeat: no units AND no buildings (sites included).
+                    eliminatedSides++;
+                    _revealHold[slot] = 0;
+                    continue;
+                }
+
+                if (_hadHq[slot] && _scratchHq[slot] == 0)
+                {
+                    // D-077 defeat: the slot owned a completed HQ and has
+                    // lost the last one — remaining units and buildings do
+                    // not save it.
                     eliminatedSides++;
                     _revealHold[slot] = 0;
                     continue;
@@ -333,6 +388,7 @@ namespace Nova.Simulation.Victory
         {
             Array.Clear(_scratchUnits, 0, MaxSlots);
             Array.Clear(_scratchBuildings, 0, MaxSlots);
+            Array.Clear(_scratchHq, 0, MaxSlots);
 
             UnitState[] units = _entityManager.RawUnits;
             int capacity = _entityManager.Capacity;
@@ -340,6 +396,13 @@ namespace Nova.Simulation.Victory
             {
                 ref readonly UnitState u = ref units[i];
                 if (!u.IsActive || u.PlayerId >= MaxSlots) continue;
+
+                // Only COMPLETED buildings carry UnitRole.HQ (construction
+                // sites carry UnitRole.Unit), so a bare role check counts HQs.
+                if (u.Role == UnitRole.HQ)
+                {
+                    _scratchHq[u.PlayerId]++;
+                }
 
                 if (IsBuilding(in u))
                 {
@@ -392,11 +455,12 @@ namespace Nova.Simulation.Victory
         public ushort StateBlockId => SnapshotBlockIds.Victory;
 
         /// <summary>
-        /// Block content v1: version, slot capacity, the latched outcome with
-        /// its winner slot and decision tick, then per slot in ascending order
-        /// the engagement latch and the reveal hold. Fixed 48 bytes — no
-        /// derived counters, so a single changed latch or hold moves the block
-        /// bytes and therefore the canonical state hash.
+        /// Block content v2 (D-077): version, slot capacity, the latched
+        /// outcome with its winner slot and decision tick, then per slot in
+        /// ascending order the engagement latch, the had-HQ latch and the
+        /// reveal hold. Fixed 56 bytes — no derived counters, so a single
+        /// changed latch or hold moves the block bytes and therefore the
+        /// canonical state hash.
         /// </summary>
         public void WriteState(SnapshotBlockWriter writer)
         {
@@ -408,6 +472,7 @@ namespace Nova.Simulation.Victory
             for (int slot = 0; slot < MaxSlots; slot++)
             {
                 writer.WriteUInt8(_engaged[slot] ? (byte)1 : (byte)0);
+                writer.WriteUInt8(_hadHq[slot] ? (byte)1 : (byte)0);
                 writer.WriteUInt32(unchecked((uint)_revealHold[slot]));
             }
         }
@@ -415,20 +480,20 @@ namespace Nova.Simulation.Victory
         /// <summary>Fully validates a victory block without mutating this system.</summary>
         public bool TryValidateState(ReadOnlySpan<byte> blockContent)
         {
-            return TryParseState(blockContent, out _, out _, out _, out _, out _);
+            return TryParseState(blockContent, out _, out _, out _, out _, out _, out _);
         }
 
         /// <summary>
-        /// Restores the latched outcome, the engagement latches and the reveal
-        /// holds; malformed input returns false and leaves this system
-        /// untouched (two-phase contract of <see cref="IStatefulSimSystem"/>).
-        /// A decided match restores decided — the D-056 "final" property
-        /// survives save/restore.
+        /// Restores the latched outcome, the engagement and had-HQ latches
+        /// and the reveal holds; malformed input returns false and leaves
+        /// this system untouched (two-phase contract of
+        /// <see cref="IStatefulSimSystem"/>). A decided match restores
+        /// decided — the D-056 "final" property survives save/restore.
         /// </summary>
         public bool TryRestoreState(ReadOnlySpan<byte> blockContent)
         {
             if (!TryParseState(blockContent, out MatchOutcome outcome, out byte winnerSlot,
-                    out uint decidedTick, out bool[] engaged, out int[] revealHold))
+                    out uint decidedTick, out bool[] engaged, out bool[] hadHq, out int[] revealHold))
             {
                 return false;
             }
@@ -437,6 +502,7 @@ namespace Nova.Simulation.Victory
             WinnerSlot = winnerSlot;
             DecidedTick = decidedTick;
             Array.Copy(engaged, _engaged, MaxSlots);
+            Array.Copy(hadHq, _hadHq, MaxSlots);
             Array.Copy(revealHold, _revealHold, MaxSlots);
             return true;
         }
@@ -450,15 +516,17 @@ namespace Nova.Simulation.Victory
         private bool TryParseState(
             ReadOnlySpan<byte> blockContent,
             out MatchOutcome outcome, out byte winnerSlot, out uint decidedTick,
-            out bool[] engaged, out int[] revealHold)
+            out bool[] engaged, out bool[] hadHq, out int[] revealHold)
         {
             outcome = MatchOutcome.Undecided;
             winnerSlot = NoWinnerSlot;
             decidedTick = 0;
             engaged = null;
+            hadHq = null;
             revealHold = null;
 
             var reader = new SnapshotBlockReader(blockContent);
+            // Clean break (see StateVersion): v1 blocks fail right here.
             if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
             if (!reader.TryReadUInt8(out byte slotCount) || slotCount != MaxSlots) return false;
             if (!reader.TryReadUInt8(out byte outcomeRaw)) return false;
@@ -481,18 +549,22 @@ namespace Nova.Simulation.Victory
             if (parsedOutcome == MatchOutcome.Undecided && tick != 0) return false;
 
             var parsedEngaged = new bool[MaxSlots];
+            var parsedHadHq = new bool[MaxSlots];
             var parsedRevealHold = new int[MaxSlots];
             for (int slot = 0; slot < MaxSlots; slot++)
             {
                 if (!reader.TryReadUInt8(out byte engagedRaw) || engagedRaw > 1) return false;
+                if (!reader.TryReadUInt8(out byte hadHqRaw) || hadHqRaw > 1) return false;
                 if (!reader.TryReadUInt32(out uint hold)) return false;
                 // The counter saturates, so anything above the bound is a
                 // tampered or foreign block.
                 if (hold > RevealHoldTicks) return false;
                 // A slot that was never on the map cannot have held the
-                // reveal condition.
-                if (engagedRaw == 0 && hold != 0) return false;
+                // reveal condition — and cannot ever have owned an HQ
+                // (owning one would have latched the engagement, D-077).
+                if (engagedRaw == 0 && (hold != 0 || hadHqRaw != 0)) return false;
                 parsedEngaged[slot] = engagedRaw == 1;
+                parsedHadHq[slot] = hadHqRaw == 1;
                 parsedRevealHold[slot] = (int)hold;
             }
             if (reader.Remaining != 0) return false;
@@ -504,6 +576,7 @@ namespace Nova.Simulation.Victory
             winnerSlot = winnerRaw;
             decidedTick = tick;
             engaged = parsedEngaged;
+            hadHq = parsedHadHq;
             revealHold = parsedRevealHold;
             return true;
         }

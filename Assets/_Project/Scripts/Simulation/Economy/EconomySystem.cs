@@ -117,6 +117,17 @@ namespace Nova.Simulation.Economy
         public const int HarvestRateAE = 2;
 
         /// <summary>
+        /// Starting Aetherium credits of the canonical match (D-077 —
+        /// quality/content/mvp-v1.json startStatePerPlayer.aetheriumAE):
+        /// 3.000 AE, so the opening affords the classic loop (Refinery
+        /// first, then Harvesters). The single named home of the value —
+        /// MatchRunner plumbs it into every Unity-hosted match and
+        /// tools/Nova.SimRunner's Determinism10000Scenario passes the same
+        /// constant, so both hosts hash the identical initial state.
+        /// </summary>
+        public const long CanonicalMatchStartingCreditsAE = 3000L;
+
+        /// <summary>
         /// Faction-resolved harvester cargo capacities, indexed by raw
         /// <see cref="FactionId"/> and resolved once from
         /// <see cref="Definitions.SimDefinitions"/>: the tick path never
@@ -143,6 +154,12 @@ namespace Nova.Simulation.Economy
         /// <summary>Number of registered Aetherium fields.</summary>
         public int FieldCount => _fieldCount;
 
+        /// <summary>
+        /// The parameterless-caller default stays 1.000 AE: a plain library
+        /// default for tests and fixtures, NOT the match rule. The canonical
+        /// match starts with <see cref="CanonicalMatchStartingCreditsAE"/>
+        /// (3.000 AE, D-077), passed explicitly by the match hosts.
+        /// </summary>
         public EconomySystem(EntityManager entityManager, long startingCredits = 1000)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));

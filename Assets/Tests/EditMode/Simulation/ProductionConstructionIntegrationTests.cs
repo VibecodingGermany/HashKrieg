@@ -54,12 +54,12 @@ namespace Nova.Simulation.Tests
                 Ingress = ingress;
             }
 
-            public static ProdHost Create(ulong seed, int capacity = 256)
+            public static ProdHost Create(ulong seed, int capacity = 256, long startingCredits = 1000)
             {
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(128, 128);
                 var movement = new MovementSystem(entities, pathfinding);
-                var economy = new EconomySystem(entities);
+                var economy = new EconomySystem(entities, startingCredits);
                 var construction = new ConstructionSystem(entities, economy);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
@@ -111,17 +111,22 @@ namespace Nova.Simulation.Tests
             }
 
             /// <summary>
-            /// The MS-1 start state of quality/content/mvp-v1.json
-            /// (startStatePerPlayer): a COMPLETED HQ, a COMPLETED Refinery
-            /// (the only prerequisite exception — no Power plant required, no
-            /// extra Harvester spawned), one Builder, two Harvesters and
-            /// 1.000 AE (the EconomySystem default).
+            /// A synthetic BASE FIXTURE for the command-flow tests below: a
+            /// completed HQ, a completed Refinery (placed completed —
+            /// <see cref="ConstructionSystem.PlaceCompletedBuilding"/>
+            /// bypasses the power rule its 20 draw would trigger), one
+            /// Builder and two Harvesters at the 1.000 AE library default.
+            /// This is deliberately NOT the match start state — since D-077
+            /// that is HQ + one Builder + 3.000 AE, pinned by
+            /// <see cref="StartState_MatchesTheManifestFixture"/> below. The
+            /// fixture keeps its Refinery so the power-grid arithmetic of
+            /// the command tests (30 provided, 20 required) stays put.
             /// </summary>
-            public EntityId SpawnStartState(byte slot, int baseX, int baseY)
+            public EntityId SpawnBaseFixture(byte slot, int baseX, int baseY)
             {
                 Assert.That(Construction.PlaceCompletedBuilding(slot, 3, baseX, baseY).IsValid, Is.True, "HQ");
                 Assert.That(Construction.PlaceCompletedBuilding(slot, 4, baseX + 4, baseY).IsValid, Is.True,
-                    "start Refinery — placed completed, bypassing its regular Power prerequisite");
+                    "base Refinery — placed completed, bypassing the power rule (no prerequisite since D-077)");
                 EntityId builder = Entities.SpawnUnit(
                     slot,
                     new Transform2D(SimFixed.FromInt(baseX + 8), SimFixed.FromInt(baseY + 1)),
@@ -162,24 +167,36 @@ namespace Nova.Simulation.Tests
         [Test]
         public void StartState_MatchesTheManifestFixture()
         {
-            var host = ProdHost.Create(Seed);
-            host.SpawnStartState(0, 4, 4);
-            host.SpawnStartState(1, 110, 110);
+            // D-077 (quality/content/mvp-v1.json startStatePerPlayer): per
+            // slot ONLY a completed HQ, one Builder and 3.000 AE — no
+            // pre-placed Refinery, no starting Harvesters.
+            var host = ProdHost.Create(Seed, startingCredits: EconomySystem.CanonicalMatchStartingCreditsAE);
+            for (byte slot = 0; slot < 2; slot++)
+            {
+                int baseX = slot == 0 ? 4 : 110;
+                int baseY = slot == 0 ? 4 : 110;
+                Assert.That(host.Construction.PlaceCompletedBuilding(slot, 3, baseX, baseY).IsValid, Is.True, "HQ");
+                host.Entities.SpawnUnit(
+                    slot,
+                    new Transform2D(SimFixed.FromInt(baseX + 8), SimFixed.FromInt(baseY + 1)),
+                    SimFixed.FromInt(3),
+                    role: UnitRole.Builder);
+            }
             host.StepTick(); // one economy recompute
 
             for (byte slot = 0; slot < 2; slot++)
             {
                 Assert.That(host.Construction.HasFinishedBuilding(slot, UnitRole.HQ), Is.True, "completed HQ");
-                Assert.That(host.Construction.HasFinishedBuilding(slot, UnitRole.Refinery), Is.True, "completed Refinery");
                 Assert.That(host.CountRole(slot, UnitRole.Builder), Is.EqualTo(1));
-                Assert.That(host.CountRole(slot, UnitRole.Harvester), Is.EqualTo(2),
-                    "the start Refinery spawns no additional Harvester (manifest)");
-                Assert.That(host.Economy.GetPlayerEconomy(slot).AetheriumCredits, Is.EqualTo(1000L));
+                Assert.That(host.CountRole(slot, UnitRole.Harvester), Is.EqualTo(0),
+                    "no starting Harvesters — the Refinery produces them (D-077)");
+                Assert.That(host.Construction.HasFinishedBuilding(slot, UnitRole.Refinery), Is.False,
+                    "no pre-placed Refinery (D-077)");
+                Assert.That(host.Economy.GetPlayerEconomy(slot).AetheriumCredits, Is.EqualTo(3000L),
+                    "the D-077 start balance (EconomySystem.CanonicalMatchStartingCreditsAE)");
                 Assert.That(host.Economy.GetPlayerEconomy(slot).PowerProvided, Is.EqualTo(30), "HQ provides 30 (provisional)");
-                Assert.That(host.Economy.GetPlayerEconomy(slot).PowerRequired, Is.EqualTo(20), "Refinery draws 20 (provisional)");
+                Assert.That(host.Economy.GetPlayerEconomy(slot).PowerRequired, Is.EqualTo(0), "nothing draws yet");
                 Assert.That(host.Economy.GetPlayerEconomy(slot).IsLowPower, Is.False);
-                Assert.That(host.Construction.HasFinishedBuilding(slot, UnitRole.Power), Is.False,
-                    "the start Refinery exists WITHOUT a Power plant — the manifest's only prerequisite exception");
             }
         }
 
@@ -187,7 +204,7 @@ namespace Nova.Simulation.Tests
         public void PlaceBuilding_ThroughSealedCommands_AppliesAndRejectsDeterministically()
         {
             var host = ProdHost.Create(Seed);
-            EntityId builder = host.SpawnStartState(0, 4, 4);
+            EntityId builder = host.SpawnBaseFixture(0, 4, 4);
             host.StepTick(); // commit the start balance (30 provided / 20 required)
 
             // Legal: Storage (def 6, 300 AE) at (20,20) — the start grid
@@ -226,7 +243,7 @@ namespace Nova.Simulation.Tests
         public void QueueUnit_ThroughSealedCommands_T2GatingAndProducerRules()
         {
             var host = ProdHost.Create(Seed);
-            host.SpawnStartState(0, 4, 4);
+            host.SpawnBaseFixture(0, 4, 4);
             EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint barracksRaw = UnitCommandStateView.ToRawEntityId(barracks);
 
@@ -255,7 +272,7 @@ namespace Nova.Simulation.Tests
         public void FullLoop_BuildBarracks_QueueInfantry_SpawnsAtRally()
         {
             var host = ProdHost.Create(Seed);
-            EntityId builder = host.SpawnStartState(0, 4, 4);
+            EntityId builder = host.SpawnBaseFixture(0, 4, 4);
             // The start grid (30 provided, 20 required) cannot power the
             // Barracks' 15 — the Alliance builds its Power plant first
             // (Buildings.md); placed completed here, the test is about the
@@ -303,8 +320,8 @@ namespace Nova.Simulation.Tests
         {
             var hostA = ProdHost.Create(Seed);
             var hostB = ProdHost.Create(Seed);
-            EntityId builderA = hostA.SpawnStartState(0, 4, 4);
-            EntityId builderB = hostB.SpawnStartState(0, 4, 4);
+            EntityId builderA = hostA.SpawnBaseFixture(0, 4, 4);
+            EntityId builderB = hostB.SpawnBaseFixture(0, 4, 4);
             Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
             Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
             hostA.StepTick(); // commit the start balance on both kernels
@@ -358,8 +375,8 @@ namespace Nova.Simulation.Tests
         {
             var hostA = ProdHost.Create(Seed);
             var hostB = ProdHost.Create(Seed);
-            hostA.SpawnStartState(0, 4, 4);
-            hostB.SpawnStartState(0, 4, 4);
+            hostA.SpawnBaseFixture(0, 4, 4);
+            hostB.SpawnBaseFixture(0, 4, 4);
             hostA.StepTick();
             hostB.StepTick();
             Assert.That(hostB.Kernel.CalculateStateHash(), Is.EqualTo(hostA.Kernel.CalculateStateHash()));
@@ -383,7 +400,7 @@ namespace Nova.Simulation.Tests
         public void Snapshot_RestoredHost_ContinuesConstructionAndProductionIdentically()
         {
             var hostA = ProdHost.Create(Seed);
-            EntityId builder = hostA.SpawnStartState(0, 4, 4);
+            EntityId builder = hostA.SpawnBaseFixture(0, 4, 4);
             Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
                 "Power first — the start grid cannot power the Barracks (Buildings.md)");
             hostA.StepTick(); // commit the start balance
@@ -429,7 +446,7 @@ namespace Nova.Simulation.Tests
         public void Replay_ConstructionAndProductionIntents_PlaybackReproducesEndHash()
         {
             var host = ProdHost.Create(Seed);
-            EntityId builder = host.SpawnStartState(0, 4, 4);
+            EntityId builder = host.SpawnBaseFixture(0, 4, 4);
             // Direct setup mutation BEFORE recording: the initial snapshot
             // (and therefore the playback) starts with the builder already
             // in reach of the future site — replay only replays commands.
@@ -491,7 +508,7 @@ namespace Nova.Simulation.Tests
         public void SetRallyPoint_OffMapCommand_IsRejected_ProductionContinuesNormally()
         {
             var host = ProdHost.Create(Seed);
-            host.SpawnStartState(0, 4, 4);
+            host.SpawnBaseFixture(0, 4, 4);
             Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
                 "Power first — a low-power grid would double the production time under test");
             host.StepTick(); // commit the start balance

@@ -1,11 +1,12 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.2.0",
   "manifestId": "mvp-v1",
   "status": "binding-requirement",
   "decisionIds": [
     "D-056",
     "D-058",
-    "D-061"
+    "D-061",
+    "D-077"
   ],
   "gateState": {
     "currentGate": "G0",
@@ -26,23 +27,19 @@
     }
   },
   "startStatePerPlayer": {
-    "aetheriumAE": 1000,
+    "aetheriumAE": 3000,
     "completedBuildingRoles": [
-      "HQ",
-      "Refinery"
+      "HQ"
     ],
     "unitRoles": [
       {
         "role": "Builder",
         "count": 1
-      },
-      {
-        "role": "Harvester",
-        "count": 2
       }
     ],
-    "onlyPrerequisiteException": "The starting completed Refinery does not require Power.",
-    "startingRefinerySpawnsAdditionalHarvester": false
+    "harvesterProducer": "Refinery",
+    "refineryPrerequisite": "none",
+    "notes": "D-077: classic C&C loop start. The Refinery is no longer pre-placed and no longer requires a Power plant in either faction (its power draw is unchanged: Alliance 20, Legion 15); the Harvester is produced by the Refinery, not the HQ."
   },
   "factions": [
     {
@@ -354,9 +351,22 @@
   "victory": {
     "evaluationPoint": "after-combat-end-of-tick",
     "elimination": {
-      "requiresNoLivingUnits": true,
-      "requiresNoLivingBuildingsIncludingConstructionSites": true,
-      "resultCode": "Victory.Elimination"
+      "defeatTriggers": [
+        {
+          "id": "total-annihilation",
+          "requiresNoLivingUnits": true,
+          "requiresNoLivingBuildingsIncludingConstructionSites": true
+        },
+        {
+          "id": "hq-loss",
+          "requiresPreviouslyOwnedCompletedHq": true,
+          "requiresNoLivingCompletedHq": true,
+          "constructionSitesNeverCountAsHq": true
+        }
+      ],
+      "triggerCombination": "either",
+      "resultCode": "Victory.Elimination",
+      "notes": "D-077: a side is defeated by EITHER total annihilation (D-056) OR by losing its last completed HQ after owning one — even if other units/buildings remain. Only completed buildings carry the HQ role; construction sites carry the Unit role and never count, so an unfinished HQ rebuild does not postpone the defeat. A side that never owned an HQ is judged by total annihilation alone. Both triggers share the existing result codes; no new result code is added."
     },
     "simultaneousEliminationResultCode": "Draw.MutualAnnihilation",
     "timeLimitTicks": 27000,

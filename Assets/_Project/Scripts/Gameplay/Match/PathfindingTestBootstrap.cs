@@ -30,7 +30,10 @@ namespace Nova.Gameplay.Match
 
         private void Start()
         {
-            _matchRunner.InitializeMatch(seed: 0xAE70123456789000UL, width: _mapWidth, height: _mapHeight, maxUnits: 1024);
+            // AI-less debug scene: the 500 debug units below belong to slot 1,
+            // which is the skirmish AI's seat in a default match — opting out
+            // keeps this flow-field demo free of AI build orders.
+            _matchRunner.InitializeMatch(seed: 0xAE70123456789000UL, width: _mapWidth, height: _mapHeight, maxUnits: 1024, enableSkirmishAi: false);
             _viewManager.Initialize(_matchRunner);
 
             // The debug units below are spawned for playerId 1 while the session's

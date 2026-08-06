@@ -116,9 +116,26 @@ namespace Nova.SimRunner.Tests
             Assert.That(f.Production.ValidateQueueUnit(0, barracks, 1, 1), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
                 "the Barracks does not produce Builders");
             Assert.That(f.Production.ValidateQueueUnit(0, hqRaw, 1, 1), Is.EqualTo(CommandResultCode.Applied),
-                "the HQ produces Builder/Harvester (documented assignment)");
+                "the HQ produces the Builder (documented assignment)");
             Assert.That(f.Production.ValidateQueueUnit(1, hqRaw, 1, 1), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
                 "the HQ belongs to slot 0");
+        }
+
+        [Test]
+        public void QueueUnit_Harvester_IsProducedByTheRefinery_NotTheHq()
+        {
+            // D-077 producer assignment: the Refinery produces the Harvester
+            // in both factions; the HQ lost it (it keeps the Builder).
+            var f = new Fixture();
+            EntityId hq = f.Construction.PlaceCompletedBuilding(0, 3, 50, 50);
+            uint hqRaw = UnitCommandStateView.ToRawEntityId(hq);
+            EntityId refinery = f.Construction.PlaceCompletedBuilding(0, 4, 20, 20);
+            uint refineryRaw = UnitCommandStateView.ToRawEntityId(refinery);
+
+            Assert.That(f.Production.ValidateQueueUnit(0, hqRaw, 2, 1), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "the HQ no longer produces the Harvester (D-077)");
+            Assert.That(f.Production.ValidateQueueUnit(0, refineryRaw, 2, 1), Is.EqualTo(CommandResultCode.Applied),
+                "the Refinery does (D-077)");
         }
 
         [Test]
@@ -203,6 +220,25 @@ namespace Nova.SimRunner.Tests
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
             Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+        }
+
+        [Test]
+        public void SetRallyPoint_Accepted_OnRefinery()
+        {
+            // D-077 regression: the Harvester moved to the Refinery, but the
+            // producer-role check predated the move and rejected rally points
+            // there. Producer roles are read from the definition table now.
+            var f = new Fixture();
+            EntityId id = f.Construction.PlaceCompletedBuilding(0, 4, 10, 10); // Alliance Refinery
+            Assert.That(id.IsValid, Is.True);
+            uint refinery = UnitCommandStateView.ToRawEntityId(id);
+
+            Assert.That(f.Production.ValidateSetRallyPoint(0, refinery, SimFixed.FromInt(30), SimFixed.FromInt(30)),
+                Is.EqualTo(CommandResultCode.Applied));
+            f.Production.SetRallyPoint(refinery, SimFixed.FromInt(30), SimFixed.FromInt(30));
+            Assert.That(f.Production.TryGetProducer(refinery, out _, out int rallyX, out int rallyY), Is.True);
+            Assert.That(rallyX, Is.EqualTo(SimFixed.FromInt(30).RawValue));
+            Assert.That(rallyY, Is.EqualTo(SimFixed.FromInt(30).RawValue));
         }
 
         [Test]

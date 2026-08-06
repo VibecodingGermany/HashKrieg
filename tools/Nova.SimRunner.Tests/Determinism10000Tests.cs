@@ -79,21 +79,28 @@ namespace Nova.SimRunner.Tests
         }
 
         // ----------------------------------------------------------
-        // Command stream: both slots, all opening domains
+        // Command stream: both slots, the full D-077 opening loop
         // ----------------------------------------------------------
 
         [Test]
-        public void ShortRun_CommandStream_CarriesBothSlotsAndOpeningDomains()
+        public void ShortRun_CommandStream_CarriesBothSlotsAndTheOpeningLoop()
         {
+            // D-077: the opening drives the classic loop — the builder walk
+            // and the Refinery placement in the first ticks, then (once the
+            // completed Refinery stands) rally point, Harvester queue and
+            // Harvest orders. 800 ticks cover the slowest faction timing
+            // (200 build + 250 production ticks + walks) with slack; nothing
+            // in the script is keyed to a completion tick.
+            var options = new DeterminismOptions { Ticks = 800, CheckpointIntervalTicks = 100 };
             byte[] replayBytes = Determinism10000Scenario.GenerateReplay(
-                ShortOptions(), NullNovaLogger.Instance, out _, out _);
+                options, NullNovaLogger.Instance, out _, out _);
             Assert.That(ReplayFile.TryParse(replayBytes, out ReplayFile replay, out ReplayReadError readError),
                 Is.True, () => $"parse failed: {readError}");
 
-            Assert.That(replay.Frames.Length, Is.EqualTo(100), "every tick is recorded, empty ticks included");
+            Assert.That(replay.Frames.Length, Is.EqualTo(800), "every tick is recorded, empty ticks included");
             var slotsSeen = new HashSet<byte>();
             var kindsSeen = new HashSet<CommandKind>();
-            int applied = 0;
+            var appliedKinds = new HashSet<CommandKind>();
             foreach (ReplayTickFrame frame in replay.Frames)
             {
                 for (int r = 0; r < frame.RecordCount; r++)
@@ -102,15 +109,17 @@ namespace Nova.SimRunner.Tests
                     kindsSeen.Add(frame.Records[r].Kind);
                     if (frame.ResultCodes[r] == CommandResultCode.Applied)
                     {
-                        applied++;
+                        appliedKinds.Add(frame.Records[r].Kind);
                     }
                 }
             }
             Assert.That(slotsSeen, Is.EquivalentTo(new byte[] { 0, 1 }), "both active slots command");
             Assert.That(kindsSeen, Is.SupersetOf(new[]
-                { CommandKind.Harvest, CommandKind.Move, CommandKind.AttackTarget, CommandKind.PlaceBuilding }),
-                "the opening window already drives economy, movement, combat and construction");
-            Assert.That(applied, Is.GreaterThan(0), "the stream carries applied commands, not only rejections");
+                { CommandKind.PlaceBuilding, CommandKind.Move, CommandKind.SetRallyPoint, CommandKind.QueueUnit, CommandKind.Harvest }),
+                "the opening loop drives construction, movement and production");
+            Assert.That(appliedKinds, Is.SupersetOf(new[]
+                { CommandKind.PlaceBuilding, CommandKind.QueueUnit, CommandKind.Harvest }),
+                "the loop actually closes: the Refinery is built, it produces Harvesters, they gather");
         }
 
         [Test]

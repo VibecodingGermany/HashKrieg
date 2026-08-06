@@ -132,26 +132,28 @@ namespace Nova.SimRunner
     /// </list>
     /// </para>
     /// <para>
-    /// Workload (why this exercises every domain): the match setup is the
+    /// Workload (D-077 — the classic loop start): the match setup is the
     /// MS-1 manifest start state of quality/content/mvp-v1.json
-    /// (startStatePerPlayer) per slot — a COMPLETED HQ, a COMPLETED Refinery
-    /// (the manifest's only prerequisite exception), one Builder, two
-    /// Harvesters and 1.000 AE — plus one Aetherium field per slot adjacent
-    /// to both harvesters and the refinery, and a documented four-unit
-    /// skirmish squad per slot facing each other in weapon range in midfield
-    /// (a deliberate addition so the combat domain runs from the opening
-    /// ticks without depending on a long production pipeline). The script
-    /// then drives, for BOTH slots: harvest and return-cargo cycles
-    /// (economy), Barracks/Power/ResearchLab/DefensePlatform/Storage
-    /// placements including one CancelConstruction (construction), infantry
-    /// queues including one T2 queue after the lab, one CancelProduction and
-    /// rally points (production), repeated moves of builders and combat
-    /// units (movement/pathfinding), focus-fire AttackTarget orders of the
-    /// skirmish squads and later of the produced infantry (combat + FoW),
-    /// one Sell and one Stop. Slot 0 commands enter as local intents
-    /// (human), slot 1 commands as crafted wire records (the stand-in "AI"
-    /// transport); state-dependent rejections stay in the recorded stream
-    /// with their deterministic results (Commands.md section 4).
+    /// (startStatePerPlayer) per slot — a COMPLETED HQ, ONE Builder and
+    /// 3.000 AE (EconomySystem.CanonicalMatchStartingCreditsAE, wired by
+    /// <see cref="BuildHost"/>) — plus one Aetherium field per slot. Nothing
+    /// else is spawned: the script then drives the opening exactly like a
+    /// player, for BOTH slots — walk the Builder to the future site, place
+    /// the Refinery once it is affordable and the committed grid covers its
+    /// draw (construction: placement, auto-assigned builder, site
+    /// progression), set the completed Refinery's rally point and queue two
+    /// Harvesters at it (production — the Refinery, not the HQ, is the
+    /// Harvester's producer since D-077), then issue a Harvest order to
+    /// every produced harvester and let the harvest/return auto-cycle
+    /// (economy) climb the credit curve for the remaining ticks. Movement
+    /// and pathfinding run along via the builder walk. Combat orders are no
+    /// longer part of the script: D-077 removed the midfield skirmish
+    /// squads, so no own combat unit exists to command — an honest,
+    /// documented reduction of the exercised surface, not a hidden one.
+    /// Slot 0 commands enter as local intents (human), slot 1 commands as
+    /// crafted wire records (the stand-in "AI" transport); state-dependent
+    /// rejections stay in the recorded stream with their deterministic
+    /// results (Commands.md section 4).
     /// </para>
     /// <para>
     /// Assertions (D-062 naming, bool artifacts): <c>managed-path-only</c>
@@ -195,41 +197,29 @@ namespace Nova.SimRunner
             return SimDefinitions.ToDefinitionId(host.Economy.GetSlotFaction(slot), role);
         }
 
-        /// <summary>Script timing (target ticks of the sealed batches).</summary>
-        private const int SkirmishFirstOrderTick = 6;
-        private const int SkirmishRetargetPeriod = 10;
-        private const int SkirmishLastRetargetTick = 56;
-        private const int ReturnCargoFirstTick = 360;
-        private const int ReturnCargoPeriod = 150;
-        private const int ProducedAttackFirstTick = 1000;
-        private const int ProducedAttackPeriod = 500;
-        private const int ProducedMoveFirstTick = 1250;
-        private const int ProducedMovePeriod = 500;
-
         /// <summary>Fixed map layout of one slot's base (all coordinates in grid cells).</summary>
         private sealed class SlotLayout
         {
             public ushort FieldId;
             public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
-            public int RefineryOriginX, RefineryOriginY;
-            public int HarvesterAX, HarvesterAY, HarvesterBX, HarvesterBY;
             public int BuilderSpawnX, BuilderSpawnY;
-            public int BarracksOriginX, BarracksOriginY, BarracksBuildX, BarracksBuildY;
-            public int PowerOriginX, PowerOriginY, PowerBuildX, PowerBuildY;
-            public int LabOriginX, LabOriginY, LabBuildX, LabBuildY;
-            public int DefenseOriginX, DefenseOriginY, DefenseBuildX, DefenseBuildY;
-            public int StorageOriginX, StorageOriginY, StorageBuildX, StorageBuildY;
-            public int RallyX, RallyY, HqRallyX, HqRallyY;
+            public int RefineryOriginX, RefineryOriginY, RefineryBuildX, RefineryBuildY;
+            public int RefineryRallyX, RefineryRallyY;
         }
 
-        /// <summary>Live handles the script queries against (captured at setup, plus deterministic scans).</summary>
+        /// <summary>
+        /// Live handles the script queries against (captured at setup) plus
+        /// the two script latches. A latch flips exactly once, as a pure
+        /// function of the tick and the polled host state — the script stays
+        /// a deterministic function of the match, like the fixed tick table
+        /// before D-077.
+        /// </summary>
         private sealed class SlotState
         {
             public EntityId Builder;
-            public EntityId HarvesterA;
-            public EntityId HarvesterB;
-            public EntityId[] Squad = new EntityId[4];
+            public bool RefineryPlaced;
+            public bool HarvestersQueued;
         }
 
         private sealed class Host
@@ -517,13 +507,25 @@ namespace Nova.SimRunner
         /// harness bug and throws; state-dependent rejections are part of the
         /// stream.
         /// <para>
-        /// Build order (GDD power figures, Buildings.md): the Power plant
-        /// comes FIRST (tick 25) — the manifest start grid (HQ 30 provided,
-        /// Refinery 20/15 required) cannot power the Alliance Barracks' 15 —
-        /// the Barracks follows at tick 320, infantry production once it
-        /// stands (tick 540/900). Definition ids are faction-resolved per
-        /// slot (<see cref="DefId"/>): the same script drives the Alliance
-        /// rows on slot 0 and the Legion rows on slot 1.
+        /// THE D-077 OPENING LOOP — the script drives the match like a
+        /// player. Tick 1 walks the Builder next to the future Refinery
+        /// site. The Refinery is placed as soon as it is affordable AND the
+        /// committed grid balance covers its draw — the same two checks the
+        /// placement validator applies (the power rule reads the previous
+        /// tick's committed balance, so the first placement passes right
+        /// after the first economy recompute committed the HQ's 30; the
+        /// Refinery needs no Power plant since D-077). Once a COMPLETED own
+        /// Refinery stands — polled per tick, completion is never hardcoded
+        /// — the script sets its rally point onto the field edge (in harvest
+        /// reach of the field AND return reach of the footprint, so the
+        /// cycle closes without walking) and queues two Harvesters: the
+        /// Refinery, not the HQ, is the Harvester's producer since D-077.
+        /// Every harvester without a standing harvest order then receives a
+        /// Harvest command on the slot's field, and the harvest/return
+        /// auto-cycle (EconomySystem) runs unaided for the remaining ticks.
+        /// Definition ids are faction-resolved per slot (<see cref="DefId"/>):
+        /// the same script drives the Alliance rows on slot 0 and the Legion
+        /// rows on slot 1.
         /// </para>
         /// </summary>
         private static void IssueSlotCommands(
@@ -531,191 +533,51 @@ namespace Nova.SimRunner
         {
             SlotLayout c = slot == HumanSlot ? Slot0Layout : Slot1Layout;
             SlotState state = slots[slot];
-            byte enemy = slot == HumanSlot ? AiSlot : HumanSlot;
-            SlotState enemyState = slots[enemy];
             int tick = (int)nextTick;
 
-            switch (tick)
+            if (tick == 1)
             {
-                case 1:
-                    SubmitIfAlive(host, state.HarvesterA, slot, ref aiSequence,
-                        ids => new HarvestPayload(ids, c.FieldId));
-                    SubmitIfAlive(host, state.HarvesterB, slot, ref aiSequence,
-                        ids => new HarvestPayload(ids, c.FieldId));
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.PowerBuildX), SimFixed.FromInt(c.PowerBuildY)));
-                    break;
-                case 25:
-                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Power), (ushort)c.PowerOriginX, (ushort)c.PowerOriginY), ref aiSequence);
-                    break;
-                case 300:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.BarracksBuildX), SimFixed.FromInt(c.BarracksBuildY)));
-                    break;
-                case 320:
-                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Barracks), (ushort)c.BarracksOriginX, (ushort)c.BarracksOriginY), ref aiSequence);
-                    break;
-                case 520:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.LabBuildX), SimFixed.FromInt(c.LabBuildY)));
-                    break;
-                case 540:
-                {
-                    uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
-                    if (barracks != 0)
-                    {
-                        Submit(host, slot, new SetRallyPointPayload(barracks, SimFixed.FromInt(c.RallyX), SimFixed.FromInt(c.RallyY)), ref aiSequence);
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.BasicInfantry), 2), ref aiSequence);
-                    }
-                    break;
-                }
-                case 700:
-                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.ResearchLab), (ushort)c.LabOriginX, (ushort)c.LabOriginY), ref aiSequence);
-                    break;
-                case 900:
-                {
-                    uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
-                    if (barracks != 0)
-                    {
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.BasicInfantry), 2), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1200:
-                {
-                    uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
-                    if (barracks != 0)
-                    {
-                        Submit(host, slot, new QueueUnitPayload(barracks, DefId(host, slot, UnitRole.AntiArmorInfantry), 1), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1300:
-                {
-                    uint barracks = FindRoleRaw(host, slot, UnitRole.Barracks);
-                    if (barracks != 0)
-                    {
-                        Submit(host, slot, new CancelProductionPayload(barracks, 0), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1450:
-                {
-                    uint hq = FindRoleRaw(host, slot, UnitRole.HQ);
-                    if (hq != 0)
-                    {
-                        Submit(host, slot, new SetRallyPointPayload(hq, SimFixed.FromInt(c.HqRallyX), SimFixed.FromInt(c.HqRallyY)), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1500:
-                {
-                    uint hq = FindRoleRaw(host, slot, UnitRole.HQ);
-                    if (hq != 0)
-                    {
-                        Submit(host, slot, new QueueUnitPayload(hq, DefId(host, slot, UnitRole.Builder), 1), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1700:
-                {
-                    uint hq = FindRoleRaw(host, slot, UnitRole.HQ);
-                    if (hq != 0)
-                    {
-                        Submit(host, slot, new QueueUnitPayload(hq, DefId(host, slot, UnitRole.Harvester), 1), ref aiSequence);
-                    }
-                    break;
-                }
-                case 1980:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.DefenseBuildX), SimFixed.FromInt(c.DefenseBuildY)));
-                    break;
-                case 2000:
-                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.DefensePlatform), (ushort)c.DefenseOriginX, (ushort)c.DefenseOriginY), ref aiSequence);
-                    break;
-                case 2500:
-                {
-                    uint defense = FindRoleRaw(host, slot, UnitRole.DefensePlatform);
-                    if (defense != 0)
-                    {
-                        Submit(host, slot, new SellPayload(defense), ref aiSequence);
-                    }
-                    break;
-                }
-                case 2980:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
-                        ids => new MovePayload(ids, SimFixed.FromInt(c.StorageBuildX), SimFixed.FromInt(c.StorageBuildY)));
-                    break;
-                case 3000:
-                    Submit(host, slot, new PlaceBuildingPayload(DefId(host, slot, UnitRole.Storage), (ushort)c.StorageOriginX, (ushort)c.StorageOriginY), ref aiSequence);
-                    break;
-                case 3050:
-                {
-                    uint site = FindConstructionSiteRaw(host, slot);
-                    if (site != 0)
-                    {
-                        Submit(host, slot, new CancelConstructionPayload(site), ref aiSequence);
-                    }
-                    break;
-                }
-                case 4000:
-                    SubmitIfAlive(host, state.Builder, slot, ref aiSequence, ids => new StopPayload(ids));
-                    break;
+                SubmitIfAlive(host, state.Builder, slot, ref aiSequence,
+                    ids => new MovePayload(ids, SimFixed.FromInt(c.RefineryBuildX), SimFixed.FromInt(c.RefineryBuildY)));
             }
 
-            // Skirmish focus fire: every SkirmishRetargetPeriod ticks in the
-            // opening window the surviving squad re-targets the lowest-index
-            // surviving enemy squad member (deterministic ascending scan).
-            if (tick >= SkirmishFirstOrderTick && tick <= SkirmishLastRetargetTick
-                && (tick - SkirmishFirstOrderTick) % SkirmishRetargetPeriod == 0)
+            // Place the Refinery once it is affordable and the committed grid
+            // covers its draw (the placement power rule reads the previous
+            // tick's committed balance — see the class remarks).
+            if (!state.RefineryPlaced
+                && SimDefinitions.TryGetBuilding(host.Economy.GetSlotFaction(slot), UnitRole.Refinery, out SimBuildingDefinition refinery))
             {
-                uint[] ownSquad = AliveRaws(host, state.Squad);
-                uint[] enemySquad = AliveRaws(host, enemyState.Squad);
-                if (ownSquad.Length > 0 && enemySquad.Length > 0)
+                PlayerEconomyState economy = host.Economy.GetPlayerEconomy(slot);
+                if (economy.AetheriumCredits >= refinery.CostAE
+                    && economy.PowerProvided - economy.PowerRequired >= refinery.PowerRequired)
                 {
-                    Submit(host, slot, new AttackTargetPayload(ownSquad, enemySquad[0]), ref aiSequence);
+                    Submit(host, slot, new PlaceBuildingPayload(
+                        DefId(host, slot, UnitRole.Refinery), (ushort)c.RefineryOriginX, (ushort)c.RefineryOriginY), ref aiSequence);
+                    state.RefineryPlaced = true;
                 }
             }
 
-            // Economy cycle: deliver cargo every ReturnCargoPeriod ticks;
-            // re-issue the harvest order to any idle harvester one tick later
-            // (covers the produced harvester and resolved orders).
-            if (tick >= ReturnCargoFirstTick && (tick - ReturnCargoFirstTick) % ReturnCargoPeriod == 0)
+            // Once the completed Refinery stands: rally onto the field edge
+            // and queue the two Harvesters (D-077 producer assignment).
+            if (!state.HarvestersQueued)
             {
-                uint[] harvesters = AliveRaws(host, state.HarvesterA, state.HarvesterB);
-                if (harvesters.Length > 0)
+                uint refineryRaw = FindRoleRaw(host, slot, UnitRole.Refinery);
+                if (refineryRaw != 0)
                 {
-                    Submit(host, slot, new ReturnCargoPayload(harvesters), ref aiSequence);
-                }
-            }
-            if (tick >= ReturnCargoFirstTick + 1 && (tick - ReturnCargoFirstTick - 1) % ReturnCargoPeriod == 0)
-            {
-                uint[] idle = IdleHarvesterRaws(host, slot);
-                if (idle.Length > 0)
-                {
-                    Submit(host, slot, new HarvestPayload(idle, c.FieldId), ref aiSequence);
+                    Submit(host, slot, new SetRallyPointPayload(
+                        refineryRaw, SimFixed.FromInt(c.RefineryRallyX), SimFixed.FromInt(c.RefineryRallyY)), ref aiSequence);
+                    Submit(host, slot, new QueueUnitPayload(
+                        refineryRaw, DefId(host, slot, UnitRole.Harvester), 2), ref aiSequence);
+                    state.HarvestersQueued = true;
                 }
             }
 
-            // Produced army: periodic attack on the lowest-index live enemy
-            // unit, alternating midfield moves half a period offset.
-            if (tick >= ProducedAttackFirstTick && (tick - ProducedAttackFirstTick) % ProducedAttackPeriod == 0)
+            // Every harvester without a standing harvest order gets one —
+            // covers each produced harvester exactly once.
+            uint[] idle = IdleHarvesterRaws(host, slot);
+            if (idle.Length > 0)
             {
-                uint[] army = OwnCombatRaws(host, slot);
-                uint target = FirstLiveEnemyRaw(host, enemy);
-                if (army.Length > 0 && target != 0)
-                {
-                    Submit(host, slot, new AttackTargetPayload(army, target), ref aiSequence);
-                }
-            }
-            if (tick >= ProducedMoveFirstTick && (tick - ProducedMoveFirstTick) % ProducedMovePeriod == 0)
-            {
-                uint[] army = OwnCombatRaws(host, slot);
-                if (army.Length > 0)
-                {
-                    int waypoint = ((tick - ProducedMoveFirstTick) / ProducedMovePeriod) % 2 == 0 ? 62 : 66;
-                    Submit(host, slot, new MovePayload(army, SimFixed.FromInt(waypoint), SimFixed.FromInt(waypoint)), ref aiSequence);
-                }
+                Submit(host, slot, new HarvestPayload(idle, c.FieldId), ref aiSequence);
             }
         }
 
@@ -725,26 +587,18 @@ namespace Nova.SimRunner
 
         /// <summary>
         /// Slot 0 base layout (bottom-left). Buildings use 3x3 footprint
-        /// origins; build positions stand in Chebyshev reach 1 of their site;
-        /// both harvesters stand in reach 1 of the field cell AND the
-        /// refinery footprint, so the harvest/return cycle runs without
-        /// walking (the documented economy reach rule).
+        /// origins; the build position stands in Chebyshev reach 1 of the
+        /// Refinery site, and the rally cell stands in reach 1 of the field
+        /// cell AND the Refinery footprint, so the harvest/return cycle
+        /// closes without walking (the documented economy reach rule).
         /// </summary>
         private static readonly SlotLayout Slot0Layout = new SlotLayout
         {
             FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
-            RefineryOriginX = 8, RefineryOriginY = 4,
-            HarvesterAX = 7, HarvesterAY = 6,
-            HarvesterBX = 7, HarvesterBY = 7,
             BuilderSpawnX = 13, BuilderSpawnY = 7,
-            BarracksOriginX = 13, BarracksOriginY = 9, BarracksBuildX = 13, BarracksBuildY = 8,
-            PowerOriginX = 8, PowerOriginY = 8, PowerBuildX = 10, PowerBuildY = 7,
-            LabOriginX = 13, LabOriginY = 13, LabBuildX = 14, LabBuildY = 12,
-            DefenseOriginX = 4, DefenseOriginY = 9, DefenseBuildX = 5, DefenseBuildY = 8,
-            StorageOriginX = 17, StorageOriginY = 4, StorageBuildX = 16, StorageBuildY = 5,
-            RallyX = 50, RallyY = 50,
-            HqRallyX = 30, HqRallyY = 30,
+            RefineryOriginX = 8, RefineryOriginY = 4, RefineryBuildX = 10, RefineryBuildY = 7,
+            RefineryRallyX = 7, RefineryRallyY = 6,
         };
 
         /// <summary>Slot 1 base layout (top-right), the 180-degree mirror of slot 0.</summary>
@@ -752,34 +606,24 @@ namespace Nova.SimRunner
         {
             FieldId = 2, FieldX = 119, FieldY = 119,
             HqOriginX = 120, HqOriginY = 120,
-            RefineryOriginX = 116, RefineryOriginY = 120,
-            HarvesterAX = 119, HarvesterAY = 120,
-            HarvesterBX = 119, HarvesterBY = 119,
             BuilderSpawnX = 113, BuilderSpawnY = 119,
-            BarracksOriginX = 111, BarracksOriginY = 115, BarracksBuildX = 113, BarracksBuildY = 118,
-            PowerOriginX = 116, PowerOriginY = 116, PowerBuildX = 116, PowerBuildY = 119,
-            LabOriginX = 111, LabOriginY = 111, LabBuildX = 112, LabBuildY = 114,
-            DefenseOriginX = 120, DefenseOriginY = 115, DefenseBuildX = 121, DefenseBuildY = 118,
-            StorageOriginX = 107, StorageOriginY = 120, StorageBuildX = 110, StorageBuildY = 121,
-            RallyX = 76, RallyY = 76,
-            HqRallyX = 96, HqRallyY = 96,
+            RefineryOriginX = 116, RefineryOriginY = 120, RefineryBuildX = 116, RefineryBuildY = 119,
+            RefineryRallyX = 119, RefineryRallyY = 120,
         };
-
-        /// <summary>Skirmish squads: four infantry per slot facing each other across a gap of exactly weapon range.</summary>
-        private static readonly int[] Squad0X = { 56, 57, 56, 57 };
-        private static readonly int[] Squad0Y = { 62, 62, 63, 63 };
-        private static readonly int[] Squad1X = { 65, 66, 65, 66 };
-        private static readonly int[] Squad1Y = { 62, 62, 63, 63 };
 
         /// <summary>
         /// Applies the deterministic match setup to a fresh host: per slot
-        /// the MS-1 manifest start state (completed HQ + Refinery, one
-        /// Builder, two Harvesters, 1.000 AE economy default), one Aetherium
-        /// field and the four-unit skirmish squad. Deterministic spawn order
-        /// means identical entity ids on every host and platform. The slot
-        /// factions are already bound — <see cref="BuildHost"/> assigns them
-        /// before <c>Kernel.Start()</c>, which the
-        /// <see cref="EconomySystem.SetSlotFaction"/> guard requires.
+        /// the D-077 start state of quality/content/mvp-v1.json
+        /// (startStatePerPlayer) — a COMPLETED HQ, ONE Builder and the 3.000
+        /// AE of <see cref="EconomySystem.CanonicalMatchStartingCreditsAE"/>
+        /// (wired by <see cref="BuildHost"/>) — plus one Aetherium field. No
+        /// pre-placed Refinery, no Harvesters, no skirmish squad: the loop
+        /// start is scripted, not spawned. Deterministic spawn order (field,
+        /// HQ, Builder; slot 0 first) means identical entity ids on every
+        /// host and platform. The slot factions are already bound —
+        /// <see cref="BuildHost"/> assigns them before <c>Kernel.Start()</c>,
+        /// which the <see cref="EconomySystem.SetSlotFaction"/> guard
+        /// requires.
         /// </summary>
         private static SlotState[] SetupMatch(Host host)
         {
@@ -795,33 +639,10 @@ namespace Nova.SimRunner
                 {
                     throw new InvalidOperationException("HQ placement failed");
                 }
-                // The manifest's only prerequisite exception: the start
-                // Refinery exists WITHOUT a Power plant and spawns no
-                // additional Harvester.
-                if (!host.Construction.PlaceCompletedBuilding(slot, DefId(host, slot, UnitRole.Refinery), c.RefineryOriginX, c.RefineryOriginY).IsValid)
-                {
-                    throw new InvalidOperationException("Refinery placement failed");
-                }
 
-                SlotState state = slots[slot];
-                state.HarvesterA = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterAX), SimFixed.FromInt(c.HarvesterAY)),
-                    SimFixed.FromRaw(163840), role: UnitRole.Harvester);
-                state.HarvesterB = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterBX), SimFixed.FromInt(c.HarvesterBY)),
-                    SimFixed.FromRaw(163840), role: UnitRole.Harvester);
-                state.Builder = host.Entities.SpawnUnit(
+                slots[slot].Builder = host.Entities.SpawnUnit(
                     slot, new Transform2D(SimFixed.FromInt(c.BuilderSpawnX), SimFixed.FromInt(c.BuilderSpawnY)),
                     SimFixed.FromInt(3), role: UnitRole.Builder);
-
-                int[] squadX = slot == HumanSlot ? Squad0X : Squad1X;
-                int[] squadY = slot == HumanSlot ? Squad0Y : Squad1Y;
-                for (int i = 0; i < 4; i++)
-                {
-                    state.Squad[i] = host.Entities.SpawnUnit(
-                        slot, new Transform2D(SimFixed.FromInt(squadX[i]), SimFixed.FromInt(squadY[i])),
-                        SimFixed.FromInt(4), role: UnitRole.BasicInfantry);
-                }
             }
             return slots;
         }
@@ -841,7 +662,10 @@ namespace Nova.SimRunner
             var entities = new EntityManager(EntityCapacity);
             var pathfinding = new PathfindingSystem(MapWidth, MapHeight);
             var movement = new MovementSystem(entities, pathfinding);
-            var economy = new EconomySystem(entities);
+            // The D-077 start balance (3.000 AE): the same constant
+            // MatchRunner plumbs into the Unity host, so both hosts hash the
+            // identical initial state.
+            var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
@@ -1016,29 +840,6 @@ namespace Nova.SimRunner
             return 0;
         }
 
-        /// <summary>
-        /// Raw id of the first active construction site of <paramref name="slot"/>
-        /// (sites carry the plain Unit role until completion), else 0.
-        /// </summary>
-        private static uint FindConstructionSiteRaw(Host host, byte slot)
-        {
-            return FindRoleRaw(host, slot, UnitRole.Unit);
-        }
-
-        /// <summary>Raw ids of the live entities of the given handles, ascending by handle order.</summary>
-        private static uint[] AliveRaws(Host host, params EntityId[] entities)
-        {
-            var raws = new List<uint>(entities.Length);
-            foreach (EntityId entity in entities)
-            {
-                if (host.Entities.IsValid(entity))
-                {
-                    raws.Add(UnitCommandStateView.ToRawEntityId(entity));
-                }
-            }
-            return raws.ToArray();
-        }
-
         /// <summary>Raw ids of all active own harvesters without a standing harvest order, ascending index.</summary>
         private static uint[] IdleHarvesterRaws(Host host, byte slot)
         {
@@ -1053,36 +854,6 @@ namespace Nova.SimRunner
                 }
             }
             return raws.ToArray();
-        }
-
-        /// <summary>Raw ids of all active own infantry (T1 and T2), ascending index.</summary>
-        private static uint[] OwnCombatRaws(Host host, byte slot)
-        {
-            var raws = new List<uint>();
-            UnitState[] units = host.Entities.RawUnits;
-            for (int i = 0; i < host.Entities.Capacity; i++)
-            {
-                if (units[i].IsActive && units[i].PlayerId == slot
-                    && (units[i].Role == UnitRole.BasicInfantry || units[i].Role == UnitRole.AntiArmorInfantry))
-                {
-                    raws.Add(UnitCommandStateView.ToRawEntityId(units[i].Id));
-                }
-            }
-            return raws.ToArray();
-        }
-
-        /// <summary>Raw id of the lowest-index active entity of <paramref name="enemySlot"/>, else 0.</summary>
-        private static uint FirstLiveEnemyRaw(Host host, byte enemySlot)
-        {
-            UnitState[] units = host.Entities.RawUnits;
-            for (int i = 0; i < host.Entities.Capacity; i++)
-            {
-                if (units[i].IsActive && units[i].PlayerId == enemySlot)
-                {
-                    return UnitCommandStateView.ToRawEntityId(units[i].Id);
-                }
-            }
-            return 0;
         }
 
         // ----------------------------------------------------------------

@@ -471,9 +471,24 @@ namespace Nova.Simulation.Production
             return _construction.IsCompletedPlacement(buildingRaw);
         }
 
+        /// <summary>
+        /// A role is a producer iff any unit definition names it as
+        /// <see cref="SimUnitDefinition.ProducerRole"/> — read from the
+        /// definition table, not hardcoded, so a producer reassignment like
+        /// D-077 (Harvester HQ → Refinery) cannot strand the rally-point
+        /// validation on a stale list.
+        /// </summary>
         private static bool IsProducerRole(UnitRole role)
         {
-            return role == UnitRole.HQ || role == UnitRole.Barracks || role == UnitRole.VehicleFactory;
+            ReadOnlySpan<SimUnitDefinition> units = SimDefinitions.AllUnits;
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i].ProducerRole == role)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private bool OwnsBuilding(byte playerSlot, uint buildingRaw)

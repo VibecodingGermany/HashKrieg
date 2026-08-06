@@ -15,10 +15,10 @@ using Nova.Simulation.State;
 using Nova.Simulation.Victory;
 using Nova.Simulation.Vision;
 
-namespace Nova.AI.Tests
+namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// MS-1 skirmish AI suite (EditMode lane, docs/tech/AIArchitecture.md): the
+    /// MS-1 skirmish AI suite (.NET lane, docs/tech/AIArchitecture.md): the
     /// stub-to-opponent slice. Proves the AI plays the full D-077 loop over
     /// the canonical command path — build order, harvest economy, army
     /// production and explicit attacks — and the end-to-end contract: the AI
@@ -34,7 +34,7 @@ namespace Nova.AI.Tests
     /// including the pre-step advance of the AI peer clock. Any edit to the
     /// MatchRunner wiring must be applied here too.
     /// </para>
-    /// Mirror of the .NET lane SkirmishAiTests.
+    /// Mirror of the EditMode lane SkirmishAiTests.
     /// </summary>
     [TestFixture]
     public sealed class SkirmishAiTests

@@ -65,7 +65,7 @@ namespace Nova.SimRunner.Tests
             int ticks = (cycleTicks * 2) + 8;                     // two cycles plus slack
 
             long previous = economy.GetPlayerEconomy(0).AetheriumCredits;
-            Assert.That(previous, Is.EqualTo(1000L), "manifest start credits");
+            Assert.That(previous, Is.EqualTo(1000L), "library default start credits (the match rule is 3.000, D-077)");
 
             var depositTicks = new List<int>();
             for (int t = 1; t <= ticks; t++)

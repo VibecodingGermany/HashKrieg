@@ -14,10 +14,11 @@ using EntityId = Nova.Core.EntityId;
 namespace Nova.Presentation.UI
 {
     /// <summary>
-    /// Read-only OnGUI overlay over a running <see cref="MatchRunner"/>: tick,
-    /// match outcome, economy, force census, selection combat profile,
-    /// Aetherium reserves and the control legend. No Canvas, no uGUI, no
-    /// prefabs, no materials.
+    /// Read-only OnGUI overlay over a running <see cref="MatchRunner"/>: an
+    /// always-on one-line status bar (credits, power, decided outcome) plus
+    /// a full diagnostic panel (tick, census, selection combat profile,
+    /// Aetherium reserves, control legend) that is hidden by default and
+    /// toggled with F3. No Canvas, no uGUI, no prefabs, no materials.
     /// <para>
     /// STRICTLY READ-ONLY: this component never mutates simulation state and
     /// never submits a command. Every value is copied out of the sim per frame
@@ -55,9 +56,10 @@ namespace Nova.Presentation.UI
         [SerializeField] private RtsDeviceInput _input;
 
         [Header("Presentation")]
-        [SerializeField] private bool _visible = true;
+        [Tooltip("Full diagnostic panel. Hidden by default — the compact status bar above it is always on. F3 toggles this panel.")]
+        [SerializeField] private bool _visible = false;
         [Tooltip("Whole GUI is scaled by this factor so it stays legible on a Retina display.")]
-        [SerializeField] private float _uiScale = 2f;
+        [SerializeField] private float _uiScale = 1.5f;
         [SerializeField] private int _fontSize = 13;
 
         private readonly StringBuilder _builder = new StringBuilder(256);
@@ -83,10 +85,19 @@ namespace Nova.Presentation.UI
             if (_input == null) _input = FindAnyObjectByType<RtsDeviceInput>();
         }
 
+        private void Update()
+        {
+            // F3 toggles the full diagnostic panel. The compact status bar
+            // (credits, power, outcome) is drawn regardless — it is the
+            // minimal match readout, not a debug view.
+            if (Input.GetKeyDown(KeyCode.F3))
+            {
+                _visible = !_visible;
+            }
+        }
+
         private void OnGUI()
         {
-            if (!_visible) return;
-
             if (_labelStyle == null)
             {
                 _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = _fontSize, richText = false, wordWrap = true };
@@ -96,8 +107,16 @@ namespace Nova.Presentation.UI
             Matrix4x4 previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
+            DrawStatusBar(scale);
+
+            if (!_visible)
+            {
+                GUI.matrix = previousMatrix;
+                return;
+            }
+
             float width = Mathf.Min(640f, Screen.width / scale - 16f);
-            GUILayout.BeginArea(new Rect(8f, 8f, width, Screen.height / scale - 16f));
+            GUILayout.BeginArea(new Rect(8f, 8f + 3f * (_fontSize + 6f), width, Screen.height / scale - 16f));
             GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandHeight(false));
 
             if (_runner == null)
@@ -120,6 +139,60 @@ namespace Nova.Presentation.UI
             GUILayout.EndVertical();
             GUILayout.EndArea();
             GUI.matrix = previousMatrix;
+        }
+
+        /// <summary>
+        /// The always-on minimal match readout: one compact line with the
+        /// local slot's credits and power state, the decided outcome (the one
+        /// thing that must never be hidden) and the F3 hint. This is the
+        /// player-facing substitute until the real HUD (Nova.UI) lands; the
+        /// full diagnostic panel below it stays opt-in via F3.
+        /// </summary>
+        private void DrawStatusBar(float scale)
+        {
+            _builder.Clear();
+
+            if (_runner == null)
+            {
+                _builder.Append("Nova — no MatchRunner in the scene.");
+            }
+            else
+            {
+                byte slot = _runner.Session != null ? _runner.Session.LocalSlot : (byte)0;
+
+                if (_runner.Economy != null)
+                {
+                    PlayerEconomyState economy = _runner.Economy.GetPlayerEconomy(slot);
+                    _builder.Append(economy.AetheriumCredits).Append(" AE")
+                        .Append("   |   Power ").Append(economy.PowerProvided).Append('/').Append(economy.PowerRequired);
+                    if (economy.IsLowPower) _builder.Append(" (LOW POWER)");
+                }
+
+                VictorySystem victory = _runner.Victory;
+                if (victory != null && victory.IsDecided)
+                {
+                    _builder.Append("   |   ");
+                    switch (victory.Outcome)
+                    {
+                        case MatchOutcome.VictoryElimination:
+                            _builder.Append(victory.WinnerSlot == slot ? "VICTORY" : "DEFEAT");
+                            break;
+                        case MatchOutcome.DrawMutualAnnihilation:
+                            _builder.Append("DRAW — mutual annihilation");
+                            break;
+                        case MatchOutcome.DrawTimeLimit:
+                            _builder.Append("DRAW — time limit");
+                            break;
+                        default:
+                            _builder.Append(victory.Outcome.ToString());
+                            break;
+                    }
+                }
+
+                _builder.Append("   |   F3: debug panel");
+            }
+
+            GUI.Label(new Rect(8f, 8f, Screen.width / scale - 16f, _fontSize + 6f), _builder.ToString(), _labelStyle);
         }
 
         private void DrawMatchLine()

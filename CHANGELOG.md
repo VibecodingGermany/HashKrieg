@@ -17,6 +17,50 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Spielbarer RTS-Core-Loop (D-077, Graybox-Sitzung GB-005, ohne Gate-Status):**
+  Die Demo ist erstmals ein spielbares, kleines 1v1 im C&C-Stil statt einer
+  technischen Testszene.
+  - **Start wie im Genre-Original:** jeder Slot startet mit Hauptquartier,
+    einem Builder und 3.000 AE (vorher: gratis Raffinerie, zwei Harvester und
+    Infanterie). Der Harvester wird jetzt von der **Raffinerie** produziert,
+    die Raffinerie setzt **kein Kraftwerk mehr voraus** (ihr Power-Bedarf
+    bleibt — ab Raffinerie + Kaserne wird ein Kraftwerk nötig).
+  - **Der Computergegner spielt:** `SkirmishAiSystem` (Legion, Slot 1) ist in
+    `MatchRunner` registriert und handelt über denselben Intent-Pfad wie ein
+    Mensch — Build-Order (Raffinerie, Kaserne, bei Bedarf Kraftwerk), zwei
+    Harvester im Auto-Kreis, Infanterieproduktion bis zwölf, Angriffswellen ab
+    sechs Kampfeinheiten mit expliziten, Fog-of-War-legalen Attack-Orders.
+    End-to-End-Test: die KI besiegt einen passiven Slot deterministisch bei
+    Tick 2.242.
+  - **Sieg bei Hauptquartier-Zerstörung:** wer sein HQ verliert, ist besiegt
+    (zusätzlich zur Totalvernichtung; gleichzeitiger Verlust bleibt Unentschieden).
+    Victory-Snapshotblock v1 → v2.
+- **Kompakte Statusleiste** (Credits, Power, Spielausgang) als immer sichtbares
+  Minimum, bis die echte UI landet.
+
+### Behoben
+- **Vollbild-Debug-Overlay entfernt:** das `DebugHud`-Diagnose-Panel ist
+  standardmäßig aus und per **F3** zuschaltbar; Szene per
+  `BootstrapSceneGenerator` neu erzeugt (Maschinenausgabe).
+- **Übereinanderliegende 3D-Assets:** die `PF_*`-Modelle sind nach
+  Art-Konvention 3,0 m/Zelle exportiert, die Sim-Welt rechnet 1 Zelle = 1
+  Welt-Einheit — Gebäude überlappten, Einheiten steckten unsichtbar in den
+  Meshes. `UnitViewManager` normalisiert Prefab-Views jetzt zur Laufzeit aus
+  den Mesh-Bounds auf den Sim-Footprint; Modelle bleiben ohne Logikänderung
+  austauschbar.
+- **Rally-Point auf der Raffinerie** wurde abgelehnt, weil die
+  Produzentenrollen-Prüfung den D-077-Umzug des Harvesters nicht kannte —
+  sie liest die Rollen jetzt aus der Definitionstabelle.
+
+### Verifikation (GB-005)
+- `dotnet test tools/Nova.SimRunner.Tests`: **420/420 grün**; SimRunner-
+  Determinismus- und DETERMINISM_10000-Self-Check PASS.
+- Unity-EditMode: **425/425 grün** (Batchmode, erstmals inklusive
+  InitialStateHash-Parität Bootstrap == Szenario); PlayMode **2/2** mit
+  frischen Screenshots in `output/demo/` (Skalierung visuell bestätigt).
+- Vertrag `quality/content/mvp-v1.json` 1.0.0 → **1.2.0**.
+
 ### Geändert
 - **Governance auf Tier 1 zurückgeschnitten (D-076).** Das Repository trug ein
   Regelwerk für ein Projekt mit fremden Beitragenden, Nutzern und Haftung –

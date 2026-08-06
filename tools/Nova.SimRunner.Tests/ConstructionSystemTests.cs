@@ -126,23 +126,28 @@ namespace Nova.SimRunner.Tests
                 Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.Artillery, out SimUnitDefinition ar) && ar.Tier == 2, Is.True);
                 Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.BasicInfantry, out SimUnitDefinition rifle) && rifle.Tier == 1, Is.True);
 
-                // Documented producer assignment (Q-040): HQ -> Builder/Harvester,
-                // Barracks -> infantry, VehicleFactory -> vehicles.
+                // Documented producer assignment (D-077): HQ -> Builder,
+                // Refinery -> Harvester, Barracks -> infantry,
+                // VehicleFactory -> vehicles.
                 Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.Builder, out SimUnitDefinition builder) && builder.ProducerRole == UnitRole.HQ, Is.True);
-                Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.Harvester, out SimUnitDefinition harvester) && harvester.ProducerRole == UnitRole.HQ, Is.True);
+                Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.Harvester, out SimUnitDefinition harvester) && harvester.ProducerRole == UnitRole.Refinery, Is.True,
+                    "the Refinery, not the HQ, produces the Harvester (D-077)");
                 Assert.That(rifle.ProducerRole, Is.EqualTo(UnitRole.Barracks));
                 Assert.That(SimDefinitions.TryGetUnit(faction, UnitRole.ScoutVehicle, out SimUnitDefinition scout) && scout.ProducerRole == UnitRole.VehicleFactory, Is.True);
             }
 
             // Faction-resolved power figures (Buildings.md section 2): the
             // Alliance Power plant provides 100, the Legion one 80; the
-            // Refinery prerequisite is faction-independent.
+            // Refinery's power DRAW (20/15) and its missing prerequisite are
+            // faction-independent (D-077).
             Assert.That(SimDefinitions.TryGetBuilding(FactionId.Alliance, UnitRole.HQ, out SimBuildingDefinition hq) && hq.PowerProvided == 30, Is.True);
             Assert.That(SimDefinitions.TryGetBuilding(FactionId.Alliance, UnitRole.Power, out SimBuildingDefinition plant) && plant.PowerProvided == 100, Is.True);
             Assert.That(SimDefinitions.TryGetBuilding(FactionId.Legion, UnitRole.Power, out SimBuildingDefinition plantL) && plantL.PowerProvided == 80, Is.True);
             Assert.That(SimDefinitions.TryGetBuilding(FactionId.Alliance, UnitRole.Refinery, out SimBuildingDefinition refinery)
-                        && refinery.PowerRequired == 20 && refinery.HasPrerequisite && refinery.PrerequisiteRole == UnitRole.Power, Is.True,
-                "a non-start refinery requires a completed Power plant (manifest exception covers only the start refinery)");
+                        && refinery.PowerRequired == 20 && !refinery.HasPrerequisite, Is.True,
+                "the Refinery lost its Power-plant prerequisite in both factions (D-077); its draw is unchanged");
+            Assert.That(SimDefinitions.TryGetBuilding(FactionId.Legion, UnitRole.Refinery, out SimBuildingDefinition refineryL)
+                        && refineryL.PowerRequired == 15 && !refineryL.HasPrerequisite, Is.True);
         }
 
         [Test]
@@ -309,11 +314,11 @@ namespace Nova.SimRunner.Tests
             var f = new Fixture();
             f.SpawnBuilder(0, 19, 20);
 
-            Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
-                "a Refinery requires a completed own Power plant");
+            Assert.That(f.Construction.ValidatePlacement(0, 11, 20, 20), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
+                "a DefensePlatform requires a completed own Power plant");
             Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
             f.Step(1); // commit the balance (100 provided)
-            Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.Applied));
+            Assert.That(f.Construction.ValidatePlacement(0, 11, 20, 20), Is.EqualTo(CommandResultCode.Applied));
         }
 
         [Test]
@@ -335,19 +340,25 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void StartRefineryException_CompletedPlacement_BypassesPrerequisiteAndPower()
+        public void RefineryPlacement_NeedsNoPowerPlant_TheCommandPathEnforcesOnlyThePowerRule()
         {
             var f = new Fixture();
-            // Manifest: the STARTING Refinery is the only prerequisite
-            // exception — placed completed at match setup, it needs no Power
-            // plant and no free power.
-            EntityId refinery = f.Construction.PlaceCompletedBuilding(0, 4, 10, 10);
-            Assert.That(refinery.IsValid, Is.True);
-            Assert.That(f.Entities.GetUnitRef(refinery).Role, Is.EqualTo(UnitRole.Refinery));
-            Assert.That(f.Construction.HasFinishedBuilding(0, UnitRole.Refinery), Is.True);
+            // D-077: the Refinery lost its Power-plant prerequisite in both
+            // factions. With a completed HQ (30 provided, covering the 20
+            // draw) the command path accepts it directly — the classic loop
+            // start needs no Power plant first.
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ provides 30");
+            f.Step(1); // commit the balance
+            Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.Applied),
+                "no Power plant required (D-077)");
 
-            // ... while the command path still enforces the regular rules.
-            Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
+            // PlaceCompletedBuilding still bypasses the power rule: a second
+            // Refinery placed completed draws into the grid unchecked, ...
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 24, 24).IsValid, Is.True);
+            f.Step(1); // commit 30 provided / 20 required
+            // ... while the command path keeps enforcing it: the 10 free
+            // power cannot cover a third Refinery's 20.
+            Assert.That(f.Construction.ValidatePlacement(0, 4, 30, 30), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
         }
 
         [Test]

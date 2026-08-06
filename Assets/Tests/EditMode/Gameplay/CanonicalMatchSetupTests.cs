@@ -68,6 +68,30 @@ namespace Nova.Gameplay.Tests
             "Nova.Simulation.Victory.VictorySystem",
         };
 
+        /// <summary>
+        /// The canonical DEMO host's tick order (MatchRunner with the MS-1
+        /// skirmish AI enabled — the default): the plain G1 order plus the AI
+        /// between combat and victory, so its decisions read the post-combat
+        /// state and victory still judges last (MatchRunner's registration
+        /// comment; docs/tech/AIArchitecture.md — the AI is a session
+        /// sidecar). The headless determinism harness registers NO AI and is
+        /// pinned against <see cref="CanonicalTickOrder"/> by the .NET lane;
+        /// this lane pins BOTH lists, MatchRunner against this one and the
+        /// reference host against the plain one.
+        /// </summary>
+        private static readonly string[] CanonicalDemoHostTickOrder =
+        {
+            "Nova.Simulation.Economy.EconomySystem",
+            "Nova.Simulation.Construction.ConstructionSystem",
+            "Nova.Simulation.Production.ProductionSystem",
+            "Nova.Simulation.Pathfinding.PathfindingSystem",
+            "Nova.Simulation.Movement.MovementSystem",
+            "Nova.Simulation.Vision.FogOfWarSystem",
+            "Nova.Simulation.Combat.CombatSystem",
+            "Nova.AI.SkirmishAiSystem",
+            "Nova.Simulation.Victory.VictorySystem",
+        };
+
         /// <summary>Canonical match configuration (DeterminismOptions defaults / MS-1 manifest capacity).</summary>
         private const ulong CanonicalSeed = 0xDE7E000000010271UL;
         private const ushort MapWidth = 128;
@@ -78,11 +102,6 @@ namespace Nova.Gameplay.Tests
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
         private const ushort DefHQAlliance = 3;
         private const ushort DefHQLegion = 20;
-        private const ushort DefRefineryAlliance = 4;
-        private const ushort DefRefineryLegion = 21;
-
-        /// <summary>Harvester move speed, Q16.16 raw (2.5 cells/tick).</summary>
-        private const int HarvesterSpeedRaw = 163840;
 
         private sealed class ReferenceHost
         {
@@ -91,8 +110,6 @@ namespace Nova.Gameplay.Tests
             public EconomySystem Economy;
             public ConstructionSystem Construction;
             public CommandIngress Ingress;
-            public EntityId HarvesterA;
-            public EntityId HarvesterB;
         }
 
         /// <summary>
@@ -108,7 +125,10 @@ namespace Nova.Gameplay.Tests
             var entities = new EntityManager(EntityCapacity);
             var pathfinding = new PathfindingSystem(MapWidth, MapHeight);
             var movement = new MovementSystem(entities, pathfinding);
-            var economy = new EconomySystem(entities);
+            // The D-077 start balance: the same constant MatchRunner plumbs
+            // into the Unity host and the scenario's BuildHost uses — all
+            // three hosts must hash the identical initial state.
+            var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
@@ -153,40 +173,31 @@ namespace Nova.Gameplay.Tests
             public ushort FieldId;
             public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
-            public int RefineryOriginX, RefineryOriginY;
-            public int HarvesterAX, HarvesterAY, HarvesterBX, HarvesterBY;
             public int BuilderX, BuilderY;
-            public int[] SquadX, SquadY;
         }
 
         private static readonly SlotLayout Slot0Layout = new SlotLayout
         {
             FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
-            RefineryOriginX = 8, RefineryOriginY = 4,
-            HarvesterAX = 7, HarvesterAY = 6, HarvesterBX = 7, HarvesterBY = 7,
             BuilderX = 13, BuilderY = 7,
-            SquadX = new[] { 56, 57, 56, 57 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
 
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
             FieldId = 2, FieldX = 119, FieldY = 119,
             HqOriginX = 120, HqOriginY = 120,
-            RefineryOriginX = 116, RefineryOriginY = 120,
-            HarvesterAX = 119, HarvesterAY = 120, HarvesterBX = 119, HarvesterBY = 119,
             BuilderX = 113, BuilderY = 119,
-            SquadX = new[] { 65, 66, 65, 66 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
 
         /// <summary>
-        /// Byte-exact mirror of Determinism10000Scenario.SetupMatch. Spawn ORDER
-        /// is load-bearing: EntityManager hands out ids from a deterministic free
-        /// list, so any reordering shifts every id and therefore every hash.
-        /// Units spawn through SpawnUnit's defaults (maxHealth 100 for all),
-        /// exactly like the scenario — NOT through SimDefinitions.
+        /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
+        /// per slot one Aetherium field, a completed HQ and ONE Builder —
+        /// nothing else. Spawn ORDER is load-bearing: EntityManager hands
+        /// out ids from a deterministic free list, so any reordering shifts
+        /// every id and therefore every hash. Units spawn through SpawnUnit's
+        /// defaults (maxHealth 100 for all), exactly like the scenario —
+        /// NOT through SimDefinitions.
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
@@ -201,58 +212,11 @@ namespace Nova.Gameplay.Tests
                     Is.True, "reference field registration");
                 Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefHQAlliance : DefHQLegion, c.HqOriginX, c.HqOriginY).IsValid,
                     Is.True, "reference HQ placement");
-                Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefRefineryAlliance : DefRefineryLegion, c.RefineryOriginX, c.RefineryOriginY).IsValid,
-                    Is.True, "reference Refinery placement");
-
-                EntityId harvesterA = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterAX), SimFixed.FromInt(c.HarvesterAY)),
-                    SimFixed.FromRaw(HarvesterSpeedRaw), role: UnitRole.Harvester);
-                EntityId harvesterB = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterBX), SimFixed.FromInt(c.HarvesterBY)),
-                    SimFixed.FromRaw(HarvesterSpeedRaw), role: UnitRole.Harvester);
-                if (slot == 0)
-                {
-                    host.HarvesterA = harvesterA;
-                    host.HarvesterB = harvesterB;
-                }
 
                 host.Entities.SpawnUnit(
                     slot, new Transform2D(SimFixed.FromInt(c.BuilderX), SimFixed.FromInt(c.BuilderY)),
                     SimFixed.FromInt(3), role: UnitRole.Builder);
-
-                for (int i = 0; i < 4; i++)
-                {
-                    host.Entities.SpawnUnit(
-                        slot, new Transform2D(SimFixed.FromInt(c.SquadX[i]), SimFixed.FromInt(c.SquadY[i])),
-                        SimFixed.FromInt(4), role: UnitRole.BasicInfantry);
-                }
             }
-        }
-
-        /// <summary>
-        /// Mirror of MatchBootstrap's opening command pair: one Harvest intent
-        /// per human harvester, in spawn order, through the ingress. The kernel
-        /// block hashes the ingress dedupe/sequence state INCLUDING pending
-        /// records (SimulationKernel.BuildKernelBlock), so these two intents are
-        /// part of the tick-0 state hash and this lane has to compare against a
-        /// reference that carries them.
-        /// </summary>
-        private static void SubmitOpeningHarvestOrders(ReferenceHost host)
-        {
-            SubmitHarvest(host, host.HarvesterA, Slot0Layout.FieldId);
-            SubmitHarvest(host, host.HarvesterB, Slot0Layout.FieldId);
-        }
-
-        private static void SubmitHarvest(ReferenceHost host, EntityId harvester, ushort fieldId)
-        {
-            uint raw = UnitCommandStateView.ToRawEntityId(harvester);
-            Assert.That(raw, Is.Not.Zero, "reference harvester handle must pack to a valid raw id");
-
-            CommandIngressResult result = host.Ingress.TrySubmitIntent(
-                CommandIntent.Create(new HarvestPayload(new[] { raw }, fieldId)),
-                out CommandRejectReason reason);
-            Assert.That(result, Is.EqualTo(CommandIngressResult.Accepted),
-                $"reference opening harvest order rejected: {result} ({reason})");
         }
 
         private static string[] SystemTypeNames(SimulationKernel kernel)
@@ -310,11 +274,29 @@ namespace Nova.Gameplay.Tests
 
             runner.InitializeMatch(CanonicalSeed, MapWidth, MapHeight, EntityCapacity);
 
+            Assert.That(SystemTypeNames(runner.Kernel), Is.EqualTo(CanonicalDemoHostTickOrder),
+                "the Unity demo host must register the canonical G1 tick order with the MS-1 " +
+                "skirmish AI between combat and victory (the default demo configuration); " +
+                "the .NET lane pins the AI-less Determinism10000Scenario.BuildHost against " +
+                "the plain eight-system list. Block ids are sorted before hashing, so a " +
+                "reordering is INVISIBLE to every state-hash test — this assertion is the " +
+                "only thing that catches it.");
+        }
+
+        [Test]
+        public void MatchRunner_WithoutSkirmishAi_RegistersThePlainCanonicalOrder()
+        {
+            var go = new GameObject("TestOrderRunnerNoAi");
+            _spawned.Add(go);
+            MatchRunner runner = go.AddComponent<MatchRunner>();
+
+            runner.InitializeMatch(CanonicalSeed, MapWidth, MapHeight, EntityCapacity, enableSkirmishAi: false);
+
             Assert.That(SystemTypeNames(runner.Kernel), Is.EqualTo(CanonicalTickOrder),
-                "the Unity host must register exactly the canonical G1 tick order; " +
-                "the .NET lane pins Determinism10000Scenario.BuildHost against the same list. " +
-                "Block ids are sorted before hashing, so a reordering is INVISIBLE to every " +
-                "state-hash test — this assertion is the only thing that catches it.");
+                "an AI-less MatchRunner (debug scenes, harnesses) must register exactly the " +
+                "plain canonical G1 tick order the headless determinism harness pins.");
+            Assert.IsNull(runner.SkirmishAi, "opt-out must leave the AI unregistered");
+            Assert.IsNull(runner.AiSession, "opt-out must leave the AI peer session unbound");
         }
 
         [Test]
@@ -343,7 +325,6 @@ namespace Nova.Gameplay.Tests
 
             ReferenceHost reference = BuildReferenceHost(CanonicalSeed);
             ApplyOpeningPosition(reference);
-            SubmitOpeningHarvestOrders(reference);
 
             ulong bootstrapHash = bootstrap.Runner.Kernel.CalculateStateHash();
             ulong referenceHash = reference.Kernel.CalculateStateHash();
@@ -356,13 +337,13 @@ namespace Nova.Gameplay.Tests
         }
 
         [Test]
-        public void MatchBootstrap_WithDefinitionStats_DiffersOnlyInHarvesterMaxHealth()
+        public void MatchBootstrap_WithDefinitionStats_DiffersOnlyInBuilderMaxHealth()
         {
             // The one documented, deliberate divergence: SetupMatch spawns every
             // unit with SpawnUnit's maxHealth default of 100, while the graybox
-            // bootstrap defaults to the real SimDefinitions stats (Alliance
-            // Harvester 800, Vehicles.md "Demeter"). maxHealth is in the hashed
-            // entity-store block, so the two
+            // bootstrap defaults to the real SimDefinitions stats (the Alliance
+            // Builder's 350 — the D-077 opening's only unit). maxHealth is in
+            // the hashed entity-store block, so the two
             // modes cannot both be hash-identical to the harness. This test
             // documents the cost of the default so nobody "fixes" the parity
             // test by flipping it silently.
@@ -372,13 +353,13 @@ namespace Nova.Gameplay.Tests
             MatchBootstrap live = NewMatchObject(useDefinitionStats: true);
             live.StartGrayboxMatch();
 
-            Assert.That(parity.Runner.Entities.TryGetUnit(parity.LocalHarvesterA, out UnitState parityHarvester), Is.True);
-            Assert.That(live.Runner.Entities.TryGetUnit(live.LocalHarvesterA, out UnitState liveHarvester), Is.True);
+            Assert.That(parity.Runner.Entities.TryGetUnit(parity.LocalBuilder, out UnitState parityBuilder), Is.True);
+            Assert.That(live.Runner.Entities.TryGetUnit(live.LocalBuilder, out UnitState liveBuilder), Is.True);
 
-            Assert.That(parityHarvester.MaxHealth, Is.EqualTo(100), "SpawnUnit's default");
-            Assert.That(liveHarvester.MaxHealth, Is.EqualTo(800), "SimDefinitions Harvester stat");
-            Assert.That(parityHarvester.Role, Is.EqualTo(liveHarvester.Role));
-            Assert.That(parityHarvester.MoveSpeed, Is.EqualTo(liveHarvester.MoveSpeed),
+            Assert.That(parityBuilder.MaxHealth, Is.EqualTo(100), "SpawnUnit's default");
+            Assert.That(liveBuilder.MaxHealth, Is.EqualTo(350), "SimDefinitions Builder stat");
+            Assert.That(parityBuilder.Role, Is.EqualTo(liveBuilder.Role));
+            Assert.That(parityBuilder.MoveSpeed, Is.EqualTo(liveBuilder.MoveSpeed),
                 "move speed is identical in both paths — only maxHealth diverges");
 
             Assert.That(live.Runner.Kernel.CalculateStateHash(),
@@ -398,8 +379,6 @@ namespace Nova.Gameplay.Tests
             Assert.That(bootstrap.EnemyFieldCell, Is.EqualTo(new Vector2Int(119, 119)));
             Assert.That(bootstrap.LocalHqOrigin, Is.EqualTo(new Vector2Int(4, 4)));
             Assert.That(bootstrap.EnemyHqOrigin, Is.EqualTo(new Vector2Int(120, 120)));
-            Assert.That(bootstrap.LocalRefineryOrigin, Is.EqualTo(new Vector2Int(8, 4)));
-            Assert.That(bootstrap.EnemyRefineryOrigin, Is.EqualTo(new Vector2Int(116, 120)));
             Assert.That(bootstrap.MapSize, Is.EqualTo(new Vector2Int(MapWidth, MapHeight)));
 
             Assert.That(bootstrap.Runner.Session.LocalSlot, Is.EqualTo((byte)MatchBootstrap.LocalSlot),
@@ -409,6 +388,14 @@ namespace Nova.Gameplay.Tests
             Assert.That(bootstrap.Runner.Entities.TryGetUnit(bootstrap.LocalHq, out UnitState hq), Is.True);
             Assert.That(hq.PlayerId, Is.EqualTo((byte)MatchBootstrap.LocalSlot));
             Assert.That(hq.Role, Is.EqualTo(UnitRole.HQ));
+
+            Assert.That(bootstrap.Runner.Entities.TryGetUnit(bootstrap.LocalBuilder, out UnitState builder), Is.True,
+                "the D-077 opening spawns exactly one Builder per slot");
+            Assert.That(builder.PlayerId, Is.EqualTo((byte)MatchBootstrap.LocalSlot));
+            Assert.That(builder.Role, Is.EqualTo(UnitRole.Builder));
+
+            Assert.That(bootstrap.Runner.Economy.GetPlayerEconomy(MatchBootstrap.LocalSlot).AetheriumCredits,
+                Is.EqualTo(3000L), "the D-077 start balance (EconomySystem.CanonicalMatchStartingCreditsAE)");
         }
 
         [Test]

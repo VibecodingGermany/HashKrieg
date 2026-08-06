@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 using Nova.Core;
-using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
@@ -19,11 +18,22 @@ namespace Nova.Gameplay.Match
     /// <see cref="MatchRunner.StartMatch"/> and applies the canonical opening
     /// position.
     /// <para>
+    /// The canonical opening (D-077 — the classic loop start,
+    /// quality/content/mvp-v1.json startStatePerPlayer): per slot ONLY a
+    /// completed HQ, ONE Builder and 3.000 AE starting credits
+    /// (EconomySystem.CanonicalMatchStartingCreditsAE, plumbed in by
+    /// <see cref="MatchRunner.InitializeMatch"/>'s default) —
+    /// plus one Aetherium field per slot. The Refinery is NO longer
+    /// pre-placed: the player builds it (it has no Power-plant prerequisite
+    /// since D-077), and the completed Refinery — not the HQ — produces the
+    /// Harvesters.
+    /// </para>
+    /// <para>
     /// It MIRRORS <c>Determinism10000Scenario.SetupMatch</c>
     /// (tools/Nova.SimRunner/Determinism10000Scenario.cs): identical seed,
     /// identical map size, identical entity capacity, identical per-slot
-    /// layout AND identical spawn ORDER — field, HQ, Refinery, HarvesterA,
-    /// HarvesterB, Builder, four skirmish infantry; slot 0 first, then slot 1.
+    /// layout AND identical spawn ORDER — field, HQ, Builder; slot 0 first,
+    /// then slot 1.
     /// The order is load-bearing: the <see cref="EntityManager"/> hands out
     /// entity ids from a deterministic free list, so any reordering shifts
     /// every id and therefore every state hash. An EditMode test asserts that
@@ -39,7 +49,7 @@ namespace Nova.Gameplay.Match
     /// their real stats. Move speeds are identical either way (the
     /// definition table is deliberately speed-flat across factions and the
     /// scenario literals agree exactly); the ONLY value that differs is
-    /// maxHealth (e.g. the Alliance Harvester's 800 vs. the default 100),
+    /// maxHealth (e.g. the Alliance Builder's 350 vs. the default 100),
     /// and maxHealth IS part of the hashed entity-store block. Set
     /// <see cref="UseDefinitionStats"/> to false to get a byte-exact
     /// <c>SetupMatch</c> mirror — that is the switch the InitialStateHash
@@ -48,9 +58,9 @@ namespace Nova.Gameplay.Match
     /// <para>
     /// Command law (docs/tech/Commands.md, sprint hard rule 2): the initial
     /// spawn/placement is the one allowed direct write into simulation state.
-    /// Everything after it — including the opening harvest order — goes
-    /// through <see cref="MatchRunner.Ingress"/> as a
-    /// <see cref="CommandIntent"/>.
+    /// The setup submits NO opening commands — the first command of the
+    /// D-077 opening is the player's Refinery placement, and it enters
+    /// through <see cref="MatchRunner.Ingress"/> like every later order.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -94,9 +104,6 @@ namespace Nova.Gameplay.Match
         [SerializeField] public bool UseDefinitionStats = true;
 
         private readonly EntityId[] _hq = new EntityId[2];
-        private readonly EntityId[] _refinery = new EntityId[2];
-        private readonly EntityId[] _harvesterA = new EntityId[2];
-        private readonly EntityId[] _harvesterB = new EntityId[2];
         private readonly EntityId[] _builder = new EntityId[2];
 
         /// <summary>The runner this bootstrap drives (resolved from the same GameObject).</summary>
@@ -137,27 +144,14 @@ namespace Nova.Gameplay.Match
         /// <summary>Center cell of the opponent HQ footprint.</summary>
         public Vector2Int EnemyHqCenterCell => EnemyHqOrigin + Vector2Int.one;
 
-        /// <summary>Lower-left footprint origin of the human Refinery (8, 4).</summary>
-        public Vector2Int LocalRefineryOrigin => new Vector2Int(LocalLayout.RefineryOriginX, LocalLayout.RefineryOriginY);
-
-        /// <summary>Lower-left footprint origin of the opponent Refinery (116, 120).</summary>
-        public Vector2Int EnemyRefineryOrigin => new Vector2Int(EnemyLayout.RefineryOriginX, EnemyLayout.RefineryOriginY);
-
         /// <summary>Entity handle of the human HQ (invalid until the match is set up).</summary>
         public EntityId LocalHq => _hq[LocalSlot];
 
         /// <summary>Entity handle of the opponent HQ.</summary>
         public EntityId EnemyHq => _hq[EnemySlot];
 
-        /// <summary>Entity handle of the human Refinery.</summary>
-        public EntityId LocalRefinery => _refinery[LocalSlot];
-
-        /// <summary>Entity handle of the human Builder (spawned at 13, 7).</summary>
+        /// <summary>Entity handle of the human Builder (spawned at 13, 7 — the D-077 opening's only unit).</summary>
         public EntityId LocalBuilder => _builder[LocalSlot];
-
-        /// <summary>Entity handles of the two human Harvesters, in spawn order.</summary>
-        public EntityId LocalHarvesterA => _harvesterA[LocalSlot];
-        public EntityId LocalHarvesterB => _harvesterB[LocalSlot];
 
         private void Start()
         {
@@ -168,9 +162,10 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// Initializes and starts the runner, builds the canonical opening
-        /// position for both slots and submits the human player's opening
-        /// harvest order. Idempotent: a second call is a no-op.
+        /// Initializes and starts the runner and builds the canonical D-077
+        /// opening position for both slots (field, completed HQ, one
+        /// Builder). Submits no commands — the loop start is the player's
+        /// move. Idempotent: a second call is a no-op.
         /// </summary>
         public void StartGrayboxMatch()
         {
@@ -204,22 +199,16 @@ namespace Nova.Gameplay.Match
             SetupSlot(EnemyLayout);
             IsMatchReady = true;
 
-            // Everything past setup is a command. Session tick is still 0 and
-            // the input delay is 1, so these land in the batch sealed for tick
-            // 1 — exactly where the scenario script issues them.
-            SubmitHarvestOrder(_harvesterA[LocalSlot], LocalLayout.FieldId);
-            SubmitHarvestOrder(_harvesterB[LocalSlot], LocalLayout.FieldId);
-
             Debug.Log(
                 $"[MatchBootstrap] Graybox match started (seed 0x{_seed:X16}, {_mapWidth}x{_mapHeight}, " +
-                $"capacity {_entityCapacity}, definition stats {UseDefinitionStats}).");
+                $"capacity {_entityCapacity}, definition stats {UseDefinitionStats}, " +
+                $"start credits {Runner.Economy.GetPlayerEconomy(LocalSlot).AetheriumCredits} AE).");
         }
 
         /// <summary>
-        /// One slot's MS-1 start state: Aetherium field, completed HQ,
-        /// completed Refinery (the manifest's documented prerequisite
-        /// exception — no Power plant required), two Harvesters, one Builder,
-        /// four skirmish infantry. Spawn order mirrors SetupMatch exactly.
+        /// One slot's D-077 start state: an Aetherium field, a completed HQ
+        /// and one Builder near it — nothing else. Spawn order mirrors
+        /// SetupMatch exactly (field, HQ, Builder).
         /// </summary>
         private void SetupSlot(SlotLayout c)
         {
@@ -230,7 +219,6 @@ namespace Nova.Gameplay.Match
 
             FactionId faction = Runner.Economy.GetSlotFaction(c.Slot);
             ushort hqDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.HQ);
-            ushort refineryDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.Refinery);
 
             _hq[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, hqDefId, c.HqOriginX, c.HqOriginY);
             if (!_hq[c.Slot].IsValid)
@@ -238,20 +226,7 @@ namespace Nova.Gameplay.Match
                 throw new InvalidOperationException($"[MatchBootstrap] HQ placement failed for slot {c.Slot}");
             }
 
-            _refinery[c.Slot] = Runner.Construction.PlaceCompletedBuilding(c.Slot, refineryDefId, c.RefineryOriginX, c.RefineryOriginY);
-            if (!_refinery[c.Slot].IsValid)
-            {
-                throw new InvalidOperationException($"[MatchBootstrap] Refinery placement failed for slot {c.Slot}");
-            }
-
-            _harvesterA[c.Slot] = Spawn(c.Slot, UnitRole.Harvester, c.HarvesterAX, c.HarvesterAY);
-            _harvesterB[c.Slot] = Spawn(c.Slot, UnitRole.Harvester, c.HarvesterBX, c.HarvesterBY);
             _builder[c.Slot] = Spawn(c.Slot, UnitRole.Builder, c.BuilderX, c.BuilderY);
-
-            for (int i = 0; i < c.SquadX.Length; i++)
-            {
-                Spawn(c.Slot, UnitRole.BasicInfantry, c.SquadX[i], c.SquadY[i]);
-            }
         }
 
         /// <summary>
@@ -276,35 +251,6 @@ namespace Nova.Gameplay.Match
                 role: def.Role);
         }
 
-        /// <summary>
-        /// Sends one Harvest order through the ingress — the ONLY legal way a
-        /// MonoBehaviour touches a running match.
-        /// </summary>
-        private bool SubmitHarvestOrder(EntityId harvester, ushort fieldId)
-        {
-            if (!Runner.Entities.IsValid(harvester))
-            {
-                return false;
-            }
-
-            uint raw = UnitCommandStateView.ToRawEntityId(harvester);
-            if (raw == 0u)
-            {
-                return false;
-            }
-
-            var payload = new HarvestPayload(new[] { raw }, fieldId);
-            CommandIngressResult result = Runner.Ingress.TrySubmitIntent(
-                CommandIntent.Create(payload), out CommandRejectReason reason);
-            if (result != CommandIngressResult.Accepted)
-            {
-                Debug.LogError($"[MatchBootstrap] opening harvest order rejected: {result} ({reason}).");
-                return false;
-            }
-
-            return true;
-        }
-
         /// <summary>Fixed opening layout of one slot, in grid cells (mirrors Determinism10000Scenario's SlotLayout subset used by SetupMatch).</summary>
         private sealed class SlotLayout
         {
@@ -312,27 +258,20 @@ namespace Nova.Gameplay.Match
             public ushort FieldId;
             public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
-            public int RefineryOriginX, RefineryOriginY;
-            public int HarvesterAX, HarvesterAY, HarvesterBX, HarvesterBY;
             public int BuilderX, BuilderY;
-            public int[] SquadX, SquadY;
         }
 
         /// <summary>
-        /// Human base, bottom-left. Both harvesters stand in Chebyshev reach 1
-        /// of the field cell AND the Refinery footprint, so the harvest/return
-        /// cycle runs without walking.
+        /// Human base, bottom-left: the field sits two cells north-east of
+        /// the HQ footprint, the Builder just east of both — the natural
+        /// first build (a Refinery beside the field) is one step away.
         /// </summary>
         private static readonly SlotLayout LocalLayout = new SlotLayout
         {
             Slot = LocalSlot,
             FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
-            RefineryOriginX = 8, RefineryOriginY = 4,
-            HarvesterAX = 7, HarvesterAY = 6, HarvesterBX = 7, HarvesterBY = 7,
             BuilderX = 13, BuilderY = 7,
-            SquadX = new[] { 56, 57, 56, 57 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
 
         /// <summary>Opponent base, top-right: the 180-degree mirror of <see cref="LocalLayout"/>.</summary>
@@ -341,11 +280,7 @@ namespace Nova.Gameplay.Match
             Slot = EnemySlot,
             FieldId = 2, FieldX = 119, FieldY = 119,
             HqOriginX = 120, HqOriginY = 120,
-            RefineryOriginX = 116, RefineryOriginY = 120,
-            HarvesterAX = 119, HarvesterAY = 120, HarvesterBX = 119, HarvesterBY = 119,
             BuilderX = 113, BuilderY = 119,
-            SquadX = new[] { 65, 66, 65, 66 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
     }
 }
