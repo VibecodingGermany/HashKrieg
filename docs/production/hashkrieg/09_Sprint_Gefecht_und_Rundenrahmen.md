@@ -24,6 +24,38 @@ Der Arbeitsbaum wird vor jedem neuen Feature aufgeräumt. Drei Änderungen dürf
 
 Zwei Änderungen sind dagegen echt und gehören dokumentiert statt zurückgenommen: `QualitySettings antiAliasing 2 → 4` zusammen mit `NovaUrp m_MSAA 1 → 4` (gleichgerichtet, MSAA wird angehoben) und `GraphicsSettings m_LightsUseColorTemperature 0 → 1`.
 
+## 2.1 Blocker aus der zweiten Spielsitzung — der Loop ist noch nicht geschlossen
+
+**Stand 2026-08-06 abends, nach Sprint 10.** Bauen funktioniert, die Kaserne steht. Zwei Stellen weiter reißt die Kette trotzdem: **aus der Kaserne kommen keine Soldaten, und der Harvester erntet nicht.** Damit ist der Kernloop — Rohstoff ernten, Einheiten bauen, kämpfen — nach wie vor offen, und der Rest dieses Sprints lässt sich gar nicht erst spielen. Diese beiden Punkte gehen deshalb **vor** allem anderen.
+
+### Der Harvester — bewiesene Ursache, gleicher Fehler wie beim Builder
+
+`EconomySystem.ExecuteHarvestOrder` bricht ab, solange der Harvester nicht am Feld steht:
+
+```
+EconomySystem.cs — if (!IsInReach(in unit, field.GridPos)) return; // held, not dropped
+```
+
+Dasselbe gilt für die Rückfahrt: `ExecuteReturnOrder` zahlt nur aus, wenn der Harvester in Reichweite einer eigenen Raffinerie steht. Der Ernteauftrag wird also angenommen, das Fahrzeug bleibt stehen, und es passiert nie etwas.
+
+**Und wieder hat die KI genau die Verdrahtung, die dem Spieler fehlt.** `SkirmishAiSystem` Abschnitt (4), im Kommentar wörtlich: *„send every idle own harvester to the own field and **WALK harvesters into reach with explicit Move intents**"* — „micro the harvesters into the economy's reach rule". Der Gegner erntet, der Spieler nicht.
+
+**Lösung, nach dem Präzedenzfall D-085:** ein Harvester-Dispatch auf der Client-Seite, der beide Beine des Kreislaufs fährt — zum Feld, wenn ein Ernteauftrag steht und das Fahrzeug außer Reichweite ist; zur nächsten eigenen Raffinerie, sobald `IsReturningCargo` gesetzt ist. Move-Befehle über den normalen Command-Pfad, keine Regeländerung, kein Hash-Bruch. Die Automatik im Kreislauf selbst existiert bereits: die Simulation behält die `HarvestFieldId` über die Rückfahrt hinweg, es fehlt ausschließlich die Fahrt. Die Alternative — Harvester in der Simulation selbst fahren lassen — wäre eine Verhaltensänderung mit neuen Baselines und wird bewusst nicht gewählt.
+
+### Die Kaserne — Ursache offen, Diagnose zuerst
+
+Hier ist **keine** Ursache bewiesen, und geraten wird nicht. Der Befund: Der Wartebalken der Command Card läuft (er liest den echten Zustand über `ProductionSystem.TryGetProducer`, ist also kein Schein), aber es erscheint keine Einheit. Die Simulationstests decken genau diesen Pfad ab und sind grün — `ProductionSystemTests.Production_SpawnsAtDefaultRally_AfterExactBuildTicks` beweist, dass eine Kaserne bei Standard-Rally nach exakt `BuildTicks` spawnt. Der Defekt liegt also woanders als in der reinen Spawn-Logik.
+
+**Diagnose in dieser Reihenfolge — das F3-Panel beantwortet die erste Frage sofort:**
+
+1. **Steigt die Einheitenzahl im F3-Panel** (`Forces: slot 0 Nu/Nb`), wenn der Balken durchläuft? Das trennt Simulation und Darstellung in einem Blick.
+2. **Ja, sie steigt** → die Einheit existiert und ist nur nicht zu sehen. Dann liegt es an der Darstellung: `UnitViewManager.ResolveViewPrefab` löst lokal auf die 34 Art-Prefabs aus der `AssetMappingRegistry` auf — ein fehlendes, falsch skaliertes oder unter den Boden gesetztes Infanterie-Prefab sieht exakt so aus wie „spawnt nicht". Gegenprobe: Registry-Eintrag der Infanterierolle leeren, dann muss das Graybox-Primitiv erscheinen. **Kein Test deckt diesen Pfad ab**, weil Tests keine Prefabs laden.
+3. **Nein, sie steigt nicht** → einer der beiden **stillen Pausenpfade** in `ProductionSystem.ExecuteTick` greift: Entity-Store voll, oder `TryFindSpawnCell` findet in acht Ringen keine freie Zelle. Beide setzen den Fortschritt zurück auf die Schwelle und schweigen — der Balken steht dann voll und nichts passiert. Beide Kapazitäten sprechen dagegen (1024 Entities, Ring 8), aber der Pfad ist da und muss geprüft werden.
+
+**Unabhängig vom Ergebnis:** beide stillen Pausen bekommen eine Rückmeldung, genau wie die Baustelle in Sprint 10 eine bekommen hat. Eine Produktion, die aus einem dieser Gründe hängt, muss das auf der Karte sagen — „kein Platz zum Ausrücken" ist eine Nachricht, kein Schweigen.
+
+**Verbindlich:** Erst ein Test, der den Defekt reproduziert, dann die Behebung. Wenn der Defekt in der Darstellung liegt, ist es ein PlayMode-Test; liegt er in der Simulation, ein EditMode-/SimRunner-Test.
+
 ## 3. Drei Eingabedefekte — zuerst, weil sie das neue HUD vergiften
 
 1. **Rechtsklick kennt die HUD-Sperre nicht.** `IsPointerOverHud` wird an drei Stellen geprüft (`RtsDeviceInput.cs:493`, `:525`, `:739`), aber der Rechtsklick-Zweig bei `:562` prüft sie nicht. Wer mit selektierter Armee auf die Bauleiste, die Minimap oder die Command Card rechtsklickt, schickt seine Truppen an den Punkt dahinter. Genau die Sorte „das Spiel macht etwas, das ich nicht wollte", gegen die der ganze HUD-Sprint angetreten ist.
@@ -106,7 +138,9 @@ Der Rundenrahmen ist die richtige Stelle dafür: Musik hat dieselben Zustandsüb
 
 ## 9. Fertig wenn
 
-Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — **und sie kämpft von selbst**. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit der Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Es läuft Musik, solange die Runde läuft, und sie verstummt mit dem Ergebnis. Und wenn die Runde vorbei ist, drücke ich auf *Neue Runde* statt auf *Programm beenden*.
+Ich schicke den Harvester auf ein Feld — **er fährt hin, erntet, liefert bei der Raffinerie ab und fängt von allein wieder an**, mein Kontostand steigt ohne einen weiteren Klick. Ich baue in der Kaserne Soldaten, **und sie stehen danach vor der Kaserne**. Ich schicke sie zur Gegnerbasis — **und sie kämpfen von selbst**. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit der Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Es läuft Musik, solange die Runde läuft, und sie verstummt mit dem Ergebnis. Und wenn die Runde vorbei ist, drücke ich auf *Neue Runde* statt auf *Programm beenden*.
+
+Das ist der geschlossene Kernloop: ernten, bauen, kämpfen, gewinnen oder verlieren, neu anfangen.
 
 ---
 
@@ -142,7 +176,55 @@ Gegnerbasis schicken -> JEDEN GEGNER EINZELN ANKLICKEN -> "VICTORY" erscheint al
 in der Statuszeile, die Simulation tickt weiter, und der einzige Ausweg ist das Beenden
 der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
 
-1. DREI EINGABEDEFEKTE (zuerst — sie vergiften sonst das neue HUD)
+1. DER LOOP IST NICHT GESCHLOSSEN — VOR ALLEM ANDEREN
+   Befund der zweiten Spielsitzung, nach Sprint 10: Bauen funktioniert, die Kaserne steht.
+   Aber AUS DER KASERNE KOMMEN KEINE SOLDATEN, und DER HARVESTER ERNTET NICHT. Ohne diese
+   beiden Punkte laesst sich der Rest dieses Sprints nicht einmal spielen.
+
+   (a) HARVESTER — Ursache bewiesen, derselbe Fehler wie beim Builder in D-085.
+       EconomySystem.ExecuteHarvestOrder bricht ab, solange das Fahrzeug nicht am Feld
+       steht: "if (!IsInReach(in unit, field.GridPos)) return; // held, not dropped".
+       Dasselbe bei der Rueckfahrt: ExecuteReturnOrder zahlt nur in Reichweite einer
+       eigenen Raffinerie aus. Der Auftrag wird angenommen, das Fahrzeug bleibt stehen.
+       Und wieder hat die KI die Verdrahtung, die dem Spieler fehlt — SkirmishAiSystem
+       Abschnitt (4), Kommentar woertlich: "send every idle own harvester to the own field
+       and WALK harvesters into reach with explicit Move intents".
+       LOESUNG nach dem Praezedenzfall D-085: ein Harvester-Dispatch auf der Client-Seite,
+       der beide Beine faehrt — zum Feld, wenn ein Ernteauftrag steht und das Fahrzeug
+       ausser Reichweite ist; zur naechsten eigenen Raffinerie, sobald IsReturningCargo
+       gesetzt ist. Move-Befehle ueber den normalen Command-Pfad. KEINE Regelaenderung,
+       KEIN Hash-Bruch. Die Kreislauf-Automatik existiert schon: die Simulation behaelt die
+       HarvestFieldId ueber die Rueckfahrt hinweg, es fehlt ausschliesslich die Fahrt.
+       Harvester in der Simulation selbst fahren zu lassen ist die Alternative und wird
+       BEWUSST NICHT gewaehlt — das waere eine Verhaltensaenderung mit neuen Baselines.
+
+   (b) KASERNE — Ursache OFFEN. Nicht raten, erst diagnostizieren.
+       Der Wartebalken laeuft und liest den echten Zustand (CommandCardHud ueber
+       ProductionSystem.TryGetProducer), aber es erscheint keine Einheit. Die
+       Simulationstests decken den Spawn-Pfad ab und sind gruen
+       (ProductionSystemTests.Production_SpawnsAtDefaultRally_AfterExactBuildTicks).
+       Der Defekt liegt also nicht in der reinen Spawn-Logik.
+       DIAGNOSE IN DIESER REIHENFOLGE — das F3-Panel beantwortet Frage 1 sofort:
+       1. Steigt die Einheitenzahl im F3-Panel (Forces: slot 0 Nu/Nb), waehrend der Balken
+          durchlaeuft? Das trennt Simulation und Darstellung in einem Blick.
+       2. JA -> die Einheit existiert und ist nur nicht sichtbar. Dann Darstellung:
+          UnitViewManager.ResolveViewPrefab loest lokal auf die 34 Art-Prefabs aus der
+          AssetMappingRegistry auf. Ein fehlendes, falsch skaliertes oder unter den Boden
+          gesetztes Infanterie-Prefab sieht exakt aus wie "spawnt nicht". Gegenprobe:
+          Registry-Eintrag der Infanterierolle leeren, dann MUSS das Graybox-Primitiv
+          erscheinen. Kein Test deckt diesen Pfad ab — Tests laden keine Prefabs.
+       3. NEIN -> einer der beiden STILLEN PAUSENPFADE in ProductionSystem.ExecuteTick:
+          Entity-Store voll, oder TryFindSpawnCell findet in acht Ringen keine freie Zelle.
+          Beide setzen den Fortschritt auf die Schwelle zurueck und schweigen. Beide
+          Kapazitaeten sprechen dagegen (1024 Entities, Ring 8), der Pfad ist aber da.
+       UNABHAENGIG VOM ERGEBNIS: beide stillen Pausen bekommen eine Rueckmeldung, genau wie
+       die Baustelle in Sprint 10. "Kein Platz zum Ausruecken" ist eine Nachricht, kein
+       Schweigen.
+       VERBINDLICH: erst ein Test, der den Defekt reproduziert, dann die Behebung. Liegt er
+       in der Darstellung, ist es ein PlayMode-Test; liegt er in der Simulation, ein
+       EditMode-/SimRunner-Test.
+
+2. DREI EINGABEDEFEKTE (sie vergiften sonst das neue HUD)
    a) Rechtsklick kennt die HUD-Sperre nicht: IsPointerOverHud wird bei RtsDeviceInput.cs
       :493, :525 und :739 geprüft, aber NICHT im Rechtsklick-Zweig bei :562. Wer mit
       selektierter Armee auf Bauleiste, Minimap oder Command Card rechtsklickt, schickt
@@ -160,7 +242,7 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
    Bauleiste wie Minimap ragen 4 px in den 12 px breiten Randscroll-Streifen der Kamera:
    der Weg zur Bauleiste scrollt die Karte.
 
-2. ZIELERFASSUNG UND FEUERERWIDERUNG — der Kern
+3. ZIELERFASSUNG UND FEUERERWIDERUNG — der Kern
    CombatSystem.ExecuteTick überspringt heute jede Einheit ohne gesetztes Ziel
    (CombatSystem.cs:168). AttackTarget wird NUR durch einen expliziten Befehl gesetzt,
    also braucht jeder einzelne Schuss einen Klick.
@@ -184,12 +266,12 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
    NICHT in diesem Sprint: Attack-Move. Das bräuchte CommandKind 18 gegen das eingefrorene
    v1-Register oder StateVersion 4->5. Eigener Sprint. Nicht mit hineinbündeln.
 
-3. LEBENSBALKEN (reine Präsentation, null Simulationsänderung)
+4. LEBENSBALKEN (reine Präsentation, null Simulationsänderung)
    UnitState.CurrentHealth und MaxHealth existieren (UnitState.cs:41-42). Balken über
    Einheiten und Gebäuden. Vorschlag: nur bei Schaden oder Selektion zeigen, nicht
    permanent über allem.
 
-4. RUNDENRAHMEN (der größte Posten)
+5. RUNDENRAHMEN (der größte Posten)
    - Ergebnisbildschirm: VictorySystem kennt den Ausgang bereits, DebugHud schreibt ihn
      nur als Wort. Panel "Sieg"/"Niederlage" mit zwei Knöpfen: Neue Runde, Hauptmenü.
    - Sichtbare Pause: MatchRunner.PauseMatch existiert, aber pausiert und kaputt sehen
@@ -202,7 +284,7 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
      anlegt und nie an eine geänderte Fog-Grid-Größe anpasst (IndexOutOfRangeException bei
      größerer Karte). Defensiv mitreparieren.
 
-5. MUSIK IM GEFECHT (gehoert zum Rundenrahmen — gleiche Zustandsuebergaenge)
+6. MUSIK IM GEFECHT (gehoert zum Rundenrahmen — gleiche Zustandsuebergaenge)
    Heute verstummt das Spiel in der Sekunde, in der es losgeht: MenuMusicPlayer blendet
    beim Matchstart aus, danach Stille.
    MATERIAL: Hashkrieg_Assets/audio/Music_inGame/ — acht Suno-Dateien, real DREI Themen
@@ -229,7 +311,7 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
    plus Eintraege im Lizenz-Ledger §3. Ohne diesen Eintrag werden die Dateien NICHT
    committet.
 
-6. BILLIGE BEDIENBARKEIT
+7. BILLIGE BEDIENBARKEIT
    - Kontrollgruppen 1-9 (Strg+Zahl setzen, Zahl abrufen) und additive Auswahl mit Shift.
      Reiner Auswahlzustand im SelectionManager, der schon eine EditMode-Fixture hat.
      Null Berührung von Simulation, Determinismus, Snapshot-Format, Befehlsregister.
@@ -244,16 +326,21 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
 
 REIHENFOLGE
 1. Arbeitsbaum sauber, inkl. der drei Aussonderungen (Voraussetzung)
-2. Die drei Eingabedefekte (klein, sofort spürbar)
-3. Zielerfassung + Feuererwiderung + Lebensbalken (der Kern — zusammen testen)
-4. Rundenrahmen
-5. Musik (setzt den Rundenrahmen voraus: sie haengt an dessen Zustandsuebergaengen)
-6. Kontrollgruppen, Ablehnungsgründe, Chrome, Legende
+2. DER LOOP: Harvester faehrt und erntet, Kaserne spawnt — zuerst, alles andere baut
+   darauf auf und laesst sich ohne das nicht einmal spielen
+3. Die drei Eingabedefekte (klein, sofort spürbar)
+4. Zielerfassung + Feuererwiderung + Lebensbalken (der Kern — zusammen testen)
+5. Rundenrahmen
+6. Musik (setzt den Rundenrahmen voraus: sie haengt an dessen Zustandsuebergaengen)
+7. Kontrollgruppen, Ablehnungsgründe, Chrome, Legende
 
 FERTIG WENN
-Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — und sie kämpft von
-selbst. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf
-angreifende Gegner. Ich hole meine Armee mit Taste 1 zurück. Wenn ein Befehl abgelehnt
-wird, sehe ich warum. Es läuft Musik, solange die Runde läuft. Und wenn die Runde vorbei
-ist, drücke ich auf "Neue Runde" statt auf "Programm beenden".
+Ich schicke den Harvester auf ein Feld, er faehrt hin, erntet, bringt die Ladung zur
+Raffinerie und faengt von allein wieder an — mein Kontostand steigt, ohne dass ich klicke.
+Ich baue in der Kaserne Soldaten, und sie stehen danach vor der Kaserne. Ich schicke sie
+zur Gegnerbasis — und sie kämpfen von selbst. Ich sehe an Lebensbalken, wer verliert.
+Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit
+Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Es läuft Musik, solange
+die Runde läuft. Und wenn die Runde vorbei ist, drücke ich auf "Neue Runde" statt auf
+"Programm beenden".
 ```
