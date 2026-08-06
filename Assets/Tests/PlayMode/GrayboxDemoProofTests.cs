@@ -18,6 +18,14 @@ namespace Nova.PlayMode.Tests
     /// output/demo/ so a human can SEE the Glutrinne blockout without opening
     /// the editor.
     /// <para>
+    /// SINCE THE MAIN-MENU SPRINT the scene no longer starts a match by
+    /// itself: MatchBootstrap.AutoStart is off and the menu overlay owns the
+    /// start, so both tests below open the match explicitly (see
+    /// StartMatchTheWayTheMenuDoes). What the menu adds on top of that — the
+    /// overlay, its buttons and the settings — is proven by MainMenuTests;
+    /// this file stays about the simulation and the render.
+    /// </para>
+    /// <para>
     /// Run headless-with-graphics (NO -nographics, screenshots need a render
     /// device) and NEVER with -quit (quality/scripts/run_gate_check.py:462 —
     /// -quit silently skips the whole run):
@@ -38,13 +46,8 @@ namespace Nova.PlayMode.Tests
             yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
 
             var bootstrap = Object.FindAnyObjectByType<MatchBootstrap>();
-            Assert.NotNull(bootstrap);
-            float deadline = Time.realtimeSinceStartup + 15f;
-            while (!bootstrap.IsMatchReady && Time.realtimeSinceStartup < deadline)
-            {
-                yield return null;
-            }
-            Assert.IsTrue(bootstrap.IsMatchReady);
+            Assert.NotNull(bootstrap, "Bootstrap scene contains no MatchBootstrap");
+            StartMatchTheWayTheMenuDoes(bootstrap);
 
             // Let shaders and first frames settle before capturing.
             yield return new WaitForSeconds(2f);
@@ -61,6 +64,36 @@ namespace Nova.PlayMode.Tests
                 Assert.IsTrue(File.Exists(shot), $"screenshot missing: {shot}");
                 Assert.Greater(new FileInfo(shot).Length, 10 * 1024, $"screenshot suspiciously small: {shot}");
             }
+        }
+
+        /// <summary>
+        /// Opens the match exactly where "Neues Spiel" opens it. The Bootstrap
+        /// scene loads into an idle host since the main-menu sprint
+        /// (MatchBootstrap.AutoStart is off, written by BootstrapSceneGenerator),
+        /// so waiting for IsMatchReady would now simply run into the old 15 s
+        /// timeout.
+        /// <para>
+        /// The button itself is not pressed here, deliberately:
+        /// MainMenuController sits in Nova.Presentation.UI, which no test
+        /// assembly may reference (quality/scripts/run_gate_check.py:183-188),
+        /// and its click handler is private. MainMenuTests presses the real
+        /// button through the panel and proves that path; this file proves the
+        /// match behind it, and calls the same public entry point the button
+        /// calls.
+        /// </para>
+        /// <para>
+        /// StartGrayboxMatch() is synchronous and idempotent: it builds the
+        /// D-077 opening position before it returns, and it is a no-op if the
+        /// scene did start the match on its own — so this also still works
+        /// against a Bootstrap.unity generated before the menu existed.
+        /// </para>
+        /// </summary>
+        private static void StartMatchTheWayTheMenuDoes(MatchBootstrap bootstrap)
+        {
+            bootstrap.StartGrayboxMatch();
+            Assert.IsTrue(bootstrap.IsMatchReady,
+                "StartGrayboxMatch() left the host un-ready — the canonical opening position was " +
+                "not built, so there is nothing to render and nothing to prove");
         }
 
         /// <summary>Renders one frame from a throwaway camera posed at <paramref name="position"/> looking at <paramref name="target"/>. The RTS camera is left untouched.</summary>
@@ -92,13 +125,7 @@ namespace Nova.PlayMode.Tests
             var bootstrap = Object.FindAnyObjectByType<MatchBootstrap>();
             Assert.NotNull(bootstrap, "Bootstrap scene contains no MatchBootstrap");
 
-            // AutoStart fires in Start(), one frame after the scene loads.
-            float deadline = Time.realtimeSinceStartup + 15f;
-            while (!bootstrap.IsMatchReady && Time.realtimeSinceStartup < deadline)
-            {
-                yield return null;
-            }
-            Assert.IsTrue(bootstrap.IsMatchReady, "Match did not become ready within 15 s of scene load");
+            StartMatchTheWayTheMenuDoes(bootstrap);
 
             MatchRunner runner = bootstrap.Runner;
             Assert.NotNull(runner, "MatchBootstrap has no runner bound");
@@ -185,7 +212,11 @@ namespace Nova.PlayMode.Tests
         /// no-op in -batchmode (no frame is ever presented), so the proof
         /// renders through a RenderTexture instead — the only path that works
         /// headless-with-graphics. IMGUI overlays (the debug HUD) do not draw
-        /// into a RenderTexture; the capture is world-only.
+        /// into a RenderTexture, and neither does the main menu: its UIDocument
+        /// renders through a screen-space-overlay PanelSettings, which is
+        /// composited after all cameras and never into a camera target texture
+        /// (MenuAssetSetup.LoadOrCreatePanelSettings). The capture stays
+        /// world-only, exactly as before the menu existed.
         /// </summary>
         private static void CaptureFrame(Camera camera, string path, int width = 1600, int height = 900)
         {

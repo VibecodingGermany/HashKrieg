@@ -73,6 +73,7 @@ namespace Nova.Presentation.UI
 
         private GUIStyle _labelStyle;
         private GUIStyle _outcomeStyle;
+        private GUIStyle _statusStyle;
 
         // Force census, recomputed at most once per frame (OnGUI runs twice:
         // Layout + Repaint) so the O(capacity) sweep is not paid twice.
@@ -101,6 +102,14 @@ namespace Nova.Presentation.UI
             if (_labelStyle == null)
             {
                 _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = _fontSize, richText = false, wordWrap = true };
+            }
+            if (_statusStyle == null)
+            {
+                // The always-on status bar is cockpit chrome, not debug text:
+                // the shared HudChrome frame (the F3 panel below keeps its
+                // plain box — it IS a debug view).
+                _statusStyle = new GUIStyle(_labelStyle) { wordWrap = false };
+                HudChrome.ApplyPanelChrome(_statusStyle);
             }
 
             float scale = Mathf.Max(1f, _uiScale);

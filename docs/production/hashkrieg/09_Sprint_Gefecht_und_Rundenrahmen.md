@@ -1,0 +1,209 @@
+# Sprint: Gefecht und Rundenrahmen
+
+**Status:** vorgeschlagen, nicht begonnen | **Vorgänger:** HUD-Sprint (D-084) und Hauptmenü-Sprint (D-083), beide umgesetzt, noch uncommittet | **Leitsatz:** aus der Demo wird eine Runde
+
+## 1. Wo wir stehen
+
+Beide Vorgängersprints sind inhaltlich da. Vom HUD-Sprint sind sieben der neun Punkte vollständig, zwei teilweise. Das Hauptmenü ist seit dem Generatorlauf vollständig verdrahtet: `AutoStart: 0`, MainMenu-Objekt mit Controller, Musik und AudioSource, AudioListener an der Kamera, PanelSettings vorhanden.
+
+Die reale Spielschleife heute: Play → Menü → Neues Spiel → HQ, Builder, 3.000 AE → Raffinerie über die Bauleiste setzen → Harvester produzieren → Kraftwerk, Kaserne, Fahrzeugfabrik → Truppen bauen → zur Gegnerbasis schicken → **jeden Gegner einzeln anklicken, bis das feindliche HQ fällt** → „VICTORY" erscheint als Wort in der Statuszeile, die Simulation tickt weiter, und der einzige Ausweg ist das Beenden der Anwendung.
+
+Genau diese beiden hervorgehobenen Stellen sind der Unterschied zwischen einer Demo, die man einmal vorführt, und einem Spiel, das man zweimal spielt. Sie sind der Inhalt dieses Sprints.
+
+## 2. Voraussetzung — kein Sprintinhalt, aber Blocker
+
+Der Arbeitsbaum trägt 70 uncommittete Einträge, darunter zwei fertige Sprints. Das gehört committet, **bevor** weitere Features darauf gestapelt werden. Drei Änderungen dürfen dabei nicht mitkommen:
+
+| Datei | Warum raus |
+|---|---|
+| `Assets/_Project/Data/Registries/AssetMappingRegistry.asset` | +72 Zeilen GUID-Verweise auf **gitignorierte** Prefabs. In jedem frischen Clone zeigen sie ins Leere. Der Inhaber hat ausdrücklich entschieden, dass die Datei leer im Repo bleibt. |
+| `Packages/manifest.json` + `packages-lock.json` | Zwei Unity-AI-Editor-Pakete, eines davon Prerelease. Gehören in keinen der beiden Sprints und würden für jeden Klon und jeden CI-Lauf verbindlich. |
+| `Assets/DefaultVolumeProfile.asset` | 785 Zeilen reine Editor-Re-Serialisierung, kein einziger Effekt aktiviert. Diff-Rauschen, das jedes künftige Blame verdeckt. |
+
+Zwei Änderungen sind dagegen echt und gehören dokumentiert statt zurückgenommen: `QualitySettings antiAliasing 2 → 4` zusammen mit `NovaUrp m_MSAA 1 → 4` (gleichgerichtet, MSAA wird angehoben) und `GraphicsSettings m_LightsUseColorTemperature 0 → 1`.
+
+## 3. Drei Eingabedefekte — zuerst, weil sie das neue HUD vergiften
+
+1. **Rechtsklick kennt die HUD-Sperre nicht.** `IsPointerOverHud` wird an drei Stellen geprüft (`RtsDeviceInput.cs:493`, `:525`, `:739`), aber der Rechtsklick-Zweig bei `:562` prüft sie nicht. Wer mit selektierter Armee auf die Bauleiste, die Minimap oder die Command Card rechtsklickt, schickt seine Truppen an den Punkt dahinter. Genau die Sorte „das Spiel macht etwas, das ich nicht wollte", gegen die der ganze HUD-Sprint angetreten ist.
+
+2. **Roter Baugeist platziert trotzdem.** Der Klick prüft `_placementHasCell`, nicht `_placementValid` (`RtsDeviceInput.cs:493-499`). Zusätzlich klemmt `ToGridCoordinate` negative Footprint-Ursprünge auf 0 — am linken und unteren Kartenrand entsteht das Gebäude also an einer anderen Stelle als der Geist zeigte.
+
+3. **Command Card wird unten abgeschnitten.** `EstimateHeight` rechnet die GUILayout-Margins und das Panel-Padding nicht mit (~40 px bei einer Fahrzeugfabrik mit vier produzierbaren Einheiten). Die unteren Zeilen samt Abbruch-Buttons liegen außerhalb der `BeginArea` und sind nicht mehr klickbar.
+
+Dazu zwei kleinere aus derselben Familie: die Rally-Point-Geste kapert den Rechtsklick, sobald bei einer Rahmenauswahl ein Gebäude mit drin ist (das HQ hat spawnbedingt immer den niedrigsten Index und damit `selected[0]`) — Rally sollte nur greifen, wenn die Selektion **ausschließlich** Gebäude enthält. Und Bauleiste wie Minimap ragen 4 px in den 12 px breiten Randscroll-Streifen der Kamera: wer den Mauszeiger an den unteren Bildschirmrand zur Bauleiste führt, scrollt dabei die Karte.
+
+## 4. Der Kern: Zielerfassung und Feuererwiderung
+
+**Das ist der eine Eingriff, der das Spielgefühl umdreht.**
+
+`CombatSystem.ExecuteTick` überspringt heute jede Einheit ohne gesetztes Ziel:
+
+```
+CombatSystem.cs:168 — if (!attacker.IsActive || !attacker.AttackTarget.IsValid) continue;
+```
+
+`AttackTarget` wird ausschließlich durch einen expliziten `AttackTarget`-Befehl gesetzt. Folge: **jeder einzelne Schuss braucht einen Klick.** Eine Armee, die man irgendwohin schickt, verteidigt sich nicht, verfolgt nicht und schießt auf nichts. Die vorhandene Schadens- und Panzerungsmatrix, die Waffenprofile und die Reichweiten liegen ungenutzt daneben.
+
+Das Gleiche trifft die **Verteidigungsplattform** noch härter. Sie ist bewaffnet (20 Schaden, Reichweite 10, Cooldown 10 Ticks — `SimDefinitions.cs:385`), und der Kommentar bei `:301` sagt ausdrücklich „DefensePlatform is armed because buildings CAN shoot". Aber `SelectionManager.CopyMobileSelection` filtert Gebäude aus jeder Befehlsselektion — ein Gebäude kann also gar keinen Angriffsbefehl empfangen und damit nie ein `AttackTarget` bekommen. Das einzige bewaffnete Gebäude des Spiels ist heute eine 400-AE-Kostenfalle.
+
+**Eine zusätzliche Phase in `CombatSystem.ExecuteTick` löst beides.** Für jede aktive Einheit ohne gültiges Ziel: nächstes feindliches, sichtbares Ziel in Waffenreichweite suchen und `AttackTarget` setzen. Gebäude eingeschlossen. Das braucht
+
+- **kein** neues Feld in `UnitState` — `AttackTarget` liegt bereits im Entity-Store-Block v4,
+- **keine** Snapshot-Versionserhöhung,
+- **keinen** neuen `CommandKind` — das v1-Register bleibt eingefroren,
+- und die Sichtprüfung existiert schon (`FogOfWarSystem.GetTeamView`, wird von `CombatSystem` bereits benutzt).
+
+**Der ehrliche Preis:** das ist die erste Simulationsänderung dieser Sprintreihe. Sie verändert den kanonischen Zustandsverlauf, und damit werden mehrere Baselines in `tools/Nova.SimRunner.Tests` rot — `MatchFingerprintTests`, `ReplayTests`, `SnapshotHashSensitivityTests` und die Öffnungs-Hash-Tests. Das ist kein Defekt, sondern genau das, wofür diese Tests da sind: sie melden, dass sich das Spielverhalten geändert hat. Die Baselines werden bewusst und dokumentiert neu gesetzt, nicht stillschweigend.
+
+**Wichtig für die Determinismus-Disziplin:** die Zielsuche muss eine **stabile, indexbasierte Reihenfolge** haben (kleinster Entity-Index gewinnt bei gleichem Abstand), damit zwei Hosts dieselbe Wahl treffen. Kein `float`, keine Distanzsortierung über Fließkomma — Abstandsvergleich im Quadrat über `SimFixed`.
+
+**Bewusst nicht in diesem Sprint: Attack-Move.** Die Geste „geh dorthin und schieß auf alles unterwegs" braucht entweder einen neuen `CommandKind` 18 gegen das eingefrorene v1-Register samt Golden-Bytes-Test, oder ein neues Zustandsfeld mit `StateVersion` 4 → 5. Beides ist ein eigener Sprint. Zielerfassung und Feuererwiderung sind billig, Attack-Move ist es nicht — sie werden getrennt, damit die billige Hälfte nicht Geisel der teuren wird.
+
+## 5. Lebensbalken — reine Präsentation
+
+`UnitState.CurrentHealth` und `MaxHealth` existieren und werden serialisiert (`UnitState.cs:41-42`). Ein Balken über Einheiten und Gebäuden ist damit null Simulationsänderung. Ohne ihn sieht man dem Gefecht nicht an, dass es stattfindet — mit Zielerfassung wird das erst richtig spürbar.
+
+Vorschlag: Balken nur bei Schaden oder bei Selektion zeigen, nicht permanent über allem.
+
+## 6. Rundenrahmen
+
+Der größte Einzelposten dieses Sprints, und der Grund, warum man das Spiel heute nur einmal spielt.
+
+- **Ergebnisbildschirm.** `VictorySystem` kennt den Ausgang bereits, `DebugHud` schreibt ihn als Wort in die Statuszeile. Es braucht ein Panel „Sieg" / „Niederlage" mit zwei Knöpfen: *Neue Runde* und *Hauptmenü*. Billig.
+- **Sichtbare Pause.** `MatchRunner.PauseMatch` existiert, aber ein pausiertes Spiel und ein kaputtes Spiel sehen identisch aus. Overlay plus gestoppte Simulation, Musik läuft weiter.
+- **Neustart und Rückweg ins Menü.** Der teure Teil. `InitializeMatch` baut Kernel, EntityManager, alle acht Systeme, die KI-Session, beide `MatchSession`-Instanzen, beide Ingress-Instanzen und beide Transports neu auf — das ist als Reset richtig, aber die **Präsentationsschicht muss mitgezogen werden**: `UnitViewManager` (Views aus dem alten Match), `SelectionManager` (Ids aus dem alten Match), Kameraposition, Minimap und besonders `FogOfWarOverlayView`, das Textur und Pixelpuffer genau einmal anlegt und nie an eine geänderte Fog-Grid-Größe anpasst. Bei gleicher Kartengröße trägt das; bei einer anderen Karte gibt es eine `IndexOutOfRangeException`. Defensiv mitreparieren.
+
+## 7. Billige Bedienbarkeit, die viel bringt
+
+- **Kontrollgruppen 1–9** (Strg+Zahl setzen, Zahl abrufen) und **additive Auswahl mit Shift**. Reiner Auswahlzustand in `SelectionManager`, der bereits eine EditMode-Fixture hat. Berührt Simulation, Determinismus, Snapshot-Format und Befehlsregister mit null Zeilen — und ist die Geste, ohne die sich kein RTS richtig anfühlt.
+- **Ablehnungsgründe sichtbar machen.** `CommandRejectReason` ist vollständig vorhanden, erreicht den Spieler aber nur im per Default ausgeblendeten F3-Panel. Ein abgelehnter Befehl, eine pausierte Simulation und eine stillstehende Baustelle sehen deshalb alle gleich aus wie „kaputt" — genau das Urteil „verwirrend". Kurze Einblendung im Dauer-HUD.
+- **Ressourcenleisten-Chrome.** `DebugHud` erzeugt `_statusStyle` und benutzt ihn nie. Der Wert steht ohne Panel auf der hellen Wüstenebene. CHANGELOG und DecisionLog behaupten hier mehr, als der Code leistet — entweder verwenden oder die Doku korrigieren.
+- **Steuerungslegende sichtbar machen.** Mittlere Maustaste für Kamera-Rotation und Space für Reset sind implementiert, aber nur hinter F3 dokumentiert. Der erklärte Zweck des HUD-Sprints — ohne Vorwissen bedienbar — ist für die Kamera damit verfehlt.
+
+## 8. Bewusst nicht in diesem Sprint
+
+| Punkt | Warum später |
+|---|---|
+| Attack-Move | Neuer `CommandKind` gegen eingefrorenes v1-Register oder `StateVersion`-Bump. Eigener Sprint. |
+| Wirtschaftsbogen (erschöpfbare Felder) | `FieldReserveAE` geht in den kanonischen Hash ein und ist über sechs Dateien in beiden Testbahnen handgespiegelt. Richtige Diagnose, teuerste Umsetzung. |
+| Fraktionswahl | Hängt an `InitialStateHash`; Spawn-Reihenfolge und Fraktionsbytes sind an zwei Stellen gespiegelt. Determinismus-Änderung, kein Menü-Feature. |
+| KI-Ausbau | Der Gegner baut heute drei Gebäudetypen und eine Einheitensorte. Mit Feuererwiderung wird er automatisch gefährlicher — erst danach sinnvoll neu zu bewerten. |
+| Lager und Radar mit Funktion | Zwei von neun Gebäuden kosten Geld und tun nichts. Ehrlicher wäre, sie bis dahin in der Bauleiste als „noch ohne Wirkung" zu kennzeichnen. |
+
+## 9. Fertig wenn
+
+Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — **und sie kämpft von selbst**. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit der Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Und wenn die Runde vorbei ist, drücke ich auf *Neue Runde* statt auf *Programm beenden*.
+
+---
+
+## 10. Prompt für Kimi
+
+```text
+AUFGABE: Gefecht und Rundenrahmen (Hashkrieg, Branch feat/playable-core-loop)
+
+VORAUSSETZUNG — ZUERST, VOR ALLEM ANDEREN
+Der Arbeitsbaum hat ~70 uncommittete Einträge mit zwei fertigen Sprints (HUD D-084,
+Hauptmenü D-083). Das committen, bevor irgendetwas Neues dazukommt. Drei Änderungen
+gehören NICHT in den Commit:
+- Assets/_Project/Data/Registries/AssetMappingRegistry.asset (+72 Zeilen GUID-Verweise
+  auf gitignorierte Prefabs — zeigen in jedem frischen Clone ins Leere; der Inhaber hat
+  entschieden, dass die Datei leer im Repo bleibt)
+- Packages/manifest.json + packages-lock.json (zwei Unity-AI-Editor-Pakete, eines
+  Prerelease — gehören in keinen der beiden Sprints)
+- Assets/DefaultVolumeProfile.asset (785 Zeilen Editor-Re-Serialisierung ohne Wirkung)
+Echt und zu dokumentieren statt zurückzunehmen: QualitySettings antiAliasing 2->4
+zusammen mit NovaUrp m_MSAA 1->4, und GraphicsSettings m_LightsUseColorTemperature 0->1.
+
+KONTEXT
+Die Runde läuft heute so: Menü -> Neues Spiel -> Basis bauen -> Truppen bauen -> zur
+Gegnerbasis schicken -> JEDEN GEGNER EINZELN ANKLICKEN -> "VICTORY" erscheint als Wort
+in der Statuszeile, die Simulation tickt weiter, und der einzige Ausweg ist das Beenden
+der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
+
+1. DREI EINGABEDEFEKTE (zuerst — sie vergiften sonst das neue HUD)
+   a) Rechtsklick kennt die HUD-Sperre nicht: IsPointerOverHud wird bei RtsDeviceInput.cs
+      :493, :525 und :739 geprüft, aber NICHT im Rechtsklick-Zweig bei :562. Wer mit
+      selektierter Armee auf Bauleiste, Minimap oder Command Card rechtsklickt, schickt
+      seine Truppen an den Punkt dahinter.
+   b) Roter Baugeist platziert trotzdem: der Klick prüft _placementHasCell statt
+      _placementValid (:493-499). Zusätzlich klemmt ToGridCoordinate negative Footprint-
+      Ursprünge auf 0 — am linken/unteren Kartenrand entsteht das Gebäude woanders als
+      der Geist zeigte.
+   c) Command Card wird unten abgeschnitten: EstimateHeight rechnet GUILayout-Margins und
+      Panel-Padding nicht mit (~40 px bei einer Fahrzeugfabrik mit 4 Einheiten). Untere
+      Zeilen samt Abbruch-Buttons liegen außerhalb der BeginArea und sind nicht klickbar.
+   Dazu zwei kleinere: die Rally-Point-Geste kapert den Rechtsklick, sobald bei einer
+   Rahmenauswahl ein Gebäude mit drin ist (das HQ hat spawnbedingt immer selected[0]) —
+   Rally darf nur greifen, wenn die Selektion AUSSCHLIESSLICH Gebäude enthält. Und
+   Bauleiste wie Minimap ragen 4 px in den 12 px breiten Randscroll-Streifen der Kamera:
+   der Weg zur Bauleiste scrollt die Karte.
+
+2. ZIELERFASSUNG UND FEUERERWIDERUNG — der Kern
+   CombatSystem.ExecuteTick überspringt heute jede Einheit ohne gesetztes Ziel
+   (CombatSystem.cs:168). AttackTarget wird NUR durch einen expliziten Befehl gesetzt,
+   also braucht jeder einzelne Schuss einen Klick.
+   Dasselbe trifft die Verteidigungsplattform noch härter: sie IST bewaffnet (20 Schaden,
+   Reichweite 10, SimDefinitions.cs:385), aber SelectionManager.CopyMobileSelection
+   filtert Gebäude aus jeder Befehlsselektion — ein Gebäude kann also nie ein AttackTarget
+   bekommen und nie feuern. 400 AE für eine Kostenfalle.
+   LÖSUNG: eine zusätzliche Phase in CombatSystem.ExecuteTick. Für jede aktive Einheit
+   OHNE gültiges Ziel das nächste feindliche, sichtbare Ziel in Waffenreichweite suchen
+   und AttackTarget setzen. GEBÄUDE EINGESCHLOSSEN.
+   Das braucht KEIN neues UnitState-Feld (AttackTarget liegt schon im Entity-Store-Block
+   v4), KEINE Snapshot-Versionserhöhung, KEINEN neuen CommandKind. Die Sichtprüfung
+   existiert bereits (FogOfWarSystem.GetTeamView, wird von CombatSystem schon benutzt).
+   DETERMINISMUS: stabile, indexbasierte Reihenfolge (kleinster Entity-Index gewinnt bei
+   gleichem Abstand). Kein float, keine Fließkomma-Distanzsortierung — Abstandsvergleich
+   im Quadrat über SimFixed.
+   ERWARTETE FOLGE: das ist die erste Simulationsänderung dieser Sprintreihe. Mehrere
+   Baselines in tools/Nova.SimRunner.Tests werden rot (MatchFingerprintTests, ReplayTests,
+   SnapshotHashSensitivityTests, Öffnungs-Hash). Das ist kein Defekt, sondern genau ihr
+   Zweck. Baselines bewusst und dokumentiert neu setzen, nicht stillschweigend.
+   NICHT in diesem Sprint: Attack-Move. Das bräuchte CommandKind 18 gegen das eingefrorene
+   v1-Register oder StateVersion 4->5. Eigener Sprint. Nicht mit hineinbündeln.
+
+3. LEBENSBALKEN (reine Präsentation, null Simulationsänderung)
+   UnitState.CurrentHealth und MaxHealth existieren (UnitState.cs:41-42). Balken über
+   Einheiten und Gebäuden. Vorschlag: nur bei Schaden oder Selektion zeigen, nicht
+   permanent über allem.
+
+4. RUNDENRAHMEN (der größte Posten)
+   - Ergebnisbildschirm: VictorySystem kennt den Ausgang bereits, DebugHud schreibt ihn
+     nur als Wort. Panel "Sieg"/"Niederlage" mit zwei Knöpfen: Neue Runde, Hauptmenü.
+   - Sichtbare Pause: MatchRunner.PauseMatch existiert, aber pausiert und kaputt sehen
+     identisch aus. Overlay plus gestoppte Simulation, Musik läuft weiter.
+   - Neustart und Rückweg ins Menü: InitializeMatch baut Kernel, EntityManager, alle acht
+     Systeme, KI-Session, beide MatchSessions, beide Ingress-Instanzen und beide
+     Transports neu auf — als Reset richtig. Aber die PRÄSENTATIONSSCHICHT muss mit:
+     UnitViewManager (Views des alten Matches), SelectionManager (alte Ids), Kamera,
+     Minimap, und besonders FogOfWarOverlayView, das Textur und Pixelpuffer genau einmal
+     anlegt und nie an eine geänderte Fog-Grid-Größe anpasst (IndexOutOfRangeException bei
+     größerer Karte). Defensiv mitreparieren.
+
+5. BILLIGE BEDIENBARKEIT
+   - Kontrollgruppen 1-9 (Strg+Zahl setzen, Zahl abrufen) und additive Auswahl mit Shift.
+     Reiner Auswahlzustand im SelectionManager, der schon eine EditMode-Fixture hat.
+     Null Berührung von Simulation, Determinismus, Snapshot-Format, Befehlsregister.
+   - Ablehnungsgründe sichtbar machen: CommandRejectReason ist vollständig da, erreicht
+     den Spieler aber nur im per Default ausgeblendeten F3-Panel. Kurze Einblendung im
+     Dauer-HUD. Heute sehen abgelehnter Befehl, pausierte Simulation und stillstehende
+     Baustelle alle gleich aus wie "kaputt".
+   - Ressourcenleisten-Chrome: DebugHud erzeugt _statusStyle und benutzt ihn nie. Entweder
+     verwenden oder CHANGELOG und DecisionLog korrigieren, die hier mehr behaupten.
+   - Steuerungslegende sichtbar machen: mittlere Maustaste (Kamera-Rotation) und Space
+     (Reset) sind implementiert, aber nur hinter F3 dokumentiert.
+
+REIHENFOLGE
+1. Committen inkl. der drei Aussonderungen (Voraussetzung)
+2. Die drei Eingabedefekte (klein, sofort spürbar)
+3. Zielerfassung + Feuererwiderung + Lebensbalken (der Kern — zusammen testen)
+4. Rundenrahmen
+5. Kontrollgruppen, Ablehnungsgründe, Chrome, Legende
+
+FERTIG WENN
+Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — und sie kämpft von
+selbst. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf
+angreifende Gegner. Ich hole meine Armee mit Taste 1 zurück. Wenn ein Befehl abgelehnt
+wird, sehe ich warum. Und wenn die Runde vorbei ist, drücke ich auf "Neue Runde" statt
+auf "Programm beenden".
+```

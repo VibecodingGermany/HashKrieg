@@ -416,6 +416,13 @@ namespace Nova.Gameplay.Match
                     instance.GetComponent<Renderer>().sharedMaterial = PrimitiveMaterial;
                 }
                 instance.transform.localScale = scale;
+                // The primitive pools are shared across roles (one cube pool
+                // serves vehicles AND buildings), and building views never
+                // receive rotation writes again (see ApplyTransform), so a
+                // recycled view must not inherit the previous tenant's
+                // heading. Unit views get their rotation from this frame's
+                // ApplyTransform anyway, so the reset is free for them.
+                instance.transform.rotation = Quaternion.identity;
             }
 
 #if UNITY_EDITOR
@@ -600,19 +607,32 @@ namespace Nova.Gameplay.Match
                 unit.Transform.PositionX.ToFloat(),
                 _viewGroundOffsets[slot],
                 unit.Transform.PositionY.ToFloat());
-            Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+
+            // Buildings never rotate: nothing in the simulation orients them,
+            // and a building view that mirrors the (unit-shaped) rotation
+            // state visibly spins when the state mutates for other reasons.
+            // Building views keep the rotation they were acquired with and
+            // receive position writes only.
+            bool isBuilding = SimDefinitions.IsBuildingRole(_viewRoles[slot]);
 
             if (blend >= 1f)
             {
                 viewTransform.position = targetPos;
-                viewTransform.rotation = targetRot;
+                if (!isBuilding)
+                {
+                    viewTransform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                }
                 return;
             }
 
             // Frame-rate independent exponential smoothing between the 10-Hz
             // authoritative positions (blend is derived from _interpolationSpeed).
             viewTransform.position = Vector3.Lerp(viewTransform.position, targetPos, blend);
-            viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
+            if (!isBuilding)
+            {
+                Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
+            }
         }
 
         private void ApplyTint(int slot, byte playerId, int healthStep)

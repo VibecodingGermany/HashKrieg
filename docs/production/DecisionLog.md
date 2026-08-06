@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.19.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.22.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -1812,6 +1812,195 @@ Harvester) verlangt den direkten Schritt.
 
 ---
 
+### D-083 | verbindlich | Hauptmenü als Overlay, UI Toolkit als UI-Standard
+
+**Status:** verbindlich. **Vom Agenten unter ausdrücklicher Inhaber-Delegation
+entschieden, nicht vom Inhaber selbst** (dritter Eintrag dieser Art nach D-074
+und D-075) — betrifft die Punkte 1 bis 4 und 6 und ist überstimmbar; eine
+Umkehr ist eine Implementierungsänderung, keine Vertragsänderung.
+**Ausgenommen von der Delegation ist Punkt 5:** Assetherkunft (Suno-Bezahltarif,
+OpenAI Image API), Schriftwahl (Rajdhani, OFL-1.1) und der Menütitel
+„HASHKRIEG" hat der Inhaber (Dennis Westermann) am 2026-08-06 selbst entschieden.
+
+**Nummernwahl:** D-077 ist die letzte im Dokumentkörper belegte ID.
+[hashkrieg/00_Entscheidungen.md](hashkrieg/00_Entscheidungen.md) reserviert den
+anschließenden Block für die Übertragung der Inhaberentscheidungen E-1 bis E-5
+— dort steht unter „Offene Punkte" noch „D-078 bis D-081", die Stand-Tabelle
+führt aber inzwischen fünf Entscheidungen, der Block ist also real D-078 bis
+D-082. Diese Entscheidung nimmt deshalb **D-083** und überspringt den
+reservierten Bereich. Eine übersprungene Nummer ist billig; dieses Protokoll
+hat eine ID-Kollision schon einmal teuer bezahlt (D-066–D-070, siehe „Offene
+Punkte").
+
+**Kontext:** Das Spiel startete direkt in ein Match: kein Menü, kein Ton, keine
+Einstellungen, kein sauberer Weg hinaus. Die Ausgangslage war dünn und dadurch
+offen — genau **eine** Szene (`Assets/_Project/Scenes/Bootstrap.unity`,
+Maschinenausgabe von `BootstrapSceneGenerator`), **null** `SceneManager`-Aufrufe
+in Produktionscode, kein `Application.Quit`, kein `PlayerPrefs`, kein
+`AudioListener` und keine Audiodatei, kein Canvas und kein UI Toolkit im
+Einsatz. Alles bisherige UI ist `OnGUI` (`DebugHud`, `RtsDeviceInput`) und im
+Code selbst als Wegwerf markiert. Das Menü ist damit das erste echte UI des
+Projekts — es setzt einen Standard, ob man will oder nicht, und deshalb steht
+die Entscheidung hier und nicht nur im Sprintdokument.
+
+**Entscheidung:**
+
+1. **Overlay in der einen Szene statt zweiter Szene.** Das Menü ist ein
+   Szenenobjekt in `Bootstrap.unity`, angelegt **im Generator**, nicht von Hand
+   (die Szene ist Maschinenausgabe und wird nie handeditiert). `MatchBootstrap`
+   ist bereits vorbereitet: `AutoStart` ist ein `[SerializeField] public bool`,
+   `StartGrayboxMatch()` ist `public` und idempotent. „Neues Spiel" ruft
+   `StartGrayboxMatch()` und blendet das Overlay aus. Eine zweite Szene wäre der
+   erste Scene-Flow-Layer des Projekts gewesen — der größte Einzelposten des
+   Sprints, ohne Gegenwert für den Spieler.
+2. **UI Toolkit statt uGUI — und damit der UI-Stack für alles Neue.**
+   `com.unity.modules.uielements` ist ein Engine-Modul und braucht keinen
+   asmdef-Eintrag; `Nova.Presentation.UI.asmdef` referenziert weiterhin
+   ausschließlich `Nova.*`-Assemblies. uGUI hätte echte Assembly-Referenzen
+   (`UnityEngine.UI`, `Unity.TextMeshPro`), EventSystem plus
+   StandaloneInputModule in der Szene und einen TMP-Essentials-Import
+   gebraucht. Das bestehende `OnGUI`-UI bleibt Wegwerf und wird nicht portiert;
+   jedes **neue** UI entsteht in UI Toolkit.
+3. **`AutoStart = false` im Generator.** Play führt ab jetzt ins Menü, nicht ins
+   Match. Das ist die spürbarste Verhaltensänderung des Sprints und trifft
+   jeden, der die Demo vorführt oder einen PlayMode-Test schreibt.
+4. **Einstellungen als JSON in `Application.persistentDataPath`, ohne
+   `PlayerPrefs` und ohne `AudioMixer`.** `GameSettings`/`GameSettingsStore`
+   schreiben eine einzige lesbare `settings.json`; angewandt wird beim Start
+   über `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`, also ohne
+   Boot-Objekt und szenenunabhängig. Musiklautstärke geht direkt auf
+   `AudioSource.volume`. `PlayerPrefs` wäre eine undurchsichtige
+   Registry-/plist-Ablage ohne Diff und ohne Löschpfad für einen Vorführer; ein
+   `AudioMixer` wäre ein Asset plus Bus-Topologie für genau eine Audioquelle —
+   der Audioplan nennt Mixer-Busse als Vorbedingung, das ist Doku-Meinung, keine
+   Engine-Einschränkung, und für diesen Umfang falsch.
+5. **Assetherkunft, Schrift und Titel (Inhaberentscheidung, nicht delegiert).**
+   Menümusik aus **Suno im Bezahltarif**, Key Art aus der **OpenAI Image API
+   (gpt-image-1)**, Schrift **Rajdhani** unter **OFL-1.1** samt beiliegender
+   `OFL.txt` — alle drei mit kommerzieller Nutzung und Output-Eigentum bzw.
+   freier Weitergabe, deshalb Repo-Freigabe. Der Suno-Bezahltarif ist die erste
+   benannte Ausnahme von [../assets/Licenses.md](../assets/Licenses.md) §2
+   Regel 5 („0 € ist hart für MS-1"). Der Menütitel lautet **„HASHKRIEG"** —
+   Vollzug von E-3 („nur die Marke"); `namespace Nova.*` und der
+   Repository-Name bleiben unverändert.
+6. **„Laden" sichtbar, aber ausgegraut, mit Tooltip „kommt später".** Die
+   Snapshot-Schicht kann den vollständigen Matchzustand serialisieren und
+   hash-identisch fortsetzen, aber **nichts schreibt je auf Platte**: kein
+   Runtime-Datei-I/O, kein Save-Format, keine Slots. Verstecken würde den
+   Spieler im Unklaren lassen, ob das Spiel speichern kann; anbieten würde ihn
+   ins Leere greifen lassen.
+
+**Verworfen:** (a) zweite Szene mit `SceneManager` — hätte den ersten
+Scene-Flow-Layer des Projekts eingeführt, für eine Funktion, die ein Overlay
+kostenlos leistet; (b) uGUI/TextMeshPro — echte Assembly-Referenzen,
+Szenen-Infrastruktur und ein Extra-Import, ohne dass das Ergebnis besser
+aussähe; (c) `PlayerPrefs` für die Einstellungen — nicht inspizierbar, nicht
+löschbar ohne Werkzeug, nicht diff-fähig; (d) „Laden" verstecken oder
+funktionsfähig vortäuschen — beides belügt den Spieler über den Speicherstand;
+(e) SFX-Regler weglassen, bis es SFX gibt — der Wert wird ohnehin gespeichert,
+und ein als „noch ohne Wirkung" gekennzeichneter Regler ist ehrlicher als eine
+Lücke, die später kommentarlos auftaucht.
+
+**Konsequenzen:**
+
+- `Assets/Tests/PlayMode/GrayboxDemoProofTests.cs` muss das Match explizit über
+  `StartGrayboxMatch()` starten — mit `AutoStart = false` reißen sonst die
+  15-Sekunden-Assertions auf `IsMatchReady`. Test mitziehen, nicht abschalten.
+- [../assets/Licenses.md](../assets/Licenses.md) 1.3.0 → 1.4.0: zwei neue
+  §1-Quellen (Suno, OFL-1.1), benannte Ausnahme in §2 Regel 5, Erweiterung der
+  Whitelist in Regel 6, drei Ledger-Zeilen in §3.
+- [DemoRunbook.md](DemoRunbook.md) 0.3.0 → 0.4.0: der Ablauf beginnt am Menü,
+  nicht am Match.
+- Der SFX-Regler wird gespeichert und angewandt, **wirkt aber auf nichts** — es
+  gibt noch keine SFX. Im UI als solcher gekennzeichnet.
+- Alle sechs Render-Detail-Stufen teilen sich **ein** URP-Asset. 19 Felder
+  unterscheiden sich real (u. a. `lodBias` 0,3–2,0, Anisotropie,
+  `particleRaycastBudget`), aber `renderScale`, Schatten und MSAA nicht. Zwei
+  zusätzliche `NovaUrp`-Kopien würden den Unterschied sichtbar machen —
+  bewusst nicht in diesem Sprint.
+- Bewusst offen: Pause-Menü, Restart, Ergebnisbildschirm, Rückweg vom Match ins
+  Menü, Fraktions- und Kartenwahl, Tastenbelegung. Die Fraktionswahl
+  insbesondere hängt an `InitialStateHash` und wäre eine Determinismus-, keine
+  Menü-Änderung.
+- Offene Nachzieharbeit außerhalb dieses Eintrags: Die drei neuen Assets
+  (`UI_KeyArt_MainMenu.jpg`, `MUS_MainMenu_Hashkrieg.ogg`, die beiden
+  Rajdhani-TTFs) haben noch keinen `PROVENANCE.json`-Datensatz, obwohl
+  [../assets/Provenance.md](../assets/Provenance.md) ihn ausdrücklich auch für
+  Audio und Fonts vor der Repo-Aufnahme verlangt. Der Ledger-Eintrag in
+  `Licenses.md` §3 deckt die Lizenzlage, nicht den Herkunftsnachweis je Datei.
+- Ebenfalls nachzuziehen: die Reservierungszeile in
+  [hashkrieg/00_Entscheidungen.md](hashkrieg/00_Entscheidungen.md) („D-078 bis
+  D-081") deckt E-5 nicht mehr ab und die dortige Begründung „D-077 ist im
+  DecisionLog noch nicht eingetragen" ist überholt.
+
+---
+
+### D-084 | verbindlich | Bedienbares HUD (GB-006, Präsentationsschicht)
+
+**Status:** verbindlich — Inhaberauftrag vom 2026-08-06 (Dennis Westermann)
+mit ausdrücklichem Aufgabenbrief (neun Punkte, Randbedingungen: kein Sim-
+Eingriff, eingefrorenes Command-Register); die hier protokollierten
+Einzelfestlegungen sind die Umsetzungsentscheidungen daraus.
+
+**Nummernwahl:** Diese Entscheidung lief parallel zum Hauptmenü-Strang und
+trug zunächst die Nummer D-078. D-078 bis D-082 sind jedoch für die
+Übertragung der Inhaberentscheidungen E-1 bis E-5 reserviert und D-083 ist
+das Hauptmenü (siehe deren Nummernwahl-Vermerk) — deshalb **D-084**.
+
+**Kontext:** Der Inhaber spielte den D-077-Stand erstmals und meldete ihn als
+„nicht bedienbar": keine sichtbare Selektion, kein Baumenü, Gebäude rotierten
+bei Rechtsklick, Kamera-Rotation unauffindbar, Nebel und Minimap fehlten. Die
+Simulation war ausdrücklich nicht das Problem.
+
+**Entscheidung (Umsetzungsfestlegungen):**
+
+1. **Datenquelle der Bauleiste ist `SimDefinitions`**, nicht
+   `BuildingRegistrySO` (im Brief vorgeschlagen): das SO hat keine Asset-
+   Instanzen und ist zur Laufzeit nicht verdrahtet; `SimDefinitions` ist die
+   Tabelle, gegen die der Executor selbst validiert — die Leiste kann so nicht
+   vom Sim-Stand abdriften. Wird `BuildingRegistrySO` eines Tages lebendig,
+   ist die Quelle austauschbar.
+2. **Das eingefrorene Command-Register (schema v1) wird nicht erweitert.**
+   Nicht abbildbare Features bleiben **offene Design-Fragen** statt
+   Improvisation: Gebäude-Upgrades, Zielprioritäten für Türme,
+   Angriffsbewegung/Stellung-halten. Reparieren wird aus vorhandenen Kinds
+   komponiert (Move + Repair als zwei Intents, damit der Builder in
+   Reichweite läuft); InstallDefenseModule wird deaktiviert mit Grund
+   angezeigt, nie abgeschickt.
+3. **Alle HUD-Features sind präsentationsseitig.** Der Gebäude-Rotations-Bug
+   wurde input- und view-seitig behoben (unbewegliche Rollen aus
+   Bewegungsbefehlen filtern; keine Rotations-Schreibzugriffe auf Gebäude-
+   Views), Fog-Overlay und Minimap lesen ausschließlich den committed
+   Team-View — Determinismus, Snapshots und der 10-Hz-Tick bleiben unberührt.
+4. **Kamera-Rotation:** mittlere Maustaste + Drag zusätzlich zu Z/X,
+   Reset auf **Space** (das Buchstaben-Budget ist erschöpft; N ist
+   Panzerabwehr-Infanterie).
+5. **Minimap ↔ Kamera laufen über `MinimapCameraLink`** (statischer Kanal in
+   Nova.Gameplay), weil die beiden Presentation-Assemblies einander per
+   Rang-Regel nicht referenzieren dürfen.
+
+**Verworfen:** (a) `BuildingRegistrySO` als Leisten-Quelle (s. Punkt 1);
+(b) ein Neubau der HUD-Schicht auf UI Toolkit — D-083 setzt UI Toolkit als
+Standard für alles Neue und erklärt das OnGUI-HUD zugleich zum nicht zu
+portierenden Wegwerfcode; dieser Pass hält sich daran (IMGUI-Idiom der
+Graybox, kein Port, keine doppelte UI-Schicht); (c) neue
+CommandKinds für Attack-Move/Hold — verboten durch die Randbedingung und
+richtig so: das Register ist der MP-Vertrag.
+
+**Konsequenzen:**
+
+- Offene Design-Fragen für einen eigenen Entscheid: **Angriffsbewegung /
+  Stellung halten / Feuererwidern** (hängt mit GB-002 zusammen — betrifft
+  Combat, also Sim) sowie **Gebäude-Upgrades und Turm-Zielprioritäten**
+  (bräuchten Register-Erweiterungen; nur mit neuem D-Eintrag und
+  Schema-Versionierung).
+- `CommandCardPresenter` ist die testbare Rollen-Aktions-Tabelle; ein Tech
+  Tree baut später darauf auf (die Bauleiste ist seine dokumentierte Vorstufe).
+- Nachweis: 420/420 .NET, 445/445 EditMode, 2/2 PlayMode, Nebel-Overlay
+  visuell bestätigt; interaktiver Inhaber-Durchlauf als DoD-Punkt ausstehend.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -1852,6 +2041,21 @@ Harvester) verlangt den direkten Schritt.
   Scout) eine konkrete Schadenszahl, die von der abgeleiteten 10 abweicht —
   das Briefing umfasste nur die drei Kampffahrzeuge (28/50/60). Der Scout
   bleibt abgeleitet, bis der Inhaber die Hyäne-Zeile entscheidet.
+- **D-083 steht in derselben Delegationslage** (Menü-Overlay, UI Toolkit,
+  `AutoStart = false`, JSON-Einstellungen, „Laden" ausgegraut); die
+  Herkunftsangaben zu Menümusik, Key Art, Schrift und Menütitel hat der Inhaber
+  dagegen selbst entschieden. **Offen darin:** Für die drei neuen Assets fehlen
+  die `PROVENANCE.json`-Datensätze, die
+  [../assets/Provenance.md](../assets/Provenance.md) vor der Repo-Aufnahme
+  verlangt — bei den KI-Quellen sind `promptText`, `providerTermsUrl`,
+  `providerTermsRetrievedAt` und ein wörtliches `outputOwnership`-Zitat
+  Pflichtfelder, die nur der Inhaber liefern kann.
+- **D-078 bis D-082 sind reserviert** für die Übertragung der
+  Inhaberentscheidungen E-1 bis E-5 aus
+  [hashkrieg/00_Entscheidungen.md](hashkrieg/00_Entscheidungen.md); die dortige
+  „Offene Punkte"-Zeile nennt noch den zu kurzen Bereich D-078 bis D-081 und
+  begründet die Reservierung mit einem inzwischen erfolgten Eintrag (D-077).
+  Beides ist in jener Datei nachzuziehen, nicht hier.
 
 ## Nächste Schritte
 
@@ -1889,3 +2093,5 @@ Harvester) verlangt den direkten Schritt.
 | 1.19.0 | 2026-07-26 | D-075 aufgenommen: Fraktions-Achse in der kanonischen Simulation (34 Definitionen in `SimDefinitions`, Id-Regel 1..17/18..34, Slot-Fraktion im Economy-Block v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Harvester-Ladekapazität); Teil-Entscheidung Legion-Fahrzeugschaden: konkrete Vehicles.md-Werte 28/50/60 schlagen die 85-%-Ableitung, Ableitung nur wo die GDDs schweigen. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden** (Teil-Entscheidung per Inhaber-Sprint-Briefing vorgegeben) — als solches gekennzeichnet und überstimmbar | Agent (unter Delegation) / Delegation: Dennis Westermann |
 | 1.20.0 | 2026-08-06 | D-076 aufgenommen: Governance-Tier-Modell. Gate-Kette G0–G5, Receipt-Verträge und Evidenzpflicht schlafen gelegt (nicht gelöscht, Weckpfad dokumentiert); Meilenstein-Nachweis auf grüne CI plus gespielte Runde umgestellt; `tests` als Pflichtcheck ergänzt; DoD 13→4, PR-Template 11→3; Doku-Ritual und ≥3-Alternativen-Pflicht bis Tier 2 ausgesetzt; D-067 dadurch gegenstandslos | Project Owner / Orchestrator |
 | 1.21.0 | 2026-08-06 | D-077 aufgenommen: spielbarer RTS-Core-Loop — Start HQ + 1 Builder + 3.000 AE, Harvester aus der Raffinerie, Raffinerie ohne Kraftwerk-Prereq, Sieg zusätzlich bei HQ-Verlust (D-056 Klausel 2 teilersetzt), Skirmish-KI für Slot 1 registriert und spielend, Debug-HUD standardmäßig aus (F3), Prefab-Views zur Laufzeit auf den Sim-Footprint normalisiert | Project Owner / Agent (Umsetzung) |
+| 1.22.0 | 2026-08-06 | D-083 aufgenommen: Hauptmenü als Overlay in `Bootstrap.unity` statt zweiter Szene (`AutoStart = false`, „Neues Spiel" ruft `StartGrayboxMatch()`), UI Toolkit als UI-Stack für alles Neue, Einstellungen als `settings.json` in `Application.persistentDataPath` ohne `PlayerPrefs` und ohne `AudioMixer`, „Laden" sichtbar und ausgegraut; Assetherkunft Suno-Bezahltarif / OpenAI Image API / Rajdhani-OFL und Menütitel „HASHKRIEG" als Inhaberentscheidung. Punkte 1–4 und 6 vom Agenten unter Delegation entschieden und überstimmbar. D-078–D-082 bleiben für E-1 bis E-5 reserviert; Kopfversion holt den Rückstand auf die Verlaufstabelle (1.20.0/1.21.0) auf | Agent (unter Delegation) / Inhaberentscheidung Punkt 5: Dennis Westermann |
+| 1.23.0 | 2026-08-06 | D-084 aufgenommen (zunächst als D-078 angelegt, wegen der E-1–E-5-Reservation und D-083 umnummeriert): bedienbares HUD — Bauleiste aus `SimDefinitions` statt `BuildingRegistrySO`, Command-Register schema v1 bleibt eingefroren (Upgrades/Turm-Prioritäten/Angriffsbewegung = offene Design-Fragen), Gebäude-Rotation präsentationsseitig behoben, Kamera MMB-Drag + Space, Minimap-Kamerakanal `MinimapCameraLink` | Project Owner / Agent (Umsetzung) |

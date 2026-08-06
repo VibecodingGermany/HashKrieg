@@ -1,10 +1,12 @@
 using UnityEngine;
+using Nova.Gameplay;
 
 namespace Nova.Presentation
 {
     /// <summary>
     /// Top-down RTS camera rig: arrow-key panning, screen-edge panning, mouse-wheel zoom along the
-    /// view axis and Z/X yaw around the focus point, with the focus clamped to the map rectangle.
+    /// view axis and yaw around the focus point — via Z/X, via middle-mouse-button horizontal drag,
+    /// and Space to reset yaw to the start orientation. The focus is clamped to the map rectangle.
     /// Uses the legacy input backend (ProjectSettings activeInputHandler: 0).
     /// PRESENTATION ONLY: never reads or mutates simulation state and never submits commands.
     /// All tuning defaults live here, so the Bootstrap scene generator must not hardcode any of them.
@@ -13,7 +15,11 @@ namespace Nova.Presentation
     /// layer (RtsDeviceInput: S stop, A attack, Q queue) where RTS convention is fixed and there is no
     /// alternative binding; the camera has arrow keys and screen-edge panning, so it is the side that
     /// can yield. Do not re-add WASD here without moving the command hotkeys first — the collision is
-    /// silent and makes every pan issue orders.
+    /// silent and makes every pan issue orders. The yaw reset binds SPACE, not a letter: the command
+    /// layer's letter budget is already exhausted (N is AntiArmorInfantry, B/C/V/T/G/F/Y build,
+    /// Q/U/E/D queue, S/A/H/R/P order), while Space is bound nowhere in the project. MMB drag is
+    /// collision-free by construction: the command layer and the build bar consume LMB/RMB only,
+    /// and edge pan runs on cursor position, an axis orthogonal to the drag delta.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -41,6 +47,8 @@ namespace Nova.Presentation
         [Header("Orbit")]
         [SerializeField] private float _pitchDegrees = 55f;
         [SerializeField] private float _rotationSpeed = 90f;
+        [Tooltip("Degrees of yaw per pixel of horizontal middle-mouse drag.")]
+        [SerializeField] private float _middleDragDegreesPerPixel = 0.35f;
 
         [Header("Start Focus (frames the human base: HQ 5,5 + refinery 9,5 + field 7,7)")]
         [SerializeField] private float _startFocusX = 8f;
@@ -97,6 +105,14 @@ namespace Nova.Presentation
             ApplyTransform();
         }
 
+        private void OnEnable()
+        {
+            // Static channel state survives play-mode transitions when domain
+            // reload is off — never open a session with a stale viewport
+            // rectangle or a queued jump from the previous one.
+            MinimapCameraLink.Reset();
+        }
+
         private void LateUpdate()
         {
             float dt = Time.unscaledDeltaTime;
@@ -105,6 +121,33 @@ namespace Nova.Presentation
             UpdatePan(dt);
             ClampFocus();
             ApplyTransform();
+            PublishMinimapPose();
+            ConsumeMinimapFocusRequest();
+        }
+
+        /// <summary>
+        /// Minimap channel (assembly rule: Nova.Presentation.UI may not
+        /// reference Nova.Presentation, so both sides talk through
+        /// MinimapCameraLink in Nova.Gameplay). The rig is the ONLY writer of
+        /// the pose the minimap draws as its viewport rectangle, and the only
+        /// consumer of the click-to-jump request: click detection lives in
+        /// MinimapHud (it owns the rect), the jump lives here (FocusOn).
+        /// </summary>
+        private void PublishMinimapPose()
+        {
+            Camera cam = _camera != null ? _camera : GetComponent<Camera>();
+            MinimapCameraLink.PublishPose(
+                _focus.x, _focus.z, _height, _pitchDegrees, _yaw,
+                cam != null ? cam.fieldOfView : 60f,
+                cam != null && cam.aspect > 0f ? cam.aspect : 16f / 9f);
+        }
+
+        private void ConsumeMinimapFocusRequest()
+        {
+            if (MinimapCameraLink.TryConsumeFocusRequest(out float worldX, out float worldZ))
+            {
+                FocusOn(new Vector3(worldX, 0f, worldZ));
+            }
         }
 
         /// <summary>
@@ -151,6 +194,25 @@ namespace Nova.Presentation
 
         private void UpdateRotation(float dt)
         {
+            // MMB drag: horizontal mouse movement becomes yaw directly (drag
+            // right = orbit right). Per-pixel, not per-second — a drag is a
+            // fixed gesture, not a held key.
+            if (Input.GetMouseButton(2))
+            {
+                float drag = Input.GetAxisRaw("Mouse X");
+                if (!Mathf.Approximately(drag, 0f))
+                {
+                    _yaw = Mathf.Repeat(_yaw + drag * _middleDragDegreesPerPixel, 360f);
+                }
+            }
+
+            // Space snaps the yaw back to the start orientation (the key
+            // budget in the class remarks explains why Space and not N).
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                _yaw = Mathf.Repeat(_startYawDegrees, 360f);
+            }
+
             float direction = 0f;
             if (Input.GetKey(KeyCode.Z)) direction -= 1f;
             if (Input.GetKey(KeyCode.X)) direction += 1f;
@@ -220,6 +282,7 @@ namespace Nova.Presentation
             _pitchDegrees = Mathf.Clamp(_pitchDegrees, 15f, 89f);
             _edgePanMargin = Mathf.Max(0f, _edgePanMargin);
             _panSpeedHeightScale = Mathf.Max(1f, _panSpeedHeightScale);
+            _middleDragDegreesPerPixel = Mathf.Max(0.01f, _middleDragDegreesPerPixel);
         }
     }
 }
