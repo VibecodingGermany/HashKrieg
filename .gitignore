@@ -92,6 +92,10 @@ tools/**/out/
 # im Repo, auch wenn das Asset es nicht tut), .gitkeep und Ordner-Metas.
 [Aa]ssets/_[Pp]roject/[Aa]rt/**/*.fbx
 [Aa]ssets/_[Pp]roject/[Aa]rt/**/*.fbx.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.glb
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.glb.meta
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.gltf
+[Aa]ssets/_[Pp]roject/[Aa]rt/**/*.gltf.meta
 [Aa]ssets/_[Pp]roject/[Aa]rt/**/*.png
 [Aa]ssets/_[Pp]roject/[Aa]rt/**/*.png.meta
 [Aa]ssets/_[Pp]roject/[Aa]rt/**/*.mat
