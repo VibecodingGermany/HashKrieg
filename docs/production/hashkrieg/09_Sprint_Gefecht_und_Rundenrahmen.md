@@ -115,18 +115,26 @@ Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — **und si
 ```text
 AUFGABE: Gefecht und Rundenrahmen (Hashkrieg, Branch feat/playable-core-loop)
 
-VORAUSSETZUNG — ZUERST, VOR ALLEM ANDEREN
-Der Arbeitsbaum hat ~70 uncommittete Einträge mit zwei fertigen Sprints (HUD D-084,
-Hauptmenü D-083). Das committen, bevor irgendetwas Neues dazukommt. Drei Änderungen
-gehören NICHT in den Commit:
-- Assets/_Project/Data/Registries/AssetMappingRegistry.asset (+72 Zeilen GUID-Verweise
-  auf gitignorierte Prefabs — zeigen in jedem frischen Clone ins Leere; der Inhaber hat
-  entschieden, dass die Datei leer im Repo bleibt)
+AUSGANGSLAGE (Stand 2026-08-06 abends — gilt, nicht neu erheben)
+Der Arbeitsbaum ist sauber. Branch feat/playable-core-loop steht auf 1f6607a und ist
+gepusht; PR #23 gegen main ist offen und traegt vier Commits (D-077, D-083/D-084, D-085,
+gitignore-Chore). Sprint 10 (Baubarkeit und Kartenbild) ist umgesetzt und committet.
+AssetMappingRegistry.asset ist lokal auf skip-worktree gesetzt: die Datei bleibt lokal mit
+ihren Art-Mappings bestehen, taucht nicht mehr im git status auf und kann nicht
+versehentlich mitcommittet werden. NICHT anfassen, NICHT zuruecksetzen.
+Diese drei Dateien gehoeren weiterhin in KEINEN Commit dieser Sprintreihe:
+- Assets/_Project/Data/Registries/AssetMappingRegistry.asset (GUID-Verweise auf
+  gitignorierte Prefabs — in jedem frischen Clone tot; Inhaberentscheidung)
 - Packages/manifest.json + packages-lock.json (zwei Unity-AI-Editor-Pakete, eines
-  Prerelease — gehören in keinen der beiden Sprints)
-- Assets/DefaultVolumeProfile.asset (785 Zeilen Editor-Re-Serialisierung ohne Wirkung)
-Echt und zu dokumentieren statt zurückzunehmen: QualitySettings antiAliasing 2->4
-zusammen mit NovaUrp m_MSAA 1->4, und GraphicsSettings m_LightsUseColorTemperature 0->1.
+  Prerelease — kein reproduzierbarer Build)
+- Assets/DefaultVolumeProfile.asset (Editor-Re-Serialisierung ohne Wirkung)
+
+WARNUNG ZUR VERIFIKATION
+Auf der Arbeitsmaschine fehlt das in global.json gepinnte .NET-8-SDK (rollForward:
+disable, installiert ist nur 10.0.302) — "dotnet test tools/Nova.SimRunner.Tests" laeuft
+dort NICHT. Wer die Simulation anfasst — und dieser Sprint tut das —, MUSS das SDK 8.0.318
+installieren oder den Nachweis ueber die CI im PR fuehren. Eine Simulationsaenderung ohne
+gelaufene Simulationstests wird nicht committet.
 
 KONTEXT
 Die Runde läuft heute so: Menü -> Neues Spiel -> Basis bauen -> Truppen bauen -> zur
