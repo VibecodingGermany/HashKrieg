@@ -18,6 +18,9 @@ on:
       - '**/*.md'
       - '.github/scripts/check_docs.py'
       - '.github/workflows/docs-checks.yml'
+  # Handstart auf beliebigem Branch: gh workflow run "Docs Checks" --ref <branch>
+  # Laeuft dann ohne Pfadfilter - wer von Hand startet, will pruefen.
+  workflow_dispatch:
 
 permissions:
   contents: read
