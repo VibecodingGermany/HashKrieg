@@ -27,10 +27,13 @@ namespace Nova.Presentation.UI
 
         private static readonly Color PanelFill = new Color(0.05f, 0.06f, 0.08f, 0.82f);
         private static readonly Color PanelEdge = new Color(0.55f, 0.62f, 0.72f, 0.50f);
+        private static readonly Color OpaquePanelFill = new Color(0.05f, 0.06f, 0.08f, 1f);
 
         private static Texture2D _pixel;
         private static Texture2D _panelTexture;
+        private static Texture2D _opaquePanelTexture;
         private static GUIStyle _panelStyle;
+        private static GUIStyle _opaquePanelStyle;
 
         /// <summary>Shared 1x1 white texture for tinted solid fills (progress bars, minimap dots, viewport lines).</summary>
         public static Texture2D Pixel
@@ -83,6 +86,30 @@ namespace Nova.Presentation.UI
         }
 
         /// <summary>
+        /// The fully opaque twin of <see cref="PanelStyle"/> (D-085): same
+        /// fill tone and border ring, alpha 1.0. For the F3 debug panel —
+        /// world geometry bleeding through dense debug text was what made it
+        /// unreadable over the minimap and the build bar.
+        /// </summary>
+        public static GUIStyle OpaquePanelStyle
+        {
+            get
+            {
+                if (_opaquePanelStyle == null)
+                {
+                    if (_opaquePanelTexture == null) _opaquePanelTexture = CreatePanelTexture(OpaquePanelFill);
+                    _opaquePanelStyle = new GUIStyle
+                    {
+                        normal = { background = _opaquePanelTexture },
+                        border = new RectOffset(PanelBorderPixels, PanelBorderPixels, PanelBorderPixels, PanelBorderPixels),
+                        padding = new RectOffset(6, 6, 5, 5)
+                    };
+                }
+                return _opaquePanelStyle;
+            }
+        }
+
+        /// <summary>
         /// Applies the same chrome to an existing text style (the status
         /// bar's label), so a one-line readout gets the identical frame
         /// without becoming a box.
@@ -107,10 +134,21 @@ namespace Nova.Presentation.UI
                 Object.Destroy(_panelTexture);
                 _panelTexture = null;
             }
+            if (_opaquePanelTexture != null)
+            {
+                Object.Destroy(_opaquePanelTexture);
+                _opaquePanelTexture = null;
+            }
             _panelStyle = null;
+            _opaquePanelStyle = null;
         }
 
         private static Texture2D CreatePanelTexture()
+        {
+            return CreatePanelTexture(PanelFill);
+        }
+
+        private static Texture2D CreatePanelTexture(Color fill)
         {
             var texture = new Texture2D(PanelTextureSize, PanelTextureSize, TextureFormat.RGBA32, mipChain: false)
             {
@@ -124,7 +162,7 @@ namespace Nova.Presentation.UI
                 {
                     bool isBorder = x < PanelBorderPixels || y < PanelBorderPixels
                         || x >= PanelTextureSize - PanelBorderPixels || y >= PanelTextureSize - PanelBorderPixels;
-                    texture.SetPixel(x, y, isBorder ? PanelEdge : PanelFill);
+                    texture.SetPixel(x, y, isBorder ? PanelEdge : fill);
                 }
             }
             texture.Apply();

@@ -1,6 +1,6 @@
 # Sprint: Gefecht und Rundenrahmen
 
-**Status:** vorgeschlagen, nicht begonnen | **Vorgänger:** HUD-Sprint (D-084) und Hauptmenü-Sprint (D-083), beide umgesetzt, noch uncommittet | **Leitsatz:** aus der Demo wird eine Runde
+**Status:** vorgeschlagen, nicht begonnen | **Vorgänger:** [10_Sprint_Baubarkeit_und_Kartenbild.md](10_Sprint_Baubarkeit_und_Kartenbild.md) (umgesetzt), davor HUD-Sprint (D-084) und Hauptmenü-Sprint (D-083) | **Leitsatz:** aus der Demo wird eine Runde
 
 ## 1. Wo wir stehen
 
@@ -12,7 +12,9 @@ Genau diese beiden hervorgehobenen Stellen sind der Unterschied zwischen einer D
 
 ## 2. Voraussetzung — kein Sprintinhalt, aber Blocker
 
-Der Arbeitsbaum trägt 70 uncommittete Einträge, darunter zwei fertige Sprints. Das gehört committet, **bevor** weitere Features darauf gestapelt werden. Drei Änderungen dürfen dabei nicht mitkommen:
+> **Stand 2026-08-06 abends:** Der HUD- und der Hauptmenü-Sprint sind committet (`706a394`, `6f03280`), Sprint 10 ist umgesetzt und wird gerade committet. Der Absatz unten bleibt als **Dauerregel** stehen: diese Dateien gehören in keinen Commit dieser Sprintreihe.
+
+Der Arbeitsbaum wird vor jedem neuen Feature aufgeräumt. Drei Änderungen dürfen dabei nie mitkommen:
 
 | Datei | Warum raus |
 |---|---|
@@ -73,6 +75,18 @@ Der größte Einzelposten dieses Sprints, und der Grund, warum man das Spiel heu
 - **Sichtbare Pause.** `MatchRunner.PauseMatch` existiert, aber ein pausiertes Spiel und ein kaputtes Spiel sehen identisch aus. Overlay plus gestoppte Simulation, Musik läuft weiter.
 - **Neustart und Rückweg ins Menü.** Der teure Teil. `InitializeMatch` baut Kernel, EntityManager, alle acht Systeme, die KI-Session, beide `MatchSession`-Instanzen, beide Ingress-Instanzen und beide Transports neu auf — das ist als Reset richtig, aber die **Präsentationsschicht muss mitgezogen werden**: `UnitViewManager` (Views aus dem alten Match), `SelectionManager` (Ids aus dem alten Match), Kameraposition, Minimap und besonders `FogOfWarOverlayView`, das Textur und Pixelpuffer genau einmal anlegt und nie an eine geänderte Fog-Grid-Größe anpasst. Bei gleicher Kartengröße trägt das; bei einer anderen Karte gibt es eine `IndexOutOfRangeException`. Defensiv mitreparieren.
 
+### 6.1 Musik im Gefecht
+
+Der Rundenrahmen ist die richtige Stelle dafür: Musik hat dieselben Zustandsübergänge wie die Runde selbst. Heute verstummt das Spiel in der Sekunde, in der es losgeht — `MenuMusicPlayer` blendet beim Matchstart aus, und danach ist Stille.
+
+**Das Material liegt vor:** `Hashkrieg_Assets/audio/Music_inGame/`, acht Suno-Dateien — real **drei Themen** mit Varianten (Thema 1 orchestral 3:49; Thema 2 in fünf Fassungen, 2:04 bis 3:47; Thema 3 in zwei Fassungen, 3:38 und 3:47). Vorschlag, überstimmbar: je Thema die längste Fassung, also `HashKrieggame 1_orc`, `HashKrieggame 2 (2)`, `HashKrieggame 3 (1)`.
+
+**Ablage und Format.** Nach `.ogg` konvertieren (wie die Menümusik) und als `MUS_Ingame_Hashkrieg_01..03.ogg` neben `MUS_MainMenu_Hashkrieg.ogg` in `Assets/_Project/Audio/Music/` legen. Import-Settings: **Streaming**, Vorbis, Qualität ~70 %, „Load In Background" an, „Preload Audio Data" aus — sonst liegen elf Minuten Musik dekomprimiert im Speicher. Repo-Zuwachs: rund 10–13 MB. Das ist bewusst in Kauf genommen und konsistent mit der Menümusik, die ebenfalls im Repo liegt; Audio fällt **nicht** unter die Art-Paket-Regel.
+
+**Verhalten.** Ein `MusicDirector` mit Playlist: Matchstart blendet ein, während `MenuMusicPlayer` ausblendet. Titel laufen nacheinander mit kurzer Pause dazwischen, kein Titel zweimal hintereinander. Pause-Overlay: Musik läuft weiter (schon oben festgelegt). Ergebnisbildschirm: ausblenden. „Hauptmenü": Menümusik kommt zurück. Lautstärke und An/Aus kommen aus derselben `GameSettings`-Quelle wie heute, live anwendbar. Die Ein-/Ausblendmechanik von `MenuMusicPlayer` wird **geteilt, nicht kopiert**.
+
+**Lizenzlage — verbindlicher Zwischenschritt.** D-083 hat den Suno-Bezahltarif ausdrücklich **zweckgebunden nur für die Menümusik** freigegeben („erzeugt kein Präzedenzrecht", `docs/assets/Licenses.md` §2 Regel 5). Ingame-Musik aus derselben Quelle braucht deshalb eine **Erweiterung der Ausnahme als eigene Inhaberentscheidung (D-086)** plus Einträge im Lizenz-Ledger §3. Ohne diesen Eintrag werden die Dateien nicht committet.
+
 ## 7. Billige Bedienbarkeit, die viel bringt
 
 - **Kontrollgruppen 1–9** (Strg+Zahl setzen, Zahl abrufen) und **additive Auswahl mit Shift**. Reiner Auswahlzustand in `SelectionManager`, der bereits eine EditMode-Fixture hat. Berührt Simulation, Determinismus, Snapshot-Format und Befehlsregister mit null Zeilen — und ist die Geste, ohne die sich kein RTS richtig anfühlt.
@@ -92,7 +106,7 @@ Der größte Einzelposten dieses Sprints, und der Grund, warum man das Spiel heu
 
 ## 9. Fertig wenn
 
-Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — **und sie kämpft von selbst**. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit der Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Und wenn die Runde vorbei ist, drücke ich auf *Neue Runde* statt auf *Programm beenden*.
+Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — **und sie kämpft von selbst**. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf angreifende Gegner. Ich hole meine Armee mit der Taste 1 zurück. Wenn ein Befehl abgelehnt wird, sehe ich warum. Es läuft Musik, solange die Runde läuft, und sie verstummt mit dem Ergebnis. Und wenn die Runde vorbei ist, drücke ich auf *Neue Runde* statt auf *Programm beenden*.
 
 ---
 
@@ -180,7 +194,34 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
      anlegt und nie an eine geänderte Fog-Grid-Größe anpasst (IndexOutOfRangeException bei
      größerer Karte). Defensiv mitreparieren.
 
-5. BILLIGE BEDIENBARKEIT
+5. MUSIK IM GEFECHT (gehoert zum Rundenrahmen — gleiche Zustandsuebergaenge)
+   Heute verstummt das Spiel in der Sekunde, in der es losgeht: MenuMusicPlayer blendet
+   beim Matchstart aus, danach Stille.
+   MATERIAL: Hashkrieg_Assets/audio/Music_inGame/ — acht Suno-Dateien, real DREI Themen
+   mit Varianten. Vorschlag (ueberstimmbar): je Thema die laengste Fassung, also
+   "HashKrieggame 1_orc" (3:49), "HashKrieggame 2 (2)" (3:47), "HashKrieggame 3 (1)"
+   (3:47).
+   ABLAGE: nach .ogg konvertieren wie die Menuemusik, als MUS_Ingame_Hashkrieg_01..03.ogg
+   neben MUS_MainMenu_Hashkrieg.ogg in Assets/_Project/Audio/Music/.
+   IMPORT-SETTINGS (wichtig): Load Type STREAMING, Vorbis, Qualitaet ~70 %, Load In
+   Background AN, Preload Audio Data AUS — sonst liegen elf Minuten Musik dekomprimiert
+   im Speicher. Repo-Zuwachs ~10-13 MB, bewusst in Kauf genommen; Audio faellt NICHT
+   unter die Art-Paket-Regel, die Menuemusik liegt ebenfalls im Repo.
+   VERHALTEN: ein MusicDirector mit Playlist. Matchstart blendet ein, waehrend
+   MenuMusicPlayer ausblendet. Titel nacheinander mit kurzer Pause, kein Titel zweimal
+   hintereinander. Pause-Overlay: Musik laeuft weiter. Ergebnisbildschirm: ausblenden.
+   "Hauptmenue": Menuemusik kommt zurueck. Lautstaerke/An-Aus aus derselben
+   GameSettings-Quelle wie heute, live anwendbar. Die Ein-/Ausblendmechanik von
+   MenuMusicPlayer wird GETEILT, nicht kopiert. Verdrahtung im BootstrapSceneGenerator
+   (die Szene ist Maschinenausgabe).
+   LIZENZ — VERBINDLICHER ZWISCHENSCHRITT VOR DEM COMMIT: D-083 hat den Suno-Bezahltarif
+   ausdruecklich ZWECKGEBUNDEN NUR fuer die Menuemusik freigegeben ("erzeugt kein
+   Praezedenzrecht", docs/assets/Licenses.md §2 Regel 5). Ingame-Musik aus derselben
+   Quelle braucht eine Erweiterung der Ausnahme als eigene Inhaberentscheidung (D-086)
+   plus Eintraege im Lizenz-Ledger §3. Ohne diesen Eintrag werden die Dateien NICHT
+   committet.
+
+6. BILLIGE BEDIENBARKEIT
    - Kontrollgruppen 1-9 (Strg+Zahl setzen, Zahl abrufen) und additive Auswahl mit Shift.
      Reiner Auswahlzustand im SelectionManager, der schon eine EditMode-Fixture hat.
      Null Berührung von Simulation, Determinismus, Snapshot-Format, Befehlsregister.
@@ -194,16 +235,17 @@ der Anwendung. Diese zwei Stellen sind der Inhalt dieses Sprints.
      (Reset) sind implementiert, aber nur hinter F3 dokumentiert.
 
 REIHENFOLGE
-1. Committen inkl. der drei Aussonderungen (Voraussetzung)
+1. Arbeitsbaum sauber, inkl. der drei Aussonderungen (Voraussetzung)
 2. Die drei Eingabedefekte (klein, sofort spürbar)
 3. Zielerfassung + Feuererwiderung + Lebensbalken (der Kern — zusammen testen)
 4. Rundenrahmen
-5. Kontrollgruppen, Ablehnungsgründe, Chrome, Legende
+5. Musik (setzt den Rundenrahmen voraus: sie haengt an dessen Zustandsuebergaengen)
+6. Kontrollgruppen, Ablehnungsgründe, Chrome, Legende
 
 FERTIG WENN
 Ich starte eine Runde, baue eine Armee, schicke sie zur Gegnerbasis — und sie kämpft von
 selbst. Ich sehe an Lebensbalken, wer verliert. Meine Verteidigungsplattform schießt auf
 angreifende Gegner. Ich hole meine Armee mit Taste 1 zurück. Wenn ein Befehl abgelehnt
-wird, sehe ich warum. Und wenn die Runde vorbei ist, drücke ich auf "Neue Runde" statt
-auf "Programm beenden".
+wird, sehe ich warum. Es läuft Musik, solange die Runde läuft. Und wenn die Runde vorbei
+ist, drücke ich auf "Neue Runde" statt auf "Programm beenden".
 ```

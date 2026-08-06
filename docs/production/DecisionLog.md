@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.22.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.24.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -2001,6 +2001,62 @@ richtig so: das Register ist der MP-Vertrag.
 
 ---
 
+### D-085 | verbindlich | Baumodell: Builder-Modell bleibt, Auto-Dispatch per Move-Intent
+
+**Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis
+Westermann) aus der Spielsitzung desselben Tages, schriftlich fixiert in
+[hashkrieg/10_Sprint_Baubarkeit_und_Kartenbild.md](hashkrieg/10_Sprint_Baubarkeit_und_Kartenbild.md)
+§3; hier protokolliert wie angeordnet.
+
+**Kontext:** In der Spielsitzung ließen sich Gebäude platzieren und das Geld
+wurde abgebucht, aber keine Baustelle machte je Fortschritt. Verifizierte
+Ursache: `ConstructionSystem.ProgressSites` lässt eine Baustelle nur dann
+wachsen, solange der zugewiesene Builder in Chebyshev-Reichweite ≤ 1 des
+3×3-Footprints steht, und ohne lebenden eigenen Builder pausiert sie. Die
+Zuweisung (eigener Builder mit kleinstem Entity-Index) existierte — aber
+niemand schickte den Builder hin. Die KI hat genau diese Verdrahtung für
+sich (Move-Payload auf eine Nachbarzelle des Footprints), der menschliche
+Platzierungspfad sendete nur den Bau-Befehl. Stirbt der einzige Builder,
+frieren alle Baustellen dauerhaft und ohne jede Meldung ein.
+
+**Entscheidung:** Von drei Baumodellen ist gewählt:
+
+1. **Das Builder-Modell bleibt.** Die Reichweiten-Regel in
+   `ConstructionSystem` wird nicht angetastet.
+2. **Der Builder wird beim Platzieren automatisch zur Baustelle geschickt** —
+   ein zusätzlicher Move-Befehl über den ganz normalen Command-Pfad, also
+   dieselbe Klasse von Ereignis wie ein Mausklick des Spielers. Die
+   Builder-Wahl spiegelt die der Simulation (eigener Builder mit kleinstem
+   Entity-Index), die Zielzelle folgt dem deterministischen Muster der KI
+   (`originX - 1`, Ostseite als Kartenrand-Fallback).
+3. **Die Zustandsanzeige ist Teil derselben Entscheidung, nicht optional:**
+   die Baustellen-Card nennt den echten Zustand in der Auswertungsreihenfolge
+   der Simulation (kein Builder → Builder unterwegs → im Bau, X % → fertig in
+   ~Y s), und ein Platzieren ohne lebenden Builder wird sofort und sichtbar
+   gewarnt statt still einzufrieren. Der benannte Preis der Wahl: stirbt der
+   Builder auf dem Weg, pausiert der Bau — dann muss der Spieler einen neuen
+   Builder bauen und ihn hinschicken.
+
+**Verworfen:** (a) das C&C-Modell (Baustelle wächst, solange ein HQ lebt)
+und (b) das Hybridmodell (HQ baut langsam, Builder beschleunigt) — beide
+hätten die Reichweiten-Regel in `ConstructionSystem` verändert und damit die
+kanonischen Hash-, Replay- und Fingerprint-Baselines gebrochen. Die gewählte
+Variante ist eine reine Eingabe-Automatik: keine Regeländerung, kein
+Snapshot-Bump, keine neuen Baselines, das Command-Register schema v1 bleibt
+eingefroren.
+
+**Konsequenzen:**
+
+- Der Auto-Dispatch läuft ausschließlich über die bestehenden
+  schema-v1-Kinds (PlaceBuilding + Move); jede spätere Änderung der
+  Bauregeln ist eine Simulationsänderung mit eigenem D-Eintrag und eigenen
+  Baselines.
+- Nachweis der Determinismus-Disziplin: 420/420 .NET-Tests, SimRunner-Hash
+  `0x2FBEC31FBC0BF430` und DETERMINISM_10000-Fingerprint `0xF866FDC042D260E1`
+  vor und nach dem Sprint byteweise identisch.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2095,3 +2151,4 @@ richtig so: das Register ist der MP-Vertrag.
 | 1.21.0 | 2026-08-06 | D-077 aufgenommen: spielbarer RTS-Core-Loop — Start HQ + 1 Builder + 3.000 AE, Harvester aus der Raffinerie, Raffinerie ohne Kraftwerk-Prereq, Sieg zusätzlich bei HQ-Verlust (D-056 Klausel 2 teilersetzt), Skirmish-KI für Slot 1 registriert und spielend, Debug-HUD standardmäßig aus (F3), Prefab-Views zur Laufzeit auf den Sim-Footprint normalisiert | Project Owner / Agent (Umsetzung) |
 | 1.22.0 | 2026-08-06 | D-083 aufgenommen: Hauptmenü als Overlay in `Bootstrap.unity` statt zweiter Szene (`AutoStart = false`, „Neues Spiel" ruft `StartGrayboxMatch()`), UI Toolkit als UI-Stack für alles Neue, Einstellungen als `settings.json` in `Application.persistentDataPath` ohne `PlayerPrefs` und ohne `AudioMixer`, „Laden" sichtbar und ausgegraut; Assetherkunft Suno-Bezahltarif / OpenAI Image API / Rajdhani-OFL und Menütitel „HASHKRIEG" als Inhaberentscheidung. Punkte 1–4 und 6 vom Agenten unter Delegation entschieden und überstimmbar. D-078–D-082 bleiben für E-1 bis E-5 reserviert; Kopfversion holt den Rückstand auf die Verlaufstabelle (1.20.0/1.21.0) auf | Agent (unter Delegation) / Inhaberentscheidung Punkt 5: Dennis Westermann |
 | 1.23.0 | 2026-08-06 | D-084 aufgenommen (zunächst als D-078 angelegt, wegen der E-1–E-5-Reservation und D-083 umnummeriert): bedienbares HUD — Bauleiste aus `SimDefinitions` statt `BuildingRegistrySO`, Command-Register schema v1 bleibt eingefroren (Upgrades/Turm-Prioritäten/Angriffsbewegung = offene Design-Fragen), Gebäude-Rotation präsentationsseitig behoben, Kamera MMB-Drag + Space, Minimap-Kamerakanal `MinimapCameraLink` | Project Owner / Agent (Umsetzung) |
+| 1.24.0 | 2026-08-06 | D-085 aufgenommen: Baumodell — Builder-Modell bleibt, Builder wird beim Platzieren per Move-Intent über den normalen Command-Pfad automatisch zur Baustelle geschickt (Reichweitenregel unangetastet, keine neuen Baselines); verworfen: C&C-Modell und Hybridmodell wegen Bruch der Hash-/Replay-/Fingerprint-Baselines; Baustellen-Zustandsanzeige ist Teil der Entscheidung | Project Owner / Agent (Umsetzung) |

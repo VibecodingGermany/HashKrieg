@@ -60,6 +60,7 @@ namespace Nova.Editor
 
             Camera camera = CreateCamera();
             CreateDirectionalLight();
+            ConfigureAtmosphere();
             GameObject ground = CreateGroundPlane();
             MatchRunner runner = CreateMatchObject();
             CreateMapObject(runner, ground);
@@ -116,12 +117,44 @@ namespace Nova.Editor
             return camera;
         }
 
+        /// <summary>
+        /// The Glutrinne sun (D-085): low and slanted for long shadows, warm
+        /// in colour temperature, with soft shadows. These are Light
+        /// properties on the generated object, so regeneration keeps them —
+        /// hand-tuning the scene YAML would be overwritten here anyway.
+        /// </summary>
         private static void CreateDirectionalLight()
         {
             var lightObject = new GameObject("Directional Light");
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+            lightObject.transform.rotation = Quaternion.Euler(33f, -128f, 0f);
+            light.color = new Color(1f, 0.87f, 0.70f);
+            light.intensity = 1.15f;
+            light.shadows = LightShadows.Soft;
+            light.shadowStrength = 0.85f;
+        }
+
+        /// <summary>
+        /// Desert atmosphere (D-085): a light sand-coloured distance fog and
+        /// a tri-light ambient gradient with a sandy horizon — the single
+        /// most visible quick win of the map pass, and pure scene
+        /// configuration. RenderSettings values are SCENE-serialized, so they
+        /// are set here, in the generator: any value hand-edited into
+        /// Bootstrap.unity would silently revert on the next regeneration.
+        /// </summary>
+        private static void ConfigureAtmosphere()
+        {
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = new Color(0.78f, 0.68f, 0.52f);
+            RenderSettings.fogStartDistance = 70f;
+            RenderSettings.fogEndDistance = 210f;
+
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.52f, 0.50f, 0.46f);
+            RenderSettings.ambientEquatorColor = new Color(0.76f, 0.66f, 0.50f); // the sandy horizon
+            RenderSettings.ambientGroundColor = new Color(0.30f, 0.26f, 0.21f);
         }
 
         /// <summary>
@@ -247,6 +280,9 @@ namespace Nova.Editor
 
             PlacementGhostView ghost = uiObject.AddComponent<PlacementGhostView>();
             WireReference(ghost, "_input", input);
+
+            ConstructionSiteMarkerView siteMarkers = uiObject.AddComponent<ConstructionSiteMarkerView>();
+            WireReference(siteMarkers, "_runner", runner);
 
             BuildMenuHud menu = uiObject.AddComponent<BuildMenuHud>();
             WireReference(menu, "_runner", runner);

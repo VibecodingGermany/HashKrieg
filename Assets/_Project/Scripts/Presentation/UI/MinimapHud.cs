@@ -15,10 +15,12 @@ namespace Nova.Presentation.UI
     /// <summary>
     /// The minimap: an IMGUI panel docked to the bottom-left corner, directly
     /// above the build bar (mirroring the command card on the right). Shows
-    /// the Glutrinne desert ground, the viewer team's fog state as
-    /// darkened/black terrain, every entity the team may legally see as a
-    /// faction-coloured dot, and the camera's ground footprint as a white
-    /// rectangle. A left click inside the map jumps the camera there.
+    /// the Glutrinne desert ground, the viewer team's fog state as the same
+    /// terrain silhouette in three brightness bands (visible full, explored
+    /// dimmed, unexplored near-dark but readable — never black), every entity
+    /// the team may legally see as a faction-coloured dot, and the camera's
+    /// ground footprint as a white rectangle. A left click inside the map
+    /// jumps the camera there.
     /// <para>
     /// NO LEAKS BY CONSTRUCTION: the background is the SAME committed team
     /// view the <see cref="FogOfWarOverlayView"/> renders and the dots come
@@ -57,16 +59,22 @@ namespace Nova.Presentation.UI
         [Tooltip("Build bar; the minimap docks directly above its bottom reserve, mirroring the command card.")]
         [SerializeField] private BuildMenuHud _buildMenu;
 
+        /// <summary>Serialized defaults as constants — HudLayout's CanonicalMinimapZone reads these for panels that must clear the minimap without holding a reference to it.</summary>
+        public const float DefaultMapSize = 168f;
+        public const float DefaultMargin = 8f;
+
         [Header("Presentation")]
         [Tooltip("Whole map is scaled by this factor, matching the BuildMenuHud/DebugHud convention for Retina displays.")]
         [SerializeField] private float _uiScale = 1.5f;
-        [SerializeField] private float _mapSize = 168f;
-        [SerializeField] private float _margin = 8f;
+        [SerializeField] private float _mapSize = DefaultMapSize;
+        [SerializeField] private float _margin = DefaultMargin;
 
         [Header("Terrain (Glutrinne desert — matches GlutrinneBlockoutView._sandColor)")]
         [SerializeField] private Color _terrainColor = new Color(0.72f, 0.60f, 0.42f, 1f);
         [Tooltip("Brightness multiplier of the terrain over Explored (seen before, not currently visible) cells.")]
         [SerializeField, Range(0f, 1f)] private float _exploredBrightness = 0.45f;
+        [Tooltip("Brightness multiplier of the terrain over UNEXPLORED cells — the silhouette stays readable instead of reading as a black hole (classic RTS convention).")]
+        [SerializeField, Range(0f, 1f)] private float _unexploredBrightness = 0.15f;
 
         [Header("Dots")]
         [SerializeField] private float _unitDotSize = 3f;
@@ -97,7 +105,7 @@ namespace Nova.Presentation.UI
         public bool IsPointerOverMinimap(Vector2 mousePosition)
         {
             float scale = Mathf.Max(1f, _uiScale);
-            var gui = new Vector2(mousePosition.x / scale, (Screen.height - mousePosition.y) / scale);
+            Vector2 gui = HudLayout.RawMouseToGui(mousePosition, scale);
             Rect map = ComputeMapRect();
             map.xMin -= 4f;
             map.yMin -= 4f;
@@ -106,13 +114,12 @@ namespace Nova.Presentation.UI
             return map.Contains(gui);
         }
 
-        /// <summary>Bottom-left docking: directly above the build bar's reserve, sharing the left screen margin.</summary>
+        /// <summary>Bottom-left docking: the minimap's zone sits directly above the build bar's reserve, sharing the left margin (HudLayout owns the screen read).</summary>
         private Rect ComputeMapRect()
         {
             float scale = Mathf.Max(1f, _uiScale);
             float barReserve = _buildMenu != null ? _buildMenu.OccupiedHeight : 0f;
-            float y = Screen.height / scale - barReserve - _margin - _mapSize;
-            return new Rect(_margin, Mathf.Max(_margin, y), _mapSize, _mapSize);
+            return HudLayout.MinimapZone(scale, _mapSize, _margin, barReserve);
         }
 
         private void OnGUI()
@@ -183,7 +190,14 @@ namespace Nova.Presentation.UI
                 (byte)(_terrainColor.g * _exploredBrightness * 255f),
                 (byte)(_terrainColor.b * _exploredBrightness * 255f),
                 255);
-            var unexplored = new Color32(0, 0, 0, 255);
+            // Unexplored is the same silhouette, much darker — not black. A
+            // black hole reads as "broken"; a dimmed desert reads as
+            // "unknown" (D-085, classic RTS minimap convention).
+            var unexplored = new Color32(
+                (byte)(_terrainColor.r * _unexploredBrightness * 255f),
+                (byte)(_terrainColor.g * _unexploredBrightness * 255f),
+                (byte)(_terrainColor.b * _unexploredBrightness * 255f),
+                255);
 
             for (int y = 0; y < view.Height; y++)
             {

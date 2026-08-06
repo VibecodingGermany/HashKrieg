@@ -139,6 +139,88 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 - Interaktiver Durchlauf durch den Inhaber steht als DoD-Punkt noch aus.
 
 ### Hinzugefügt
+- **Baubarkeit, HUD-Zonen und Kartenbild (D-085, Sprint „Baubarkeit und
+  Kartenbild"):** Was die Bauleiste verspricht, passiert jetzt auch — ein
+  gesetztes Gebäude wird tatsächlich gebaut, und das Spiel sagt, was es tut.
+  - **Builder-Auto-Dispatch beim Platzieren:** zusätzlich zum Bau-Befehl
+    geht ein normaler Move-Befehl an den Builder, den die Simulation der
+    Baustelle zuweisen wird (eigener Builder mit kleinstem Entity-Index —
+    dieselbe Spiegelung wie `CommandCardPresenter.TryFindRepairBuilder`),
+    auf dieselbe deterministische Nachbarzelle, die die KI ansteuert
+    (westlich des Footprints, Ostseite als Kartenrand-Fallback). Läuft über
+    den bestehenden Command-Pfad: kein neuer `CommandKind`, kein
+    StateVersion-Bump, Hashes/Replays/Fingerprints unverändert. Ohne
+    lebenden Builder bleibt das Platzieren erlaubt (Abbruch erstattet 75 %),
+    aber Statuszeile und Log warnen sofort.
+  - **Baustellen-Zustand auf der Command Card:** eine Zeile in der
+    Auswertungsreihenfolge der Simulation — „Kein Builder — Bau pausiert.
+    Builder im HQ bauen." → „Builder unterwegs" → „im Bau, 43 % — fertig in
+    ~12 s". Prozent und Restzeit kommen aus `BuildTicks`, `ProgressRaw` und
+    `ProductionSpeedMultiplierQ16`, nicht aus einer Schätzung; die Regeln
+    stecken in `ConstructionSiteStatus` (Nova.Gameplay, Unity-frei, EditMode-
+    getestet).
+  - **Pausierte Baustellen in der Welt sichtbar:** `ConstructionSiteMarkerView`
+    legt einen Bodenrahmen auf jede eigene Baustelle — ruhig bei
+    wachsenden, pulsierend amber bei pausierten (kein Builder oder Builder
+    noch nicht in Reichweite).
+  - **HUD-Zonenmodell (`HudLayout`):** eine Klasse besitzt alle Panel-
+    Rechtecke und ist die einzige Stelle, die `Screen.width/height` liest —
+    Statusstreifen oben, Minimap unten links, Bauleiste unten mittig,
+    Command Card rechts über der Leiste, F3-Panel im verbleibenden freien
+    Feld (nie in der Spalte der Card). Überlappung ist damit
+    konstruktionsbedingt ausgeschlossen statt pro Panel geflickt; die
+    Zonenmathematik (`HudLayoutMath`, Nova.Gameplay) ist EditMode-getestet.
+  - **F3-Panel lesbar:** opaker Hintergrund (`HudChrome.OpaquePanelStyle`
+    statt `GUI.skin.box`), Höhe auf die Zone begrenzt, Inhalt in einer
+    `GUI.ScrollView`.
+  - **Kartenbild ohne ein einziges Asset:** prozedurale 512×512-Sandtextur
+    zur Laufzeit (deterministisches Wert-Rauschen mit festem Seed, vier
+    Sandtöne plus niederfrequente Flecken, nahtlos gekachelt 32×32), 84
+    deterministisch gestreute Felsen aus Primitiven ohne Collider (ausgespart
+    um Startbasen und Aetheriumfelder), schräge warme Sonne mit weichen
+    Schatten, sandfarbener Distanznebel und Ambient-Gradient (im
+    Szenengenerator gesetzt — `RenderSettings` ist szenen-serialisiert),
+    Kartenrand als drei Zellen breite Verwitterungszone per Overlay-Schleier
+    statt des flachen dunklen Balkens, Minimap-Unerkundet als stark
+    abgedunkelte Geländesilhouette (~15 %) statt Schwarz.
+
+### Geändert
+- **Bauleisten-Buttons auf zwei Zeilen (62 px):** Name (Hotkey) und
+  Kosten · Zeit — `wordWrap` aus, harte Kürzung mit „…" gegen die echte
+  Stilbreite, kein Label kann mehr aus einem Button laufen. Der Sperrgrund
+  („benötigt Raffinerie" / „nicht genug Aetherium") wandert aus dem Button
+  in die Statuszeile über der Leiste und erscheint beim Überfahren; dieselbe
+  Zeile trägt die Builder-Warnung und den Onboarding-Hinweis.
+
+### Behoben
+- **Rechtsklick kannte die HUD-Sperre nicht:** RMB auf Bauleiste, Minimap
+  oder Command Card schickte die Armee an den Punkt dahinter — der Zweig
+  prüft jetzt `IsPointerOverHud` wie die drei anderen Klickpfade.
+- **Roter Baugeist platzierte trotzdem:** der Platzierungsklick prüfte
+  `_placementHasCell` statt `_placementValid`; ein ungültiger Klick (auch
+  am Kartenrand, wo `ToGridCoordinate` negative Ursprünge still auf 0
+  klemmte) setzte das Gebäude woanders hin als der Geist zeigte. Jetzt
+  platziert nur der grüne Geist, ein Fehlklick lässt den Geist scharf
+  (RMB/ESC bricht ab).
+- **Command Card unten abgeschnitten:** `EstimateHeight` rechnete weder
+  GUILayout-Margins noch Panel-Padding mit (~40 px) — die untersten Knöpfe
+  lagen außerhalb der `BeginArea` und waren nicht klickbar. Die Höhe zählt
+  jetzt Zeile für Zeile mit den echten Stil-Werten.
+
+### Verifikation (D-085)
+- `dotnet test tools/Nova.SimRunner.Tests`: **420/420 grün** — null Sim-
+  Änderung, wie vom Sprint gefordert.
+- SimRunner: Hash `0x2FBEC31FBC0BF430` (Standard) und Fingerprint
+  `0xF866FDC042D260E1` / Final `0xD8650F4DEDE1494C` (DETERMINISM_10000) —
+  **identisch zum Stand vor dem Sprint**.
+- `dotnet build` aller betroffenen Projekte: 0 Fehler, 0 Warnungen;
+  EditMode-Spiegeltests für `ConstructionSiteStatus` und `HudLayoutMath`
+  kompilieren grün (laufen wie alle EditMode-Tests nur in Unity).
+- Szenen-Regeneration und PlayMode-Durchlauf stehen als Folgeschritt aus
+  (der Szenengenerator verdrahtet die neuen Komponenten; `Bootstrap.unity`
+  ist Maschinenausgabe).
+
+### Hinzugefügt
 - **Spielbarer RTS-Core-Loop (D-077, Graybox-Sitzung GB-005, ohne Gate-Status):**
   Die Demo ist erstmals ein spielbares, kleines 1v1 im C&C-Stil statt einer
   technischen Testszene.

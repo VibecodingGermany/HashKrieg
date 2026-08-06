@@ -64,8 +64,11 @@ namespace Nova.Presentation.UI
         private const float SectionHeight = 20f;
         private const float RowHeight = 20f;
         private const float ProgressHeight = 8f;
+        private const float SiteStatusHeight = 28f;
         private const float FooterHeight = 16f;
-        private const float PanelPadding = 12f;
+
+        /// <summary>Canonical panel width (the serialized default), read by HudLayout for the zones that must clear the card column.</summary>
+        public const float DefaultPanelWidth = 236f;
 
         /// <summary>What a card button does when clicked. Payload: QueueUnit = unit defId, CancelProduction = queue index.</summary>
         private enum CardAction
@@ -115,6 +118,8 @@ namespace Nova.Presentation.UI
             public readonly List<QueueRow> QueueRows = new List<QueueRow>(ProductionSystem.MaxQueueEntries);
             /// <summary>Site progress 0..1; negative = no bar under the title.</summary>
             public float ProgressBar01 = -1f;
+            /// <summary>The site card's live state line (kein Builder / unterwegs / im Bau …); null on unit and building cards.</summary>
+            public string SiteStatusText;
             public string FooterHint;
 
             public void Clear()
@@ -126,6 +131,7 @@ namespace Nova.Presentation.UI
                 QueueHeader = null;
                 QueueRows.Clear();
                 ProgressBar01 = -1f;
+                SiteStatusText = null;
                 FooterHint = null;
             }
         }
@@ -139,7 +145,7 @@ namespace Nova.Presentation.UI
         [Header("Presentation")]
         [Tooltip("Whole panel is scaled by this factor, matching the BuildMenuHud/DebugHud convention for Retina displays.")]
         [SerializeField] private float _uiScale = 1.5f;
-        [SerializeField] private float _panelWidth = 236f;
+        [SerializeField] private float _panelWidth = DefaultPanelWidth;
         [SerializeField] private float _panelMargin = 8f;
 
         private readonly CommandCardPresenter _presenter = new CommandCardPresenter();
@@ -153,6 +159,7 @@ namespace Nova.Presentation.UI
         private GUIStyle _buttonStyle;
         private GUIStyle _sectionStyle;
         private GUIStyle _rowStyle;
+        private GUIStyle _siteStatusStyle;
         private GUIStyle _cancelStyle;
         private GUIStyle _hintStyle;
 
@@ -217,9 +224,9 @@ namespace Nova.Presentation.UI
             model.Visible = true;
 
             if (_runner.Construction != null
-                && _runner.Construction.TryGetSite(rawLead, out ushort siteDefId, out int siteProgressRaw, out _))
+                && _runner.Construction.TryGetSite(rawLead, out ushort siteDefId, out int siteProgressRaw, out uint siteBuilderRaw))
             {
-                BuildSiteModel(model, siteDefId, siteProgressRaw);
+                BuildSiteModel(model, siteDefId, siteProgressRaw, siteBuilderRaw, slot, entities);
             }
             else if (SimDefinitions.IsBuildingRole(lead.Role))
             {
@@ -300,8 +307,18 @@ namespace Nova.Presentation.UI
             }
         }
 
-        /// <summary>The construction-site card: progress plus cancel (75% refund, the construction domain's rule).</summary>
-        private void BuildSiteModel(CardModel model, ushort siteDefId, int siteProgressRaw)
+        /// <summary>
+        /// The construction-site card: progress with a live state line plus
+        /// cancel (75% refund, the construction domain's rule). The state
+        /// line names the sim's own evaluation in its own order — no living
+        /// Builder (paused), Builder assigned but outside the footprint's
+        /// reach (paused), or building with the ETA from BuildTicks,
+        /// ProgressRaw and the owner's ProductionSpeedMultiplierQ16 — because
+        /// a standing site must never look simply "broken" (D-085).
+        /// </summary>
+        private void BuildSiteModel(
+            CardModel model, ushort siteDefId, int siteProgressRaw, uint siteBuilderRaw,
+            byte slot, EntityManager entities)
         {
             if (!SimDefinitions.TryGetBuilding(siteDefId, out SimBuildingDefinition def))
             {
@@ -310,10 +327,42 @@ namespace Nova.Presentation.UI
             }
 
             model.Title = $"Baustelle: {CommandCardPresenter.BuildingDisplayName(def.Role)}";
-            model.ProgressBar01 = Mathf.Clamp01(siteProgressRaw / (float)(def.BuildTicks << 16));
+            model.ProgressBar01 = Mathf.Clamp01(ConstructionSiteStatus.Progress01(siteProgressRaw, def.BuildTicks));
+
+            // The reach verdict mirrors the sim's private Chebyshev rule: the
+            // site entity sits at the footprint's CENTER cell, so the origin
+            // is center minus half the footprint — the same derivation the
+            // AI's construction support makes.
+            bool builderInReach = false;
+            if (siteBuilderRaw != 0
+                && entities.TryGetUnit(UnitCommandStateView.ToEntityId(siteBuilderRaw), out UnitState builder)
+                && entities.TryGetUnit(model.LeadId, out UnitState siteUnit))
+            {
+                const int half = SimDefinitions.BuildingFootprintCells / 2;
+                int originX = GridCellOf(siteUnit.Transform.PositionX) - half;
+                int originY = GridCellOf(siteUnit.Transform.PositionY) - half;
+                builderInReach = ConstructionSiteStatus.IsInReachOfFootprint(
+                    GridCellOf(builder.Transform.PositionX), GridCellOf(builder.Transform.PositionY),
+                    originX, originY, SimDefinitions.BuildingFootprintCells);
+            }
+
+            SiteBuildState state = ConstructionSiteStatus.Evaluate(siteBuilderRaw != 0, builderInReach);
+            int speedRaw = _runner.Economy != null
+                ? _runner.Economy.GetPlayerEconomy(slot).ProductionSpeedMultiplierQ16.RawValue
+                : Nova.Core.SimFixed.One.RawValue;
+            int remainingSeconds = ConstructionSiteStatus.RemainingSecondsCeil(
+                siteProgressRaw, def.BuildTicks, speedRaw);
+            model.SiteStatusText = ConstructionSiteStatus.StatusText(
+                state, ConstructionSiteStatus.Progress01(siteProgressRaw, def.BuildTicks), remainingSeconds);
 
             long refund = (long)def.CostAE * ConstructionSystem.CancelRefundPercent / 100;
             AddButton(model, $"Abbruch (+{refund} AE)", true, CardAction.CancelConstruction);
+        }
+
+        /// <summary>Sim-space coordinate to grid cell at the presentation boundary: floor, clamped at 0, the same mapping the sim applies.</summary>
+        private static int GridCellOf(Nova.Core.SimFixed simCoordinate)
+        {
+            return Mathf.Max(0, Mathf.FloorToInt(simCoordinate.ToFloat()));
         }
 
         /// <summary>
@@ -411,6 +460,10 @@ namespace Nova.Presentation.UI
 
             GUILayout.Label(model.Title, _titleStyle, GUILayout.Height(TitleHeight));
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
+            if (model.SiteStatusText != null)
+            {
+                GUILayout.Label(model.SiteStatusText, _siteStatusStyle, GUILayout.Height(SiteStatusHeight));
+            }
 
             for (int i = 0; i < model.Buttons.Count; i++)
             {
@@ -476,44 +529,49 @@ namespace Nova.Presentation.UI
             }
         }
 
-        /// <summary>Bottom-right docking: the card sits directly above the build bar, sharing its right margin.</summary>
+        /// <summary>Bottom-right docking: the card's zone sits directly above the build bar's reserve, sharing the right margin (HudLayout owns the screen read).</summary>
         private Rect ComputePanelRect(CardModel model)
         {
             float scale = Mathf.Max(1f, _uiScale);
             float height = EstimateHeight(model);
-            float x = Screen.width / scale - _panelWidth - _panelMargin;
             float barReserve = _buildMenu != null ? _buildMenu.OccupiedHeight : 0f;
-            float y = Screen.height / scale - barReserve - _panelMargin - height;
-            return new Rect(x, Mathf.Max(_panelMargin, y), _panelWidth, height);
+            return HudLayout.CommandCardZone(scale, _panelWidth, height, _panelMargin, barReserve);
         }
 
         /// <summary>
         /// Panel height from the model's rows; must track the GUILayout
         /// consumption of OnGUI row for row (a clip would cut buttons off,
-        /// a surplus is just empty box background).
+        /// a surplus is just empty box background). Every row costs its
+        /// content height PLUS its style's vertical margin — GUILayout stacks
+        /// margin boxes, it does not collapse them — and the panel style's
+        /// own padding wraps the lot. (The earlier estimate ignored both and
+        /// the card's bottom buttons fell outside the BeginArea, ~40 px short
+        /// on a typical card: visible, but not clickable.)
         /// </summary>
         private float EstimateHeight(CardModel model)
         {
-            float height = TitleHeight + PanelPadding;
-            if (model.ProgressBar01 >= 0f) height += ProgressHeight;
+            float height = HudChrome.PanelStyle.padding.vertical;
+            height += TitleHeight + _titleStyle.margin.vertical;
+            if (model.ProgressBar01 >= 0f) height += ProgressHeight; // GUIStyle.none: no margin
+            if (model.SiteStatusText != null) height += SiteStatusHeight + _siteStatusStyle.margin.vertical;
             for (int i = 0; i < model.Buttons.Count; i++)
             {
-                height += ButtonHeight(model.Buttons[i].Label);
+                height += ButtonHeight(model.Buttons[i].Label) + _buttonStyle.margin.vertical;
             }
             if (model.QueueHeader != null)
             {
-                height += SectionHeight;
+                height += SectionHeight + _sectionStyle.margin.vertical;
                 for (int i = 0; i < model.QueueRows.Count; i++)
                 {
-                    height += RowHeight;
+                    height += RowHeight; // the horizontal row group carries GUIStyle.none
                     if (model.QueueRows[i].Progress01 >= 0f) height += ProgressHeight;
                 }
             }
-            if (model.FooterHint != null) height += FooterHeight;
+            if (model.FooterHint != null) height += FooterHeight + _hintStyle.margin.vertical;
             return height;
         }
 
-        /// <summary>Buttons wrap to their line count (name / cost / reason), same three-line idiom as the build bar.</summary>
+        /// <summary>Buttons wrap to their line count (name / cost / reason) — the card keeps its reasons on the button (D-084); only the build bar moved them to the status line.</summary>
         private static float ButtonHeight(string label)
         {
             int lines = 1;
@@ -594,6 +652,13 @@ namespace Nova.Presentation.UI
             if (_rowStyle == null)
             {
                 _rowStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = false };
+            }
+            if (_siteStatusStyle == null)
+            {
+                // Wraps: the no-Builder warning is longer than the panel is
+                // wide and must read in full, never clip (SiteStatusHeight
+                // reserves the two lines it needs).
+                _siteStatusStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Italic, wordWrap = true };
             }
             if (_cancelStyle == null)
             {

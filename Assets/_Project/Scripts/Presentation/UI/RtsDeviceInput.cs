@@ -5,6 +5,7 @@ using UnityEngine;
 using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.State;
@@ -491,17 +492,81 @@ namespace Nova.Presentation.UI
                 // A click on the HUD belongs to its buttons (OnGUI), which
                 // re-target the ghost — never place behind the HUD.
                 if (IsPointerOverHud(mouse)) return;
-                if (_placementHasCell)
+
+                // The verdict gates the dispatch, not the mere presence of a
+                // cell: a RED ghost (off-map, occupied, unaffordable) places
+                // nothing. Before this check the raw cell went out anyway and
+                // ToGridCoordinate silently clamped a negative footprint
+                // origin to 0, so the building appeared somewhere the ghost
+                // never showed. The click keeps the ghost armed instead —
+                // misclicks are free, RMB/ESC is what cancels.
+                if (!_placementValid)
                 {
-                    Report($"PlaceBuilding {_placementDefId}",
-                        _dispatcher.PlaceBuilding(_placementDefId,
-                            ToGridCoordinate(_placementOriginX), ToGridCoordinate(_placementOriginY)));
+                    _lastCommandStatus = "Placement: invalid position — nothing placed (RMB/ESC cancels)";
+                    return;
                 }
+
+                IntentDispatchResult placed = _dispatcher.PlaceBuilding(_placementDefId,
+                    ToGridCoordinate(_placementOriginX), ToGridCoordinate(_placementOriginY));
+                Report($"PlaceBuilding {_placementDefId}", placed);
                 _placementMode = false;
+
+                // D-085: the placement carries the builder auto-dispatch —
+                // the same Move the AI sends its own assigned Builder, over
+                // the normal command path. No sim rule is touched.
+                if (placed.Accepted)
+                {
+                    DispatchBuilderToConstructionSite(_placementOriginX, _placementOriginY);
+                }
                 return;
             }
 
             HandleBuildingHotkeys(shift);
+        }
+
+        /// <summary>
+        /// The D-085 builder auto-dispatch, fired right after an accepted
+        /// placement: a plain Move intent sending the builder the site will
+        /// auto-assign — the lowest-index living own Builder, the sim's own
+        /// convention, mirrored by
+        /// <see cref="CommandCardPresenter.TryFindRepairBuilder"/> — to the
+        /// deterministic adjacent approach cell the AI uses
+        /// (<see cref="ConstructionSiteStatus.ApproachCell"/>). Without this
+        /// the site would sit at 0% forever: ConstructionSystem only
+        /// progresses a site while its assigned Builder stands in Chebyshev
+        /// reach, and nothing else ever walked him there.
+        /// <para>
+        /// With NO living own Builder the placement stays legal (the money
+        /// sits in a site that refunds 75% on cancel), but the status says so
+        /// at once instead of freezing silently — and the build bar repeats
+        /// the warning as long as any own site lacks a Builder
+        /// (<see cref="BuildMenuHud"/>).
+        /// </para>
+        /// </summary>
+        private void DispatchBuilderToConstructionSite(int originX, int originY)
+        {
+            if (!CommandCardPresenter.TryFindRepairBuilder(_runner.Entities, _dispatcher.LocalSlot, out EntityId builder))
+            {
+                _lastCommandStatus += $" — {ConstructionSiteStatus.NoBuilderWarning}";
+                Debug.LogWarning("[RtsDeviceInput] Placed without a living own Builder — the site will pause until one is built (U at the HQ).");
+                return;
+            }
+
+            ConstructionSiteStatus.ApproachCell(originX, originY,
+                SimDefinitions.BuildingFootprintCells, ConstructionSystem.GridSize,
+                out int cellX, out int cellY);
+
+            _builderScratch[0] = builder;
+            IntentDispatchResult moved = _dispatcher.MoveTo(
+                _builderScratch.AsSpan(0, 1),
+                Nova.Core.SimFixed.FromInt(cellX), Nova.Core.SimFixed.FromInt(cellY));
+            _lastCommandStatus += moved.Accepted
+                ? $" — Builder unterwegs ({cellX},{cellY})"
+                : $" — Builder-Move {moved.Result} ({moved.RejectReason})";
+            if (!moved.Accepted)
+            {
+                Debug.LogWarning($"[RtsDeviceInput] Builder auto-dispatch rejected: {moved.RejectReason}");
+            }
         }
 
         // ----------------------------------------------------------------
@@ -559,7 +624,12 @@ namespace Nova.Presentation.UI
                 return;
             }
 
-            if (Input.GetMouseButtonDown(1) && TryScreenPointToGround(mouse, out Vector3 moveTo))
+            // The right-click order path honours the HUD lock exactly like
+            // the placement click, the selection press and the order-pick
+            // click above: a right-click on the build bar, the minimap or the
+            // command card belongs to the HUD and must NOT send the army to
+            // the world point behind the panel.
+            if (Input.GetMouseButtonDown(1) && !IsPointerOverHud(mouse) && TryScreenPointToGround(mouse, out Vector3 moveTo))
             {
                 // Right-click with an own producer building as the lead
                 // selection sets that building's rally point — the building

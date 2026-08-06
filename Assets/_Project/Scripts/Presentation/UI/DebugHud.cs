@@ -75,6 +75,10 @@ namespace Nova.Presentation.UI
         private GUIStyle _outcomeStyle;
         private GUIStyle _statusStyle;
 
+        // F3 panel scroll position: the panel's height is bounded by its
+        // HudLayout zone, so surplus content scrolls instead of running out.
+        private Vector2 _scrollPos;
+
         // Force census, recomputed at most once per frame (OnGUI runs twice:
         // Layout + Repaint) so the O(capacity) sweep is not paid twice.
         private string _censusText;
@@ -106,8 +110,9 @@ namespace Nova.Presentation.UI
             if (_statusStyle == null)
             {
                 // The always-on status bar is cockpit chrome, not debug text:
-                // the shared HudChrome frame (the F3 panel below keeps its
-                // plain box — it IS a debug view).
+                // the shared HudChrome frame. The F3 panel below paints the
+                // opaque twin (HudChrome.OpaquePanelStyle) — translucent
+                // chrome under dense debug text was what made it unreadable.
                 _statusStyle = new GUIStyle(_labelStyle) { wordWrap = false };
                 HudChrome.ApplyPanelChrome(_statusStyle);
             }
@@ -124,9 +129,24 @@ namespace Nova.Presentation.UI
                 return;
             }
 
-            float width = Mathf.Min(640f, Screen.width / scale - 16f);
-            GUILayout.BeginArea(new Rect(8f, 8f + 3f * (_fontSize + 6f), width, Screen.height / scale - 16f));
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandHeight(false));
+            // The F3 panel lives in the HudLayout free-field zone: below the
+            // status strip, bottom-bounded by the minimap's top edge, never
+            // entering the command card's column. Degenerate zone (tiny
+            // window) = draw nothing instead of overlapping.
+            Rect strip = HudLayout.StatusStrip(scale, _fontSize + 6f, 8f);
+            Rect minimap = HudLayout.CanonicalMinimapZone(scale);
+            Rect zone = HudLayout.DebugPanelZone(scale, 640f, 8f, strip.yMax + 4f, minimap.yMin);
+            if (zone.height <= 0f || zone.width <= 0f)
+            {
+                GUI.matrix = previousMatrix;
+                return;
+            }
+
+            GUILayout.BeginArea(zone);
+            GUILayout.BeginVertical(HudChrome.OpaquePanelStyle);
+            _scrollPos = GUILayout.BeginScrollView(
+                _scrollPos,
+                GUILayout.Height(Mathf.Max(0f, zone.height - HudChrome.OpaquePanelStyle.padding.vertical)));
 
             if (_runner == null)
             {
@@ -145,6 +165,7 @@ namespace Nova.Presentation.UI
                 GUILayout.Label(string.IsNullOrEmpty(legend) ? "Controls: no RtsDeviceInput in the scene." : legend, _labelStyle);
             }
 
+            GUILayout.EndScrollView();
             GUILayout.EndVertical();
             GUILayout.EndArea();
             GUI.matrix = previousMatrix;
@@ -201,7 +222,7 @@ namespace Nova.Presentation.UI
                 _builder.Append("   |   F3: debug panel");
             }
 
-            GUI.Label(new Rect(8f, 8f, Screen.width / scale - 16f, _fontSize + 6f), _builder.ToString(), _labelStyle);
+            GUI.Label(HudLayout.StatusStrip(scale, _fontSize + 6f, 8f), _builder.ToString(), _statusStyle);
         }
 
         private void DrawMatchLine()
