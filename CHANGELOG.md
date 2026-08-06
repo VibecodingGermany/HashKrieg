@@ -17,6 +17,253 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Hauptmenü, Menümusik und Einstellungen (D-083):** Wer das Spiel startet,
+  landet nicht mehr mitten in einem Match, sondern vor einem Menü mit Key Art,
+  Titel „HASHKRIEG" und Musik — und kann das Spiel zum ersten Mal auch wieder
+  sauber verlassen.
+  - **Vier Einträge — Neues Spiel / Laden / Einstellungen / Beenden.**
+    „Neues Spiel" ruft `MatchBootstrap.StartGrayboxMatch()` und blendet das
+    Menü aus; „Beenden" ruft `Application.Quit()` (im Editor: Play-Modus
+    beenden). Das Menü ist ein **Overlay in der bestehenden `Bootstrap.unity`**,
+    keine zweite Szene — das Projekt hat weiterhin **null**
+    `SceneManager`-Aufrufe im Produktionscode, und das Menü-Objekt entsteht im
+    `BootstrapSceneGenerator`, weil die Szene Maschinenausgabe ist.
+  - **„Laden" ist sichtbar, aber ausgegraut** („kommt später"). Die
+    Snapshot-Schicht serialisiert den vollständigen Matchzustand und setzt ihn
+    hash-identisch fort — aber nichts schreibt je auf Platte, es gibt kein
+    Save-Format und keine Slots. Den Eintrag zu verstecken ließe offen, ob das
+    Spiel überhaupt speichern kann; ihn anzubieten ließe den Spieler ins Leere
+    greifen.
+  - **Einstellungen mit Persistenz:** Musik an/aus + Lautstärke, SFX an/aus +
+    Lautstärke, Render-Detail über die sechs Quality-Level, vSync, Auflösung,
+    Vollbild. Gespeichert wird als lesbares JSON in
+    `Application.persistentDataPath/settings.json` — **kein `PlayerPrefs`**
+    (nicht inspizierbar, nicht löschbar ohne Werkzeug) und **kein `AudioMixer`**
+    (die Musiklautstärke geht direkt auf `AudioSource.volume`). Angewandt wird
+    beim Start über `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`, also
+    ohne Boot-Objekt; eine kaputte Datei fällt auf die Vorgabewerte zurück,
+    statt den Start zu blockieren.
+  - **Ehrlich zu den Grenzen:** Der **SFX-Regler wirkt auf nichts** — es gibt
+    noch keine SFX; der Wert wird gespeichert und im UI als wirkungslos
+    gekennzeichnet. Und alle sechs **Render-Detail-Stufen teilen sich ein
+    URP-Asset**: 19 Felder unterscheiden sich real (`lodBias` 0,3–2,0,
+    Anisotropie, Partikelbudget), `renderScale`, Schatten und MSAA dagegen
+    nicht.
+  - **Erstes echtes UI Toolkit-UI:** damit ist der UI-Stack für alles Neue
+    gesetzt. `com.unity.modules.uielements` ist ein Engine-Modul und brauchte
+    keinen asmdef-Eintrag — `Nova.Presentation.UI.asmdef` referenziert
+    weiterhin ausschließlich `Nova.*`-Assemblies. Das bestehende
+    `OnGUI`-HUD bleibt Wegwerfcode und wird nicht portiert.
+  - **Assets im Repo, Lizenzlage geklärt:** Key Art (OpenAI Image API),
+    Menümusik (Suno, Bezahltarif, nahtlos geloopt) und die Schrift Rajdhani
+    (OFL-1.1 samt `OFL.txt`) liegen unter `Assets/_Project/UI/` und
+    `Assets/_Project/Audio/` — bewusst nicht unter `Art/`, das ist gitignored,
+    und ein frischer Clone hätte ein schwarzes, stummes Menü **ohne
+    Fehlermeldung**. Freigabe und Ledger-Zeilen:
+    [docs/assets/Licenses.md](docs/assets/Licenses.md) 1.3.0 → 1.4.0, inklusive
+    benannter Ausnahme von der harten 0-€-Regel für den Suno-Tarif.
+
+### Geändert
+- **Das Spiel startet nicht mehr automatisch ins Match.**
+  `MatchBootstrap.AutoStart` steht im Szenengenerator auf `false` (D-083). Das
+  ist die spürbarste Verhaltensänderung dieses Stands und betrifft jeden, der
+  die Demo vorführt oder testet: Play führt ins Hauptmenü, das Match beginnt
+  erst mit „Neues Spiel". [Das Demo-Runbook](docs/production/DemoRunbook.md)
+  ist entsprechend auf 0.4.0 gezogen — der Ablaufvorschlag beginnt jetzt am
+  Menü, und die Zeitmarken zählen ab Matchstart. PlayMode-Tests, die auf
+  `IsMatchReady` warten, müssen das Match explizit über `StartGrayboxMatch()`
+  starten.
+- **4× MSAA statt gar keiner Kantenglättung** (Inhaberentscheidung 2026-08-06).
+  `Assets/_Project/Settings/NovaUrp.asset` stand auf `m_MSAA: 1`, was in URP
+  „aus" bedeutet — und da auch keine Post-Process-Kantenglättung gesetzt war,
+  rendert das Spiel bis hierher vollständig ungeglättet. Der Wert steht jetzt
+  auf `4`.
+  Damit klärt sich zugleich ein Nebenbefund, der wie ein Fehler aussah: das
+  wandernde `antiAliasing`-Feld in `ProjectSettings/QualitySettings.asset` ist
+  **kein Schalter, sondern ein Abfallprodukt**. URP liest beim Start
+  `m_MSAA` aus dem URP-Asset und schreibt das Ergebnis dorthin zurück
+  (`UniversalRenderPipeline.cs`, Zweig `msaaSampleCountNeedsUpdate`). Wer MSAA
+  ändern will, ändert das URP-Asset; der QualitySettings-Wert folgt von selbst
+  und ist kein sinnvoller Ort für einen Konflikt.
+  Weiterhin gilt: alle sechs Quality-Stufen teilen sich dieses eine URP-Asset,
+  der Render-Detail-Regler im Menü ändert MSAA also **nicht**.
+
+### Hinzugefügt
+- **Bedienbares HUD (D-084, Graybox-Sitzung GB-006):** Die Demo ist jetzt ohne
+  Tastenbelegungs-Vorwissen spielbar — alles Sichtbare ist auch anklickbar.
+  - **Selektions-Feedback:** grüner Bodenmarker unter jeder selektierten
+    Einheit und jedem Gebäude; Drag-Box-Rechteck während der Rahmenauswahl.
+  - **Bauleiste** am unteren Bildschirmrand: alle neun MS-1-Gebäude mit Name,
+    Hotkey, Kosten und Bauzeit; nicht verfügbare Einträge ausgegraut **mit
+    Grund** („benötigt X" / „nicht genug Aetherium"). Klick oder Hotkey öffnet
+    die **Platzierung mit Ghost-Vorschau** (grün = gültig, rot = ungültig;
+    LMB platziert, RMB/ESC bricht ab). Datenquelle ist `SimDefinitions` —
+    `BuildingRegistrySO` hat keine Instanzen und ist nicht verdrahtet (D-084).
+  - **Onboarding-Hinweis** beim Start („1. Raffinerie bauen (Y) 2. Harvester
+    produzieren (Q) 3. Aetherium ernten (H)"), verschwindet, sobald der
+    Wirtschaftskreislauf läuft.
+  - **Command Cards:** Kontextpanel für Einheiten (Bewegen/Angreifen/Stopp,
+    Harvest/Return für Harvester, Repair-Zielwahl für Builder) und für Gebäude
+    (Verkaufen +50 %, Reparieren, Produktions-Queue mit Fortschrittsbalken und
+    Abbruch pro Eintrag, Baustellen-Abbruch +75 %; InstallDefenseModule
+    ehrlich deaktiviert — G2/G4-Inhalt). Buttons feuern dieselben Intents wie
+    die Hotkeys; `CommandCardPresenter` ist das Unity-freie, testbare
+    Rollen-Mapping (18 neue EditMode-Tests).
+  - **Rally-Point per Rechtsklick:** mit selektiertem Produktionsgebäude setzt
+    RMB den Sammelpunkt — sichtbar als Flagge plus Linie vom Gebäude.
+  - **Kamera:** Rotation zusätzlich auf mittlerer Maustaste + Drag, **Space**
+    setzt die Rotation zurück (Z/X bleibt).
+  - **Fog of War sichtbar:** unerkundet schwarz, erkundet abgedunkelt,
+    sichtbar klar — als Welt-Overlay aus dem committed Team-View (5 Hz),
+    keine Sim-Mutation.
+  - **Minimap** unten links: Gelände, Fog-Status, Fraktionspunkte (Feinde nur
+    in sichtbaren Zellen), Kamera-Viewport-Rahmen; Klick springt dorthin
+    (Kamerakanal über `MinimapCameraLink`, da die beiden Presentation-
+    Assemblies einander nicht referenzieren dürfen).
+  - **HUD-Chrome:** einheitliche dunkle Panels für Statusleiste, Bauleiste,
+    Command Card und Minimap; das F3-Diagnose-Panel bleibt bewusst schlicht.
+
+### Behoben
+- **Gebäude rotierten bei Rechtsklick:** Bewegungsbefehle gingen an die
+  gesamte Selektion inklusive Gebäuden, und die View schrieb Sim-Rotation auf
+  Gebäudemodelle. Jetzt filtriert die Eingabe unbewegliche Rollen aus
+  Move/Attack/Stop/Harvest/Return heraus und `UnitViewManager` schreibt keine
+  Rotation mehr auf Gebäude-Views.
+
+### Verifikation (GB-006)
+- `dotnet test tools/Nova.SimRunner.Tests`: **420/420 grün** (Sim unberührt).
+- Unity-EditMode: **445/445 grün** (+18 CommandCardPresenter-, +2
+  SelectionManager-Tests); PlayMode **2/2** mit frischen Screenshots in
+  `output/demo/` (Nebel-Overlay visuell bestätigt).
+- Interaktiver Durchlauf durch den Inhaber steht als DoD-Punkt noch aus.
+
+### Hinzugefügt
+- **Baubarkeit, HUD-Zonen und Kartenbild (D-085, Sprint „Baubarkeit und
+  Kartenbild"):** Was die Bauleiste verspricht, passiert jetzt auch — ein
+  gesetztes Gebäude wird tatsächlich gebaut, und das Spiel sagt, was es tut.
+  - **Builder-Auto-Dispatch beim Platzieren:** zusätzlich zum Bau-Befehl
+    geht ein normaler Move-Befehl an den Builder, den die Simulation der
+    Baustelle zuweisen wird (eigener Builder mit kleinstem Entity-Index —
+    dieselbe Spiegelung wie `CommandCardPresenter.TryFindRepairBuilder`),
+    auf dieselbe deterministische Nachbarzelle, die die KI ansteuert
+    (westlich des Footprints, Ostseite als Kartenrand-Fallback). Läuft über
+    den bestehenden Command-Pfad: kein neuer `CommandKind`, kein
+    StateVersion-Bump, Hashes/Replays/Fingerprints unverändert. Ohne
+    lebenden Builder bleibt das Platzieren erlaubt (Abbruch erstattet 75 %),
+    aber Statuszeile und Log warnen sofort.
+  - **Baustellen-Zustand auf der Command Card:** eine Zeile in der
+    Auswertungsreihenfolge der Simulation — „Kein Builder — Bau pausiert.
+    Builder im HQ bauen." → „Builder unterwegs" → „im Bau, 43 % — fertig in
+    ~12 s". Prozent und Restzeit kommen aus `BuildTicks`, `ProgressRaw` und
+    `ProductionSpeedMultiplierQ16`, nicht aus einer Schätzung; die Regeln
+    stecken in `ConstructionSiteStatus` (Nova.Gameplay, Unity-frei, EditMode-
+    getestet).
+  - **Pausierte Baustellen in der Welt sichtbar:** `ConstructionSiteMarkerView`
+    legt einen Bodenrahmen auf jede eigene Baustelle — ruhig bei
+    wachsenden, pulsierend amber bei pausierten (kein Builder oder Builder
+    noch nicht in Reichweite).
+  - **HUD-Zonenmodell (`HudLayout`):** eine Klasse besitzt alle Panel-
+    Rechtecke und ist die einzige Stelle, die `Screen.width/height` liest —
+    Statusstreifen oben, Minimap unten links, Bauleiste unten mittig,
+    Command Card rechts über der Leiste, F3-Panel im verbleibenden freien
+    Feld (nie in der Spalte der Card). Überlappung ist damit
+    konstruktionsbedingt ausgeschlossen statt pro Panel geflickt; die
+    Zonenmathematik (`HudLayoutMath`, Nova.Gameplay) ist EditMode-getestet.
+  - **F3-Panel lesbar:** opaker Hintergrund (`HudChrome.OpaquePanelStyle`
+    statt `GUI.skin.box`), Höhe auf die Zone begrenzt, Inhalt in einer
+    `GUI.ScrollView`.
+  - **Kartenbild ohne ein einziges Asset:** prozedurale 512×512-Sandtextur
+    zur Laufzeit (deterministisches Wert-Rauschen mit festem Seed, vier
+    Sandtöne plus niederfrequente Flecken, nahtlos gekachelt 32×32), 84
+    deterministisch gestreute Felsen aus Primitiven ohne Collider (ausgespart
+    um Startbasen und Aetheriumfelder), schräge warme Sonne mit weichen
+    Schatten, sandfarbener Distanznebel und Ambient-Gradient (im
+    Szenengenerator gesetzt — `RenderSettings` ist szenen-serialisiert),
+    Kartenrand als drei Zellen breite Verwitterungszone per Overlay-Schleier
+    statt des flachen dunklen Balkens, Minimap-Unerkundet als stark
+    abgedunkelte Geländesilhouette (~15 %) statt Schwarz.
+
+### Geändert
+- **Bauleisten-Buttons auf zwei Zeilen (62 px):** Name (Hotkey) und
+  Kosten · Zeit — `wordWrap` aus, harte Kürzung mit „…" gegen die echte
+  Stilbreite, kein Label kann mehr aus einem Button laufen. Der Sperrgrund
+  („benötigt Raffinerie" / „nicht genug Aetherium") wandert aus dem Button
+  in die Statuszeile über der Leiste und erscheint beim Überfahren; dieselbe
+  Zeile trägt die Builder-Warnung und den Onboarding-Hinweis.
+
+### Behoben
+- **Rechtsklick kannte die HUD-Sperre nicht:** RMB auf Bauleiste, Minimap
+  oder Command Card schickte die Armee an den Punkt dahinter — der Zweig
+  prüft jetzt `IsPointerOverHud` wie die drei anderen Klickpfade.
+- **Roter Baugeist platzierte trotzdem:** der Platzierungsklick prüfte
+  `_placementHasCell` statt `_placementValid`; ein ungültiger Klick (auch
+  am Kartenrand, wo `ToGridCoordinate` negative Ursprünge still auf 0
+  klemmte) setzte das Gebäude woanders hin als der Geist zeigte. Jetzt
+  platziert nur der grüne Geist, ein Fehlklick lässt den Geist scharf
+  (RMB/ESC bricht ab).
+- **Command Card unten abgeschnitten:** `EstimateHeight` rechnete weder
+  GUILayout-Margins noch Panel-Padding mit (~40 px) — die untersten Knöpfe
+  lagen außerhalb der `BeginArea` und waren nicht klickbar. Die Höhe zählt
+  jetzt Zeile für Zeile mit den echten Stil-Werten.
+
+### Verifikation (D-085)
+- `dotnet test tools/Nova.SimRunner.Tests`: **420/420 grün** — null Sim-
+  Änderung, wie vom Sprint gefordert.
+- SimRunner: Hash `0x2FBEC31FBC0BF430` (Standard) und Fingerprint
+  `0xF866FDC042D260E1` / Final `0xD8650F4DEDE1494C` (DETERMINISM_10000) —
+  **identisch zum Stand vor dem Sprint**.
+- `dotnet build` aller betroffenen Projekte: 0 Fehler, 0 Warnungen;
+  EditMode-Spiegeltests für `ConstructionSiteStatus` und `HudLayoutMath`
+  kompilieren grün (laufen wie alle EditMode-Tests nur in Unity).
+- Szenen-Regeneration und PlayMode-Durchlauf stehen als Folgeschritt aus
+  (der Szenengenerator verdrahtet die neuen Komponenten; `Bootstrap.unity`
+  ist Maschinenausgabe).
+
+### Hinzugefügt
+- **Spielbarer RTS-Core-Loop (D-077, Graybox-Sitzung GB-005, ohne Gate-Status):**
+  Die Demo ist erstmals ein spielbares, kleines 1v1 im C&C-Stil statt einer
+  technischen Testszene.
+  - **Start wie im Genre-Original:** jeder Slot startet mit Hauptquartier,
+    einem Builder und 3.000 AE (vorher: gratis Raffinerie, zwei Harvester und
+    Infanterie). Der Harvester wird jetzt von der **Raffinerie** produziert,
+    die Raffinerie setzt **kein Kraftwerk mehr voraus** (ihr Power-Bedarf
+    bleibt — ab Raffinerie + Kaserne wird ein Kraftwerk nötig).
+  - **Der Computergegner spielt:** `SkirmishAiSystem` (Legion, Slot 1) ist in
+    `MatchRunner` registriert und handelt über denselben Intent-Pfad wie ein
+    Mensch — Build-Order (Raffinerie, Kaserne, bei Bedarf Kraftwerk), zwei
+    Harvester im Auto-Kreis, Infanterieproduktion bis zwölf, Angriffswellen ab
+    sechs Kampfeinheiten mit expliziten, Fog-of-War-legalen Attack-Orders.
+    End-to-End-Test: die KI besiegt einen passiven Slot deterministisch bei
+    Tick 2.242.
+  - **Sieg bei Hauptquartier-Zerstörung:** wer sein HQ verliert, ist besiegt
+    (zusätzlich zur Totalvernichtung; gleichzeitiger Verlust bleibt Unentschieden).
+    Victory-Snapshotblock v1 → v2.
+- **Kompakte Statusleiste** (Credits, Power, Spielausgang) als immer sichtbares
+  Minimum, bis die echte UI landet.
+
+### Behoben
+- **Vollbild-Debug-Overlay entfernt:** das `DebugHud`-Diagnose-Panel ist
+  standardmäßig aus und per **F3** zuschaltbar; Szene per
+  `BootstrapSceneGenerator` neu erzeugt (Maschinenausgabe).
+- **Übereinanderliegende 3D-Assets:** die `PF_*`-Modelle sind nach
+  Art-Konvention 3,0 m/Zelle exportiert, die Sim-Welt rechnet 1 Zelle = 1
+  Welt-Einheit — Gebäude überlappten, Einheiten steckten unsichtbar in den
+  Meshes. `UnitViewManager` normalisiert Prefab-Views jetzt zur Laufzeit aus
+  den Mesh-Bounds auf den Sim-Footprint; Modelle bleiben ohne Logikänderung
+  austauschbar.
+- **Rally-Point auf der Raffinerie** wurde abgelehnt, weil die
+  Produzentenrollen-Prüfung den D-077-Umzug des Harvesters nicht kannte —
+  sie liest die Rollen jetzt aus der Definitionstabelle.
+
+### Verifikation (GB-005)
+- `dotnet test tools/Nova.SimRunner.Tests`: **420/420 grün**; SimRunner-
+  Determinismus- und DETERMINISM_10000-Self-Check PASS.
+- Unity-EditMode: **425/425 grün** (Batchmode, erstmals inklusive
+  InitialStateHash-Parität Bootstrap == Szenario); PlayMode **2/2** mit
+  frischen Screenshots in `output/demo/` (Skalierung visuell bestätigt).
+- Vertrag `quality/content/mvp-v1.json` 1.0.0 → **1.2.0**.
+
 ### Geändert
 - **Governance auf Tier 1 zurückgeschnitten (D-076).** Das Repository trug ein
   Regelwerk für ein Projekt mit fremden Beitragenden, Nutzern und Haftung –

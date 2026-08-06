@@ -281,12 +281,17 @@ namespace Nova.Simulation.Definitions
     /// 300 — quality/content/mvp-v1.json factions[i].identity.harvesterCargoAE).
     /// </para>
     /// <para>
-    /// Producer assignment (documented provisional, Q-040, identical for both
-    /// factions): the HQ produces Builder and Harvester, the Barracks
-    /// produces both infantry roles, the VehicleFactory produces all four
-    /// vehicle roles. Tier-2 units (AntiArmorInfantry, BattleTank, Artillery)
-    /// additionally require the owner's T2 unlock (a completed ResearchLab —
-    /// mvp-v1.json technology.researchLabCompletionUnlocksTier2; no research
+    /// Producer assignment (D-077, identical for both factions): the HQ
+    /// produces the Builder, the REFINERY produces the Harvester (the
+    /// classic loop start — before D-077 the HQ produced both), the
+    /// Barracks produces both infantry roles, the VehicleFactory produces
+    /// all four vehicle roles. The same decision removed the Refinery's
+    /// Power-plant prerequisite in both factions; its power DRAW (Alliance
+    /// 20, Legion 15) is unchanged, so a Power plant is still needed once
+    /// Refinery + Barracks exceed the HQ's 30. Tier-2 units (AntiArmorInfantry,
+    /// BattleTank, Artillery) additionally require the owner's T2 unlock (a
+    /// completed ResearchLab — mvp-v1.json
+    /// technology.researchLabCompletionUnlocksTier2; no research
     /// upgrades, no research queue, no tier 3).
     /// </para>
     /// <para>
@@ -371,7 +376,7 @@ namespace Nova.Simulation.Definitions
             // --- Alliance (factions[0]) ---
             new SimBuildingDefinition(3,  FactionId.Alliance, UnitRole.HQ,              costAE: 2500, buildTicks: 600, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 2000, armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(5,  FactionId.Alliance, UnitRole.Power,           costAE: 450,  buildTicks: 150, powerProvided: 100, powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(4,  FactionId.Alliance, UnitRole.Refinery,        costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 800,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(4,  FactionId.Alliance, UnitRole.Refinery,        costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 800,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
             new SimBuildingDefinition(6,  FactionId.Alliance, UnitRole.Storage,         costAE: 300,  buildTicks: 100, powerProvided: 0,   powerRequired: 5,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(7,  FactionId.Alliance, UnitRole.Barracks,        costAE: 500,  buildTicks: 180, powerProvided: 0,   powerRequired: 15, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 600,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(8,  FactionId.Alliance, UnitRole.VehicleFactory,  costAE: 900,  buildTicks: 250, powerProvided: 0,   powerRequired: 25, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 900,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
@@ -385,7 +390,7 @@ namespace Nova.Simulation.Definitions
             // content (Buildings.md section 3). ---
             new SimBuildingDefinition(20, FactionId.Legion,   UnitRole.HQ,              costAE: 2000, buildTicks: 500, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 1700, armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(22, FactionId.Legion,   UnitRole.Power,           costAE: 350,  buildTicks: 120, powerProvided: 80,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(21, FactionId.Legion,   UnitRole.Refinery,        costAE: 550,  buildTicks: 160, powerProvided: 0,   powerRequired: 15, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 680,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(21, FactionId.Legion,   UnitRole.Refinery,        costAE: 550,  buildTicks: 160, powerProvided: 0,   powerRequired: 15, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 680,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
             new SimBuildingDefinition(23, FactionId.Legion,   UnitRole.Storage,         costAE: 250,  buildTicks: 80,  powerProvided: 0,   powerRequired: 5,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(24, FactionId.Legion,   UnitRole.Barracks,        costAE: 400,  buildTicks: 140, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 510,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
             new SimBuildingDefinition(25, FactionId.Legion,   UnitRole.VehicleFactory,  costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 765,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
@@ -398,7 +403,7 @@ namespace Nova.Simulation.Definitions
         {
             // --- Alliance (factions[0]) ---
             new SimUnitDefinition(1,  FactionId.Alliance, UnitRole.Builder,            costAE: 800,  buildTicks: 300, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 350,  moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimUnitDefinition(2,  FactionId.Alliance, UnitRole.Harvester,          costAE: 700,  buildTicks: 250, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 800,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 330), // 2.5
+            new SimUnitDefinition(2,  FactionId.Alliance, UnitRole.Harvester,          costAE: 700,  buildTicks: 250, tier: 1, producerRole: UnitRole.Refinery,       maxHealth: 800,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 330), // 2.5; D-077: produced by the Refinery
             new SimUnitDefinition(12, FactionId.Alliance, UnitRole.BasicInfantry,      costAE: 120,  buildTicks: 100, tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 90,   moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 9),
             new SimUnitDefinition(13, FactionId.Alliance, UnitRole.AntiArmorInfantry,  costAE: 250,  buildTicks: 150, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 100,  moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 50,  attackRangeTiles: 10, attackCooldownTicks: 25), // 3.5
             new SimUnitDefinition(14, FactionId.Alliance, UnitRole.ScoutVehicle,       costAE: 300,  buildTicks: 120, tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 220,  moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 12,  attackRangeTiles: 8,  attackCooldownTicks: 10),
@@ -427,7 +432,7 @@ namespace Nova.Simulation.Definitions
             // Vehicles.md names that concrete value; the derivation only
             // applies where the GDDs are silent. ---
             new SimUnitDefinition(18, FactionId.Legion,   UnitRole.Builder,            costAE: 650,  buildTicks: 240, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 320,  moveSpeed: SimFixed.FromInt(3),      armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimUnitDefinition(19, FactionId.Legion,   UnitRole.Harvester,          costAE: 550,  buildTicks: 200, tier: 1, producerRole: UnitRole.HQ,             maxHealth: 750,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 300), // 2.5
+            new SimUnitDefinition(19, FactionId.Legion,   UnitRole.Harvester,          costAE: 550,  buildTicks: 200, tier: 1, producerRole: UnitRole.Refinery,       maxHealth: 750,  moveSpeed: SimFixed.FromRaw(163840), armorClass: ArmorClass.Light,    damageType: Unarmed,               attackDamage: 0,   attackRangeTiles: 0,  attackCooldownTicks: 0, cargoCapacityAE: 300), // 2.5; D-077: produced by the Refinery
             new SimUnitDefinition(29, FactionId.Legion,   UnitRole.BasicInfantry,      costAE: 60,   buildTicks: 80,  tier: 1, producerRole: UnitRole.Barracks,       maxHealth: 55,   moveSpeed: SimFixed.FromInt(4),      armorClass: ArmorClass.Infantry, damageType: DamageType.Kinetic,    attackDamage: 8,   attackRangeTiles: 6,  attackCooldownTicks: 10),
             new SimUnitDefinition(30, FactionId.Legion,   UnitRole.AntiArmorInfantry,  costAE: 200,  buildTicks: 120, tier: 2, producerRole: UnitRole.Barracks,       maxHealth: 90,   moveSpeed: SimFixed.FromRaw(229376), armorClass: ArmorClass.Infantry, damageType: DamageType.Explosive,  attackDamage: 40,  attackRangeTiles: 9,  attackCooldownTicks: 25), // 3.5
             new SimUnitDefinition(31, FactionId.Legion,   UnitRole.ScoutVehicle,       costAE: 220,  buildTicks: 90,  tier: 1, producerRole: UnitRole.VehicleFactory, maxHealth: 180,  moveSpeed: SimFixed.FromInt(6),      armorClass: ArmorClass.Light,    damageType: DamageType.Kinetic,    attackDamage: 10,  attackRangeTiles: 7,  attackCooldownTicks: 10),

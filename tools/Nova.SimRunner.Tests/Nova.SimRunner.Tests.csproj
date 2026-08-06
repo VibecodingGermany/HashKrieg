@@ -14,6 +14,9 @@
   <ItemGroup>
     <Compile Include="..\..\Assets\_Project\Scripts\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\..\Assets\_Project\Scripts\Simulation\**\*.cs" Link="Simulation\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The MS-1 skirmish AI (engine-free assembly) under test: same
+         shared-sources contract as Core/Simulation. -->
+    <Compile Include="..\..\Assets\_Project\Scripts\AI\**\*.cs" Link="AI\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- Performance harness sources under test (Program.cs entry point excluded). -->
     <Compile Include="..\Nova.SimRunner\PerfStatistics.cs" Link="SimRunner\PerfStatistics.cs" />
     <Compile Include="..\Nova.SimRunner\ScenarioArtifacts.cs" Link="SimRunner\ScenarioArtifacts.cs" />

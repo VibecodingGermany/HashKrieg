@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.15.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Dokumentversion:** 0.16.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -102,19 +102,39 @@ und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 | Ergebnisstufe | Status |
 |---|---|
-| Sprint 7 | läuft |
-| Spielbar | lokales 1v1 auf der Glutrinne-Graybox (siehe §4) |
+| Spielbar | lokales 1v1 gegen eine KI, mit Menü, HUD und Siegbedingung (siehe §4) |
+| Kernloop | **fast geschlossen** — Ernte und Einheitenproduktion sind der letzte offene Schritt |
 | MS-0 | offen — Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
 | MS-1 / MVP | nicht erreicht — Lücken im [ScopeLedger](docs/production/ScopeLedger.md) |
 | Alpha | nicht begonnen |
 
-Was zuletzt entstanden ist:
+### Was seit Juli entstanden ist
 
-- **Graybox-Slice** — die Simulation ist erstmals sicht- und bedienbar (siehe §4)
-- **Fraktionsidentität** — Allianz und Legion spielen sich unterschiedlich:
-  Schadensmatrix, Waffenwerte, Siegbedingungen, fraktionsaufgelöste
-  Definitionstabelle und Harvester-Kapazität
-- **Weltentwurf und Concept-Art** — 34 Bilder, ein Bildstandard, eine Lore (§5)
+Vier aufeinander aufbauende Sprints haben aus einer Simulation ohne Zugang ein
+Spiel gemacht, das man starten, bedienen und gewinnen kann:
+
+| | Was daraus wurde |
+|---|---|
+| **Spielbare Kernschleife** (D-077) | Klassischer C&amp;C-Start: HQ, ein Builder, 3.000 AE. **Slot 1 wird von einer KI gespielt** — sie baut, erntet, produziert Truppen und greift in Wellen an, und sie tut das über denselben versiegelten Befehlspfad wie ein menschlicher Gegner im Netzwerk. Eine Runde endet mit der Zerstörung des feindlichen Hauptquartiers. |
+| **Hauptmenü und Einstellungen** (D-083) | Menü mit Key Art, Titel und Musik statt Direktstart ins Match. Musik- und SFX-Regler, Renderdetail, vSync, Auflösung, Vollbild — als lesbares JSON gespeichert. Erstes UI-Toolkit-UI im Projekt. |
+| **Bedienbares HUD** (D-084) | Bauleiste mit allen neun Gebäuden samt Sperrgrund, Kommandokarte, Minimap mit Kamerafenster, Platzierungsvorschau, Auswahl- und Sammelpunktmarker. Alles Sichtbare ist auch anklickbar. |
+| **Bauen und Kartenbild** (D-085) | Baustellen werden fertig: Der Builder fährt selbst zur Baustelle, die Karte sagt, was sie tut („kein Builder", „im Bau, 43 %", „fertig in ~12 s"). Dazu ein Zonenmodell, das überlappende HUD-Panels konstruktionsbedingt ausschließt, und eine Wüste aus prozeduraler Textur, Streufelsen und warmem Licht — ohne ein einziges neues Asset. |
+
+Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich in
+Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein Simulationskern
+mit rund 900 automatisierten Tests, und **34 3D-Assets**, die über eine
+Drop-in-Pipeline einfahren (§5).
+
+### Was noch fehlt
+
+Ehrlich und ohne Beschönigung — der Kernloop ist an zwei Stellen offen:
+
+- **Aus der Kaserne kommen keine Soldaten** und **der Harvester erntet nicht.**
+  Beides ist analysiert und steht als erster Posten im nächsten Sprint.
+- **Einheiten kämpfen nicht von selbst.** Jeder Schuss braucht heute einen Klick;
+  automatische Zielerfassung und Feuererwiderung sind der Kern des nächsten Sprints.
+- **Die Runde hat kein Ende.** „VICTORY" erscheint als Wort in einer Textzeile, die
+  Simulation läuft weiter, und der einzige Ausweg ist Programm beenden.
 
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
@@ -129,16 +149,19 @@ ist vollständig erhalten und ruht bis Tier 3 — siehe
 
 ## 4. Das Spiel ausprobieren (Graybox)
 
-Seit dem Graybox-Slice ist das Spiel **sicht- und bedienbar**: lokales 1v1 mit
-Wirtschaft, Bau, Produktion, Fog of War, Schadensmatrix und Siegauswertung. Was
-es zeigt und was noch fehlt, steht weiter unten — bitte vor dem ersten Start
-lesen.
+Lokales 1v1 gegen eine KI, mit Menü, Bauleiste, Minimap, Fog of War,
+Schadensmatrix und Siegauswertung. Was es zeigt und was noch fehlt, steht
+weiter unten — bitte vor dem ersten Start lesen.
 
 ### Variante 1: im Editor (empfohlen)
 
 1. Projekt in **Unity `6000.5.4f1`** öffnen (exakter Pin, kein Auto-Upgrade).
 2. `Assets/_Project/Scenes/Bootstrap.unity` öffnen und **Play** drücken.
-3. Das Match startet von selbst: 128×128-Karte, zwei Slots, du bist Slot 0.
+3. Das **Hauptmenü** erscheint. „Neues Spiel" startet das Match: 128×128-Karte,
+   du bist Slot 0 (Allianz), Slot 1 spielt die KI (Legion).
+
+Ohne das Art-Paket rendert das Spiel Graybox-Primitive statt 3D-Modelle — es ist
+in beiden Fällen vollständig spielbar (§5).
 
 Die Szene ist **Maschinenausgabe**. Wenn sie beschädigt oder veraltet ist, wird
 sie über das Menü `Tools/Project Nova/Create Bootstrap Scene` neu erzeugt — die
@@ -146,25 +169,28 @@ sie über das Menü `Tools/Project Nova/Create Bootstrap Scene` neu erzeugt — 
 
 ### Steuerung
 
-Verbindlich ist der Code (`RtsDeviceInput`); das HUD zeigt dieselbe Legende an.
+**Man braucht diese Tabelle nicht mehr.** Seit dem HUD-Sprint ist alles Nötige
+anklickbar: Bauleiste unten, Kommandokarte rechts, Minimap links. Die Tasten sind
+Abkürzungen für Geübte. Verbindlich ist der Code (`RtsDeviceInput`).
 
 | Eingabe | Wirkung |
 |---|---|
-| Linke Maustaste, Klick | Eigene Einheit unter dem Cursor auswählen, sonst Auswahl leeren |
-| Linke Maustaste, Ziehen | Box-Auswahl eigener Einheiten |
-| Rechte Maustaste | Bewegen zum Zielpunkt |
-| `S` | Stop |
-| `A` | Angriff: Gegner unter dem Cursor wird echtes Angriffsziel, sonst Bewegung dorthin |
-| `H` | Nächstes nicht erschöpftes Aetherium-Feld ernten |
-| `R` | Ladung zur Raffinerie zurückbringen |
-| `B` / `Shift`+`B` | Gebäude platzieren: Kraftwerk / Kaserne |
-| `Q` / `Shift`+`Q` | Einheit in Auftrag geben: Harvester (HQ) / Infanterie (Kaserne) |
-| Pfeiltasten, Bildschirmrand | Kamera schwenken |
-| Mausrad | Zoom |
-| `Z` / `X` | Kamera drehen |
+| Linke Maustaste, Klick | Eigene Einheit oder eigenes Gebäude auswählen, sonst Auswahl leeren |
+| Linke Maustaste, Ziehen | Box-Auswahl |
+| Rechte Maustaste | Bewegen; mit einem eigenen Produktionsgebäude in der Auswahl: Sammelpunkt setzen |
+| Mittlere Maustaste, Ziehen | Kamera drehen · `Leertaste` setzt sie zurück |
+| Pfeiltasten, Bildschirmrand | Kamera schwenken · Mausrad Zoom · `Z` / `X` drehen |
+| `S` · `A` · `H` · `R` | Stop · Angriff · Ernten · Ladung abliefern |
+| `Y` `B` `C` `Shift`+`B` `V` `T` `G` `F` | Gebäude platzieren: Raffinerie, Kraftwerk, Lager, Kaserne, Fahrzeugfabrik, Forschungslabor, Radar, Verteidigungsplattform |
+| `U` `Q` `N` `E` `Shift`+`E` `D` `Shift`+`D` | Einheit in Auftrag geben: Builder, Harvester, Panzerabwehr, Späher, Leichter Panzer, Kampfpanzer, Artillerie |
+| `P` · `F3` | Simulation pausieren · Debug-Panel ein- und ausblenden |
 
-Es gibt **keine Pause-Taste**, kein Speichern und kein Laden in dieser
-Bedienschicht.
+Beim Platzieren folgt ein Baugeist dem Cursor — grün heißt gültig, rot heißt
+nicht. Linksklick setzt, Rechtsklick oder `Escape` bricht ab.
+
+Es gibt **kein Speichern und kein Laden** — der Menüeintrag „Laden" ist sichtbar,
+aber ausgegraut. Die Simulation kann ihren Zustand vollständig serialisieren und
+hash-identisch fortsetzen; es fehlt nur das Schreiben auf die Platte.
 
 ### Variante 2: fertige Player
 
@@ -190,25 +216,31 @@ Mono-Player, **von macOS aus gebaut**. SmartScreen warnt beim ersten Start.
 Ehrliche Einschränkung: Der Build ist abgeschlossen, wurde aber **nie
 ausgeführt** — der erste Windows-Start ist gleichzeitig der erste echte Test.
 
-### Was die Graybox zeigt — und was nicht
+### Was läuft — und was nicht
 
-**Zu sehen und zu prüfen:** Lockstep-Kern mit 10 Hz, Befehle ausschließlich
-durch den versiegelten Command-Pfad; Auswahl, Bewegung, Flow-Field-Pathfinding,
-Bau, Produktion; Fog of War; Ökonomie-Grundlagen im Debug-HUD; Form kodiert
-Rolle, Farbe kodiert Spieler.
+**Läuft:** Lockstep-Kern mit 10 Hz, Befehle ausschließlich durch den versiegelten
+Command-Pfad; Menü und Einstellungen; Auswahl, Bewegung, Flow-Field-Pathfinding;
+Basisbau von der Bauleiste bis zum fertigen Gebäude; Produktionswarteschlangen mit
+Sammelpunkt; Fog of War; Schadens- und Panzerungsmatrix; eine KI, die baut, erntet,
+Truppen produziert und in Wellen angreift; Sieg durch Zerstörung des feindlichen
+Hauptquartiers.
 
-**Ausdrücklich nicht beurteilbar:**
+**Läuft noch nicht:**
 
-- **Der Gegner spielt nicht.** Slot 1 bekommt eine Startbasis und sonst nichts;
-  es gibt noch keine KI.
-- **Der Harvester-Kreislauf schließt sich nicht** von allein. Manuell (`H`,
-  dann `R`, dann fahren) funktioniert der Zyklus.
-- **Das HUD ist eine Debug-Überlagerung**, keine UI. Keine Pause, kein
-  Save/Load, kein Rebinding.
-- **Look and Feel ist unverifiziert.** Ob die Graybox lesbar ist und sich die
-  Steuerung richtig anfühlt, konnte automatisiert niemand prüfen — das ist
-  genau die Frage, die der erste menschliche Durchlauf beantwortet.
+- **Ernte und Einheitenproduktion.** Der Harvester fährt nicht zum Feld, und aus
+  der Kaserne kommt keine Einheit. Beides ist analysiert und steht als erster
+  Posten im nächsten Sprint. **Das ist aktuell der Grund, warum man eine Runde
+  nicht zu Ende spielen kann.**
+- **Kampf braucht Klicks.** Einheiten erfassen keine Ziele von selbst und erwidern
+  kein Feuer; jeder Schuss ist ein Einzelklick. Die Verteidigungsplattform ist
+  bewaffnet, kann aber strukturell nie feuern.
+- **Kein Rundenabschluss.** Der Ausgang steht als Wort in der Statuszeile, danach
+  läuft die Simulation weiter. Kein Ergebnisbildschirm, kein Neustart.
+- **Keine Ingame-Musik und keine Soundeffekte.** Die Menümusik ist da; im Gefecht
+  ist es still.
 
+Der nächste Sprint schließt genau diese Liste ab:
+[09_Sprint_Gefecht_und_Rundenrahmen.md](docs/production/hashkrieg/09_Sprint_Gefecht_und_Rundenrahmen.md).
 Die vollständige Liste der Verschiebungen steht im
 [ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll im
 [GrayboxLog](docs/production/GrayboxLog.md).
@@ -226,8 +258,21 @@ Orange — und entspricht der Teamfarben-Maske im späteren Spielasset.
 - [Ordner und Herkunftsnachweis](docs/assets/concept-art/README.md) – Provenienz
   je Bild inklusive Modell, Prompt und SHA-256
 
-**Status:** Entwürfe zur Formfindung, **keine Produktionsassets**. Es existiert
-kein 3D-Asset im Projekt.
+**Status der Concept-Art:** Entwürfe zur Formfindung, keine Produktionsassets.
+
+### 3D-Assets
+
+**34 Modelle sind produziert und im Spiel** — je Fraktion die neun Gebäude- und
+acht Einheitenrollen. Sie liegen bewusst **nicht im Repository**: rund 105 MB
+hätten es mehr als verdoppelt und wären später nur per History-Rewrite wieder
+herauszubekommen. Stattdessen werden sie als Paket verteilt
+([AssetPackage.md](docs/assets/AssetPackage.md)) und fahren per Drop-in ein — ein
+konventionskonformes Prefab wird beim Import automatisch registriert.
+
+Ein frischer Clone ist deshalb **immer spielbar**: fehlt das Paket, rendert das
+Spiel Graybox-Primitive, bei denen die Form die Rolle und die Farbe den Spieler
+kodiert. Mit Paket stehen dieselben Einheiten als Modelle da. Die Simulation
+merkt davon nichts.
 
 ## 6. Mitmachen
 
@@ -237,10 +282,11 @@ Mithilfe ist willkommen — besonders in diesen Bereichen:
 | Du kannst… | Dann schau hier |
 |---|---|
 | **mitentscheiden**, ob die Wirtschaft umgedreht wird | §2 und [Konzept_Hashkrieg.md](docs/vision/Konzept_Hashkrieg.md) |
-| **die Graybox spielen** und sagen, wie sie sich anfühlt | §4 — Look and Feel ist bisher von niemandem beurteilt |
+| **eine Runde spielen** und sagen, wo es sich falsch anfühlt | §4 — genau so sind die letzten drei Blocker gefunden worden |
 | **3D-Assets bauen** aus den Concept-Art-Vorlagen | [Bildstandard](docs/assets/ConceptArtStyleGuide.md) und [AssetBudget](docs/tech/AssetBudget.md) |
 | **an der Simulation arbeiten** (C#, deterministisch, Unity-frei) | [SimulationCore](docs/tech/SimulationCore.md) und [CodingGuidelines](docs/tech/CodingGuidelines.md) |
-| **KI schreiben** — Slot 1 spielt bisher gar nicht | [SkirmishAi_Spec](docs/tech/modules/SkirmishAi_Spec.md) |
+| **die KI stärker machen** — sie spielt, aber schlicht | [SkirmishAi_Spec](docs/tech/modules/SkirmishAi_Spec.md) |
+| **Sound beisteuern** — im Gefecht ist es bisher still | [Audioplan](docs/production/hashkrieg/04_Audioplan.md) |
 | **Doku verbessern** | [DocumentationStandard](docs/meta/DocumentationStandard.md) |
 
 Zwei Dinge, die den Einstieg leichter machen: Der Simulationskern ist
@@ -333,12 +379,23 @@ Punkt geführt.
 
 ## Nächste Schritte
 
-1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
-2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren und
-   adversarial prüfen.
-3. Am nachfolgenden sauberen Subject G0-B herstellen und dort mit der
-   vollständigen Receipt-Kette und Umgebungsbindung G0 beweisen.
-4. G1 einschließlich V1–V5a erst nach bestandenem G0 beginnen.
+Der nächste Sprint schließt den Kernloop und gibt der Runde ein Ende
+([09_Sprint_Gefecht_und_Rundenrahmen.md](docs/production/hashkrieg/09_Sprint_Gefecht_und_Rundenrahmen.md)):
+
+1. **Ernte und Einheitenproduktion reparieren** — ohne sie lässt sich der Rest
+   nicht einmal spielen.
+2. **Zielerfassung und Feuererwiderung** — Einheiten und Türme kämpfen von selbst,
+   statt Klick für Klick.
+3. **Rundenrahmen** — Ergebnisbildschirm, sichtbare Pause, Neustart und Rückweg
+   ins Menü.
+4. **Ingame-Musik** und die billigen Bedienbarkeits-Posten: Kontrollgruppen,
+   sichtbare Ablehnungsgründe, Steuerungslegende.
+
+Danach zur Bewertung: Wirtschaftsdruck durch erschöpfbare Felder, Ausbau der KI,
+und die Gebäude, die heute Geld kosten und nichts tun (Lager, Radar).
+
+Die Gate-Kette G0–G5 ruht unter Tier 1 und wird erst wieder aufgenommen, wenn das
+Projekt ein Publikum hat.
 
 ## Änderungsverlauf
 
@@ -355,3 +412,4 @@ Punkt geführt.
 | 0.13.0 | 2026-07-26 | Abschnitt „Das Spiel ausprobieren" mit Editor-Start, Steuerungslegende, Player-Anleitung und ehrlicher Abgrenzung des Graybox-Stands ergänzt | Technical Writer |
 | 0.14.0 | 2026-07-26 | Abschnitt zum neuen Arbeitstitel *Hashkrieg* ergänzt: Weltentwurf, Concept-Art-Satz und Style-Guide verlinkt | Technical Writer |
 | 0.15.0 | 2026-07-26 | Neu gegliedert und bebildert: Hashkrieg-Richtung nach vorn gezogen, die offene Wirtschaftsentscheidung als eigener Abschnitt sichtbar gemacht, Mitmach-Abschnitt mit Einstiegspunkten ergänzt, Projektstatus um Graybox und Fraktionsidentität aktualisiert, Lizenzlage präzisiert | Technical Writer |
+| 0.16.0 | 2026-08-06 | Auf den Stand nach vier Sprints gezogen (D-077, D-083, D-084, D-085): Projektstatus nennt jetzt die spielende KI, Menü, bedienbares HUD und funktionierendes Bauen; §4 korrigiert den Start (Menü statt Direktstart), führt die vollständige Steuerung und ersetzt die überholte „was die Graybox nicht kann"-Liste durch den echten offenen Rest; §5 dokumentiert die 34 3D-Assets und die Drop-in-Pipeline statt „es existiert kein 3D-Asset"; Mitmach-Tabelle und Nächste Schritte auf den laufenden Sprintplan umgestellt | Technical Writer |

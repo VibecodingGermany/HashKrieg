@@ -40,13 +40,14 @@ namespace Nova.Simulation.Construction
     /// placed while the owner's last committed balance
     /// (previous tick's phase-2 recompute) covers the additional draw:
     /// PowerProvided - PowerRequired &gt;= PowerRequired of the new
-    /// building. The manifest exception (quality/content/mvp-v1.json
-    /// startStatePerPlayer.onlyPrerequisiteException: the STARTING Refinery
-    /// needs no Power) is honored structurally: the match start is placed
-    /// via <see cref="PlaceCompletedBuilding"/>, which bypasses placement
-    /// validation entirely — every refinery placed through the command path
-    /// requires a completed own Power plant (provisional prerequisite,
-    /// Q-040) and the power rule.
+    /// building. The Refinery carries NO prerequisite since D-077 (the
+    /// classic loop start — quality/content/mvp-v1.json
+    /// startStatePerPlayer): placed through the command path it is gated
+    /// only by funds, footprint and the power rule. The remaining
+    /// prerequisite roles (VehicleFactory needs a Refinery, ResearchLab a
+    /// Barracks, Radar and DefensePlatform a Power plant) are unchanged.
+    /// <see cref="PlaceCompletedBuilding"/> bypasses placement validation
+    /// entirely — it is the direct write the match start is placed with.
     /// </para>
     /// <para>
     /// Same-tick power stacking (documented, same precedent as the combat

@@ -72,6 +72,21 @@ namespace Nova.Gameplay.Match
         /// </summary>
         private const float PrefabGroundOffset = 0f;
 
+        /// <summary>
+        /// Uniform scale factor that shrinks a prefab's horizontal extent to
+        /// its simulation footprint when the measured bounds come out larger
+        /// than the footprint. Art is authored at the ArtAssetStandard.md
+        /// convention (1 grid cell = 3 m) while the simulation world runs 1
+        /// cell = 1 world unit, so the raw PF_* meshes are ~3x too large and
+        /// would overlap (GB-005 finding). Normalizing here — at the view
+        /// boundary, from the mesh's own bounds — keeps every future drop-in
+        /// model swappable without touching prefabs or game logic. Art that
+        /// arrives SMALLER than its footprint keeps its authored scale
+        /// (factor 1): upscaling a detailed miniature reads worse than a
+        /// slightly small model, and the authored look is preserved.
+        /// </summary>
+        private readonly Dictionary<GameObject, float> _prefabScaleFactors = new Dictionary<GameObject, float>();
+
         [Header("References")]
         [SerializeField] private MatchRunner _matchRunner;
         [SerializeField] private GameObject _unitPrefab;
@@ -370,10 +385,14 @@ namespace Nova.Gameplay.Match
                 if (_prefabPools.TryGetValue(sourcePrefab, out Stack<GameObject> prefabPool) && prefabPool.Count > 0)
                 {
                     instance = prefabPool.Pop();
+                    // The factor was measured and cached when the first
+                    // instance of this source prefab was created below.
+                    instance.transform.localScale = Vector3.one * _prefabScaleFactors[sourcePrefab];
                 }
                 else
                 {
                     instance = Instantiate(sourcePrefab, transform);
+                    instance.transform.localScale = Vector3.one * NormalizePrefabScale(sourcePrefab, instance, in unit);
                 }
                 instance.SetActive(true);
             }
@@ -397,6 +416,13 @@ namespace Nova.Gameplay.Match
                     instance.GetComponent<Renderer>().sharedMaterial = PrimitiveMaterial;
                 }
                 instance.transform.localScale = scale;
+                // The primitive pools are shared across roles (one cube pool
+                // serves vehicles AND buildings), and building views never
+                // receive rotation writes again (see ApplyTransform), so a
+                // recycled view must not inherit the previous tenant's
+                // heading. Unit views get their rotation from this frame's
+                // ApplyTransform anyway, so the reset is free for them.
+                instance.transform.rotation = Quaternion.identity;
             }
 
 #if UNITY_EDITOR
@@ -456,6 +482,59 @@ namespace Nova.Gameplay.Match
                 }
             }
             return _unitPrefab;
+        }
+
+        /// <summary>
+        /// Measures the freshly instantiated prefab view and caches the
+        /// uniform scale factor that brings its horizontal extent down to the
+        /// simulation footprint of its role (see the field remarks on
+        /// <see cref="_prefabScaleFactors"/>). The instance must be unscaled
+        /// (fresh <c>Instantiate</c>) and parented under this transform —
+        /// world bounds and the local scale applied afterwards share the same
+        /// parent, so the ratio stays exact. Meshes without renderers, or art
+        /// already smaller than its footprint, keep factor 1.
+        /// </summary>
+        private float NormalizePrefabScale(GameObject sourcePrefab, GameObject instance, in UnitState unit)
+        {
+            float factor = 1f;
+
+            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length > 0)
+            {
+                Bounds bounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++)
+                {
+                    bounds.Encapsulate(renderers[i].bounds);
+                }
+
+                float target = TargetViewSize(unit.Role);
+                float current = Mathf.Max(bounds.size.x, bounds.size.z);
+                if (current > target && current > 1e-4f)
+                {
+                    factor = target / current;
+                }
+            }
+
+            _prefabScaleFactors[sourcePrefab] = factor;
+            return factor;
+        }
+
+        /// <summary>
+        /// Horizontal world size a view of this role should occupy. Buildings
+        /// fill their 3x3-cell footprint (<see cref="SimDefinitions.BuildingFootprintCells"/>,
+        /// 1 cell = 1 world unit); units reuse the graybox shape table's
+        /// larger horizontal extent so art and primitive fallback read at the
+        /// same size for the same role.
+        /// </summary>
+        private static float TargetViewSize(UnitRole role)
+        {
+            if (SimDefinitions.IsBuildingRole(role))
+            {
+                return SimDefinitions.BuildingFootprintCells;
+            }
+
+            GetRoleShape(role, out _, out Vector3 primitiveScale);
+            return Mathf.Max(primitiveScale.x, primitiveScale.z);
         }
 
         /// <summary>
@@ -528,19 +607,32 @@ namespace Nova.Gameplay.Match
                 unit.Transform.PositionX.ToFloat(),
                 _viewGroundOffsets[slot],
                 unit.Transform.PositionY.ToFloat());
-            Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+
+            // Buildings never rotate: nothing in the simulation orients them,
+            // and a building view that mirrors the (unit-shaped) rotation
+            // state visibly spins when the state mutates for other reasons.
+            // Building views keep the rotation they were acquired with and
+            // receive position writes only.
+            bool isBuilding = SimDefinitions.IsBuildingRole(_viewRoles[slot]);
 
             if (blend >= 1f)
             {
                 viewTransform.position = targetPos;
-                viewTransform.rotation = targetRot;
+                if (!isBuilding)
+                {
+                    viewTransform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                }
                 return;
             }
 
             // Frame-rate independent exponential smoothing between the 10-Hz
             // authoritative positions (blend is derived from _interpolationSpeed).
             viewTransform.position = Vector3.Lerp(viewTransform.position, targetPos, blend);
-            viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
+            if (!isBuilding)
+            {
+                Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
+            }
         }
 
         private void ApplyTint(int slot, byte playerId, int healthStep)

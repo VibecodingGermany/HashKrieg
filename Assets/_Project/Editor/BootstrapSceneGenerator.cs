@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 using Nova.Data;
 using Nova.Gameplay.Match;
 using Nova.Presentation;
@@ -59,10 +60,12 @@ namespace Nova.Editor
 
             Camera camera = CreateCamera();
             CreateDirectionalLight();
+            ConfigureAtmosphere();
             GameObject ground = CreateGroundPlane();
             MatchRunner runner = CreateMatchObject();
             CreateMapObject(runner, ground);
-            CreateUiObject(runner, camera);
+            GameObject ui = CreateUiObject(runner, camera);
+            CreateMainMenuObject(runner, camera, ui);
             EnsureGlutrinneMapAsset();
 
             // The drop-in registry is rebuilt from whatever PF_* prefabs
@@ -81,7 +84,7 @@ namespace Nova.Editor
 
             AssetDatabase.SaveAssets();
             Debug.Log($"Bootstrap scene created at {ScenePath} and registered " +
-                      "in EditorBuildSettings (camera rig, ground, Match, Map, UI).");
+                      "in EditorBuildSettings (camera rig, ground, Match, Map, UI, MainMenu).");
         }
 
         /// <summary>
@@ -105,15 +108,53 @@ namespace Nova.Editor
 
             // [RequireComponent(typeof(Camera))] — the Camera above satisfies it.
             cameraObject.AddComponent<RtsCameraController>();
+
+            // The scene had no AudioListener at all, so every sound in the
+            // game — starting with the menu track — was silent no matter how
+            // the source was configured. It rides on the main camera, which is
+            // where Unity's own camera template puts it.
+            cameraObject.AddComponent<AudioListener>();
             return camera;
         }
 
+        /// <summary>
+        /// The Glutrinne sun (D-085): low and slanted for long shadows, warm
+        /// in colour temperature, with soft shadows. These are Light
+        /// properties on the generated object, so regeneration keeps them —
+        /// hand-tuning the scene YAML would be overwritten here anyway.
+        /// </summary>
         private static void CreateDirectionalLight()
         {
             var lightObject = new GameObject("Directional Light");
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+            lightObject.transform.rotation = Quaternion.Euler(33f, -128f, 0f);
+            light.color = new Color(1f, 0.87f, 0.70f);
+            light.intensity = 1.15f;
+            light.shadows = LightShadows.Soft;
+            light.shadowStrength = 0.85f;
+        }
+
+        /// <summary>
+        /// Desert atmosphere (D-085): a light sand-coloured distance fog and
+        /// a tri-light ambient gradient with a sandy horizon — the single
+        /// most visible quick win of the map pass, and pure scene
+        /// configuration. RenderSettings values are SCENE-serialized, so they
+        /// are set here, in the generator: any value hand-edited into
+        /// Bootstrap.unity would silently revert on the next regeneration.
+        /// </summary>
+        private static void ConfigureAtmosphere()
+        {
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogColor = new Color(0.78f, 0.68f, 0.52f);
+            RenderSettings.fogStartDistance = 70f;
+            RenderSettings.fogEndDistance = 210f;
+
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.52f, 0.50f, 0.46f);
+            RenderSettings.ambientEquatorColor = new Color(0.76f, 0.66f, 0.50f); // the sandy horizon
+            RenderSettings.ambientGroundColor = new Color(0.30f, 0.26f, 0.21f);
         }
 
         /// <summary>
@@ -150,7 +191,15 @@ namespace Nova.Editor
             // Adding the runner first means MatchBootstrap binds to this
             // instance instead of Unity refusing an auto-added duplicate.
             MatchRunner runner = matchObject.AddComponent<MatchRunner>();
-            matchObject.AddComponent<MatchBootstrap>();
+            MatchBootstrap bootstrap = matchObject.AddComponent<MatchBootstrap>();
+
+            // The main menu owns the start now: the scene loads into an idle
+            // host (no kernel, every HUD component silent) and "Neues Spiel"
+            // calls the idempotent StartGrayboxMatch(). AutoStart is a public
+            // field, so a plain assignment is serialized with the scene —
+            // WireReference exists for private [SerializeField] object
+            // references and cannot carry a bool.
+            bootstrap.AutoStart = false;
 
             UnitViewManager views = matchObject.AddComponent<UnitViewManager>();
             WireReference(views, "_matchRunner", runner);
@@ -204,8 +253,15 @@ namespace Nova.Editor
             EditorUtility.SetDirty(map);
         }
 
-        /// <summary>Input sampling and the read-only debug overlay.</summary>
-        private static void CreateUiObject(MatchRunner runner, Camera camera)
+        /// <summary>
+        /// Input sampling, the world-space HUD markers (selection, rally
+        /// flags, placement ghost), the build bar, the command card and the
+        /// read-only debug overlay. The build bar and the command card are
+        /// additionally wired INTO the input component: clicks landing on a
+        /// HUD rect belong to the HUD and must not start a world selection
+        /// drag, place a building or resolve an order pick behind it.
+        /// </summary>
+        private static GameObject CreateUiObject(MatchRunner runner, Camera camera)
         {
             var uiObject = new GameObject("UI");
 
@@ -213,9 +269,98 @@ namespace Nova.Editor
             WireReference(input, "_runner", runner);
             WireReference(input, "_camera", camera);
 
+            SelectionMarkerView markers = uiObject.AddComponent<SelectionMarkerView>();
+            WireReference(markers, "_runner", runner);
+            WireReference(markers, "_input", input);
+            WireReference(markers, "_views", runner.GetComponent<UnitViewManager>());
+
+            RallyFlagView rally = uiObject.AddComponent<RallyFlagView>();
+            WireReference(rally, "_runner", runner);
+            WireReference(rally, "_input", input);
+
+            PlacementGhostView ghost = uiObject.AddComponent<PlacementGhostView>();
+            WireReference(ghost, "_input", input);
+
+            ConstructionSiteMarkerView siteMarkers = uiObject.AddComponent<ConstructionSiteMarkerView>();
+            WireReference(siteMarkers, "_runner", runner);
+
+            BuildMenuHud menu = uiObject.AddComponent<BuildMenuHud>();
+            WireReference(menu, "_runner", runner);
+            WireReference(menu, "_input", input);
+
+            WireReference(input, "_buildMenu", menu);
+
+            CommandCardHud card = uiObject.AddComponent<CommandCardHud>();
+            WireReference(card, "_runner", runner);
+            WireReference(card, "_input", input);
+            WireReference(card, "_buildMenu", menu);
+
+            WireReference(input, "_commandCard", card);
+
+            FogOfWarOverlayView fog = uiObject.AddComponent<FogOfWarOverlayView>();
+            WireReference(fog, "_runner", runner);
+
+            MinimapHud minimap = uiObject.AddComponent<MinimapHud>();
+            WireReference(minimap, "_runner", runner);
+            WireReference(minimap, "_buildMenu", menu);
+
             DebugHud hud = uiObject.AddComponent<DebugHud>();
             WireReference(hud, "_runner", runner);
             WireReference(hud, "_input", input);
+
+            return uiObject;
+        }
+
+        /// <summary>
+        /// The main menu overlay: a UI Toolkit panel and the menu track, in
+        /// the same scene as the match. There is no menu scene and no
+        /// SceneManager call anywhere — MatchBootstrap.AutoStart is off (see
+        /// CreateMatchObject) and MainMenuController starts the match from
+        /// "Neues Spiel".
+        /// <para>
+        /// The camera rig and the debug HUD are wired INTO the menu because
+        /// they are the only two components in this scene without a "no match
+        /// yet" guard: the rig would edge-pan and zoom while the player moves
+        /// the pointer over the menu, and the HUD's always-on status bar draws
+        /// before its own visibility check. The menu switches both off while
+        /// it is up. On the receiving side the rig is typed as Behaviour
+        /// (Nova.Presentation.UI may not reference Nova.Presentation), which
+        /// WireReference handles — it assigns object references, not typed
+        /// fields.
+        /// </para>
+        /// </summary>
+        private static void CreateMainMenuObject(MatchRunner runner, Camera camera, GameObject uiObject)
+        {
+            var menuObject = new GameObject("MainMenu");
+
+            UIDocument document = menuObject.AddComponent<UIDocument>();
+            document.panelSettings = MenuAssetSetup.LoadOrCreatePanelSettings();
+            // No visualTreeAsset on purpose: MainMenuController builds its
+            // tree in C#, so the generated scene carries no hand-authored UXML
+            // asset that this generator could not reproduce.
+
+            // MenuMusicPlayer declares [RequireComponent(typeof(AudioSource))]
+            // and configures the source itself (clip, loop, 2D, playback) —
+            // this file wires, it does not tune.
+            AudioSource source = menuObject.AddComponent<AudioSource>();
+
+            MenuMusicPlayer music = menuObject.AddComponent<MenuMusicPlayer>();
+            WireReference(music, "_source", source);
+            WireReference(music, "_clip",
+                MenuAssetSetup.LoadRequired<AudioClip>(MenuAssetSetup.MusicClipPath));
+
+            MainMenuController menu = menuObject.AddComponent<MainMenuController>();
+            WireReference(menu, "_document", document);
+            WireReference(menu, "_bootstrap", runner.GetComponent<MatchBootstrap>());
+            WireReference(menu, "_music", music);
+            WireReference(menu, "_cameraRig", camera.GetComponent<RtsCameraController>());
+            WireReference(menu, "_debugHud", uiObject.GetComponent<DebugHud>());
+            WireReference(menu, "_keyArt",
+                MenuAssetSetup.LoadRequired<Texture2D>(MenuAssetSetup.KeyArtPath));
+            WireReference(menu, "_titleFont",
+                MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.TitleFontPath));
+            WireReference(menu, "_bodyFont",
+                MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.BodyFontPath));
         }
 
         /// <summary>

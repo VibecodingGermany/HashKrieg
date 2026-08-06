@@ -15,12 +15,14 @@ namespace Nova.SimRunner.Tests
 {
     /// <summary>
     /// Canonical MS-1 victory suite (.NET lane, docs/gamedesign/VictoryConditions.md
-    /// section "MS-1-Override (D-056)"): the three decided outcomes
-    /// (elimination, mutual annihilation, time limit), the undecided match,
-    /// the "once decided, final" property across later ticks AND snapshot
-    /// save/restore, construction sites counting as buildings, the last-unit
-    /// reveal hold with its reset rule, block hardening and determinism.
-    /// Mirror of the EditMode lane VictorySystemTests.
+    /// section "MS-1-Override (D-056)" plus the D-077 second defeat trigger):
+    /// the three decided outcomes (elimination, mutual annihilation, time
+    /// limit), elimination's two triggers (total annihilation per D-056 and
+    /// last-HQ loss per D-077), the undecided match, the "once decided,
+    /// final" property across later ticks AND snapshot save/restore,
+    /// construction sites counting as buildings, the last-unit reveal hold
+    /// with its reset rule, block hardening (v2 format, clean break from v1)
+    /// and determinism. Mirror of the EditMode lane VictorySystemTests.
     /// </summary>
     [TestFixture]
     public sealed class VictorySystemTests
@@ -67,6 +69,19 @@ namespace Nova.SimRunner.Tests
                 for (int i = 0; i < Entities.Capacity; i++)
                 {
                     if (units[i].IsActive && units[i].PlayerId == slot)
+                    {
+                        Entities.DespawnUnit(units[i].Id);
+                    }
+                }
+            }
+
+            /// <summary>Despawns every living HQ of a slot (the D-077 "HQ sniped" state, other entities survive).</summary>
+            public void SnipeHq(byte slot)
+            {
+                UnitState[] units = Entities.RawUnits;
+                for (int i = 0; i < Entities.Capacity; i++)
+                {
+                    if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.HQ)
                     {
                         Entities.DespawnUnit(units[i].Id);
                     }
@@ -148,24 +163,25 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void PartiallyWipedSide_WithEntitiesLeft_StaysUndecided()
         {
-            TestHost host = NewTwoSidedHost();
+            // Slot 1 fields only units, so it never owns an HQ: the D-077
+            // HQ-loss trigger never arms for it and D-056 alone judges it.
+            TestHost host = NewHost();
+            host.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            host.SpawnUnit(0, 12, 10);
+            EntityId first = host.SpawnUnit(1, 50, 50);
+            host.SpawnUnit(1, 52, 50);
+            host.Step(1);
 
-            // Slot 1 loses its HQ but keeps the unit: not eliminated.
-            UnitState[] units = host.Entities.RawUnits;
-            for (int i = 0; i < host.Entities.Capacity; i++)
-            {
-                if (units[i].IsActive && units[i].PlayerId == 1 && units[i].Role == UnitRole.HQ)
-                {
-                    host.Entities.DespawnUnit(units[i].Id);
-                }
-            }
+            // Slot 1 loses one of its two units: not eliminated.
+            host.Entities.DespawnUnit(first);
             host.Step(1);
 
             host.Victory.CountLiving(1, out int remainingUnits, out int remainingBuildings);
             Assert.That(remainingUnits, Is.EqualTo(1));
             Assert.That(remainingBuildings, Is.EqualTo(0));
+            Assert.That(host.Victory.HadHq(1), Is.False, "slot 1 never owned an HQ");
             Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.Undecided),
-                "D-056 defeat needs zero units AND zero buildings");
+                "D-056 defeat needs zero units AND zero buildings, and slot 1 still owns a unit");
         }
 
         // ------------------------------------------------------------------
@@ -194,6 +210,84 @@ namespace Nova.SimRunner.Tests
 
             Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
             Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)1));
+        }
+
+        // ------------------------------------------------------------------
+        // (b2) The D-077 second defeat trigger: losing the last HQ
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void HqSnipedWithOtherEntitiesLeft_IsDefeated_TheOtherSlotWins()
+        {
+            // D-077: slot 1 loses its HQ but keeps its unit — the defeat
+            // lands anyway, because the slot had owned a completed HQ.
+            TestHost host = NewTwoSidedHost();
+            host.SnipeHq(1);
+            host.Step(1);
+
+            host.Victory.CountLiving(1, out int remainingUnits, out int remainingBuildings);
+            Assert.That(remainingUnits, Is.EqualTo(1), "the unit survives — the defeat comes from the HQ loss alone");
+            Assert.That(remainingBuildings, Is.EqualTo(0));
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)0), "slot 0 still owns its HQ");
+            Assert.That(host.Victory.DecidedTick, Is.EqualTo(host.Kernel.CurrentTick.Value),
+                "the defeat lands immediately, on the tick the HQ died");
+        }
+
+        [Test]
+        public void BothHqsSnipedInTheSameTick_IsMutualAnnihilationDraw()
+        {
+            // Both sides keep their units — the draw comes from two HQ-loss
+            // defeats in the same tick, not from total annihilation.
+            TestHost host = NewTwoSidedHost();
+            host.SnipeHq(0);
+            host.SnipeHq(1);
+            host.Step(1);
+
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.DrawMutualAnnihilation));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo(VictorySystem.NoWinnerSlot), "a draw has no winner");
+            Assert.That(host.Victory.DecidedTick, Is.EqualTo(host.Kernel.CurrentTick.Value));
+        }
+
+        [Test]
+        public void SideThatNeverHadAnHq_IsNotDefeatedByHqRule_ButStillByTotalAnnihilation()
+        {
+            // Slot 1 fields only units — the D-077 trigger never arms for it.
+            TestHost host = NewHost();
+            host.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            host.SpawnUnit(1, 50, 50);
+            host.Step(5);
+
+            Assert.That(host.Victory.HadHq(0), Is.True);
+            Assert.That(host.Victory.HadHq(1), Is.False);
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.Undecided),
+                "a slot that never owned an HQ cannot lose it");
+
+            // D-056 total annihilation still defeats it.
+            host.WipeSlot(1);
+            host.Step(1);
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)0));
+        }
+
+        [Test]
+        public void DecidedOutcome_IsFinal_WhenTheWinnersHqDiesLater()
+        {
+            TestHost host = NewTwoSidedHost();
+            host.SnipeHq(1);
+            host.Step(1);
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)0));
+            uint decidedTick = host.Victory.DecidedTick;
+
+            // The winner's HQ dies AFTER the decision — a naive re-evaluation
+            // would flip this to MutualAnnihilation.
+            host.SnipeHq(0);
+            host.Step(50);
+
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination), "the outcome is final (D-056)");
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)0));
+            Assert.That(host.Victory.DecidedTick, Is.EqualTo(decidedTick), "the decision tick never moves");
         }
 
         [Test]
@@ -315,7 +409,10 @@ namespace Nova.SimRunner.Tests
         public void RevealHold_CountsUninterruptedTicks_AndResetsWhenTheConditionEnds()
         {
             TestHost host = NewHost();
-            EntityId hq = host.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            // Slot 0's building is a Barracks, not the HQ: the D-077 HQ-loss
+            // trigger never arms for it, so stripping the building starts the
+            // reveal hold instead of ending the match.
+            EntityId building = host.SpawnUnit(0, 10, 10, UnitRole.Barracks);
             host.SpawnUnit(0, 12, 10);
             host.SpawnUnit(1, 50, 50, UnitRole.HQ);
             host.Step(1);
@@ -323,7 +420,7 @@ namespace Nova.SimRunner.Tests
             Assert.That(host.Victory.RevealHoldTicksOf(0), Is.EqualTo(0),
                 "a side that still owns a building never starts the hold");
 
-            host.Entities.DespawnUnit(hq); // no buildings, one unit left
+            host.Entities.DespawnUnit(building); // no buildings, one unit left
             host.Step(5);
             Assert.That(host.Victory.RevealHoldTicksOf(0), Is.EqualTo(5));
             Assert.That(host.Victory.IsRevealed(0), Is.False);
@@ -395,14 +492,43 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void VictoryBlockV2_RoundTripsHadHqLatches()
+        {
+            TestHost source = NewTwoSidedHost();
+            source.Step(3);
+            Assert.That(source.Victory.HadHq(0), Is.True, "both slots opened with a completed HQ");
+            Assert.That(source.Victory.HadHq(1), Is.True);
+            Assert.That(source.Victory.HadHq(2), Is.False, "an unused slot never owns an HQ");
+
+            byte[] snapshot = source.Kernel.SaveSnapshot();
+            TestHost restored = NewHost();
+            Assert.That(restored.Victory.HadHq(0), Is.False, "a fresh host has no latches");
+            Assert.That(restored.Kernel.TryRestoreSnapshot(snapshot), Is.True);
+
+            Assert.That(restored.Victory.HadHq(0), Is.True, "the had-HQ latch restores");
+            Assert.That(restored.Victory.HadHq(1), Is.True);
+            Assert.That(restored.Victory.HadHq(2), Is.False);
+
+            // Re-serializing the restored state reproduces the source block
+            // byte-exactly — the latches live in the v2 block.
+            var sourceWriter = new SnapshotBlockWriter();
+            source.Victory.WriteState(sourceWriter);
+            var restoredWriter = new SnapshotBlockWriter();
+            restored.Victory.WriteState(restoredWriter);
+            Assert.That(restoredWriter.ToArray(), Is.EqualTo(sourceWriter.ToArray()));
+        }
+
+        [Test]
         public void UndecidedStateWithRevealHold_SurvivesSnapshotSaveAndRestore()
         {
             TestHost source = NewHost();
-            EntityId hq = source.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            // Barracks, not the HQ: removing it must start the reveal hold,
+            // not the D-077 HQ-loss defeat.
+            EntityId building = source.SpawnUnit(0, 10, 10, UnitRole.Barracks);
             source.SpawnUnit(0, 12, 10);
             source.SpawnUnit(1, 50, 50, UnitRole.HQ);
             source.Step(1);
-            source.Entities.DespawnUnit(hq);
+            source.Entities.DespawnUnit(building);
             source.Step(7);
             Assert.That(source.Victory.RevealHoldTicksOf(0), Is.EqualTo(7));
 
@@ -465,12 +591,18 @@ namespace Nova.SimRunner.Tests
             byte[] content = writer.ToArray();
 
             Assert.That(host.Victory.StateBlockId, Is.EqualTo(SnapshotBlockIds.Victory));
-            Assert.That(content.Length, Is.EqualTo(4 + 4 + VictorySystem.MaxSlots * 5),
-                "version + slot count + outcome + winner + decided tick, then 5 bytes per slot");
+            Assert.That(content.Length, Is.EqualTo(4 + 4 + VictorySystem.MaxSlots * 6),
+                "version + slot count + outcome + winner + decided tick, then 6 bytes per slot (engaged, had-HQ, reveal hold)");
             Assert.That(content[0], Is.EqualTo(VictorySystem.StateVersion));
             Assert.That(content[1], Is.EqualTo((byte)VictorySystem.MaxSlots));
             Assert.That(content[2], Is.EqualTo((byte)MatchOutcome.Undecided));
             Assert.That(content[3], Is.EqualTo(VictorySystem.NoWinnerSlot));
+            Assert.That(content[8], Is.EqualTo((byte)1), "slot 0 engaged");
+            Assert.That(content[9], Is.EqualTo((byte)1), "slot 0 owned a completed HQ (D-077 latch)");
+            Assert.That(content[8 + 6], Is.EqualTo((byte)1), "slot 1 engaged");
+            Assert.That(content[8 + 6 + 1], Is.EqualTo((byte)1), "slot 1 owned a completed HQ");
+            Assert.That(content[8 + (VictorySystem.MaxSlots - 1) * 6], Is.EqualTo((byte)0),
+                "an unused slot carries zero latches");
             Assert.That(host.Victory.TryValidateState(content), Is.True);
         }
 
@@ -515,16 +647,47 @@ namespace Nova.SimRunner.Tests
             ghostWinner[4] = 3;
             Assert.That(host.Victory.TryValidateState(ghostWinner), Is.False, "the winner must be an engaged slot");
 
-            // A reveal hold above the saturation bound.
+            // A reveal hold above the saturation bound (slot 0's hold starts
+            // two flag bytes into its 6-byte record).
             byte[] overRun = (byte[])valid.Clone();
-            WriteUInt32(overRun, 8 + 1, (uint)VictorySystem.RevealHoldTicks + 1);
+            WriteUInt32(overRun, 8 + 2, (uint)VictorySystem.RevealHoldTicks + 1);
             Assert.That(host.Victory.TryValidateState(overRun), Is.False, "the hold saturates at 600");
 
             // A hold on a slot that was never engaged (slot 7).
             byte[] ghostHold = (byte[])valid.Clone();
-            WriteUInt32(ghostHold, 8 + (VictorySystem.MaxSlots - 1) * 5 + 1, 3u);
+            WriteUInt32(ghostHold, 8 + (VictorySystem.MaxSlots - 1) * 6 + 2, 3u);
             Assert.That(host.Victory.TryValidateState(ghostHold), Is.False,
                 "a slot that never was on the map cannot hold the reveal condition");
+
+            // An illegal had-HQ flag value on an engaged slot (slot 0).
+            Assert.That(host.Victory.TryValidateState(Mutate(valid, 8 + 1, 2)), Is.False,
+                "the had-HQ latch is a 0/1 flag");
+
+            // A had-HQ latch on a slot that was never engaged (slot 7) —
+            // owning an HQ would have latched the engagement (D-077).
+            Assert.That(host.Victory.TryValidateState(Mutate(valid, 8 + (VictorySystem.MaxSlots - 1) * 6 + 1, 1)), Is.False,
+                "an unengaged slot cannot carry the had-HQ latch");
+
+            // Clean break: a v1 block (D-056 layout, 48 bytes, version byte 1)
+            // is rejected, not migrated (pre-release format reset).
+            var v1Writer = new SnapshotBlockWriter();
+            v1Writer.WriteUInt8(1);
+            v1Writer.WriteUInt8((byte)VictorySystem.MaxSlots);
+            v1Writer.WriteUInt8((byte)MatchOutcome.Undecided);
+            v1Writer.WriteUInt8(VictorySystem.NoWinnerSlot);
+            v1Writer.WriteUInt32(0);
+            for (int slot = 0; slot < VictorySystem.MaxSlots; slot++)
+            {
+                v1Writer.WriteUInt8(0); // engagement latch
+                v1Writer.WriteUInt32(0); // reveal hold
+            }
+            byte[] v1 = v1Writer.ToArray();
+            Assert.That(v1.Length, Is.EqualTo(48), "the v1 fixture matches the documented D-056 layout");
+            Assert.That(host.Victory.TryValidateState(v1), Is.False, "v1 blocks are rejected, not migrated");
+            // Even a version-byte-patched v1 block fails: it is 8 bytes short
+            // of the v2 layout.
+            Assert.That(host.Victory.TryValidateState(Mutate(v1, 0, VictorySystem.StateVersion)), Is.False,
+                "a relabeled v1 block is still the wrong length");
 
             // Nothing above touched the live system.
             Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.Undecided));

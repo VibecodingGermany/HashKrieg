@@ -1,5 +1,6 @@
 using System;
 using Nova.Core;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.State;
 
 namespace Nova.Gameplay
@@ -66,6 +67,31 @@ namespace Nova.Gameplay
             }
 
             return _selectedCount;
+        }
+
+        /// <summary>
+        /// Copies the selected ids of MOBILE entities — everything that is not
+        /// a building role — into <paramref name="destination"/> and returns
+        /// the count written (capped at the destination length). Buildings are
+        /// immobile, so unit orders (Move, Stop, Attack, Harvest, ReturnCargo)
+        /// addressed to them are meaningless; the device input filters every
+        /// such dispatch through this method. Stale ids (dead or despawned
+        /// entities) are dropped as well, mirroring what the dispatcher's
+        /// state view would do one layer later.
+        /// </summary>
+        public int CopyMobileSelection(EntityManager entityManager, EntityId[] destination)
+        {
+            if (destination == null) throw new ArgumentNullException(nameof(destination));
+            if (entityManager == null || _selectedCount == 0) return 0;
+
+            int written = 0;
+            for (int i = 0; i < _selectedCount && written < destination.Length; i++)
+            {
+                if (!entityManager.TryGetUnit(_selectedIds[i], out UnitState unit)) continue;
+                if (SimDefinitions.IsBuildingRole(unit.Role)) continue;
+                destination[written++] = _selectedIds[i];
+            }
+            return written;
         }
     }
 }

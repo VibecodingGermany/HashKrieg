@@ -14,10 +14,11 @@ using EntityId = Nova.Core.EntityId;
 namespace Nova.Presentation.UI
 {
     /// <summary>
-    /// Read-only OnGUI overlay over a running <see cref="MatchRunner"/>: tick,
-    /// match outcome, economy, force census, selection combat profile,
-    /// Aetherium reserves and the control legend. No Canvas, no uGUI, no
-    /// prefabs, no materials.
+    /// Read-only OnGUI overlay over a running <see cref="MatchRunner"/>: an
+    /// always-on one-line status bar (credits, power, decided outcome) plus
+    /// a full diagnostic panel (tick, census, selection combat profile,
+    /// Aetherium reserves, control legend) that is hidden by default and
+    /// toggled with F3. No Canvas, no uGUI, no prefabs, no materials.
     /// <para>
     /// STRICTLY READ-ONLY: this component never mutates simulation state and
     /// never submits a command. Every value is copied out of the sim per frame
@@ -55,9 +56,10 @@ namespace Nova.Presentation.UI
         [SerializeField] private RtsDeviceInput _input;
 
         [Header("Presentation")]
-        [SerializeField] private bool _visible = true;
+        [Tooltip("Full diagnostic panel. Hidden by default — the compact status bar above it is always on. F3 toggles this panel.")]
+        [SerializeField] private bool _visible = false;
         [Tooltip("Whole GUI is scaled by this factor so it stays legible on a Retina display.")]
-        [SerializeField] private float _uiScale = 2f;
+        [SerializeField] private float _uiScale = 1.5f;
         [SerializeField] private int _fontSize = 13;
 
         private readonly StringBuilder _builder = new StringBuilder(256);
@@ -71,6 +73,11 @@ namespace Nova.Presentation.UI
 
         private GUIStyle _labelStyle;
         private GUIStyle _outcomeStyle;
+        private GUIStyle _statusStyle;
+
+        // F3 panel scroll position: the panel's height is bounded by its
+        // HudLayout zone, so surplus content scrolls instead of running out.
+        private Vector2 _scrollPos;
 
         // Force census, recomputed at most once per frame (OnGUI runs twice:
         // Layout + Repaint) so the O(capacity) sweep is not paid twice.
@@ -83,22 +90,63 @@ namespace Nova.Presentation.UI
             if (_input == null) _input = FindAnyObjectByType<RtsDeviceInput>();
         }
 
+        private void Update()
+        {
+            // F3 toggles the full diagnostic panel. The compact status bar
+            // (credits, power, outcome) is drawn regardless — it is the
+            // minimal match readout, not a debug view.
+            if (Input.GetKeyDown(KeyCode.F3))
+            {
+                _visible = !_visible;
+            }
+        }
+
         private void OnGUI()
         {
-            if (!_visible) return;
-
             if (_labelStyle == null)
             {
                 _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = _fontSize, richText = false, wordWrap = true };
+            }
+            if (_statusStyle == null)
+            {
+                // The always-on status bar is cockpit chrome, not debug text:
+                // the shared HudChrome frame. The F3 panel below paints the
+                // opaque twin (HudChrome.OpaquePanelStyle) — translucent
+                // chrome under dense debug text was what made it unreadable.
+                _statusStyle = new GUIStyle(_labelStyle) { wordWrap = false };
+                HudChrome.ApplyPanelChrome(_statusStyle);
             }
 
             float scale = Mathf.Max(1f, _uiScale);
             Matrix4x4 previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            float width = Mathf.Min(640f, Screen.width / scale - 16f);
-            GUILayout.BeginArea(new Rect(8f, 8f, width, Screen.height / scale - 16f));
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.ExpandHeight(false));
+            DrawStatusBar(scale);
+
+            if (!_visible)
+            {
+                GUI.matrix = previousMatrix;
+                return;
+            }
+
+            // The F3 panel lives in the HudLayout free-field zone: below the
+            // status strip, bottom-bounded by the minimap's top edge, never
+            // entering the command card's column. Degenerate zone (tiny
+            // window) = draw nothing instead of overlapping.
+            Rect strip = HudLayout.StatusStrip(scale, _fontSize + 6f, 8f);
+            Rect minimap = HudLayout.CanonicalMinimapZone(scale);
+            Rect zone = HudLayout.DebugPanelZone(scale, 640f, 8f, strip.yMax + 4f, minimap.yMin);
+            if (zone.height <= 0f || zone.width <= 0f)
+            {
+                GUI.matrix = previousMatrix;
+                return;
+            }
+
+            GUILayout.BeginArea(zone);
+            GUILayout.BeginVertical(HudChrome.OpaquePanelStyle);
+            _scrollPos = GUILayout.BeginScrollView(
+                _scrollPos,
+                GUILayout.Height(Mathf.Max(0f, zone.height - HudChrome.OpaquePanelStyle.padding.vertical)));
 
             if (_runner == null)
             {
@@ -117,9 +165,64 @@ namespace Nova.Presentation.UI
                 GUILayout.Label(string.IsNullOrEmpty(legend) ? "Controls: no RtsDeviceInput in the scene." : legend, _labelStyle);
             }
 
+            GUILayout.EndScrollView();
             GUILayout.EndVertical();
             GUILayout.EndArea();
             GUI.matrix = previousMatrix;
+        }
+
+        /// <summary>
+        /// The always-on minimal match readout: one compact line with the
+        /// local slot's credits and power state, the decided outcome (the one
+        /// thing that must never be hidden) and the F3 hint. This is the
+        /// player-facing substitute until the real HUD (Nova.UI) lands; the
+        /// full diagnostic panel below it stays opt-in via F3.
+        /// </summary>
+        private void DrawStatusBar(float scale)
+        {
+            _builder.Clear();
+
+            if (_runner == null)
+            {
+                _builder.Append("Nova — no MatchRunner in the scene.");
+            }
+            else
+            {
+                byte slot = _runner.Session != null ? _runner.Session.LocalSlot : (byte)0;
+
+                if (_runner.Economy != null)
+                {
+                    PlayerEconomyState economy = _runner.Economy.GetPlayerEconomy(slot);
+                    _builder.Append(economy.AetheriumCredits).Append(" AE")
+                        .Append("   |   Power ").Append(economy.PowerProvided).Append('/').Append(economy.PowerRequired);
+                    if (economy.IsLowPower) _builder.Append(" (LOW POWER)");
+                }
+
+                VictorySystem victory = _runner.Victory;
+                if (victory != null && victory.IsDecided)
+                {
+                    _builder.Append("   |   ");
+                    switch (victory.Outcome)
+                    {
+                        case MatchOutcome.VictoryElimination:
+                            _builder.Append(victory.WinnerSlot == slot ? "VICTORY" : "DEFEAT");
+                            break;
+                        case MatchOutcome.DrawMutualAnnihilation:
+                            _builder.Append("DRAW — mutual annihilation");
+                            break;
+                        case MatchOutcome.DrawTimeLimit:
+                            _builder.Append("DRAW — time limit");
+                            break;
+                        default:
+                            _builder.Append(victory.Outcome.ToString());
+                            break;
+                    }
+                }
+
+                _builder.Append("   |   F3: debug panel");
+            }
+
+            GUI.Label(HudLayout.StatusStrip(scale, _fontSize + 6f, 8f), _builder.ToString(), _statusStyle);
         }
 
         private void DrawMatchLine()

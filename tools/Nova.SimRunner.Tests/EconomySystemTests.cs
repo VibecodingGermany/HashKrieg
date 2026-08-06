@@ -36,11 +36,30 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void StartConditions_AreCanonicalManifestValues()
         {
+            // The canonical match start balance (D-077 —
+            // startStatePerPlayer.aetheriumAE of quality/content/mvp-v1.json)
+            // lives in ONE named constant the match hosts pass explicitly.
+            Assert.That(EconomySystem.CanonicalMatchStartingCreditsAE, Is.EqualTo(3000L),
+                "startStatePerPlayer.aetheriumAE of quality/content/mvp-v1.json (D-077)");
+
+            var economy = new EconomySystem(CreateEntities(), EconomySystem.CanonicalMatchStartingCreditsAE);
+            for (byte slot = 0; slot < EconomySystem.MaxPlayers; slot++)
+            {
+                Assert.That(economy.GetPlayerEconomy(slot).AetheriumCredits, Is.EqualTo(3000L));
+            }
+        }
+
+        [Test]
+        public void ParameterlessStartCredits_StayTheLibraryDefault()
+        {
+            // The constructor default is deliberately NOT the match rule
+            // (D-077): existing fixtures keep their 1.000 AE arithmetic;
+            // match hosts pass CanonicalMatchStartingCreditsAE explicitly.
             var economy = new EconomySystem(CreateEntities());
             for (byte slot = 0; slot < EconomySystem.MaxPlayers; slot++)
             {
                 Assert.That(economy.GetPlayerEconomy(slot).AetheriumCredits, Is.EqualTo(1000L),
-                    "startStatePerPlayer.aetheriumAE of quality/content/mvp-v1.json");
+                    "library default — the canonical 3.000 AE are opt-in via the constant");
             }
         }
 

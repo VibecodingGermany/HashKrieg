@@ -24,6 +24,51 @@ namespace Nova.Gameplay.Tests
         }
 
         [Test]
+        public void SelectionManager_CopyMobileSelection_ExcludesBuildingsAndStaleIds()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+
+            EntityId builder = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(3), maxHealth: 350, role: UnitRole.Builder);
+            EntityId harvester = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(2), maxHealth: 800, role: UnitRole.Harvester);
+            EntityId hq = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(14), SimFixed.FromInt(14)), SimFixed.Zero, maxHealth: 2000, role: UnitRole.HQ);
+            EntityId refinery = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(16), SimFixed.FromInt(16)), SimFixed.Zero, maxHealth: 800, role: UnitRole.Refinery);
+
+            // Select everything (buildings included — box select does not
+            // filter), then let one mobile unit die so its id goes stale.
+            selection.SelectBox(entities, playerId: 0, minX: 0f, minY: 0f, maxX: 20f, maxY: 20f);
+            Assert.AreEqual(4, selection.SelectedCount);
+            entities.DespawnUnit(harvester);
+
+            var buffer = new EntityId[SelectionManager.MaxSelectedEntities];
+            int count = selection.CopyMobileSelection(entities, buffer);
+
+            Assert.AreEqual(1, count);
+            Assert.AreEqual(builder, buffer[0]);
+            Assert.AreNotEqual(hq, buffer[0]);
+            Assert.AreNotEqual(refinery, buffer[0]);
+        }
+
+        [Test]
+        public void ProducerBuildingRoles_IsProducerRole_MatchesMs1ProducerAssignment()
+        {
+            // The D-077 producer assignment: HQ (Builder), Refinery
+            // (Harvester), Barracks (infantry), VehicleFactory (vehicles).
+            Assert.IsTrue(ProducerBuildingRoles.IsProducerRole(UnitRole.HQ));
+            Assert.IsTrue(ProducerBuildingRoles.IsProducerRole(UnitRole.Refinery));
+            Assert.IsTrue(ProducerBuildingRoles.IsProducerRole(UnitRole.Barracks));
+            Assert.IsTrue(ProducerBuildingRoles.IsProducerRole(UnitRole.VehicleFactory));
+
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.Power));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.Storage));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.ResearchLab));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.Radar));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.DefensePlatform));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.Builder));
+            Assert.IsFalse(ProducerBuildingRoles.IsProducerRole(UnitRole.Unit));
+        }
+
+        [Test]
         public void CommandCardPresenter_GetAvailableCommands_ReturnsExpectedFlags()
         {
             var presenter = new CommandCardPresenter();

@@ -14,8 +14,11 @@ namespace Nova.Simulation.Economy
     /// the harvest deposit; spending is the concern of the command /
     /// construction / production slices, which must refuse a spend the
     /// balance cannot cover (<see cref="TrySpendCredits"/> is the enforcing
-    /// primitive). The start balance is 1000 AE (quality/content/mvp-v1.json
-    /// startStatePerPlayer.aetheriumAE).
+    /// primitive). The canonical match start balance is 3.000 AE
+    /// (<see cref="EconomySystem.CanonicalMatchStartingCreditsAE"/>, D-077 —
+    /// quality/content/mvp-v1.json startStatePerPlayer.aetheriumAE); the
+    /// constructor default below is a plain library default for tests and
+    /// fixtures, not the match rule.
     /// </para>
     /// <para>
     /// Power: <see cref="PowerProvided"/> and <see cref="PowerRequired"/> are

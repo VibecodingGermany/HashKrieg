@@ -74,11 +74,6 @@ namespace Nova.SimRunner.Tests
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
         private const ushort DefHQAlliance = 3;
         private const ushort DefHQLegion = 20;
-        private const ushort DefRefineryAlliance = 4;
-        private const ushort DefRefineryLegion = 21;
-
-        /// <summary>Harvester move speed, Q16.16 raw (2.5 cells/tick).</summary>
-        private const int HarvesterSpeedRaw = 163840;
 
         private sealed class ReferenceHost
         {
@@ -87,8 +82,6 @@ namespace Nova.SimRunner.Tests
             public EconomySystem Economy;
             public ConstructionSystem Construction;
             public CommandIngress Ingress;
-            public EntityId HarvesterA;
-            public EntityId HarvesterB;
         }
 
         /// <summary>
@@ -104,7 +97,10 @@ namespace Nova.SimRunner.Tests
             var entities = new EntityManager(EntityCapacity);
             var pathfinding = new PathfindingSystem(MapWidth, MapHeight);
             var movement = new MovementSystem(entities, pathfinding);
-            var economy = new EconomySystem(entities);
+            // The D-077 start balance: the same constant the scenario's
+            // BuildHost and MatchRunner use — all three hosts must hash the
+            // identical initial state.
+            var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
@@ -149,40 +145,31 @@ namespace Nova.SimRunner.Tests
             public ushort FieldId;
             public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
-            public int RefineryOriginX, RefineryOriginY;
-            public int HarvesterAX, HarvesterAY, HarvesterBX, HarvesterBY;
             public int BuilderX, BuilderY;
-            public int[] SquadX, SquadY;
         }
 
         private static readonly SlotLayout Slot0Layout = new SlotLayout
         {
             FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
-            RefineryOriginX = 8, RefineryOriginY = 4,
-            HarvesterAX = 7, HarvesterAY = 6, HarvesterBX = 7, HarvesterBY = 7,
             BuilderX = 13, BuilderY = 7,
-            SquadX = new[] { 56, 57, 56, 57 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
 
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
             FieldId = 2, FieldX = 119, FieldY = 119,
             HqOriginX = 120, HqOriginY = 120,
-            RefineryOriginX = 116, RefineryOriginY = 120,
-            HarvesterAX = 119, HarvesterAY = 120, HarvesterBX = 119, HarvesterBY = 119,
             BuilderX = 113, BuilderY = 119,
-            SquadX = new[] { 65, 66, 65, 66 },
-            SquadY = new[] { 62, 62, 63, 63 },
         };
 
         /// <summary>
-        /// Byte-exact mirror of Determinism10000Scenario.SetupMatch. Spawn ORDER
-        /// is load-bearing: EntityManager hands out ids from a deterministic free
-        /// list, so any reordering shifts every id and therefore every hash.
-        /// Units spawn through SpawnUnit's defaults (maxHealth 100 for all),
-        /// exactly like the scenario — NOT through SimDefinitions.
+        /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
+        /// per slot one Aetherium field, a completed HQ and ONE Builder —
+        /// nothing else. Spawn ORDER is load-bearing: EntityManager hands
+        /// out ids from a deterministic free list, so any reordering shifts
+        /// every id and therefore every hash. Units spawn through SpawnUnit's
+        /// defaults (maxHealth 100 for all), exactly like the scenario —
+        /// NOT through SimDefinitions.
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
@@ -197,58 +184,11 @@ namespace Nova.SimRunner.Tests
                     Is.True, "reference field registration");
                 Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefHQAlliance : DefHQLegion, c.HqOriginX, c.HqOriginY).IsValid,
                     Is.True, "reference HQ placement");
-                Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefRefineryAlliance : DefRefineryLegion, c.RefineryOriginX, c.RefineryOriginY).IsValid,
-                    Is.True, "reference Refinery placement");
-
-                EntityId harvesterA = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterAX), SimFixed.FromInt(c.HarvesterAY)),
-                    SimFixed.FromRaw(HarvesterSpeedRaw), role: UnitRole.Harvester);
-                EntityId harvesterB = host.Entities.SpawnUnit(
-                    slot, new Transform2D(SimFixed.FromInt(c.HarvesterBX), SimFixed.FromInt(c.HarvesterBY)),
-                    SimFixed.FromRaw(HarvesterSpeedRaw), role: UnitRole.Harvester);
-                if (slot == 0)
-                {
-                    host.HarvesterA = harvesterA;
-                    host.HarvesterB = harvesterB;
-                }
 
                 host.Entities.SpawnUnit(
                     slot, new Transform2D(SimFixed.FromInt(c.BuilderX), SimFixed.FromInt(c.BuilderY)),
                     SimFixed.FromInt(3), role: UnitRole.Builder);
-
-                for (int i = 0; i < 4; i++)
-                {
-                    host.Entities.SpawnUnit(
-                        slot, new Transform2D(SimFixed.FromInt(c.SquadX[i]), SimFixed.FromInt(c.SquadY[i])),
-                        SimFixed.FromInt(4), role: UnitRole.BasicInfantry);
-                }
             }
-        }
-
-        /// <summary>
-        /// Mirror of MatchBootstrap's opening command pair: one Harvest intent
-        /// per human harvester, in spawn order, through the ingress. The kernel
-        /// block hashes the ingress dedupe/sequence state INCLUDING pending
-        /// records (SimulationKernel.BuildKernelBlock), so these two intents are
-        /// part of the tick-0 state hash and the EditMode lane has to compare
-        /// against a reference that carries them.
-        /// </summary>
-        private static void SubmitOpeningHarvestOrders(ReferenceHost host)
-        {
-            SubmitHarvest(host, host.HarvesterA, Slot0Layout.FieldId);
-            SubmitHarvest(host, host.HarvesterB, Slot0Layout.FieldId);
-        }
-
-        private static void SubmitHarvest(ReferenceHost host, EntityId harvester, ushort fieldId)
-        {
-            uint raw = UnitCommandStateView.ToRawEntityId(harvester);
-            Assert.That(raw, Is.Not.Zero, "reference harvester handle must pack to a valid raw id");
-
-            CommandIngressResult result = host.Ingress.TrySubmitIntent(
-                CommandIntent.Create(new HarvestPayload(new[] { raw }, fieldId)),
-                out CommandRejectReason reason);
-            Assert.That(result, Is.EqualTo(CommandIngressResult.Accepted),
-                $"reference opening harvest order rejected: {result} ({reason})");
         }
 
         // ----------------------------------------------------------------
@@ -334,28 +274,6 @@ namespace Nova.SimRunner.Tests
                 $"(reference 0x{referenceHash:X16}, scenario 0x{scenarioHash:X16}). " +
                 "The EditMode lane asserts MatchBootstrap against this same reference, so a " +
                 "drift here means the Unity host and the headless harness are no longer the same match.");
-        }
-
-        [Test]
-        public void OpeningHarvestOrders_AreTheOnlyDeltaTheEditModeLaneAddsOnTop()
-        {
-            // The EditMode lane compares MatchBootstrap against
-            // ApplyOpeningPosition + SubmitOpeningHarvestOrders. This pins that
-            // the second stage is (a) accepted by the real ingress and (b)
-            // actually visible in the hash — otherwise that comparison would
-            // silently be a weaker test than it looks.
-            ReferenceHost bare = BuildReferenceHost(CanonicalSeed);
-            ApplyOpeningPosition(bare);
-            ulong bareHash = bare.Kernel.CalculateStateHash();
-
-            ReferenceHost withOrders = BuildReferenceHost(CanonicalSeed);
-            ApplyOpeningPosition(withOrders);
-            SubmitOpeningHarvestOrders(withOrders);
-
-            Assert.That(withOrders.Ingress.PendingCount, Is.EqualTo(2),
-                "both opening harvest intents are pending for tick 1");
-            Assert.That(withOrders.Kernel.CalculateStateHash(), Is.Not.EqualTo(bareHash),
-                "pending ingress records are part of the kernel block, so they must move the hash");
         }
 
         [Test]
