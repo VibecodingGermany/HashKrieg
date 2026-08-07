@@ -88,14 +88,20 @@ namespace Nova.Networking
         /// <summary>Starts the listener on 0.0.0.0:<paramref name="port"/>; port 0 picks a free one (test lane).</summary>
         public void Start(int port)
         {
-            _listener = new TcpListener(IPAddress.Any, port);
+            Start(port, IPAddress.Any);
+        }
+
+        /// <summary>Starts the listener on <paramref name="bindAddress"/>:<paramref name="port"/>; port 0 picks a free one (test lane).</summary>
+        public void Start(int port, IPAddress bindAddress)
+        {
+            _listener = new TcpListener(bindAddress, port);
             _listener.Start();
             if (_seed == 0)
             {
                 var rng = new Random(Environment.TickCount);
                 _seed = ((ulong)(uint)rng.Next() << 32) | (uint)rng.Next();
             }
-            _log($"relay listening on port {Port}, seed 0x{_seed:X16}, input delay {_inputDelayTicks}");
+            _log($"relay listening on {bindAddress}:{Port}, seed 0x{_seed:X16}, input delay {_inputDelayTicks}");
         }
 
         /// <summary>The effective bound port.</summary>

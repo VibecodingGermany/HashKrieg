@@ -60,6 +60,7 @@ Kommandozeilenargumente:
 | `NOVA_INPUT_DELAY_TICKS` | nein | `3` | Network-Lockstep-Input-Delay (300 ms bei 10 Hz) |
 | `NOVA_RECORD_DIR` | nein | leer = Aufzeichnung aus | Verzeichnis für die `*.novarec`-Command-Stream-Dumps pro Match |
 | `NOVA_RELAY_SEED` | nein | `0` = pro Match generiert | fixer Match-Seed für reproduzierbare Testläufe |
+| `NOVA_RELAY_BIND` | nein | `127.0.0.1` | Bind-Adresse des Listeners; bewusst localhost, nicht `0.0.0.0` — die Öffnung nach außen ist ein eigener, expliziter Schritt |
 
 Diese Variablen kommen produktiv ausschließlich aus
 `/etc/hashkrieg-relay.env` (`chmod 600`, gehört `root:novarelay`) — kein
@@ -107,9 +108,11 @@ WantedBy=multi-user.target
   ohne gesetztes Token.
 - Kein Secret im Repository — Token und alle sonstige Konfiguration kommen
   ausschließlich aus `/etc/hashkrieg-relay.env`.
-- Der Dienst lauscht zunächst nur auf `127.0.0.1` — kein direkter
-  Internet-Zugriff auf den Relay-Port, bis der WebSocket/nginx-Transport
-  (siehe Offene Punkte) steht.
+- Der Dienst lauscht per Vorgabe nur lokal (`NOVA_RELAY_BIND=127.0.0.1`) —
+  kein direkter Internet-Zugriff auf den Relay-Port, bis der
+  WebSocket/nginx-Transport (siehe Offene Punkte) steht. Die Öffnung nach
+  außen (`NOVA_RELAY_BIND=0.0.0.0` oder eine öffentliche Adresse) ist ein
+  bewusster, eigener Schritt und keine Vorgabe.
 
 ## Offene Punkte
 
