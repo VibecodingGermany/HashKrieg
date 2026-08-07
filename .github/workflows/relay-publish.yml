@@ -1,0 +1,48 @@
+name: Relay Publish
+
+# Baut die Relay-Server-Binary als self-contained linux-x64-Artefakt
+# (docs/tech/RelayServer.md). Der Produktionsserver installiert kein
+# .NET-SDK - er zieht nur die fertige Binary aus diesem Lauf.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Assets/_Project/Scripts/Networking/**"
+      - "Assets/_Project/Scripts/Simulation/**"
+      - "Assets/_Project/Scripts/Core/**"
+      - "tools/Nova.RelayServer/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: relay-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Tag-gepinnt statt SHA-gepinnt: die exakte SDK-Version kommt aus
+      # global.json (siehe tests.yml), die Runner-Images liefern sie nicht
+      # zuverlaessig mit.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Publish
+        run: >
+          dotnet publish tools/Nova.RelayServer/Nova.RelayServer.csproj
+          -c Release -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nova-relay-linux-x64
+          path: publish
+          retention-days: 30
