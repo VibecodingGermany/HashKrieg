@@ -161,7 +161,7 @@ namespace Nova.Gameplay.Match
             Pathfinding = new PathfindingSystem(_mapWidth, _mapHeight);
             Movement = new MovementSystem(Entities, Pathfinding);
             Economy = new EconomySystem(Entities, startingCredits);
-            Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy);
+            Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy, Pathfinding.CostField);
             Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
             Combat = new CombatSystem(Entities, FogOfWar, Economy);

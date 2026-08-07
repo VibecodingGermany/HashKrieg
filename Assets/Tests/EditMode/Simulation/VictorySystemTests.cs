@@ -97,7 +97,7 @@ namespace Nova.Simulation.Tests
             var pathfinding = new PathfindingSystem(MapSize, MapSize);
             var movement = new MovementSystem(entities, pathfinding);
             var economy = new EconomySystem(entities, startingCredits);
-            var construction = new ConstructionSystem(entities, economy);
+            var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var victory = new VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);

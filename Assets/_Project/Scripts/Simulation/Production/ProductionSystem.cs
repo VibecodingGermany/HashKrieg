@@ -53,7 +53,7 @@ namespace Nova.Simulation.Production
     /// the building's rally point: the rally CELL is tried first, then
     /// expanding Chebyshev rings 1..<see cref="SpawnSearchMaxRing"/>, within
     /// a ring in ascending (y, x) order; a cell is free when no placement
-    /// footprint covers it (units may share cells — provisional, Q-040).
+    /// footprint covers it and no active unit stands on it.
     /// When no free cell exists inside the search range or the entity store
     /// is full (MS-1 cap 1.024, mvp-v1.json capacity.entityStoreCap), the
     /// finished unit waits: progress stays clamped at the threshold and the
@@ -425,7 +425,9 @@ namespace Nova.Simulation.Production
         /// Spawn cell search (documented deterministic algorithm): the rally
         /// cell first, then expanding Chebyshev rings 1..SpawnSearchMaxRing,
         /// within a ring ascending (y, x); a cell is free when no placement
-        /// footprint covers it.
+        /// footprint covers it AND no active unit stands on it — freshly
+        /// produced units form a line in front of the building instead of
+        /// stacking on the rally cell.
         /// </summary>
         private bool TryFindSpawnCell(ProducerRow row, out int cellX, out int cellY)
         {
@@ -441,7 +443,7 @@ namespace Nova.Simulation.Production
                         if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
                         int x = rallyCellX + dx;
                         int y = rallyCellY + dy;
-                        if (_construction.IsCellFree(x, y))
+                        if (_construction.IsCellFree(x, y) && !_entityManager.HasActiveUnitOnCell(x, y))
                         {
                             cellX = x;
                             cellY = y;

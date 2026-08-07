@@ -533,7 +533,7 @@ namespace Nova.SimRunner
             var pathfinding = new TimedPathfindingSystem(MapWidth, MapHeight);
             var movement = new MovementSystem(entities, pathfinding);
             var economy = new EconomySystem(entities);
-            var construction = new ConstructionSystem(entities, economy);
+            var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
 

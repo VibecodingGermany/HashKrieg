@@ -123,7 +123,7 @@ namespace Nova.SimRunner.Tests
             var pathfinding = new PathfindingSystem(MapWidth, MapHeight);
             var movement = new MovementSystem(entities, pathfinding);
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
-            var construction = new ConstructionSystem(entities, economy);
+            var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
             var combat = new CombatSystem(entities, fogOfWar, economy);

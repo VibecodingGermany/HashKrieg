@@ -17,6 +17,49 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Geändert
+- **Truppenführung — Einheiten teilen sich den Platz (D-088, Sprint 11):**
+  eine Armee ist kein Haufen mehr. Zwölf markierte Einheiten kommen als
+  Gruppe nebeneinander an statt übereinander, frisch gebaute Truppen bilden
+  eine Reihe vor der Kaserne statt eines Punkts, und Armeen laufen **um**
+  Gebäude herum statt hindurch.
+  - **Formationsverteilung beim Move-Befehl:** die Einheiten werden
+    deterministisch auf freie Zellen um das Ziel verteilt — kleinster
+    Entity-Index bekommt die Zielzelle, die folgenden die expandierenden
+    Chebyshev-Ringe in aufsteigender (y, x)-Reihenfolge. Die Gruppe teilt
+    sich dabei **ein** Flow-Field; jede Einheit trägt ihre persönliche
+    Ankunftszelle im neuen `UnitState.GoalGridPos` (Entity-Store-Block v5).
+  - **Separation auch im Stand:** angekommene Einheiten weichen einander
+    weiter aus — gedämpft, pro Tick gedeckelt und mit Totzone, also lösend
+    statt vibrierend; exakte Überlappungen löst ein Index-Tiebreak.
+    Gebäude und Baustellen werden nie verschoben, wirken aber als
+    Hindernis. Kein Bewegungsschritt betritt mehr eine unbegehbare Zelle.
+  - **Gebäude sind Gelände:** Footprints stehen als unbegehbar im
+    Kostenfeld der Wegfindung (Platzierung, Verkauf, Zerstörung). Wer beim
+    Platzieren im Footprint steht, wird auf die nächste freie Zelle
+    geschoben statt eingemauert; wem unterwegs das Ziel bebaut wird, hält
+    an der Wand statt ewig dagegenzulaufen. Dahinter zwei Vertragsänderungen
+    (D-088): der Epoch-Restore des Pathfinding-Blocks adoptiert die
+    serialisierte Epoch statt sie zu vergleichen, und der Flow-Field-Cache
+    regeneriert bei Terrainänderung an Ort statt geleert zu werden.
+  - **Produktions-Spawn meidet einheitenbelegte Zellen** (bisher wurden nur
+    Gebäude-Footprints geprüft) — fünf gebaute Soldaten stehen als Reihe
+    vor der Kaserne.
+  - **KI-Folgefix:** die Skirmish-KI wählt Bau-Laufziele footprint-frei;
+    ihre feste Westseiten-Regel konnte in einem Nachbargebäude enden und
+    die Baustelle dauerhaft pausieren.
+
+### Verifikation (D-088)
+- `dotnet test tools/Nova.SimRunner.Tests`: **438/438 grün** (neun neue
+  Truppenführung-Tests je Lane; die Epoch-/Cache-Vertragstests sind auf die
+  neue Semantik umgeschrieben).
+- Baselines bewusst und dokumentiert neu gesetzt: SimRunner-Hash
+  `0xB680C879DEA70B26`, `DETERMINISM_10000`-Fingerprint
+  `0xAD8531312FE93F4B`, Final-Hash `0x6916A323202089A9`,
+  Playback-Self-Check PASS.
+- Die gespielte Runde des Inhabers (DoD: Spielverhalten geändert) steht
+  aus.
+
 ### Hinzugefügt
 - **Gefecht und Rundenrahmen (D-086, D-087, Sprint 09):** aus der Demo wird
   eine Runde — ernten, bauen, kämpfen, gewinnen oder verlieren, neu anfangen.

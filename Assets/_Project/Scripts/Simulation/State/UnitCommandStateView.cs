@@ -63,6 +63,14 @@ namespace Nova.Simulation.State
         private readonly ConstructionSystem _constructionSystem;
         private readonly ProductionSystem _productionSystem;
 
+        // Formation distribution scratch (ApplyMove): a per-cell stamp array
+        // marks the cells one command has already handed out, and the id
+        // buffer holds the command's valid ids sorted by entity index. Both
+        // are reused across calls — no steady-state allocation.
+        private readonly int[] _formationCellStamps;
+        private readonly uint[] _formationIds;
+        private int _formationStamp;
+
         public UnitCommandStateView(
             EntityManager entityManager,
             PathfindingSystem pathfindingSystem,
@@ -75,6 +83,8 @@ namespace Nova.Simulation.State
             _economySystem = economySystem ?? throw new ArgumentNullException(nameof(economySystem));
             _constructionSystem = constructionSystem;
             _productionSystem = productionSystem;
+            _formationCellStamps = new int[pathfindingSystem.CostField.Width * pathfindingSystem.CostField.Height];
+            _formationIds = new uint[CommandLimits.MaxEntityIdsPerCommand];
         }
 
         /// <summary>Converts a packed wire id to a prototype handle; invalid when the generation does not fit.</summary>
@@ -420,6 +430,9 @@ namespace Nova.Simulation.State
             return rawId;
         }
 
+        /// <summary>Maximum Chebyshev ring of the formation slot search around a move target.</summary>
+        private const int FormationMaxRing = 16;
+
         private void ApplyMove(in MovePayload move)
         {
             // Canonical world-to-grid mapping: floor, also for negative values
@@ -428,15 +441,79 @@ namespace Nova.Simulation.State
             int gridY = SimMath.Clamp(SimFixed.WorldToGrid(move.TargetY), 0, _pathfindingSystem.CostField.Height - 1);
             var target = new GridPos2D(gridX, gridY);
 
+            // One shared flow field for the whole group: every unit's
+            // TargetGridPos is the command target — only the personal
+            // arrival cell (GoalGridPos) differs per unit.
             _pathfindingSystem.RequestFlowField(target);
 
-            for (int i = 0; i < move.EntityIds.Length; i++)
+            // The command's valid ids, in ascending entity-index order:
+            // the lowest-index unit claims the best cell. Insertion sort,
+            // bounded by MaxEntityIdsPerCommand, fully deterministic;
+            // duplicate ids collapse — one unit claims exactly one cell.
+            int count = 0;
+            for (int i = 0; i < move.EntityIds.Length && count < _formationIds.Length; i++)
             {
                 EntityId id = ToEntityId(move.EntityIds[i]);
-                if (_entityManager.IsValid(id))
+                if (!_entityManager.IsValid(id)) continue;
+                bool duplicate = false;
+                for (int j = 0; j < count; j++)
                 {
-                    _entityManager.GetUnitRef(id).SetTarget(target);
+                    if (ToEntityId(_formationIds[j]).Index == id.Index)
+                    {
+                        duplicate = true;
+                        break;
+                    }
                 }
+                if (duplicate) continue;
+
+                int insertAt = count;
+                while (insertAt > 0 && ToEntityId(_formationIds[insertAt - 1]).Index > id.Index)
+                {
+                    _formationIds[insertAt] = _formationIds[insertAt - 1];
+                    insertAt--;
+                }
+                _formationIds[insertAt] = move.EntityIds[i];
+                count++;
+            }
+
+            // Formation distribution: ring 0 is the target cell itself, then
+            // expanding Chebyshev rings in ascending (y, x) order — the
+            // convention of ProductionSystem's spawn search. A cell is
+            // claimable when it is walkable and not already claimed by this
+            // command; the stamp array tracks claims without allocation.
+            _formationStamp++;
+            int next = 0;
+            for (int ring = 0; ring <= FormationMaxRing && next < count; ring++)
+            {
+                for (int dy = -ring; dy <= ring && next < count; dy++)
+                {
+                    for (int dx = -ring; dx <= ring && next < count; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
+                        int cx = gridX + dx;
+                        int cy = gridY + dy;
+                        if (!_pathfindingSystem.CostField.IsInBounds(cx, cy)
+                            || !_pathfindingSystem.CostField.IsWalkable((ushort)cx, (ushort)cy))
+                        {
+                            continue;
+                        }
+                        int cellIndex = cy * _pathfindingSystem.CostField.Width + cx;
+                        if (_formationCellStamps[cellIndex] == _formationStamp) continue;
+
+                        _formationCellStamps[cellIndex] = _formationStamp;
+                        _entityManager.GetUnitRef(ToEntityId(_formationIds[next]))
+                            .SetTarget(target, new GridPos2D(cx, cy));
+                        next++;
+                    }
+                }
+            }
+
+            // More units than claimable cells (map edge, huge group): the
+            // rest keeps the plain command target and the standing
+            // separation resolves the overlap on arrival.
+            for (; next < count; next++)
+            {
+                _entityManager.GetUnitRef(ToEntityId(_formationIds[next])).SetTarget(target);
             }
         }
     }

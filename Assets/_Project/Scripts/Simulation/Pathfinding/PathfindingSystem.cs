@@ -25,10 +25,13 @@ namespace Nova.Simulation.Pathfinding
     /// of (cost field, destination) and are rebuilt on restore by re-running
     /// the identical deterministic generation — this is the derived-cache
     /// rebuild the spec allows when the continuation provably matches
-    /// (docs/tech/SimulationCore.md section 3). The proof is the serialized
-    /// <see cref="CostField.Epoch"/>: restore rejects a block whose epoch
-    /// does not match the live cost field, so a rebuild can never continue on
-    /// terrain that moved underneath it.
+    /// (docs/tech/SimulationCore.md section 3). Since the sprint
+    /// Truppenführung the cost field also carries building footprints, so
+    /// the epoch counts mutation HISTORY a restore cannot replay: the
+    /// serialized epoch is therefore ADOPTED (<see cref="CostField.RestoreEpoch"/>)
+    /// instead of compared, and the content proof is structural — footprint
+    /// content is fully determined by the construction block, which restores
+    /// before this one (registration order).
     /// </para>
     /// <para>
     /// Deliberately not sealed and <see cref="RequestFlowField"/> is virtual:
@@ -37,10 +40,12 @@ namespace Nova.Simulation.Pathfinding
     /// (tools/Nova.SimRunner) can only attribute the pathfinding phase by
     /// subclassing this system. The simulation itself carries no measurement
     /// logic; the interception point exists solely so harness code can wrap
-    /// the call from outside. Consequently ALL generation stays inside
-    /// <see cref="RequestFlowField"/> and <see cref="GetField"/> is a pure
+    /// the call from outside. Consequently <see cref="GetField"/> is a pure
     /// lookup — a generating lookup would silently move pathfinding cost out
     /// of the measured window and under-report the V4/V5a and G5 budgets.
+    /// Generation additionally happens inside <see cref="ExecuteTick"/> when
+    /// a cost field mutation forces the bounded cache regeneration
+    /// (SyncCostFieldEpoch) — per-system tick work of this system's phase.
     /// </para>
     /// </summary>
     public class PathfindingSystem : IStatefulSimSystem
@@ -217,7 +222,7 @@ namespace Nova.Simulation.Pathfinding
         /// </summary>
         public bool TryValidateState(ReadOnlySpan<byte> blockContent)
         {
-            return TryParseState(blockContent, out _, out _, out _, out _);
+            return TryParseState(blockContent, out _, out _, out _, out _, out _);
         }
 
         /// <summary>
@@ -229,7 +234,7 @@ namespace Nova.Simulation.Pathfinding
         public bool TryRestoreState(ReadOnlySpan<byte> blockContent)
         {
             if (!TryParseState(blockContent, out uint tick, out GridPos2D mru,
-                    out int count, out bool hasMru))
+                    out int count, out bool hasMru, out uint epoch))
             {
                 return false;
             }
@@ -237,7 +242,12 @@ namespace Nova.Simulation.Pathfinding
             // Commit: rebuild the derived cache from the canonical inputs so
             // the restored host continues with identical directions. The
             // parsed entries live in the scratch buffers filled by
-            // TryParseState; they are already in canonical order.
+            // TryParseState; they are already in canonical order. The
+            // construction block committed before this one (registration
+            // order), so the live cost field already carries every restored
+            // footprint; should a host ever restore in a different order,
+            // the next SyncCostFieldEpoch regenerates the fields against the
+            // completed cost field — convergence is guaranteed either way.
             _cache.Clear();
             for (int i = 0; i < count; i++)
             {
@@ -257,22 +267,41 @@ namespace Nova.Simulation.Pathfinding
                 IntegrationField.Generate(CostField, mru);
             }
 
+            // Adopt the serialized epoch: footprint writes count mutation
+            // HISTORY, which a block restore cannot replay, so the live
+            // counter after a rebuild differs from the saving host's.
+            // Adopting keeps both counters in lockstep for every mutation
+            // that follows the restore — later snapshots stay byte-comparable.
+            CostField.RestoreEpoch(epoch);
             _currentTick = tick;
-            _cacheEpoch = CostField.Epoch;
+            _cacheEpoch = epoch;
             return true;
         }
 
         /// <summary>
-        /// Drops the whole cache when the cost field mutated since the cached
-        /// fields were generated. Terrain changes invalidate every derived
-        /// field at once, which is both correct and the cheapest rule to
-        /// reason about.
+        /// Rebuilds every cached field against the current cost field when
+        /// the terrain moved since the fields were generated (a building
+        /// footprint written by the construction system). Regeneration in
+        /// place — not a cache drop — keeps the fields of already-moving
+        /// units valid: a dropped cache would fall those units back to
+        /// direct steering, which knows no costs and would walk them
+        /// through walls. The sync runs at most once per tick boundary (or
+        /// once per request after a mutation), so a whole build queue of
+        /// placements inside one tick coalesces into a single regeneration
+        /// pass bounded by the cache capacity — never one recompute per
+        /// placement.
         /// </summary>
         private void SyncCostFieldEpoch()
         {
             if (_cacheEpoch == CostField.Epoch) return;
 
-            _cache.Clear();
+            int count = _cache.CopyCanonicalEntries(_entryDestinations, _entryTicks);
+            for (int i = 0; i < count; i++)
+            {
+                int slot = _cache.FindSlot(_entryDestinations[i]);
+                IntegrationField.Generate(CostField, _entryDestinations[i]);
+                _cache.FieldAt(slot).Generate(IntegrationField, CostField);
+            }
             _cacheEpoch = CostField.Epoch;
         }
 
@@ -285,17 +314,23 @@ namespace Nova.Simulation.Pathfinding
         /// </summary>
         private bool TryParseState(
             ReadOnlySpan<byte> blockContent,
-            out uint tick, out GridPos2D mruDestination, out int entryCount, out bool hasMru)
+            out uint tick, out GridPos2D mruDestination, out int entryCount, out bool hasMru,
+            out uint epoch)
         {
             tick = 0;
             mruDestination = GridPos2D.Invalid;
             entryCount = 0;
             hasMru = false;
+            epoch = 0;
 
             var reader = new Snapshots.SnapshotBlockReader(blockContent);
             if (!reader.TryReadUInt8(out byte version) || version != StateVersion) return false;
-            if (!reader.TryReadUInt32(out uint epoch)) return false;
-            if (epoch != CostField.Epoch) return false; // derived-cache rebuild would be unprovable
+            // The serialized epoch is NOT compared against the live field:
+            // with building footprints written into the cost field it counts
+            // mutation history, which a restore cannot replay — the restore
+            // adopts it instead (see TryRestoreState). The field stays in the
+            // v2 format and is validated for presence only.
+            if (!reader.TryReadUInt32(out uint parsedEpoch)) return false;
             if (!reader.TryReadUInt32(out uint parsedTick)) return false;
             if (!reader.TryReadUInt8(out byte hasMruRaw) || hasMruRaw > 1) return false;
             if (!reader.TryReadUInt16(out ushort mruX)) return false;
@@ -345,6 +380,7 @@ namespace Nova.Simulation.Pathfinding
             mruDestination = parsedMru;
             entryCount = countRaw;
             hasMru = hasMruRaw == 1;
+            epoch = parsedEpoch;
             return true;
         }
     }

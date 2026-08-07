@@ -108,10 +108,10 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void HeaderVersion_IsFour()
+        public void HeaderVersion_IsFive()
         {
-            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)4));
-            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)4));
+            Assert.That(EntityManager.StateVersion, Is.EqualTo((byte)5));
+            Assert.That(Serialize(CreateStoreWithUnits())[0], Is.EqualTo((byte)5));
         }
 
         [Test]

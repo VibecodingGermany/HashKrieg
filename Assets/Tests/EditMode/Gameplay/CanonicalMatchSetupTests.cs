@@ -129,7 +129,7 @@ namespace Nova.Gameplay.Tests
             // into the Unity host and the scenario's BuildHost uses — all
             // three hosts must hash the identical initial state.
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
-            var construction = new ConstructionSystem(entities, economy);
+            var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
             var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
