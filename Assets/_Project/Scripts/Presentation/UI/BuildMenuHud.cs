@@ -113,6 +113,8 @@ namespace Nova.Presentation.UI
         private bool _siteLacksBuilder;
         private int _siteLacksBuilderFrame = -1;
         private string _hoveredBlockerReason;
+        private string _transientNotice;
+        private float _transientNoticeUntil;
 
         private void Awake()
         {
@@ -357,9 +359,24 @@ namespace Nova.Presentation.UI
         private string ResolveStatusLineText()
         {
             if (_hoveredBlockerReason != null) return _hoveredBlockerReason;
+            if (_transientNotice != null && Time.unscaledTime < _transientNoticeUntil) return _transientNotice;
             if (_siteLacksBuilder) return ConstructionSiteStatus.NoBuilderWarning;
             if (!_hintDismissed && _runner.IsRunning) return HintText;
-            return null;
+            // Idle fallback: the camera controls, so the one undiscoverable
+            // gesture (MMB rotate / Space reset) is documented WITHOUT F3.
+            return "Kamera: Pfeile/Rand schwenken · Mausrad Zoom · MMB-Drag drehen · Space Reset";
+        }
+
+        /// <summary>
+        /// A short-lived notice in the status line (e.g. a rejected command's
+        /// reason): visible for a few seconds, then the line falls back to
+        /// its normal priorities. A rejected order must never read as
+        /// "kaputt" (sprint 09 §7).
+        /// </summary>
+        public void ShowTransientNotice(string text, float seconds = 4f)
+        {
+            _transientNotice = text;
+            _transientNoticeUntil = Time.unscaledTime + seconds;
         }
 
         /// <summary>

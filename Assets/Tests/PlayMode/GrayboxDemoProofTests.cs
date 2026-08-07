@@ -188,6 +188,99 @@ namespace Nova.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// Reproduction test for the second-play-session report "the barracks
+        /// produces no soldiers" (sprint 09 §2.1): the queue bar advanced, but
+        /// no unit ever appeared. The sim suite proves the spawn path headless
+        /// (ProductionSystemTests.Production_SpawnsAtDefaultRally_AfterExactBuildTicks),
+        /// so this test drives the FULL path — real scene, real command intake,
+        /// real view layer — and asserts BOTH ends: the entity exists in the
+        /// store (sim side) AND owns a live, sensibly-bounded view
+        /// (presentation side). Which half fails decides where the defect
+        /// lives; a silent pass here means the defect does not reproduce in
+        /// this harness and must be chased interactively instead.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Barracks_ProducesVisibleInfantry()
+        {
+            Directory.CreateDirectory(ShotDir);
+
+            yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
+
+            var bootstrap = Object.FindAnyObjectByType<MatchBootstrap>();
+            Assert.NotNull(bootstrap, "Bootstrap scene contains no MatchBootstrap");
+            StartMatchTheWayTheMenuDoes(bootstrap);
+
+            MatchRunner runner = bootstrap.Runner;
+            var views = Object.FindAnyObjectByType<UnitViewManager>();
+            Assert.NotNull(views, "Bootstrap scene contains no UnitViewManager");
+
+            // Test-setup placement (the same legal direct write MatchBootstrap
+            // uses for the opening position): a COMPLETED Alliance Barracks
+            // (defId 7) plus a Power plant (defId 5, so production runs at
+            // full speed) beside the player's HQ.
+            Assert.IsTrue(runner.Construction.PlaceCompletedBuilding(0, 5, 12, 4).IsValid,
+                "setup: Power placement failed");
+            Nova.Core.EntityId barracks = runner.Construction.PlaceCompletedBuilding(0, 7, 16, 4);
+            Assert.IsTrue(barracks.IsValid, "setup: Barracks placement failed");
+
+            // Queue two BasicInfantry (defId 12) through the sealed command
+            // intake, exactly as the command card would.
+            uint barracksRaw = Nova.Simulation.State.UnitCommandStateView.ToRawEntityId(barracks);
+            Assert.AreNotEqual(0u, barracksRaw, "barracks has no packable raw id");
+            Assert.AreEqual(
+                CommandIngressResult.Accepted,
+                runner.Ingress.TrySubmitIntent(
+                    CommandIntent.Create(new QueueUnitPayload(barracksRaw, 12, 2)), out _),
+                "the queue intent must enter the sealed stream");
+
+            // 2 x 100 build ticks at full power = 20 s of simulation; wait
+            // with margin for the 10 Hz tick pump in real time.
+            yield return new WaitForSeconds(30f);
+
+            // --- Sim side: the entity must exist. ---------------------------
+            int infantryCount = 0;
+            Nova.Core.EntityId firstInfantry = Nova.Core.EntityId.Invalid;
+            Nova.Simulation.State.UnitState[] units = runner.Entities.RawUnits;
+            for (int i = 0; i < runner.Entities.Capacity; i++)
+            {
+                // Plain struct copy (no ref local: iterators forbid them).
+                Nova.Simulation.State.UnitState u = units[i];
+                if (!u.IsActive || u.PlayerId != 0 || u.Role != Nova.Simulation.State.UnitRole.BasicInfantry) continue;
+                infantryCount++;
+                if (!firstInfantry.IsValid) firstInfantry = u.Id;
+            }
+            Assert.Greater(infantryCount, 0,
+                "SIM SIDE: no BasicInfantry in the entity store after the queue ran — " +
+                "the defect is in the sim's spawn path (silent stall: store full or no free cell), " +
+                "not in the view layer");
+
+            // --- Presentation side: it must own a live, sane view. ----------
+            Assert.IsTrue(views.TryGetView(firstInfantry, out GameObject view) && view != null,
+                "PRESENTATION SIDE: the infantry entity exists but owns NO view — " +
+                "the defect is in UnitViewManager (prefab resolution / FoW feed)");
+            var renderer = view.GetComponentInChildren<Renderer>();
+            Assert.NotNull(renderer, $"view {view.name} has no renderer at all");
+            Assert.IsTrue(renderer.bounds.size.magnitude < 20f,
+                $"view bounds are degenerate ({renderer.bounds.size}) — scale normalization broke this prefab");
+            Assert.Greater(renderer.bounds.center.y, -2f,
+                $"view is sunk below the ground ({renderer.bounds.center}) — prefab pivot/normalization issue");
+
+            // Evidence shot at the spawn cell (default rally: 2 east of the
+            // barracks' centre cell).
+            Camera camera = Camera.main;
+            Assert.NotNull(camera, "no main camera in the Bootstrap scene");
+            Nova.Simulation.State.UnitState infantry = default;
+            runner.Entities.TryGetUnit(firstInfantry, out infantry);
+            float wx = infantry.Transform.PositionX.ToFloat();
+            float wz = infantry.Transform.PositionY.ToFloat();
+            CaptureFrom($"{ShotDir}/demo_06_barracks_infantry.png",
+                new Vector3(wx - 8f, 20f, wz - 14f), new Vector3(wx, 0f, wz));
+
+            Debug.Log($"[GrayboxDemoProof] barracks loop: {infantryCount} BasicInfantry entities, " +
+                      $"lead view '{view.name}' at {renderer.bounds.center}");
+        }
+
         /// <summary>Active construction sites owned by one slot (ascending entity-index scan).</summary>
         private static int CountSites(MatchRunner runner, byte slot)
         {

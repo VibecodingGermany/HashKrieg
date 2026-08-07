@@ -119,6 +119,14 @@ namespace Nova.Presentation.UI
         private bool _settingsDirty;
         private float _dirtySince;
 
+        /// <summary>
+        /// True while the menu overlay owns the screen (initial state, and
+        /// after MatchFrameHud's "Hauptmenü"). Read by the input component to
+        /// suspend world gestures while the menu is up — a click on a menu
+        /// button must never also select or order in the world behind it.
+        /// </summary>
+        public bool IsMenuVisible { get; private set; }
+
         private void Awake()
         {
             if (_document == null) _document = GetComponent<UIDocument>();
@@ -134,6 +142,7 @@ namespace Nova.Presentation.UI
             // the match would open on a drifted camera. Start() runs before
             // the first LateUpdate and before the first OnGUI of the frame.
             SetGameplayLayerActive(false);
+            IsMenuVisible = true;
 
             LogMissingWiring();
 
@@ -495,19 +504,59 @@ namespace Nova.Presentation.UI
                 return;
             }
 
+            IsMenuVisible = false;
             // Order matters: match first, rig second. RtsCameraController
             // resets the minimap channel in its OnEnable, and that reset
             // belongs to the fresh match rather than to the empty scene.
-            _bootstrap.StartGrayboxMatch();
+            // A match that already ran is restarted cleanly instead of being
+            // stacked (RestartMatch rebuilds the kernel and every system).
+            if (_bootstrap.IsMatchReady)
+            {
+                _bootstrap.RestartMatch();
+            }
+            else
+            {
+                _bootstrap.StartGrayboxMatch();
+            }
             SetGameplayLayerActive(true);
 
             if (_music != null) _music.FadeOutAndStop();
             if (_screen != null) _screen.style.display = DisplayStyle.None;
 
-            // Nothing left to drive. There is deliberately no way back into
-            // the menu in this sprint (no pause menu, no restart); whoever
-            // adds one re-enables this component and calls BuildTree again.
+            // Nothing left to drive — until a match ends: MatchFrameHud's
+            // "Hauptmenü" button re-enters through ReturnToMenu below.
             enabled = false;
+        }
+
+        /// <summary>
+        /// The way back from a finished match (MatchFrameHud's "Hauptmenü"
+        /// button): pause the host, hide the cockpit layer, bring the menu
+        /// screen and its music back. The match state itself is left for the
+        /// NEXT "Neues Spiel", which restarts it via
+        /// <see cref="MatchBootstrap.RestartMatch"/> — the menu does not
+        /// demolish what it may never need again.
+        /// </summary>
+        public void ReturnToMenu()
+        {
+            if (_bootstrap != null && _bootstrap.Runner != null && _bootstrap.Runner.IsRunning)
+            {
+                _bootstrap.Runner.PauseMatch();
+            }
+            SetGameplayLayerActive(false);
+
+            // The menu music component switched itself off when its fade
+            // landed on match start; re-enabling re-enters OnEnable, which
+            // applies the stored volume and replays the loop.
+            if (_music != null && !_music.enabled)
+            {
+                _music.enabled = true;
+            }
+            if (_screen != null)
+            {
+                _screen.style.display = DisplayStyle.Flex;
+            }
+            IsMenuVisible = true;
+            enabled = true;
         }
 
         private void Quit()

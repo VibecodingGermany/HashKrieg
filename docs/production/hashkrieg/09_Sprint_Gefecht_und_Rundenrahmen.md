@@ -1,6 +1,21 @@
 # Sprint: Gefecht und Rundenrahmen
 
-**Status:** vorgeschlagen, nicht begonnen | **Vorgänger:** [10_Sprint_Baubarkeit_und_Kartenbild.md](10_Sprint_Baubarkeit_und_Kartenbild.md) (umgesetzt), davor HUD-Sprint (D-084) und Hauptmenü-Sprint (D-083) | **Leitsatz:** aus der Demo wird eine Runde
+**Status:** umgesetzt (2026-08-07) — siehe Ergebnisblock unten | **Vorgänger:** [10_Sprint_Baubarkeit_und_Kartenbild.md](10_Sprint_Baubarkeit_und_Kartenbild.md) (umgesetzt), davor HUD-Sprint (D-084) und Hauptmenü-Sprint (D-083) | **Leitsatz:** aus der Demo wird eine Runde
+
+> **Ergebnis (2026-08-07):** Alle Punkte umgesetzt — Harvester-Client-Dispatch
+> (beide Beine des Kreislaufs, manuelle Züge haben Vorrang), Auto-Zielerfassung
+> + Feuererwiderung inkl. feuernder Verteidigungsplattform (D-087; Baselines
+> unverändert, weil die kanonische Partie keinen Auslösefall enthält; sechs
+> neue Tests je Lane), Lebensbalken, Ergebnisbildschirm + sichtbare Pause +
+> Neue Runde/Hauptmenü (vollständiger Präsentations-Reset inklusive
+> Nebel-Instanzwachen), Ingame-Musik als Drei-Themen-Playlist (D-086,
+> Lizenzeintrag 1.5.0), Kontrollgruppen 1–9 + Shift-Auswahl,
+> Ablehnungs-Einblendung und sichtbare Kameralegende. Die Kaserne war im
+> Harness nicht reproduzierbar (zwei neue Suiten beweisen Spawn + View);
+> stille Produktionspausen melden sich jetzt auf der Card. Eingabereste
+> (Rally-Kaperung, Randscroll über dem HUD) behoben. Verifikation: .NET
+> 428/428, Determinismus-Hashes byte-identisch; Unity-Läufe (EditMode/
+> PlayMode) im Abschlusslauf dieses Tages.
 
 ## 1. Wo wir stehen
 

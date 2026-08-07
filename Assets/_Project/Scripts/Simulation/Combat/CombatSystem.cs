@@ -14,11 +14,14 @@ namespace Nova.Simulation.Combat
     /// <para>
     /// Tick logic (deterministic, strict ascending entity-index order):
     /// (1) every living unit's weapon cooldown decrements by one tick;
-    /// (2) every unit with an <see cref="UnitState.AttackTarget"/> validates
+    /// (2) AUTO-ACQUISITION (D-087): every armed entity without a valid
+    /// attack order picks the nearest hostile, visible, in-range target —
+    /// buildings included; explicit orders are never retargeted;
+    /// (3) every unit with an <see cref="UnitState.AttackTarget"/> validates
     /// its target — a dead/despawned target is cleared from the order; a
     /// living target must be in range AND <see cref="VisionState.Visible"/>
     /// in the committed team view before a shot is legal;
-    /// (3) a unit whose cooldown reached zero fires: the damage is applied
+    /// (4) a unit whose cooldown reached zero fires: the damage is applied
     /// instantly (MS-1 hitscan — no projectiles, no flight time, no splash)
     /// and the cooldown restarts; a target at or below zero health dies
     /// deterministically via <see cref="EntityManager.DespawnUnit"/> and the
@@ -161,7 +164,51 @@ namespace Nova.Simulation.Combat
                 }
             }
 
-            // Phase 2: engagements in strict ascending entity-index order.
+            // Phase 2 (D-087): auto-acquisition. Every active entity WITHOUT
+            // a valid attack order picks the NEAREST hostile, visible,
+            // in-range target — buildings included, so the DefensePlatform
+            // finally fires (it is armed by definition but could never
+            // receive an explicit order). Unarmed roles (damage 0) skip.
+            // Deterministic: strict ascending scans, squared fixed-point
+            // distances in widened long arithmetic, lowest entity index wins
+            // ties (strict less-than keeps the earliest candidate). A unit
+            // with a HELD explicit order (out of range / hidden target) is
+            // never retargeted by this phase.
+            for (int i = 0; i < capacity; i++)
+            {
+                ref UnitState attacker = ref units[i];
+                if (!attacker.IsActive || attacker.AttackTarget.IsValid) continue;
+
+                WeaponProfile weapon = WeaponProfiles.Get(_factions.GetSlotFaction(attacker.PlayerId), attacker.Role);
+                if (!weapon.IsArmed) continue;
+                if (attacker.PlayerId >= _fogOfWar.TeamCount) continue;
+                TeamView view = _fogOfWar.GetTeamView(attacker.PlayerId);
+
+                EntityId best = EntityId.Invalid;
+                long bestDistanceSquared = long.MaxValue;
+                for (int c = 0; c < capacity; c++)
+                {
+                    ref readonly UnitState candidate = ref units[c];
+                    if (!candidate.IsActive || candidate.PlayerId == attacker.PlayerId) continue;
+                    if (!IsInRange(in attacker, in candidate, weapon.AttackRange)) continue;
+                    if (!IsVisibleToAttacker(view, in candidate)) continue;
+
+                    long dx = (long)attacker.Transform.PositionX.RawValue - candidate.Transform.PositionX.RawValue;
+                    long dy = (long)attacker.Transform.PositionY.RawValue - candidate.Transform.PositionY.RawValue;
+                    long distanceSquared = dx * dx + dy * dy;
+                    if (distanceSquared >= bestDistanceSquared) continue; // equal distance: lowest index already held
+
+                    bestDistanceSquared = distanceSquared;
+                    best = candidate.Id;
+                }
+
+                if (best.IsValid)
+                {
+                    attacker.AttackTarget = best;
+                }
+            }
+
+            // Phase 3: engagements in strict ascending entity-index order.
             for (int i = 0; i < capacity; i++)
             {
                 ref UnitState attacker = ref units[i];
@@ -247,6 +294,16 @@ namespace Nova.Simulation.Combat
                 return false;
             }
             TeamView view = _fogOfWar.GetTeamView(attacker.PlayerId);
+            return IsVisibleToAttacker(view, in target);
+        }
+
+        /// <summary>
+        /// The cell check over an already-resolved committed view — the
+        /// auto-acquisition phase fetches the attacker's view once per
+        /// attacker instead of once per candidate.
+        /// </summary>
+        private static bool IsVisibleToAttacker(TeamView view, in UnitState target)
+        {
             int gx = Math.Max(0, Math.Min(view.Width - 1, SimFixed.WorldToGrid(target.Transform.PositionX)));
             int gy = Math.Max(0, Math.Min(view.Height - 1, SimFixed.WorldToGrid(target.Transform.PositionY)));
             return view.IsVisible(gx, gy);

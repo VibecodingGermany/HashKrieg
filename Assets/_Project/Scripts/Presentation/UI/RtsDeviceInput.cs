@@ -81,13 +81,14 @@ namespace Nova.Presentation.UI
         [Header("Wiring (scene generator)")]
         [SerializeField] private MatchRunner _runner;
         [Tooltip("Camera used for screen->ground projection. Falls back to Camera.main.")]
-        [SerializeField] private Camera _camera;
-        [Tooltip("Build bar; its screen rect suppresses selection drags and placement clicks that land on the HUD.")]
+        [SerializeField] private Camera _camera;        [Tooltip("Build bar; its screen rect suppresses selection drags and placement clicks that land on the HUD.")]
         [SerializeField] private BuildMenuHud _buildMenu;
         [Tooltip("Command card; its panel rect suppresses selection drags and order-pick clicks that land on the HUD.")]
         [SerializeField] private CommandCardHud _commandCard;
         [Tooltip("Minimap; its map rect suppresses selection drags and order-pick clicks that land on the HUD (they are camera jumps).")]
         [SerializeField] private MinimapHud _minimap;
+        [Tooltip("Main menu; while its overlay is visible, all world gestures are suspended.")]
+        [SerializeField] private MainMenuController _menu;
 
         [Header("Graybox tuning")]
         [Tooltip("Ground plane height. Picking projects onto this mathematical plane, not onto view colliders, so the per-role view heights do not matter.")]
@@ -177,6 +178,15 @@ namespace Nova.Presentation.UI
         // repair command's actors; the executor rejects the whole command on
         // a non-Builder actor).
         private readonly EntityId[] _builderScratch = new EntityId[SelectionManager.MaxSelectedEntities];
+
+        // Harvester escort cadence (D-085-pattern client dispatch): how often
+        // the standing harvest/return orders are re-checked against the
+        // economy's reach rules. Moves go through the plain command path; no
+        // sim rule is touched.
+        private const float HarvesterEscortIntervalSeconds = 0.5f;
+        private float _harvesterEscortNextTime;
+        private string _harvesterEscortLastWarning;
+
 
         /// <summary>Selected unit count (read by <see cref="DebugHud"/>).</summary>
         public int SelectionCount => _selection.SelectedCount;
@@ -389,9 +399,10 @@ namespace Nova.Presentation.UI
             if (_camera == null) _camera = Camera.main;
             if (_commandCard == null) _commandCard = FindAnyObjectByType<CommandCardHud>();
             if (_minimap == null) _minimap = FindAnyObjectByType<MinimapHud>();
+            if (_menu == null) _menu = FindAnyObjectByType<MainMenuController>();
             _legend =
                 "LMB click/drag select | RMB move — with an own producer building selected: set its rally point | S stop | " +
-                "A attack enemy under cursor (else plain move — no auto-acquire yet) | " +
+                "A attack enemy under cursor (else plain move; armed units auto-acquire visible in-range enemies, D-087) | " +
                 "H harvest nearest field | R return cargo | P pause/resume\n" +
                 "Build (build bar below or hotkey — a ghost follows the cursor; LMB place | RMB/ESC cancel): " +
                 $"B {_buildingDefId} | Shift+B {_altBuildingDefId} | C {_storageDefId} | V {_vehicleFactoryDefId} | " +
@@ -399,15 +410,19 @@ namespace Nova.Presentation.UI
                 $"Units: Q {_unitDefId} | Shift+Q {_altUnitDefId} | U {_builderDefId} | N {_antiArmorDefId} | " +
                 $"E {_scoutDefId} | Shift+E {_lightTankDefId} | D {_battleTankDefId} | Shift+D {_artilleryDefId}\n" +
                 "Command card (bottom right): LMB an order button, then LMB its target in the world (RMB/ESC cancels the pick)\n" +
+                "Groups: Ctrl+1..9 save selection, 1..9 recall | Shift+LMB/drag adds to the selection\n" +
                 "Camera: arrow keys / screen edge pan | wheel zoom | Z,X rotate | MMB drag rotate | Space reset rotation";
         }
 
         private void Update()
         {
             if (!EnsureDispatcher()) return;
+            if (_menu != null && _menu.IsMenuVisible) return; // the overlay owns every click
 
             Vector2 mouse = Input.mousePosition;
             UpdatePlacementHover(mouse);
+            UpdateHarvesterEscort();
+            HudPointerLink.Publish(IsPointerOverHud(mouse));
             HandleSelection(mouse);
             HandleOrders(mouse);
         }
@@ -570,6 +585,219 @@ namespace Nova.Presentation.UI
         }
 
         // ----------------------------------------------------------------
+        // Harvester escort (D-085-pattern client dispatch)
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Drives both legs of the harvest cycle for the LOCAL player, the
+        /// exact wiring the Skirmish AI has for itself (SkirmishAiSystem
+        /// section 4) and the player lacked: the economy HELDS out-of-reach
+        /// harvest and return orders forever (held, never dropped), so a
+        /// harvester ordered at a distant field stood still for good.
+        /// <para>
+        /// Gather leg: a harvester with a standing
+        /// <see cref="UnitState.HarvestFieldId"/> outside the field's
+        /// Chebyshev-1 reach gets a Move intent toward a cell that closes the
+        /// WHOLE auto-cycle in one spot where possible (in reach of the field
+        /// AND in deposit reach of the nearest own completed Refinery — the
+        /// AI's dual-reach pick); the field cell itself is the fallback.
+        /// Return leg: a harvester with <see cref="UnitState.IsReturningCargo"/>
+        /// and cargo outside the Refinery's footprint reach gets a Move to
+        /// the deterministic footprint-adjacent cell.
+        /// </para>
+        /// <para>
+        /// PLAYER ORDERS WIN: the escort never overrides a move the player
+        /// explicitly issued — it only engages while the harvester is idle
+        /// (or already heading to the escort's own target, the idempotent
+        /// re-issue). All moves travel the plain command path
+        /// (<see cref="RtsIntentDispatcher.MoveTo"/>); the reach rules mirror
+        /// EconomySystem's own (field: Chebyshev 1 of the field cell;
+        /// deposit: 1 + footprint radius around the Refinery's centre cell)
+        /// and no sim rule is touched.
+        /// </para>
+        /// </summary>
+        private void UpdateHarvesterEscort()
+        {
+            if (Time.time < _harvesterEscortNextTime) return;
+            _harvesterEscortNextTime = Time.time + HarvesterEscortIntervalSeconds;
+
+            EntityManager entities = _runner.Entities;
+            EconomySystem economy = _runner.Economy;
+            ConstructionSystem construction = _runner.Construction;
+            if (entities == null || economy == null || construction == null) return;
+
+            byte slot = _dispatcher.LocalSlot;
+            UnitState[] units = entities.RawUnits;
+            int capacity = entities.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != slot || unit.Role != UnitRole.Harvester) continue;
+
+                int cellX = GridCellOf(unit.Transform.PositionX);
+                int cellY = GridCellOf(unit.Transform.PositionY);
+
+                if (unit.IsReturningCargo)
+                {
+                    if (unit.CargoAE <= 0) continue;
+                    if (!TryFindNearestOwnRefinery(slot, cellX, cellY, out int refCX, out int refCY)) continue;
+                    if (InDepositReach(cellX, cellY, refCX, refCY)) continue;
+
+                    DepositApproachCell(refCX, refCY, out int targetX, out int targetY);
+                    TryEscortMove(in unit, targetX, targetY);
+                }
+                else
+                {
+                    ushort fieldId = unit.HarvestFieldId;
+                    if (fieldId == 0) continue;
+                    if (!economy.TryGetField(fieldId, out AetheriumField field)) continue;
+                    if (field.IsExhausted) continue;
+                    if (InFieldReach(cellX, cellY, field.GridPos.X, field.GridPos.Y)) continue;
+
+                    int targetX = field.GridPos.X;
+                    int targetY = field.GridPos.Y;
+                    if (TryFindNearestOwnRefinery(slot, cellX, cellY, out int refCX, out int refCY)
+                        && TryFindDualReachCell(field.GridPos.X, field.GridPos.Y, refCX, refCY,
+                            out int dualX, out int dualY))
+                    {
+                        targetX = dualX;
+                        targetY = dualY;
+                    }
+                    TryEscortMove(in unit, targetX, targetY);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Issues the escort move unless the harvester already heads there or
+        /// is under a (manual) move order. Rejections are logged once per
+        /// distinct message instead of spamming every cadence tick.
+        /// </summary>
+        private void TryEscortMove(in UnitState unit, int targetX, int targetY)
+        {
+            if (AlreadyHeadingTo(in unit, targetX, targetY)) return;
+            if (unit.IsMoving) return; // an explicit player order owns the drive
+
+            _builderScratch[0] = unit.Id;
+            IntentDispatchResult moved = _dispatcher.MoveTo(
+                _builderScratch.AsSpan(0, 1),
+                Nova.Core.SimFixed.FromInt(targetX), Nova.Core.SimFixed.FromInt(targetY));
+            if (!moved.Accepted)
+            {
+                string warning = $"[RtsDeviceInput] Harvester escort rejected: {moved.Result} ({moved.RejectReason})";
+                if (!string.Equals(warning, _harvesterEscortLastWarning, System.StringComparison.Ordinal))
+                {
+                    _harvesterEscortLastWarning = warning;
+                    Debug.LogWarning(warning);
+                }
+            }
+        }
+
+        /// <summary>Sim grid cell of a fixed-point world coordinate (presentation-side boundary read).</summary>
+        private static int GridCellOf(Nova.Core.SimFixed worldCoordinate)
+        {
+            return System.Math.Max(0, Nova.Core.SimFixed.WorldToGrid(worldCoordinate));
+        }
+
+        /// <summary>The economy's field reach: the harvester's cell within Chebyshev 1 of the field cell.</summary>
+        private static bool InFieldReach(int cellX, int cellY, int fieldX, int fieldY)
+        {
+            return System.Math.Abs(cellX - fieldX) <= 1 && System.Math.Abs(cellY - fieldY) <= 1;
+        }
+
+        /// <summary>
+        /// The economy's deposit reach: 1 + footprint radius around the
+        /// Refinery's CENTRE cell (the entity sits at origin+1 of its 3x3
+        /// footprint — EconomySystem.HasOwnRefineryInReach measures against
+        /// the footprint, not the centre point).
+        /// </summary>
+        private static bool InDepositReach(int cellX, int cellY, int refineryCentreX, int refineryCentreY)
+        {
+            int reach = 1 + (SimDefinitions.BuildingFootprintCells - 1) / 2;
+            return System.Math.Abs(cellX - refineryCentreX) <= reach
+                && System.Math.Abs(cellY - refineryCentreY) <= reach;
+        }
+
+        /// <summary>
+        /// Nearest own COMPLETED Refinery (ascending entity-index scan,
+        /// distance-squared pick; output is its centre cell). Sites and the
+        /// AI's buildings do not count.
+        /// </summary>
+        private bool TryFindNearestOwnRefinery(byte slot, int fromCellX, int fromCellY, out int centreX, out int centreY)
+        {
+            centreX = 0;
+            centreY = 0;
+            long best = long.MaxValue;
+            UnitState[] units = _runner.Entities.RawUnits;
+            int capacity = _runner.Entities.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState candidate = ref units[i];
+                if (!candidate.IsActive || candidate.PlayerId != slot || candidate.Role != UnitRole.Refinery) continue;
+                if (!_runner.Construction.IsCompletedPlacement(UnitCommandStateView.ToRawEntityId(candidate.Id))) continue;
+
+                int cx = GridCellOf(candidate.Transform.PositionX);
+                int cy = GridCellOf(candidate.Transform.PositionY);
+                long dx = cx - fromCellX;
+                long dy = cy - fromCellY;
+                long distanceSq = dx * dx + dy * dy;
+                if (distanceSq >= best) continue;
+
+                best = distanceSq;
+                centreX = cx;
+                centreY = cy;
+            }
+            return best != long.MaxValue;
+        }
+
+        /// <summary>
+        /// The deterministic footprint-adjacent deposit cell: west of the
+        /// footprint, east as the map-edge fallback (the AI's pattern),
+        /// middle row clamped onto the map. The Refinery centre is origin+1,
+        /// so the footprint spans centre-1 .. centre+1 per axis.
+        /// </summary>
+        private static void DepositApproachCell(int refineryCentreX, int refineryCentreY, out int cellX, out int cellY)
+        {
+            int originX = refineryCentreX - 1;
+            cellX = originX - 1;
+            if (cellX < 0) cellX = originX + SimDefinitions.BuildingFootprintCells;
+            cellY = System.Math.Max(0, System.Math.Min(ConstructionSystem.GridSize - 1, refineryCentreY));
+        }
+
+        /// <summary>
+        /// First cell (ascending y, x over the field's nine reach cells) that
+        /// satisfies BOTH the gather reach (Chebyshev 1 of the field) and the
+        /// deposit reach of the given Refinery centre — the one-spot full
+        /// auto-cycle the AI aims for. False when no such overlap exists.
+        /// </summary>
+        private static bool TryFindDualReachCell(int fieldX, int fieldY, int refineryCentreX, int refineryCentreY,
+            out int cellX, out int cellY)
+        {
+            for (int y = fieldY - 1; y <= fieldY + 1; y++)
+            {
+                for (int x = fieldX - 1; x <= fieldX + 1; x++)
+                {
+                    if (x < 0 || y <0 || x >= ConstructionSystem.GridSize || y >= ConstructionSystem.GridSize) continue;
+                    if (!InDepositReach(x, y, refineryCentreX, refineryCentreY)) continue;
+                    cellX = x;
+                    cellY = y;
+                    return true;
+                }
+            }
+            cellX = 0;
+            cellY = 0;
+            return false;
+        }
+
+        /// <summary>True while the unit already walks toward exactly this escort target (idempotent re-issue guard).</summary>
+        private static bool AlreadyHeadingTo(in UnitState unit, int targetX, int targetY)
+        {
+            return unit.IsMoving && unit.TargetGridPos.IsValid
+                && unit.TargetGridPos.X == targetX && unit.TargetGridPos.Y == targetY;
+        }
+
+
+        // ----------------------------------------------------------------
         // Selection & orders
         // ----------------------------------------------------------------
 
@@ -604,8 +832,10 @@ namespace Nova.Presentation.UI
 
             if (!_dragActive || !Input.GetMouseButtonUp(0)) return;
             _dragActive = false;
-            if (_dragPastThreshold) SelectBox(_dragStart, mouse);
-            else SelectSingle(mouse);
+            // Shift makes both selection gestures additive (sprint 09 §7).
+            bool additive = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (_dragPastThreshold) SelectBox(_dragStart, mouse, additive);
+            else SelectSingle(mouse, additive);
         }
 
         private void HandleOrders(Vector2 mouse)
@@ -676,6 +906,10 @@ namespace Nova.Presentation.UI
                 }
             }
 
+            // Control groups 1-9 (sprint 09 §7): Ctrl/Cmd+Digit stores the
+            // current selection, the bare digit recalls it.
+            HandleControlGroups();
+
             // Buildings: one key per MS-1 role ENTERS placement mode (the
             // ghost then follows the cursor); the early graybox's instant
             // placement at the cursor is gone. HQ is deliberately unbound
@@ -701,6 +935,33 @@ namespace Nova.Presentation.UI
             if (Input.GetKeyDown(KeyCode.G)) EnterPlacementMode(_radarDefId);
             if (Input.GetKeyDown(KeyCode.F)) EnterPlacementMode(_defensePlatformDefId);
             if (Input.GetKeyDown(KeyCode.Y)) EnterPlacementMode(_refineryDefId);
+        }
+
+        /// <summary>
+        /// Control groups 1-9: Ctrl/Cmd+Digit stores the current selection,
+        /// the bare digit recalls it (dead or foreign members are dropped at
+        /// recall — SelectionManager checks the live entity store). One group
+        /// action per frame at most.
+        /// </summary>
+        private void HandleControlGroups()
+        {
+            bool modify = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)
+                || Input.GetKey(KeyCode.LeftCommand) || Input.GetKey(KeyCode.RightCommand);
+            for (int slot = 1; slot < SelectionManager.ControlGroupCount; slot++)
+            {
+                if (!Input.GetKeyDown(KeyCode.Alpha0 + slot)) continue;
+                if (modify)
+                {
+                    _selection.SaveControlGroup(slot);
+                    _lastCommandStatus = $"Control group {slot} saved ({_selection.SelectedCount} unit(s))";
+                }
+                else if (_selection.HasControlGroup(slot))
+                {
+                    int recalled = _selection.RecallControlGroup(slot, _runner.Entities, _dispatcher.LocalSlot);
+                    _lastCommandStatus = $"Control group {slot}: {recalled} unit(s) recalled";
+                }
+                return;
+            }
         }
 
         private void TryQueueUnit(ushort defId)
@@ -756,17 +1017,41 @@ namespace Nova.Presentation.UI
         /// <see cref="ProducerBuildingRoles"/>, the input layer's restatement
         /// of the sim's producer-role rule over the same definition table).
         /// </summary>
+        /// <summary>
+        /// The rally-target producer for the right-click gesture: an own
+        /// producer building (per <see cref="ProducerBuildingRoles"/>, the
+        /// input layer's restatement of the sim's producer-role rule over the
+        /// same definition table) — but ONLY when the selection consists
+        /// EXCLUSIVELY of own buildings. A mixed box selection (the HQ has
+        /// the lowest index and so always leads) must read as a Move order
+        /// for its units, never hijack the right-click for a rally point.
+        /// The producer returned is the lowest-index one in the selection.
+        /// </summary>
         private bool TryGetLeadProducer(out EntityId producer)
         {
             producer = EntityId.Invalid;
             if (_runner.Entities == null) return false;
             ReadOnlySpan<EntityId> selected = _selection.SelectedEntities;
             if (selected.Length == 0) return false;
-            if (!_runner.Entities.TryGetUnit(selected[0], out UnitState lead)) return false;
-            if (lead.PlayerId != _dispatcher.LocalSlot) return false;
-            if (!ProducerBuildingRoles.IsProducerRole(lead.Role)) return false;
-            producer = lead.Id;
-            return true;
+
+            EntityManager entities = _runner.Entities;
+            for (int i = 0; i < selected.Length; i++)
+            {
+                if (!entities.TryGetUnit(selected[i], out UnitState candidate)) return false;
+                if (candidate.PlayerId != _dispatcher.LocalSlot) return false;
+                if (SimDefinitions.IsBuildingRole(candidate.Role))
+                {
+                    if (!producer.IsValid && ProducerBuildingRoles.IsProducerRole(candidate.Role))
+                    {
+                        producer = candidate.Id;
+                    }
+                    continue;
+                }
+                // A single mobile unit in the selection turns the gesture
+                // back into a Move — buildings ride along as bystanders.
+                return false;
+            }
+            return producer.IsValid;
         }
 
         /// <summary>True when the raw mouse position is over the build bar — those clicks belong to the HUD, not the world.</summary>
@@ -979,7 +1264,7 @@ namespace Nova.Presentation.UI
         /// Four, not two: under a tilted camera the screen rectangle projects
         /// to a trapezoid, and two corners would clip the selection.
         /// </summary>
-        private void SelectBox(Vector2 a, Vector2 b)
+        private void SelectBox(Vector2 a, Vector2 b, bool additive)
         {
             if (_runner.Entities == null) return;
             if (!TryScreenPointToGround(a, out Vector3 p0)) return;
@@ -992,24 +1277,37 @@ namespace Nova.Presentation.UI
             float minY = Mathf.Min(Mathf.Min(p0.z, p1.z), Mathf.Min(p2.z, p3.z));
             float maxY = Mathf.Max(Mathf.Max(p0.z, p1.z), Mathf.Max(p2.z, p3.z));
 
-            int count = _selection.SelectBox(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY);
-            _lastCommandStatus = $"Box select: {count} unit(s)";
+            int count = additive
+                ? _selection.SelectBoxAdditive(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY)
+                : _selection.SelectBox(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY);
+            _lastCommandStatus = additive ? $"Box select (added): {count} unit(s) selected" : $"Box select: {count} unit(s)";
         }
 
-        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>, else clear.</summary>
-        private void SelectSingle(Vector2 screenPoint)
+        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>; additive with Shift, else replace (a plain click on empty ground clears).</summary>
+        private void SelectSingle(Vector2 screenPoint, bool additive)
         {
             if (_runner.Entities == null) return;
             if (TryScreenPointToGround(screenPoint, out Vector3 world)
                 && TryPickUnit(world, ownedByLocalSlot: true, out EntityId picked))
             {
-                _selection.SelectSingle(picked);
-                _lastCommandStatus = $"Selected entity {picked.Index}";
+                if (additive)
+                {
+                    _selection.AddSingle(picked);
+                    _lastCommandStatus = $"Added entity {picked.Index} ({_selection.SelectedCount} selected)";
+                }
+                else
+                {
+                    _selection.SelectSingle(picked);
+                    _lastCommandStatus = $"Selected entity {picked.Index}";
+                }
                 return;
             }
 
-            _selection.ClearSelection();
-            _lastCommandStatus = "Selection cleared";
+            if (!additive)
+            {
+                _selection.ClearSelection();
+                _lastCommandStatus = "Selection cleared";
+            }
         }
 
         /// <summary>Nearest active unit to a ground point, filtered by ownership.</summary>
@@ -1163,6 +1461,13 @@ namespace Nova.Presentation.UI
             if (!result.Accepted && !string.Equals(previous, _lastCommandStatus, StringComparison.Ordinal))
             {
                 Debug.LogWarning($"[RtsDeviceInput] {_lastCommandStatus}");
+                // The reason must reach the player, not only the F3 panel:
+                // a rejected command used to be indistinguishable from a
+                // broken game (sprint 09 §7).
+                if (_buildMenu != null)
+                {
+                    _buildMenu.ShowTransientNotice($"Befehl abgelehnt: {label} — {result.RejectReason}");
+                }
             }
         }
 

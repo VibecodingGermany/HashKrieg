@@ -838,6 +838,29 @@ namespace Nova.Gameplay.Match
             }
         }
 
+        /// <summary>
+        /// Drops every live view AND forgets every binding, for a match
+        /// restart (MatchBootstrap.RestartMatch rebuilds the kernel and the
+        /// entity store). The per-slot tables are re-sized only when the
+        /// capacity changes, so without this the new match's entity ids could
+        /// collide with stale bindings of the old one and inherit its views.
+        /// </summary>
+        public void ResetViews()
+        {
+            ReleaseAllViews();
+            if (_viewInstances == null) return;
+            for (int i = 0; i < _viewInstances.Length; i++)
+            {
+                _boundIds[i] = EntityId.Invalid;
+                _viewShapeKeys[i] = PrefabShapeKey;
+                _viewOwners[i] = -1;
+                _viewHealthSteps[i] = -1;
+                _lastSeenFrame[i] = 0;
+                _tracked[i] = false;
+            }
+            _frameStamp = 0;
+        }
+
         private void ReleaseAllViews()
         {
             if (_viewInstances != null)

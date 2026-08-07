@@ -26,6 +26,7 @@ namespace Nova.Gameplay
     public static class MinimapCameraLink
     {
         private static bool _focusRequested;
+        private static bool _startFocusResetRequested;
         private static float _requestedX;
         private static float _requestedZ;
 
@@ -78,6 +79,28 @@ namespace Nova.Gameplay
         }
 
         /// <summary>
+        /// Written by the match-frame HUD on a match restart ("Neue Runde"):
+        /// asks the rig to snap back to its serialized start framing. The
+        /// reset itself (<c>ResetToStartFocus</c>) stays in the camera — this
+        /// channel only carries the request, same discipline as the jump.
+        /// </summary>
+        public static void RequestStartFocusReset()
+        {
+            _startFocusResetRequested = true;
+        }
+
+        /// <summary>
+        /// Consumed by the rig's LateUpdate exactly once: true when a start
+        /// framing reset was requested since the last consume.
+        /// </summary>
+        public static bool TryConsumeStartFocusReset()
+        {
+            if (!_startFocusResetRequested) return false;
+            _startFocusResetRequested = false;
+            return true;
+        }
+
+        /// <summary>
         /// Consumed by the rig's LateUpdate: returns the pending jump target
         /// exactly once. A request the rig never consumes (disabled camera)
         /// simply lingers until the next session reset — it never reaches the
@@ -102,6 +125,7 @@ namespace Nova.Gameplay
         {
             HasPose = false;
             _focusRequested = false;
+            _startFocusResetRequested = false;
             _requestedX = 0f;
             _requestedZ = 0f;
         }

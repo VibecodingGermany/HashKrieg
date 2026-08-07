@@ -304,6 +304,17 @@ namespace Nova.Editor
             WireReference(minimap, "_runner", runner);
             WireReference(minimap, "_buildMenu", menu);
 
+            HealthBarHud healthBars = uiObject.AddComponent<HealthBarHud>();
+            WireReference(healthBars, "_runner", runner);
+            WireReference(healthBars, "_input", input);
+
+            MatchFrameHud frame = uiObject.AddComponent<MatchFrameHud>();
+            WireReference(frame, "_runner", runner);
+            WireReference(frame, "_bootstrap", runner.GetComponent<MatchBootstrap>());
+            WireReference(frame, "_views", runner.GetComponent<UnitViewManager>());
+            // _menu is wired in CreateMainMenuObject — the menu object does
+            // not exist yet at this point in the generation order.
+
             DebugHud hud = uiObject.AddComponent<DebugHud>();
             WireReference(hud, "_runner", runner);
             WireReference(hud, "_input", input);
@@ -361,6 +372,51 @@ namespace Nova.Editor
                 MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.TitleFontPath));
             WireReference(menu, "_bodyFont",
                 MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.BodyFontPath));
+
+            // The match frame's "Hauptmenü" button calls back into this menu.
+            MatchFrameHud frame = uiObject.GetComponent<MatchFrameHud>();
+            if (frame != null)
+            {
+                WireReference(frame, "_menu", menu);
+            }
+
+            CreateIngameMusicObject(runner, menu);
+        }
+
+        /// <summary>
+        /// The in-game playlist (D-086): own GameObject, own AudioSource —
+        /// MusicDirector configures the source itself, this file only wires
+        /// the three MUS_Ingame clips in playlist order.
+        /// </summary>
+        private static void CreateIngameMusicObject(MatchRunner runner, MainMenuController menu)
+        {
+            var musicObject = new GameObject("IngameMusic");
+            AudioSource source = musicObject.AddComponent<AudioSource>();
+            var director = musicObject.AddComponent<MusicDirector>();
+            WireReference(director, "_source", source);
+            WireReference(director, "_runner", runner);
+            WireReference(director, "_bootstrap", runner.GetComponent<MatchBootstrap>());
+            WireReference(director, "_menu", menu);
+
+            var clips = new[]
+            {
+                MenuAssetSetup.LoadRequired<AudioClip>("Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_01.ogg"),
+                MenuAssetSetup.LoadRequired<AudioClip>("Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_02.ogg"),
+                MenuAssetSetup.LoadRequired<AudioClip>("Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_03.ogg"),
+            };
+            var serialized = new SerializedObject(director);
+            SerializedProperty playlist = serialized.FindProperty("_playlist");
+            if (playlist == null)
+            {
+                Debug.LogError("[BootstrapSceneGenerator] MusicDirector has no serialized field '_playlist'.");
+                return;
+            }
+            playlist.arraySize = clips.Length;
+            for (int i = 0; i < clips.Length; i++)
+            {
+                playlist.GetArrayElementAtIndex(i).objectReferenceValue = clips[i];
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>

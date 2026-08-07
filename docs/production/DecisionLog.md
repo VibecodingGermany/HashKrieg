@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.24.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.25.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -2057,6 +2057,70 @@ eingefroren.
 
 ---
 
+### D-086 | verbindlich | Suno-Ausnahme um Ingame-Musik erweitert
+
+**Status:** verbindlich — Inhaberentscheidung vom 2026-08-07 (Dennis
+Westermann), im Dialog erteilt (Auswahl „drei Themen": je längste Fassung —
+`1_orc`, `2 (2)`, `3 (1)`).
+
+**Kontext:** D-083 hat den Suno-Bezahltarif ausdrücklich zweckgebunden **nur**
+für die Menümusik freigegeben („erzeugt kein Präzedenzrecht",
+[Licenses.md](../assets/Licenses.md) §2 Regel 5). Sprint 09 bringt Musik ins
+Gefecht; die drei verwendeten Themen stammen aus derselben Quelle und
+demselben Tarif, fielen aber nicht unter den ursprünglichen Zweck.
+
+**Entscheidung:** Die Regel-5-Ausnahme gilt zusätzlich für die Ingame-Musik
+`Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_01..03.ogg` (OGG-Vorbis,
+aus den Suno-MP3s konvertiert; Streaming-Import, Qualität 0,7, Load In
+Background). Die Begrenzung auf Quelle und Zweck sowie das fehlende
+Präzedenzrecht bleiben unverändert; die `PROVENANCE.json`-Pflichtfelder
+stehen wie bei der Menümusik beim Inhaber aus (Offene Punkte der
+Lizenzdatei).
+
+**Verworfen:** (a) MP3-Quelldateien direkt importieren — technisch
+gleichwertig (Unity transkodiert beim Import), aber die Projektkonvention ist
+OGG; (b) Ingame-Musik streichen, bis die Provenienzdatensätze vorliegen —
+die Lizenzlage ist mit der Ausnahme-Erweiterung gedeckt, der Herkunftsnachweis
+ist eine nachgelagerte Pflicht, keine Blockade.
+
+**Konsequenzen:** Ledger-Eintrag §3 und Regel-5-Erweiterung in
+[Licenses.md](../assets/Licenses.md) (1.5.0) sind Teil dieser Entscheidung.
+Repo-Zuwachs ~14 MB ist bewusst in Kauf genommen; Audio fällt nicht unter die
+Art-Paket-Regel.
+
+---
+
+### D-087 | verbindlich | Zielerfassung und Feuererwiderung im Kampfsystem
+
+**Status:** verbindlich — Inhaberauftrag vom 2026-08-06/07 (Sprint 09 §4;
+Leitsatz „aus der Demo wird eine Runde").
+
+**Kontext:** `AttackTarget` wurde ausschließlich per explizitem Befehl
+gesetzt — jeder Schuss brauchte einen Klick, und die einzige bewaffnete
+Gebäuderolle (Verteidigungsplattform) konnte nie feuern, weil Gebäude gar
+keine Befehle empfangen.
+
+**Entscheidung:** `CombatSystem.ExecuteTick` hat eine **Auto-Acquire-Phase**
+zwischen Cooldown und Feuern: jede aktive Einheit ohne gültiges Ziel wählt
+das nächste feindliche, sichtbare (committed Team-View), in Waffenreichweite
+liegende Ziel — Gebäude eingeschlossen. Determinismus-Regeln: aufsteigende
+Index-Scans, Abstandsvergleich im Quadrat in geweiterter Ganzzahlarithmetik,
+bei Gleichstand gewinnt der kleinste Entity-Index; explizit gehaltene
+Angriffsziele werden nie umgesetzt. Kein neuer `CommandKind`, kein neues
+`UnitState`-Feld, keine Snapshot-Versionserhöhung. **Attack-Move bleibt
+ausdrücklich ausgespart** (Register- oder Formatänderung, eigener Sprint).
+
+**Konsequenzen:** Erste Simulationsänderung seit D-077 mit Spielverhalten-
+Wirkung. Die kanonischen Baselines (`DETERMINISM_10000`-Fingerprint
+`0xF866FDC042D260E1`, Final-Hash `0xD8650F4DEDE1494C`) blieben **unverändert**
+— die kanonische Partie enthält keinen Fall „bewaffnete Einheit ohne Befehl
+neben sichtbarem Feind", sodass die neue Phase dort nie auslöst; die
+Verhaltensänderung ist durch sechs neue Tests in beiden Lanes belegt
+(Auto-Acquire, Fog-Gate, Nächstes-Ziel/Index-Tiebreak, gehaltene Order,
+Plattform feuert, Unbewaffnete erfassen nie). Tools-Lane: 428/428.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2152,3 +2216,4 @@ eingefroren.
 | 1.22.0 | 2026-08-06 | D-083 aufgenommen: Hauptmenü als Overlay in `Bootstrap.unity` statt zweiter Szene (`AutoStart = false`, „Neues Spiel" ruft `StartGrayboxMatch()`), UI Toolkit als UI-Stack für alles Neue, Einstellungen als `settings.json` in `Application.persistentDataPath` ohne `PlayerPrefs` und ohne `AudioMixer`, „Laden" sichtbar und ausgegraut; Assetherkunft Suno-Bezahltarif / OpenAI Image API / Rajdhani-OFL und Menütitel „HASHKRIEG" als Inhaberentscheidung. Punkte 1–4 und 6 vom Agenten unter Delegation entschieden und überstimmbar. D-078–D-082 bleiben für E-1 bis E-5 reserviert; Kopfversion holt den Rückstand auf die Verlaufstabelle (1.20.0/1.21.0) auf | Agent (unter Delegation) / Inhaberentscheidung Punkt 5: Dennis Westermann |
 | 1.23.0 | 2026-08-06 | D-084 aufgenommen (zunächst als D-078 angelegt, wegen der E-1–E-5-Reservation und D-083 umnummeriert): bedienbares HUD — Bauleiste aus `SimDefinitions` statt `BuildingRegistrySO`, Command-Register schema v1 bleibt eingefroren (Upgrades/Turm-Prioritäten/Angriffsbewegung = offene Design-Fragen), Gebäude-Rotation präsentationsseitig behoben, Kamera MMB-Drag + Space, Minimap-Kamerakanal `MinimapCameraLink` | Project Owner / Agent (Umsetzung) |
 | 1.24.0 | 2026-08-06 | D-085 aufgenommen: Baumodell — Builder-Modell bleibt, Builder wird beim Platzieren per Move-Intent über den normalen Command-Pfad automatisch zur Baustelle geschickt (Reichweitenregel unangetastet, keine neuen Baselines); verworfen: C&C-Modell und Hybridmodell wegen Bruch der Hash-/Replay-/Fingerprint-Baselines; Baustellen-Zustandsanzeige ist Teil der Entscheidung | Project Owner / Agent (Umsetzung) |
+| 1.25.0 | 2026-08-07 | D-086 (Suno-Ausnahme um Ingame-Musik erweitert, drei Themen als OGG im Repo) und D-087 (Auto-Zielerfassung und Feuererwiderung im CombatSystem; Baselines unverändert, sechs neue Tests je Lane; Attack-Move ausgespart) aufgenommen | Project Owner / Agent (Umsetzung) |

@@ -14,8 +14,16 @@ namespace Nova.Gameplay
     {
         public const int MaxSelectedEntities = 64;
 
+        /// <summary>Control-group slots: digits 1..9 are valid; index 0 stays unused so the key IS the index.</summary>
+        public const int ControlGroupCount = 10;
+
         private readonly EntityId[] _selectedIds;
         private int _selectedCount;
+
+        // Control groups 1-9 (sprint 09 §7): index 0 stays unused so the
+        // digit key IS the index. Pure UI state — no sim contact.
+        private readonly EntityId[][] _groups = new EntityId[ControlGroupCount][];
+        private readonly int[] _groupCounts = new int[ControlGroupCount];
 
         public int SelectedCount => _selectedCount;
         public ReadOnlySpan<EntityId> SelectedEntities => _selectedIds.AsSpan(0, _selectedCount);
@@ -23,6 +31,10 @@ namespace Nova.Gameplay
         public SelectionManager()
         {
             _selectedIds = new EntityId[MaxSelectedEntities];
+            for (int i = 0; i < ControlGroupCount; i++)
+            {
+                _groups[i] = new EntityId[MaxSelectedEntities];
+            }
         }
 
         public void ClearSelection()
@@ -40,9 +52,27 @@ namespace Nova.Gameplay
             return true;
         }
 
+        /// <summary>Shift-click: adds the entity to the selection (no-op when already selected or full).</summary>
+        public bool AddSingle(EntityId id)
+        {
+            if (!id.IsValid || _selectedCount >= MaxSelectedEntities) return false;
+            for (int i = 0; i < _selectedCount; i++)
+            {
+                if (_selectedIds[i] == id) return false;
+            }
+            _selectedIds[_selectedCount++] = id;
+            return true;
+        }
+
         public int SelectBox(EntityManager entityManager, byte playerId, float minX, float minY, float maxX, float maxY)
         {
             ClearSelection();
+            return SelectBoxAdditive(entityManager, playerId, minX, minY, maxX, maxY);
+        }
+
+        /// <summary>Shift-drag: the union of the current selection and the box contents (deduped, capped).</summary>
+        public int SelectBoxAdditive(EntityManager entityManager, byte playerId, float minX, float minY, float maxX, float maxY)
+        {
             if (entityManager == null) return 0;
 
             UnitState[] rawUnits = entityManager.RawUnits;
@@ -59,13 +89,54 @@ namespace Nova.Gameplay
 
                 if (px >= minX && px <= maxX && py >= minY && py <= maxY)
                 {
-                    if (_selectedCount < MaxSelectedEntities)
-                    {
-                        _selectedIds[_selectedCount++] = u.Id;
-                    }
+                    AddSingle(u.Id);
                 }
             }
 
+            return _selectedCount;
+        }
+
+        // ------------------------------------------------------------------
+        // Control groups (sprint 09 §7)
+        // ------------------------------------------------------------------
+
+        /// <summary>Stores the current selection under group <paramref name="slot"/> (1..9); an empty selection clears the group.</summary>
+        public void SaveControlGroup(int slot)
+        {
+            if (slot < 1 || slot >= ControlGroupCount) return;
+            for (int i = 0; i < _selectedCount; i++)
+            {
+                _groups[slot][i] = _selectedIds[i];
+            }
+            _groupCounts[slot] = _selectedCount;
+        }
+
+        public bool HasControlGroup(int slot)
+        {
+            return slot >= 1 && slot < ControlGroupCount && _groupCounts[slot] > 0;
+        }
+
+        /// <summary>
+        /// Replaces the selection with the group's survivors: dead or foreign
+        /// ids are dropped here (staleness is checked against the live entity
+        /// store at recall time), and the group itself is compacted in place.
+        /// Returns the recalled count.
+        /// </summary>
+        public int RecallControlGroup(int slot, EntityManager entityManager, byte playerId)
+        {
+            ClearSelection();
+            if (!HasControlGroup(slot) || entityManager == null) return 0;
+
+            int stored = _groupCounts[slot];
+            int alive = 0;
+            for (int i = 0; i < stored; i++)
+            {
+                EntityId id = _groups[slot][i];
+                if (!entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerId) continue;
+                _groups[slot][alive++] = id;
+                AddSingle(id);
+            }
+            _groupCounts[slot] = alive;
             return _selectedCount;
         }
 

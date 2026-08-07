@@ -206,6 +206,27 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
+        /// Starts a completely fresh match after one already ran ("Neue
+        /// Runde" / a second "Neues Spiel"): stops the old kernel, then
+        /// re-runs the whole start path — InitializeMatch rebuilds kernel,
+        /// entity store, all systems, the AI peer, both sessions and both
+        /// ingress instances, so the sim side is a true reset. The
+        /// PRESENTATION side must be reset by the caller (views via
+        /// UnitViewManager.ResetViews, camera via ResetToStartFocus; the fog
+        /// overlay and minimap self-heal through their fog-instance guards,
+        /// and the selection clears itself on the ingress rebind).
+        /// </summary>
+        public void RestartMatch()
+        {
+            if (Runner != null && Runner.IsRunning)
+            {
+                Runner.PauseMatch();
+            }
+            IsMatchReady = false;
+            StartGrayboxMatch();
+        }
+
+        /// <summary>
         /// One slot's D-077 start state: an Aetherium field, a completed HQ
         /// and one Builder near it — nothing else. Spawn order mirrors
         /// SetupMatch exactly (field, HQ, Builder).
