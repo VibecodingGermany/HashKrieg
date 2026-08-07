@@ -5,10 +5,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <RootNamespace>Nova.SimRunner</RootNamespace>
-    <!-- Determinism define shared with the Unity host (docs/tech/SimulationCore.md
-         section 9). No canonical name existed in the tech contracts, so
-         NOVA_FIXED_POINT is introduced here and ratified in SimulationCore.md. -->
+    <RootNamespace>Nova.RelayServer</RootNamespace>
+    <AssemblyName>nova-relay</AssemblyName>
+    <!-- Same sources and determinism define as every headless host
+         (docs/tech/SimulationCore.md section 9). -->
     <DefineConstants>$(DefineConstants);NOVA_FIXED_POINT</DefineConstants>
   </PropertyGroup>
 

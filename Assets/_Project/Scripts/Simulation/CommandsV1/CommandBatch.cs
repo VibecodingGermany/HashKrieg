@@ -51,9 +51,13 @@ namespace Nova.Simulation.CommandsV1
 
         /// <summary>
         /// Canonical (TargetTick, PlayerSlot, Sequence) comparison used for
-        /// batch ordering (docs/tech/Commands.md section 3).
+        /// batch ordering (docs/tech/Commands.md section 3). Public since
+        /// sprint 12: the order is part of the lockstep wire contract, and
+        /// the relay server (Nova.Networking) sorts the recorded command
+        /// stream with exactly this comparison — a duplicated implementation
+        /// could silently drift from the kernel's.
         /// </summary>
-        internal static int CompareRecords(CommandRecord left, CommandRecord right)
+        public static int CompareRecords(CommandRecord left, CommandRecord right)
         {
             int byTick = left.TargetTick.CompareTo(right.TargetTick);
             if (byTick != 0) return byTick;
