@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
@@ -116,6 +117,16 @@ namespace Nova.Simulation.Construction
     /// when a test proves an identical rebuild); hit points stay with the
     /// entities (entity store block) — exactly one home per value.
     /// </para>
+    /// <para>
+    /// Footprints are impassable terrain (sprint Truppenführung): when the
+    /// host wires the pathfinding <see cref="CostField"/> (optional
+    /// constructor argument — the canonical hosts do), every footprint
+    /// change is mirrored into it as <see cref="CostField.ImpassableCost"/>/
+    /// <see cref="CostField.OpenCost"/> writes, and placing a footprint onto
+    /// mobile units pushes them onto the nearest free cell (restore skips
+    /// the push-out: the entity store restores afterwards, so the snapshot's
+    /// own units already satisfy the invariant).
+    /// </para>
     /// </summary>
     public sealed class ConstructionSystem : IStatefulSimSystem
     {
@@ -133,6 +144,9 @@ namespace Nova.Simulation.Construction
 
         /// <summary>Format capacity for standing repair orders.</summary>
         public const int MaxRepairOrders = 64;
+
+        /// <summary>Maximum Chebyshev ring of the push-out cell search around a displaced unit.</summary>
+        public const int PushOutMaxRing = 8;
 
         /// <summary>Refund percentage of CancelConstruction (provisional, Q-040 candidate; integer floor).</summary>
         public const int CancelRefundPercent = 75;
@@ -180,11 +194,16 @@ namespace Nova.Simulation.Construction
         // Derived occupancy cache (rebuilt from the placements on restore).
         private readonly byte[] _occupied;
 
+        // Pathfinding cost field the footprints are mirrored into (optional:
+        // hosts without movement — pure economy/construction test rigs —
+        // leave it null and footprints simply do not block pathing there).
+        private readonly CostField _costField;
+
         public string Name => "ConstructionSystem";
 
         public ushort StateBlockId => SnapshotBlockIds.Construction;
 
-        public ConstructionSystem(EntityManager entityManager, EconomySystem economy)
+        public ConstructionSystem(EntityManager entityManager, EconomySystem economy, CostField costField = null)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _economy = economy ?? throw new ArgumentNullException(nameof(economy));
@@ -193,6 +212,7 @@ namespace Nova.Simulation.Construction
             _repairs = new RepairOrderState[MaxRepairOrders];
             _t2Unlocked = new bool[EconomySystem.MaxPlayers];
             _occupied = new byte[GridSize * GridSize];
+            _costField = costField;
         }
 
         public void Initialize(SimulationKernel kernel)
@@ -442,7 +462,7 @@ namespace Nova.Simulation.Construction
             if (slot < 0) return EntityId.Invalid;
 
             EntityId id = SpawnBuildingEntity(playerSlot, in def, originX, originY, completed: true);
-            OccupyFootprint(originX, originY);
+            OccupyFootprint(originX, originY, pushOutUnits: true);
             _buildings[slot] = new PlacementState
             {
                 IsActive = true,
@@ -693,7 +713,7 @@ namespace Nova.Simulation.Construction
         private void CreateSite(byte playerSlot, in SimBuildingDefinition def, int originX, int originY)
         {
             EntityId id = SpawnBuildingEntity(playerSlot, in def, originX, originY, completed: false);
-            OccupyFootprint(originX, originY);
+            OccupyFootprint(originX, originY, pushOutUnits: true);
             int slot = FreeSiteIndex();
             _sites[slot] = new SiteState
             {
@@ -779,7 +799,14 @@ namespace Nova.Simulation.Construction
             return true;
         }
 
-        private void OccupyFootprint(int originX, int originY) => SetFootprint(originX, originY, 1);
+        private void OccupyFootprint(int originX, int originY, bool pushOutUnits)
+        {
+            SetFootprint(originX, originY, 1);
+            if (pushOutUnits)
+            {
+                PushMobileUnitsOutOfFootprint(originX, originY);
+            }
+        }
 
         private void FreeFootprint(int originX, int originY) => SetFootprint(originX, originY, 0);
 
@@ -791,8 +818,85 @@ namespace Nova.Simulation.Construction
                 for (int x = originX; x < originX + f; x++)
                 {
                     _occupied[y * GridSize + x] = value;
+                    // Mirror into the pathfinding cost field: buildings are
+                    // impassable terrain. Out-of-bounds cells (cost field
+                    // smaller than the 128 construction grid) are no-ops.
+                    _costField?.SetCost((ushort)x, (ushort)y,
+                        value == 1 ? CostField.ImpassableCost : CostField.OpenCost);
                 }
             }
+        }
+
+        /// <summary>
+        /// Displaces every mobile unit standing inside a freshly occupied
+        /// footprint onto the nearest free cell (expanding Chebyshev rings
+        /// around its cell, ascending (y, x) — the spawn-search convention;
+        /// free = no placement footprint, walkable, no unit on it). A unit
+        /// whose personal goal cell lies inside the new footprint is
+        /// retargeted to the cell it was pushed to, so it stops there
+        /// instead of walking back into the wall. Immobile entities
+        /// (MoveSpeed 0: the site/building entity itself) are skipped. A
+        /// unit with no free cell inside <see cref="PushOutMaxRing"/> stays
+        /// where it is (documented edge case: walled in at the map edge).
+        /// </summary>
+        private void PushMobileUnitsOutOfFootprint(int originX, int originY)
+        {
+            int f = SimDefinitions.BuildingFootprintCells;
+            UnitState[] units = _entityManager.RawUnits;
+            int capacity = _entityManager.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.MoveSpeed <= SimFixed.Zero) continue;
+
+                int ux = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionX));
+                int uy = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionY));
+                if (ux < originX || ux >= originX + f || uy < originY || uy >= originY + f) continue;
+
+                if (!TryFindPushOutCell(ux, uy, out int nx, out int ny))
+                {
+                    continue;
+                }
+
+                unit.Transform = new Transform2D(
+                    SimFixed.FromInt(nx), SimFixed.FromInt(ny), unit.Transform.Rotation);
+                if (unit.IsMoving && unit.GoalGridPos.IsValid
+                    && unit.GoalGridPos.X >= originX && unit.GoalGridPos.X < originX + f
+                    && unit.GoalGridPos.Y >= originY && unit.GoalGridPos.Y < originY + f)
+                {
+                    unit.SetTarget(new GridPos2D(nx, ny));
+                }
+            }
+        }
+
+        /// <summary>Deterministic ring search of the push-out: nearest free cell around the displaced unit.</summary>
+        private bool TryFindPushOutCell(int fromX, int fromY, out int cellX, out int cellY)
+        {
+            for (int ring = 0; ring <= PushOutMaxRing; ring++)
+            {
+                for (int dy = -ring; dy <= ring; dy++)
+                {
+                    for (int dx = -ring; dx <= ring; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
+                        int x = fromX + dx;
+                        int y = fromY + dy;
+                        if (!IsCellFree(x, y)) continue;
+                        if (_costField != null
+                            && (!_costField.IsInBounds(x, y) || !_costField.IsWalkable((ushort)x, (ushort)y)))
+                        {
+                            continue;
+                        }
+                        if (_entityManager.HasActiveUnitOnCell(x, y)) continue;
+                        cellX = x;
+                        cellY = y;
+                        return true;
+                    }
+                }
+            }
+            cellX = 0;
+            cellY = 0;
+            return false;
         }
 
         private int IndexOfSite(uint rawEntityId)
@@ -916,15 +1020,20 @@ namespace Nova.Simulation.Construction
             Array.Copy(parsed.Repairs, _repairs, MaxRepairOrders);
             Array.Copy(parsed.T2Unlocked, _t2Unlocked, EconomySystem.MaxPlayers);
 
-            // Rebuild the derived occupancy cache from the placements.
+            // Rebuild the derived occupancy cache from the placements. No
+            // push-out here: the entity store block restores AFTER this one
+            // (registration order), so the live units at this point are the
+            // PRE-restore ones — the snapshot's own units already satisfy
+            // the outside-the-footprint invariant the runtime push-out
+            // upholds.
             Array.Clear(_occupied, 0, _occupied.Length);
             for (int i = 0; i < MaxSites; i++)
             {
-                if (_sites[i].IsActive) OccupyFootprint(_sites[i].OriginX, _sites[i].OriginY);
+                if (_sites[i].IsActive) OccupyFootprint(_sites[i].OriginX, _sites[i].OriginY, pushOutUnits: false);
             }
             for (int i = 0; i < MaxBuildings; i++)
             {
-                if (_buildings[i].IsActive) OccupyFootprint(_buildings[i].OriginX, _buildings[i].OriginY);
+                if (_buildings[i].IsActive) OccupyFootprint(_buildings[i].OriginX, _buildings[i].OriginY, pushOutUnits: false);
             }
             return true;
         }

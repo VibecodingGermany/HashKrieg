@@ -315,11 +315,15 @@ namespace Nova.AI
                     continue;
                 }
 
-                // Deterministic adjacent cell: west of the footprint, east as
-                // the map-edge fallback (both Chebyshev 1 of the rectangle).
-                int targetX = originX - 1;
-                if (targetX < 0) targetX = originX + SimDefinitions.BuildingFootprintCells;
-                int targetY = Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, originY + 1));
+                // Deterministic adjacent cell: the first footprint-free
+                // cell in Chebyshev reach 1 of the site rectangle — a fixed
+                // side can lie inside a neighbour building, which is
+                // impassable since the Truppenführung sprint and would
+                // stall the site forever.
+                if (!TryFindFootprintAdjacentCell(originX, originY, out int targetX, out int targetY))
+                {
+                    continue;
+                }
                 if (builder.IsMoving && builder.TargetGridPos.IsValid
                     && builder.TargetGridPos.X == targetX && builder.TargetGridPos.Y == targetY)
                 {
@@ -584,11 +588,14 @@ namespace Nova.AI
 
         /// <summary>
         /// The first cell (ascending (y, x)) standing in Chebyshev reach
-        /// &lt;= 1 of a footprint rectangle — the deposit walk target of the
-        /// return leg. Units may stand on any cell in this slice (footprints
-        /// block placement, never movement), so no free-cell check applies.
+        /// &lt;= 1 of a footprint rectangle and OUTSIDE every placement
+        /// footprint — since the Truppenführung sprint footprints are
+        /// impassable terrain, an unchecked adjacent cell can lie inside a
+        /// neighbour building; a unit ordered there would be redirected by
+        /// the formation distribution to a cell possibly OUT of reach and
+        /// the construction/deposit would stall forever.
         /// </summary>
-        private static bool TryFindFootprintAdjacentCell(int originX, int originY, out int cellX, out int cellY)
+        private bool TryFindFootprintAdjacentCell(int originX, int originY, out int cellX, out int cellY)
         {
             int f = SimDefinitions.BuildingFootprintCells;
             for (int y = originY - 1; y <= originY + f; y++)
@@ -597,6 +604,7 @@ namespace Nova.AI
                 {
                     if (x < 0 || y < 0 || x >= ConstructionSystem.GridSize || y >= ConstructionSystem.GridSize) continue;
                     if (ChebyshevToFootprint(x, y, originX, originY) != 1) continue;
+                    if (!_construction.IsCellFree(x, y)) continue;
                     cellX = x;
                     cellY = y;
                     return true;

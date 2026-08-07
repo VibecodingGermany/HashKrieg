@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.25.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.26.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
 
 ## Zweck
 
@@ -2121,6 +2121,71 @@ Plattform feuert, Unbewaffnete erfassen nie). Tools-Lane: 428/428.
 
 ---
 
+### D-088 | verbindlich | Truppenführung: Formationsverteilung, Separation im Stand, Gebäude als Gelände
+
+**Status:** verbindlich — Inhaberauftrag vom 2026-08-07
+([hashkrieg/11_Sprint_Truppenfuehrung.md](hashkrieg/11_Sprint_Truppenfuehrung.md),
+Leitsatz „eine Armee ist kein Haufen"), nach der ersten vollständig
+gespielten Runde. Die drei Diagnosen des Sprints (eine Zielzelle für alle,
+Separation nur in Bewegung, Gebäude ohne Wegfindungswirkung) waren im
+Briefing bewiesen; die Umsetzungswahl unten ist **vom Agenten innerhalb des
+Briefings entschieden** (das Briefing stellte Teil 2 ausdrücklich frei) und
+damit überstimmbar.
+
+**Entscheidung:**
+
+1. **Formationsverteilung über geteiltes Flow-Ziel plus persönlicher
+   Ankunftszelle.** `UnitState` bekommt `GoalGridPos` neben `TargetGridPos`
+   (Entity-Store-Block **v5**; v1–v4 werden wie bisher hart abgelehnt): die
+   Gruppe teilt sich genau **ein** Flow-Field, jede Einheit bekommt eine
+   eigene Zielzelle — kleinster Entity-Index die Befehlszelle, die
+   folgenden die expandierenden Chebyshev-Ringe in aufsteigender (y, x)-
+   Reihenfolge (die Konvention der Spawn-Suche, kein float, keine
+   Distanzsortierung). Derselbe Ring sucht freie Zellen, wenn das
+   angeklickte Ziel selbst unbegehbar ist. Die Produktions-Spawn-Suche
+   lehnt zusätzlich einheitenbelegte Zellen ab — frisch gebaute Truppen
+   bilden eine Reihe statt eines Punkts. Verworfen: ein Flow-Field pro
+   Einheit (Cache-Kapazität 32, Thrashing ab der ersten größeren Gruppe).
+2. **Separation auch im Stand — Einschleifen-Variante.** Die
+   Bewegungsschleife läuft für alle aktiven mobilen Einheiten; ohne
+   Bewegungsbefehl ist der Flow-Anteil null und es wirkt nur eine
+   **gedämpfte (0,5), gedeckelte (0,25 m/Tick) und mit Totzone belegte**
+   Positionskorrektur ohne Rotationsänderung — Entstapeln statt Vibrieren.
+   Exakte Überlappung (distanzlos) wird per Entity-Index-Tiebreak gelöst.
+   Unbewegliche Entitäten (Gebäude, Baustellen: MoveSpeed 0) werden nie
+   verschoben, wirken aber weiter als Hindernis. Kein Schritt betritt eine
+   unbegehbare Zelle (Achsen-Fallback gegen Eckstau); ein nachträglich
+   unbegehbar gewordenes Ziel gilt als erreicht, sobald keine begehbare
+   Nachbarzelle näher liegt.
+3. **Gebäude-Footprints ins Kostenfeld — mit neuem Epoch-Vertrag.** Das
+   `ConstructionSystem` spiegelt jede Footprint-Änderung als
+   Impassable/Open-Schreiben ins `CostField` (optionale Verdrahtung; die
+   kanonischen Hosts verdrahten) und schiebt mobile Einheiten beim
+   Platzieren aus dem Footprint (Ringsuche; Ziel im Footprint wird auf die
+   Ausweichzelle umgesetzt). Zwei Vertragsänderungen im
+   `PathfindingSystem`: (a) die serialisierte Epoch wird beim Restore
+   **adoptiert statt verglichen** — mit dynamischen Footprints zählt sie
+   Mutationshistorie, die ein Block-Restore nicht nachspielen kann; der
+   Inhaltsbeweis ist strukturell (Construction-Block restauriert vor
+   Pathfinding, Registrationsreihenfolge), und (b) eine Terrainänderung
+   **regeneriert die gecachten Flow-Fields an Ort und Stelle** statt den
+   Cache zu leeren — einmal pro Tick zusammengefasst, durch die
+   Cache-Kapazität begrenzt; bewegte Einheiten verlieren dadurch nie die
+   kostenbewusste Führung (kein Direct-Steering durch Wände).
+
+**Konsequenzen:** Bewusst bezahlte Baseline-Neusetzung — SimRunner-Hash
+`0x2FBEC31FBC0BF430` → **`0xB680C879DEA70B26`**, `DETERMINISM_10000`-
+Fingerprint `0xF866FDC042D260E1` → **`0xAD8531312FE93F4B`** (Final-Hash
+`0x6916A323202089A9`, Playback-Self-Check PASS). Der Epoch-Reject-Test
+(CostFieldEpochSnapshotTests) wurde durch den Adopt-Vertrag ersetzt; neun
+neue Truppenführung-Tests je Lane; Tools-Lane **438/438 grün**. Die
+Skirmish-KI musste eine Folge lernen: ihr Bau-Laufziel „Westseite des
+Footprints" kann seit (3) in einem Nachbargebäude liegen — Laufziele
+werden jetzt footprint-frei gewählt. Attack-Move bleibt ausgespart
+(Register-Änderung, siehe D-087).
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2217,3 +2282,4 @@ Plattform feuert, Unbewaffnete erfassen nie). Tools-Lane: 428/428.
 | 1.23.0 | 2026-08-06 | D-084 aufgenommen (zunächst als D-078 angelegt, wegen der E-1–E-5-Reservation und D-083 umnummeriert): bedienbares HUD — Bauleiste aus `SimDefinitions` statt `BuildingRegistrySO`, Command-Register schema v1 bleibt eingefroren (Upgrades/Turm-Prioritäten/Angriffsbewegung = offene Design-Fragen), Gebäude-Rotation präsentationsseitig behoben, Kamera MMB-Drag + Space, Minimap-Kamerakanal `MinimapCameraLink` | Project Owner / Agent (Umsetzung) |
 | 1.24.0 | 2026-08-06 | D-085 aufgenommen: Baumodell — Builder-Modell bleibt, Builder wird beim Platzieren per Move-Intent über den normalen Command-Pfad automatisch zur Baustelle geschickt (Reichweitenregel unangetastet, keine neuen Baselines); verworfen: C&C-Modell und Hybridmodell wegen Bruch der Hash-/Replay-/Fingerprint-Baselines; Baustellen-Zustandsanzeige ist Teil der Entscheidung | Project Owner / Agent (Umsetzung) |
 | 1.25.0 | 2026-08-07 | D-086 (Suno-Ausnahme um Ingame-Musik erweitert, drei Themen als OGG im Repo) und D-087 (Auto-Zielerfassung und Feuererwiderung im CombatSystem; Baselines unverändert, sechs neue Tests je Lane; Attack-Move ausgespart) aufgenommen | Project Owner / Agent (Umsetzung) |
+| 1.26.0 | 2026-08-07 | D-088 aufgenommen: Truppenführung — Formationsverteilung mit geteiltem Flow-Ziel und `GoalGridPos` (Entity-Store v5), Separation im Stand (gedämpft, Totzone, Index-Tiebreak), Gebäude-Footprints ins Kostenfeld mit Push-out; Epoch-Restore-Vertrag von Vergleich auf Adoption geändert, Flow-Cache regeneriert an Ort statt Leerung; Baselines bewusst neu gesetzt | Project Owner / Agent (Umsetzung) |

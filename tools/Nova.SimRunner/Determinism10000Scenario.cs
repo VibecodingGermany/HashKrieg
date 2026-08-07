@@ -666,7 +666,7 @@ namespace Nova.SimRunner
             // MatchRunner plumbs into the Unity host, so both hosts hash the
             // identical initial state.
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
-            var construction = new ConstructionSystem(entities, economy);
+            var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
             var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);

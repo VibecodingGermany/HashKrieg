@@ -9,14 +9,19 @@ using Nova.Simulation.State;
 namespace Nova.SimRunner.Tests
 {
     /// <summary>
-    /// Cost field epoch suite (.NET lane). The cost field is static
-    /// prototype content and is NOT serialized; everything derived from it
+    /// Cost field epoch suite (.NET lane). The cost field is static terrain
+    /// PLUS the building footprints the construction system writes into it
+    /// (Truppenführung); it is NOT serialized. Everything derived from it
     /// (integration and flow fields) is a derived cache that restore rebuilds.
-    /// That rebuild is only legitimate when the terrain provably did not move,
-    /// so the pathfinding block carries <see cref="CostField.Epoch"/> and
-    /// restore rejects any block whose epoch differs from the live field.
-    /// Before this slice the cost field was covered by no snapshot block at
-    /// all and the pathfinding block held nothing but a single destination.
+    /// Since footprints make the epoch a mutation HISTORY counter a restore
+    /// cannot replay, the pathfinding block's serialized epoch is ADOPTED on
+    /// restore (<see cref="CostField.RestoreEpoch"/>) and the cached fields
+    /// are rebuilt against the live cost field — footprint content is
+    /// structurally guaranteed by the construction block, which restores
+    /// before pathfinding (registration order). A terrain change no longer
+    /// DROPS the cache either: the bounded regeneration rewrites every
+    /// cached field in place, so moving units never fall back to
+    /// cost-blind direct steering.
     /// <para>
     /// Hand-mirrored with the EditMode lane copy of this fixture.
     /// </para>
@@ -94,31 +99,45 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void CostFieldMutation_DropsTheFlowFieldCache()
+        public void CostFieldMutation_RegeneratesTheFlowFieldCacheInPlace()
         {
             var system = new PathfindingSystem(MapSize, MapSize);
-            var oldDestination = new GridPos2D(20, 20);
+            var oldDestination = new GridPos2D(20, 10);
             system.RequestFlowField(oldDestination);
             Assert.That(system.FlowFieldCacheCount, Is.EqualTo(1));
 
+            // (15,10) sits directly west of the would-be wall (x=16,
+            // y=10..13) on the destination row. Open terrain: the first
+            // strictly-lowest neighbour in iteration order is NorthEast.
+            Assert.That(system.GetField(oldDestination).GetDirection(15, 10),
+                Is.EqualTo(Direction2D.NorthEast), "open-terrain baseline direction");
+
             TestHost.ApplyTerrain(system.CostField);
 
-            // Invalidation is lazy: it happens at the next tick boundary or on
-            // the next request, whichever comes first. Both paths must drop
-            // every entry, since a terrain change invalidates all of them.
+            // Regeneration is lazy: it happens at the next tick boundary or
+            // on the next request, whichever comes first — and it rewrites
+            // the cached fields IN PLACE instead of dropping them, so units
+            // already following a field keep cost-aware guidance.
             system.RequestFlowField(new GridPos2D(6, 6));
 
-            Assert.That(system.HasField(oldDestination), Is.False,
-                "fields generated against the previous terrain must not survive");
-            Assert.That(system.FlowFieldCacheCount, Is.EqualTo(1));
+            Assert.That(system.HasField(oldDestination), Is.True,
+                "a terrain change regenerates cached fields, it does not evict them");
+            Assert.That(system.FlowFieldCacheCount, Is.EqualTo(2),
+                "the new destination joins the regenerated one");
+
+            // NorthEast and East are wall cells now; the detour below the
+            // wall makes SouthEast the first strictly-lowest neighbour.
+            Assert.That(system.GetField(oldDestination).GetDirection(15, 10),
+                Is.EqualTo(Direction2D.SouthEast),
+                "the regenerated field routes around the new wall");
 
             var afterTerrain = new GridPos2D(21, 21);
             system.RequestFlowField(afterTerrain);
             TestHost.ApplyTerrain(system.CostField);
             system.ExecuteTick(new Tick(1));
-            Assert.That(system.FlowFieldCacheCount, Is.EqualTo(0),
-                "the tick boundary invalidates as well, so a snapshot never sees a stale cache");
-            Assert.That(system.HasField(afterTerrain), Is.False);
+            Assert.That(system.FlowFieldCacheCount, Is.EqualTo(3),
+                "the tick boundary regenerates as well — every entry survives");
+            Assert.That(system.HasField(afterTerrain), Is.True);
         }
 
         [Test]
@@ -189,23 +208,67 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void Restore_IsRejectedAtomically_WhenTheCostFieldEpochDiffers()
+        public void Restore_AdoptsTheSerializedEpoch_AndRebuildsAgainstTheLiveCostField()
         {
-            byte[] snapshot = BuildPopulatedHost().Kernel.SaveSnapshot();
+            TestHost source = BuildPopulatedHost();
+            byte[] snapshot = source.Kernel.SaveSnapshot();
 
-            // Same map size, same everything — except the terrain never moved,
-            // so rebuilding the cached fields here would silently produce
-            // different directions than the snapshot's host had.
-            TestHost mismatched = TestHost.Create(withTerrain: false);
-            ulong hashBefore = mismatched.Kernel.CalculateStateHash();
-            byte[] stateBefore = mismatched.Kernel.SaveSnapshot();
+            // A fresh host whose terrain does NOT match the snapshot's host.
+            // The old contract rejected this (unprovable derived-cache
+            // rebuild); since footprints are dynamic the epoch counts mutation
+            // history and cannot be replayed, so the new contract ADOPTS the
+            // serialized epoch and rebuilds the cached fields against the
+            // live cost field. Footprint content in a real match is carried
+            // by the construction block — this fixture has no construction
+            // system, so its bare-terrain host is exactly the case the new
+            // contract accepts.
+            TestHost restored = TestHost.Create(withTerrain: false);
+            Assert.That(restored.Kernel.TryRestoreSnapshot(snapshot), Is.True,
+                "epoch mismatch no longer rejects: the epoch is adopted, the cache rebuilt");
+            Assert.That(restored.Pathfinding.CostField.Epoch,
+                Is.EqualTo(source.Pathfinding.CostField.Epoch),
+                "the serialized epoch is adopted so later snapshots stay byte-comparable");
+            Assert.That(restored.Kernel.SaveSnapshot(), Is.EqualTo(snapshot),
+                "the restored blocks round-trip byte-identically");
 
-            Assert.That(mismatched.Kernel.TryRestoreSnapshot(snapshot), Is.False,
-                "an unprovable derived-cache rebuild must be rejected, not attempted");
-            Assert.That(mismatched.Kernel.CalculateStateHash(), Is.EqualTo(hashBefore));
-            Assert.That(mismatched.Kernel.SaveSnapshot(), Is.EqualTo(stateBefore),
-                "a rejected restore leaves the host byte-identical");
-            Assert.That(mismatched.Pathfinding.FlowFieldCacheCount, Is.EqualTo(0));
+            // The rebuilt fields follow the LIVE (wall-less) terrain, not the
+            // saving host's: the wall cell (16,11) is impassable for the
+            // source (Direction2D.None) and an ordinary routed cell here.
+            Assert.That(
+                source.Pathfinding.GetField(PopulatedDestinations[0]).GetDirection(16, 11),
+                Is.EqualTo(Direction2D.None), "the source's wall cell carries no direction");
+            Assert.That(
+                restored.Pathfinding.GetField(PopulatedDestinations[0]).GetDirection(16, 11),
+                Is.Not.EqualTo(Direction2D.None),
+                "rebuilt against the live cost field, not the saving host's terrain");
+        }
+
+        [Test]
+        public void Restore_SameTerrain_RoundTripsByteIdentically()
+        {
+            TestHost source = BuildPopulatedHost();
+            byte[] snapshot = source.Kernel.SaveSnapshot();
+
+            // Same host, same terrain: the block round-trips exactly.
+            Assert.That(source.Kernel.TryRestoreSnapshot(snapshot), Is.True);
+            Assert.That(source.Kernel.SaveSnapshot(), Is.EqualTo(snapshot));
+
+            // Fresh host with identical terrain: identical fields, identical
+            // continuation hashes.
+            TestHost restored = TestHost.Create(withTerrain: true);
+            Assert.That(restored.Kernel.TryRestoreSnapshot(snapshot), Is.True);
+            Assert.That(restored.Kernel.SaveSnapshot(), Is.EqualTo(snapshot));
+            Assert.That(restored.Kernel.CalculateStateHash(),
+                Is.EqualTo(source.Kernel.CalculateStateHash()));
+
+            for (int i = 0; i < 20; i++)
+            {
+                source.Kernel.StepTick();
+                restored.Kernel.StepTick();
+                Assert.That(restored.Kernel.CalculateStateHash(),
+                    Is.EqualTo(source.Kernel.CalculateStateHash()),
+                    $"continuation diverged at tick {i + 1}");
+            }
         }
 
         [Test]
@@ -229,10 +292,14 @@ namespace Nova.SimRunner.Tests
             oldVersion[0] = 1;
             Assert.That(pathfinding.TryValidateState(oldVersion), Is.False);
 
-            // Epoch mismatch.
+            // The epoch bytes are part of the v2 format but are no longer
+            // COMPARED — with dynamic footprints the epoch counts mutation
+            // history a restore cannot replay, so it is adopted instead. A
+            // block with a different epoch stays valid.
             byte[] wrongEpoch = (byte[])block.Clone();
             wrongEpoch[1] = (byte)(wrongEpoch[1] + 1);
-            Assert.That(pathfinding.TryValidateState(wrongEpoch), Is.False);
+            Assert.That(pathfinding.TryValidateState(wrongEpoch), Is.True,
+                "the serialized epoch is adopted on restore, not validated against the live field");
 
             // Trailing bytes are a structural error.
             var overlong = new byte[block.Length + 1];

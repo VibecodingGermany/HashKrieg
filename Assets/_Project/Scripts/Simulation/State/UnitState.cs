@@ -37,7 +37,26 @@ namespace Nova.Simulation.State
         /// recompute, so it is part of the hashed/serialized unit state.
         /// </summary>
         public SimFixed SightRadius;
+        /// <summary>
+        /// Flow-field destination of the current movement order: the SHARED
+        /// group target the pathfinding cache is keyed by. Distinct from
+        /// <see cref="GoalGridPos"/>, the unit's personal arrival cell —
+        /// a formation move assigns every unit its own goal cell around one
+        /// shared flow destination, so a group move costs exactly one flow
+        /// field instead of one per unit.
+        /// </summary>
         public GridPos2D TargetGridPos;
+
+        /// <summary>
+        /// Personal arrival cell of the current movement order (formation
+        /// slot). Equals <see cref="TargetGridPos"/> for a single-unit order;
+        /// a group order distributes goal cells over the Chebyshev rings
+        /// around the shared target (UnitCommandStateView.ApplyMove). The
+        /// movement system's arrival check and its direct-steering fallback
+        /// aim at this cell, the flow-field lookup at
+        /// <see cref="TargetGridPos"/>.
+        /// </summary>
+        public GridPos2D GoalGridPos;
         public int CurrentHealth;
         public int MaxHealth;
         public EntityId AttackTarget;
@@ -93,19 +112,35 @@ namespace Nova.Simulation.State
             HarvestFieldId = 0;
             IsReturningCargo = false;
             TargetGridPos = GridPos2D.Invalid;
+            GoalGridPos = GridPos2D.Invalid;
             IsActive = true;
             IsMoving = false;
         }
 
+        /// <summary>Single-cell movement order: flow destination and arrival cell coincide.</summary>
         public void SetTarget(GridPos2D target)
         {
             TargetGridPos = target;
+            GoalGridPos = target;
             IsMoving = target.IsValid;
+        }
+
+        /// <summary>
+        /// Group movement order: <paramref name="flowTarget"/> is the shared
+        /// flow-field destination, <paramref name="goalCell"/> this unit's
+        /// personal arrival cell from the formation distribution.
+        /// </summary>
+        public void SetTarget(GridPos2D flowTarget, GridPos2D goalCell)
+        {
+            TargetGridPos = flowTarget;
+            GoalGridPos = goalCell;
+            IsMoving = flowTarget.IsValid;
         }
 
         public void Stop()
         {
             TargetGridPos = GridPos2D.Invalid;
+            GoalGridPos = GridPos2D.Invalid;
             IsMoving = false;
         }
     }

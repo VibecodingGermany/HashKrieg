@@ -6,14 +6,18 @@ namespace Nova.Simulation.Pathfinding
     /// Stores movement cost values for each cell in a grid sector.
     /// Cost 1 = open terrain, 2..254 = high-cost terrain/rough ground, 255 = impassable obstacle.
     /// <para>
-    /// The cost field itself is static prototype content and is NOT part of a
-    /// snapshot block. Everything derived from it (integration fields, flow
-    /// fields) is a derived cache that may only be rebuilt on restore when
-    /// the cost field provably did not move. <see cref="Epoch"/> is that
-    /// proof: a monotonic mutation counter that
-    /// <see cref="PathfindingSystem"/> serializes and compares on restore.
-    /// A restore into a host whose terrain diverged is rejected instead of
-    /// silently continuing on a stale flow-field cache.
+    /// The cost field itself is static prototype content PLUS the building
+    /// footprints the construction system writes into it; it is NOT part of
+    /// a snapshot block. Everything derived from it (integration fields,
+    /// flow fields) is a derived cache that may only be rebuilt on restore
+    /// when the cost field provably matches the saving host. Since the
+    /// sprint Truppenführung that proof is structural: footprint content is
+    /// fully determined by the construction snapshot block (which restores
+    /// before pathfinding), and the serialized <see cref="Epoch"/> is
+    /// ADOPTED via <see cref="RestoreEpoch"/> so later snapshots stay
+    /// byte-comparable — a mutation counter cannot be replayed from final
+    /// state, so reject-on-mismatch was unimplementable once footprints
+    /// became dynamic.
     /// </para>
     /// </summary>
     public sealed class CostField
@@ -90,6 +94,19 @@ namespace Nova.Simulation.Pathfinding
         {
             Array.Fill(_costs, defaultCost);
             Epoch = unchecked(Epoch + 1);
+        }
+
+        /// <summary>
+        /// Snapshot-restore path of <see cref="PathfindingSystem"/>: adopts
+        /// the serialized epoch so the restored host's counter continues in
+        /// lockstep with the saving host (both apply the same subsequent
+        /// footprint mutations). Runtime code never calls this — runtime
+        /// mutations go through <see cref="SetCost"/> and advance the
+        /// counter themselves.
+        /// </summary>
+        public void RestoreEpoch(uint epoch)
+        {
+            Epoch = epoch;
         }
     }
 }

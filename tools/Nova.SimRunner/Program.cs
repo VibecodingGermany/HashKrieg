@@ -367,7 +367,7 @@ namespace Nova.SimRunner
             var pathfinding = new PathfindingSystem(128, 128);
             var movement = new MovementSystem(entities, pathfinding);
             var economy = new EconomySystem(entities);
-            var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
+            var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new Nova.Simulation.Production.ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
             var combat = new CombatSystem(entities, fogOfWar, economy);

@@ -14,7 +14,18 @@ namespace Nova.Simulation.Movement
     /// <see cref="UnitState.TargetGridPos"/>, looked up in the pathfinding
     /// system's bounded multi-destination cache. Reading one shared global
     /// field instead would make any new Move command retarget every already
-    /// moving unit on the map.
+    /// moving unit on the map. The ARRIVAL cell is the personal
+    /// <see cref="UnitState.GoalGridPos"/> instead: a group move shares one
+    /// flow destination and distributes goal cells (formation), so the group
+    /// costs one cache entry and still unstacks into a line.
+    /// </para>
+    /// <para>
+    /// Separation steering runs for ALL active mobile units, moving or
+    /// standing. A moving unit combines flow and separation into its heading;
+    /// a standing unit applies a damped, capped, dead-zoned positional
+    /// correction only (no heading, no rotation change), so arrived units
+    /// unstack without vibrating. Units never enter impassable cells —
+    /// buildings occupy the cost field once construction feeds it.
     /// </para>
     /// <para>
     /// Q-040(i) resolution (implemented, ratification pending): the whole
@@ -52,6 +63,21 @@ namespace Nova.Simulation.Movement
 
         /// <summary>Separation steering weight (0.5, exact in Q16.16).</summary>
         private static readonly SimFixed SeparationWeight = SimFixed.FromRaw(SimFixed.OneRaw / 2);
+
+        /// <summary>
+        /// Damping of the standing separation (0.5, exact in Q16.16): two
+        /// stacked standing units each correct half the overlap per tick, so
+        /// a pair converges exactly onto the contact distance instead of
+        /// overshooting into vibration.
+        /// </summary>
+        private static readonly SimFixed StandingSeparationWeight = SimFixed.FromRaw(SimFixed.OneRaw / 2);
+
+        /// <summary>
+        /// Maximum positional correction of a standing unit per tick
+        /// (0.25 m, exact in Q16.16): bounds the unstacking step inside
+        /// dense clusters, where the summed overlap vector can be large.
+        /// </summary>
+        private static readonly SimFixed MaxStandingStep = SimFixed.FromRaw(SimFixed.OneRaw / 4);
 
         /// <summary>
         /// Dead-zone for the combined steering vector, squared (~1.07e-4,
@@ -112,7 +138,11 @@ namespace Nova.Simulation.Movement
             for (int i = 0; i < capacity; i++)
             {
                 ref UnitState unit = ref units[i];
-                if (!unit.IsActive || !unit.IsMoving) continue;
+                if (!unit.IsActive) continue;
+                // Immobile entities (buildings, construction sites: MoveSpeed
+                // 0) occupy bins above, so mobile units keep their distance —
+                // but they are never pushed themselves.
+                if (unit.MoveSpeed <= SimFixed.Zero) continue;
 
                 SimFixed curX = unit.Transform.PositionX;
                 SimFixed curY = unit.Transform.PositionY;
@@ -120,34 +150,52 @@ namespace Nova.Simulation.Movement
                 ushort gridX = (ushort)Math.Max(0, Math.Min(_gridWidth - 1, SimFixed.WorldToGrid(curX)));
                 ushort gridY = (ushort)Math.Max(0, Math.Min(_gridHeight - 1, SimFixed.WorldToGrid(curY)));
 
-                // Arrival check
-                if (gridX == unit.TargetGridPos.X && gridY == unit.TargetGridPos.Y)
+                bool moving = unit.IsMoving && unit.GoalGridPos.IsValid;
+
+                // Arrival check against the unit's PERSONAL goal cell. A
+                // goal cell that turned impassable after the order (a
+                // building placed on it) counts as reached once no walkable
+                // neighbour is strictly closer — the unit stops at the wall
+                // instead of pushing against it forever.
+                if (moving)
                 {
-                    unit.Stop();
-                    continue;
+                    bool atGoal = gridX == unit.GoalGridPos.X && gridY == unit.GoalGridPos.Y;
+                    if (atGoal || IsGoalUnreachable(unit.GoalGridPos, gridX, gridY))
+                    {
+                        unit.Stop();
+                        continue;
+                    }
                 }
 
-                // Query the flow direction of THIS unit's own destination.
-                // Pure cache lookup, never a generation: a miss (destination
-                // evicted from the bounded cache) yields Direction2D.None and
-                // falls through to the direct-steering path below.
-                FlowField field = _pathfindingSystem.GetField(unit.TargetGridPos);
-                Direction2D flowDir = field != null
-                    ? field.GetDirection(gridX, gridY)
-                    : Direction2D.None;
-                var (flowDx, flowDy) = Direction2DUtility.GetOffset(flowDir);
-
-                SimFixed moveDx = SimFixed.FromInt(flowDx);
-                SimFixed moveDy = SimFixed.FromInt(flowDy);
-
-                // If at flow end or blocked, move directly towards target cell center
-                if (flowDir == Direction2D.None)
+                SimFixed moveDx = SimFixed.Zero;
+                SimFixed moveDy = SimFixed.Zero;
+                if (moving)
                 {
-                    moveDx = (SimFixed.FromInt(unit.TargetGridPos.X) + HalfCell) - curX;
-                    moveDy = (SimFixed.FromInt(unit.TargetGridPos.Y) + HalfCell) - curY;
+                    // Query the flow direction of THIS unit's own destination.
+                    // Pure cache lookup, never a generation: a miss (destination
+                    // evicted from the bounded cache) yields Direction2D.None and
+                    // falls through to the direct-steering path below.
+                    FlowField field = _pathfindingSystem.GetField(unit.TargetGridPos);
+                    Direction2D flowDir = field != null
+                        ? field.GetDirection(gridX, gridY)
+                        : Direction2D.None;
+                    var (flowDx, flowDy) = Direction2DUtility.GetOffset(flowDir);
+
+                    moveDx = SimFixed.FromInt(flowDx);
+                    moveDy = SimFixed.FromInt(flowDy);
+
+                    // If at flow end or blocked, move directly towards the
+                    // personal goal cell center.
+                    if (flowDir == Direction2D.None)
+                    {
+                        moveDx = (SimFixed.FromInt(unit.GoalGridPos.X) + HalfCell) - curX;
+                        moveDy = (SimFixed.FromInt(unit.GoalGridPos.Y) + HalfCell) - curY;
+                    }
                 }
 
-                // O(1) Local 3x3 Spatial Grid Neighborhood Separation
+                // O(1) Local 3x3 Spatial Grid Neighborhood Separation —
+                // computed for moving and standing units alike, so an
+                // arrived unit still makes room (and can be pushed).
                 SimFixed sepDx = SimFixed.Zero;
                 SimFixed sepDy = SimFixed.Zero;
 
@@ -169,7 +217,17 @@ namespace Nova.Simulation.Movement
                                 SimFixed distSq = unit.Transform.DistanceToSquared(in other.Transform);
                                 SimFixed minDist = unit.Radius + other.Radius;
 
-                                if (distSq > SimFixed.Zero && distSq < minDist * minDist)
+                                if (distSq == SimFixed.Zero)
+                                {
+                                    // Exact overlap (same position, e.g. a
+                                    // stacked spawn): the push direction is
+                                    // undefined, so break the tie by entity
+                                    // index — the higher index yields in +x.
+                                    // Deterministic across hosts (indices are
+                                    // canonical state).
+                                    sepDx += otherIndex > i ? -minDist : minDist;
+                                }
+                                else if (distSq < minDist * minDist)
                                 {
                                     SimFixed dist = SimTrig.Sqrt(distSq);
                                     SimFixed pushFactor = (minDist - dist) / dist;
@@ -183,28 +241,105 @@ namespace Nova.Simulation.Movement
                     }
                 }
 
-                // Combine flow vector and separation
-                SimFixed finalDx = moveDx + sepDx * SeparationWeight;
-                SimFixed finalDy = moveDy + sepDy * SeparationWeight;
-
-                SimFixed lenSq = finalDx * finalDx + finalDy * finalDy;
-                if (lenSq > MinSteeringLengthSquared)
+                if (moving)
                 {
-                    SimFixed len = SimTrig.Sqrt(lenSq);
-                    finalDx /= len;
-                    finalDy /= len;
+                    // Combine flow vector and separation
+                    SimFixed finalDx = moveDx + sepDx * SeparationWeight;
+                    SimFixed finalDy = moveDy + sepDy * SeparationWeight;
 
-                    // Exact 1/10 s per tick: divide by the tick rate once
-                    // (ties-to-even) instead of multiplying by a rounded
-                    // 0.1 s constant (see class remarks).
-                    SimFixed step = unit.MoveSpeed / TicksPerSecond;
-                    SimFixed nextX = curX + finalDx * step;
-                    SimFixed nextY = curY + finalDy * step;
-                    SimAngle rotation = SimTrig.Atan2(finalDy, finalDx);
+                    SimFixed lenSq = finalDx * finalDx + finalDy * finalDy;
+                    if (lenSq > MinSteeringLengthSquared)
+                    {
+                        SimFixed len = SimTrig.Sqrt(lenSq);
+                        finalDx /= len;
+                        finalDy /= len;
 
-                    unit.Transform = new Transform2D(nextX, nextY, rotation);
+                        // Exact 1/10 s per tick: divide by the tick rate once
+                        // (ties-to-even) instead of multiplying by a rounded
+                        // 0.1 s constant (see class remarks).
+                        SimFixed step = unit.MoveSpeed / TicksPerSecond;
+                        SimFixed nextX = curX + finalDx * step;
+                        SimFixed nextY = curY + finalDy * step;
+                        SimAngle rotation = SimTrig.Atan2(finalDy, finalDx);
+
+                        // Never step into an impassable cell (a building
+                        // footprint, once construction feeds the cost field):
+                        // full step first, then the axis-decomposed fallbacks
+                        // so a diagonal past a wall corner cannot stall.
+                        if (IsWalkablePosition(nextX, nextY))
+                        {
+                            unit.Transform = new Transform2D(nextX, nextY, rotation);
+                        }
+                        else if (IsWalkablePosition(nextX, curY))
+                        {
+                            unit.Transform = new Transform2D(nextX, curY, rotation);
+                        }
+                        else if (IsWalkablePosition(curX, nextY))
+                        {
+                            unit.Transform = new Transform2D(curX, nextY, rotation);
+                        }
+                        // Fully blocked: hold position and retry next tick.
+                    }
+                }
+                else
+                {
+                    // Standing separation: a pure positional correction — the
+                    // raw overlap vector, damped, capped and dead-zoned. The
+                    // push approaches zero as the overlap closes, so arrived
+                    // units unstack without vibrating; rotation is untouched.
+                    SimFixed pushDx = sepDx * StandingSeparationWeight;
+                    SimFixed pushDy = sepDy * StandingSeparationWeight;
+
+                    SimFixed lenSq = pushDx * pushDx + pushDy * pushDy;
+                    if (lenSq > MinSteeringLengthSquared)
+                    {
+                        SimFixed len = SimTrig.Sqrt(lenSq);
+                        if (len > MaxStandingStep)
+                        {
+                            pushDx = pushDx * MaxStandingStep / len;
+                            pushDy = pushDy * MaxStandingStep / len;
+                        }
+
+                        SimFixed nextX = curX + pushDx;
+                        SimFixed nextY = curY + pushDy;
+                        if (IsWalkablePosition(nextX, nextY))
+                        {
+                            unit.Transform = new Transform2D(nextX, nextY, unit.Transform.Rotation);
+                        }
+                    }
                 }
             }
+        }
+
+        /// <summary>True when the world position lies inside the map on a walkable cell.</summary>
+        private bool IsWalkablePosition(SimFixed x, SimFixed y)
+        {
+            int gx = SimFixed.WorldToGrid(x);
+            int gy = SimFixed.WorldToGrid(y);
+            if (gx < 0 || gy < 0 || gx >= _gridWidth || gy >= _gridHeight) return false;
+            return _pathfindingSystem.CostField.IsWalkable((ushort)gx, (ushort)gy);
+        }
+
+        /// <summary>
+        /// True when the goal cell is impassable and no walkable neighbour
+        /// cell is strictly closer to it (Chebyshev, matching the 8-way
+        /// movement): the unit has reached the wall around its goal.
+        /// </summary>
+        private bool IsGoalUnreachable(GridPos2D goal, int gridX, int gridY)
+        {
+            if (_pathfindingSystem.CostField.IsWalkable(goal.X, goal.Y)) return false;
+            int current = Math.Max(Math.Abs(gridX - goal.X), Math.Abs(gridY - goal.Y));
+            foreach (Direction2D dir in Direction2DUtility.AllCardinalAndDiagonal)
+            {
+                var (dx, dy) = Direction2DUtility.GetOffset(dir);
+                int nx = gridX + dx;
+                int ny = gridY + dy;
+                if (nx < 0 || ny < 0 || nx >= _gridWidth || ny >= _gridHeight) continue;
+                if (!_pathfindingSystem.CostField.IsWalkable((ushort)nx, (ushort)ny)) continue;
+                int closer = Math.Max(Math.Abs(nx - goal.X), Math.Abs(ny - goal.Y));
+                if (closer < current) return false;
+            }
+            return true;
         }
 
         public void Shutdown()

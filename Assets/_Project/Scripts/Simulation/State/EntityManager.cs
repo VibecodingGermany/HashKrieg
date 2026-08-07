@@ -79,6 +79,26 @@ namespace Nova.Simulation.State
             return true;
         }
 
+        /// <summary>
+        /// True when any active unit's grid cell is the given cell. O(capacity)
+        /// scan — intended for rare queries (spawn cell search, placement
+        /// push-out), never for per-tick loops.
+        /// </summary>
+        public bool HasActiveUnitOnCell(int gridX, int gridY)
+        {
+            for (int i = 0; i < Capacity; i++)
+            {
+                ref readonly UnitState u = ref _units[i];
+                if (!u.IsActive) continue;
+                if (SimFixed.WorldToGrid(u.Transform.PositionX) == gridX
+                    && SimFixed.WorldToGrid(u.Transform.PositionY) == gridY)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public ref UnitState GetUnitRef(EntityId id)
         {
             if (!IsValid(id))
@@ -124,10 +144,13 @@ namespace Nova.Simulation.State
         /// canonical economy fields of the harvest slice:
         /// <see cref="UnitState.Role"/> (uint8), <see cref="UnitState.CargoAE"/>
         /// (int32), <see cref="UnitState.HarvestFieldId"/> (uint16) and
-        /// <see cref="UnitState.IsReturningCargo"/> (uint8). v1–v3 blocks are
-        /// rejected (the pre-G1 reset allows the hard cut; no migration path).
+        /// <see cref="UnitState.IsReturningCargo"/> (uint8). v5 adds
+        /// <see cref="UnitState.GoalGridPos"/> (uint16 x2) — the personal
+        /// arrival cell of the formation-aware movement order (sprint
+        /// Truppenführung). v1–v4 blocks are rejected (the pre-G1 reset
+        /// allows the hard cut; no migration path).
         /// </summary>
-        public const byte StateVersion = 4;
+        public const byte StateVersion = 5;
 
         /// <summary>
         /// Writes the complete authoritative entity store state as canonical
@@ -177,6 +200,8 @@ namespace Nova.Simulation.State
                 writer.WriteSimFixed(u.SightRadius);
                 writer.WriteUInt16(u.TargetGridPos.X);
                 writer.WriteUInt16(u.TargetGridPos.Y);
+                writer.WriteUInt16(u.GoalGridPos.X);
+                writer.WriteUInt16(u.GoalGridPos.Y);
                 writer.WriteInt32(u.CurrentHealth);
                 writer.WriteInt32(u.MaxHealth);
                 writer.WriteEntityId(u.AttackTarget);
@@ -333,6 +358,8 @@ namespace Nova.Simulation.State
                 if (moveSpeed < 0 || radius < 0 || sightRadius < 0) return false;
                 if (!reader.TryReadUInt16(out ushort targetX)) return false;
                 if (!reader.TryReadUInt16(out ushort targetY)) return false;
+                if (!reader.TryReadUInt16(out ushort goalX)) return false;
+                if (!reader.TryReadUInt16(out ushort goalY)) return false;
                 if (!reader.TryReadInt32(out int currentHealth)) return false;
                 if (!reader.TryReadInt32(out int maxHealth)) return false;
                 if (!reader.TryReadEntityId(out EntityId attackTarget)) return false;
@@ -382,6 +409,7 @@ namespace Nova.Simulation.State
                     Radius = SimFixed.FromRaw(radius),
                     SightRadius = SimFixed.FromRaw(sightRadius),
                     TargetGridPos = new Pathfinding.GridPos2D(targetX, targetY),
+                    GoalGridPos = new Pathfinding.GridPos2D(goalX, goalY),
                     CurrentHealth = currentHealth,
                     MaxHealth = maxHealth,
                     AttackTarget = attackTarget,

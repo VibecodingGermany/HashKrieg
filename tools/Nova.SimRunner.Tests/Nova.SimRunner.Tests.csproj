@@ -17,6 +17,9 @@
     <!-- The MS-1 skirmish AI (engine-free assembly) under test: same
          shared-sources contract as Core/Simulation. -->
     <Compile Include="..\..\Assets\_Project\Scripts\AI\**\*.cs" Link="AI\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The relay/lockstep network layer under test: engine-free assembly,
+         same shared-sources contract (strands A1-A5 of sprint 12). -->
+    <Compile Include="..\..\Assets\_Project\Scripts\Networking\**\*.cs" Link="Networking\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- Performance harness sources under test (Program.cs entry point excluded). -->
     <Compile Include="..\Nova.SimRunner\PerfStatistics.cs" Link="SimRunner\PerfStatistics.cs" />
     <Compile Include="..\Nova.SimRunner\ScenarioArtifacts.cs" Link="SimRunner\ScenarioArtifacts.cs" />

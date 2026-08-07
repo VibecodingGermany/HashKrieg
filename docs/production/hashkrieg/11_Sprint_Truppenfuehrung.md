@@ -1,6 +1,54 @@
 # Sprint: Truppenführung — Einheiten teilen sich den Platz
 
-**Status:** vorgeschlagen, nicht begonnen | **Vorgänger:** [09_Sprint_Gefecht_und_Rundenrahmen.md](09_Sprint_Gefecht_und_Rundenrahmen.md) (umgesetzt, D-086/D-087) | **Leitsatz:** eine Armee ist kein Haufen
+**Status:** umgesetzt (2026-08-07) | **Vorgänger:** [09_Sprint_Gefecht_und_Rundenrahmen.md](09_Sprint_Gefecht_und_Rundenrahmen.md) (umgesetzt, D-086/D-087) | **Leitsatz:** eine Armee ist kein Haufen
+
+## Ergebnis (2026-08-07)
+
+- **TEIL 1 umgesetzt — Formationsverteilung:** `UnitCommandStateView.ApplyMove`
+  verteilt auf freie Zellen um das Ziel (kleinster Entity-Index → Zielzelle, dann
+  Chebyshev-Ringe aufsteigend (y, x), Stempel-Array statt Allokation). Neu ist
+  `UnitState.GoalGridPos` (Entity-Store-Block **v5**): die Gruppe teilt sich **ein**
+  Flow-Field (`TargetGridPos`), die Ankunft prüft die persönliche Zelle — ein
+  Flow-Field pro Einheit wurde wegen der Cache-Kapazität (32) verworfen. Die
+  Produktions-Spawn-Suche lehnt jetzt auch einheitenbelegte Zellen ab.
+- **TEIL 2 umgesetzt — Separation im Stand (Einschleifen-Variante):** die
+  Bewegungsschleife läuft für alle aktiven mobilen Einheiten; stehend wirkt nur
+  eine gedämpfte (0,5), gedeckelte (0,25 m/Tick) Positionskorrektur mit Totzone,
+  ohne Rotationsänderung. Exakte Überlappung (distanzlos) löst ein
+  Entity-Index-Tiebreak. Unbewegliche Entitäten (MoveSpeed 0) werden nie
+  verschoben. Gewählt gegen den separaten Entstapelungs-Durchgang, weil ein
+  Codepfad weniger Abweichungsfläche hat und der Flow-Anteil ohne Befehl
+  ohnehin null ist.
+- **TEIL 3 umgesetzt — Gebäude ins Kostenfeld:** `ConstructionSystem` bekommt
+  das `CostField` optional injiziert (kanonische Hosts verdrahtet:
+  MatchRunner, SimRunner-Szenarien, match-nahe Test-Hosts) und spiegelt jeden
+  Footprint als Impassable/Open-Schreiben; Platzierung schiebt mobile Einheiten
+  per Ringsuche aus dem Footprint (Ziel im Footprint → umgesetzt auf die
+  Ausweichzelle). Falle 1 (Cache-Flut): der Epoch-Sync **regeneriert an Ort**
+  statt zu leeren — einmal pro Tick zusammengefasst, durch die Cache-Kapazität
+  begrenzt, und bewegte Einheiten verlieren nie die Führung (kein
+  Direct-Steering durch Wände). Falle 2 (Einschluss): Push-out plus
+  „unbegehbares Ziel gilt an der Wand als erreicht" (keine begehbare
+  Nachbarzelle näher). **Vertragsänderung:** die serialisierte Epoch wird beim
+  Restore **adoptiert statt verglichen** — Mutationshistorie ist aus dem
+  Endzustand nicht nachspielbar; der Inhaltsbeweis ist strukturell
+  (Construction-Block restauriert vor Pathfinding).
+- **KI-Folgefix (nicht im Briefing, durch Teil 3 ausgelöst):** die
+  Westseiten-Laufzielregel der Skirmish-KI konnte in einem Nachbargebäude
+  enden — Baustelle pausierte dann dauerhaft (im Diagnoselauf: 2.500 Ticks
+  lang 0 Fortschritt). Bau- und Ablade-Laufziele werden jetzt footprint-frei
+  gewählt.
+- **Verifikation:** `dotnet test tools/Nova.SimRunner.Tests` **438/438 grün**
+  (neun neue `TroopHandlingTests` je Lane; `CostFieldEpochSnapshotTests` auf
+  den Adopt-/Regenerations-Vertrag umgeschrieben). Baselines bewusst neu
+  gesetzt: SimRunner-Hash `0xB680C879DEA70B26` (zwei Läufe bitidentisch),
+  DETERMINISM_10000 Fingerprint `0xAD8531312FE93F4B`, Final-Hash
+  `0x6916A323202089A9`, Playback-Self-Check PASS. Unity-Batchmode-Kompilierung
+  aller Skripte fehlerfrei; die EditMode-Ausführung scheiterte hier an der
+  Lizenz (0 Entitlements), nicht am Code — nachzuholen auf der Arbeitsmaschine.
+- **Offen / DoD-Rest:** die gespielte Runde des Inhabers („Fertig wenn",
+  §6) steht aus.
+- **Entscheidung:** als D-088 im [DecisionLog](../DecisionLog.md) protokolliert.
 
 ## 1. Wo wir stehen
 

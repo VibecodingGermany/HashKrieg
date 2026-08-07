@@ -60,7 +60,7 @@ namespace Nova.Simulation.Tests
                 var pathfinding = new PathfindingSystem(128, 128);
                 var movement = new MovementSystem(entities, pathfinding);
                 var economy = new EconomySystem(entities, startingCredits);
-                var construction = new ConstructionSystem(entities, economy);
+                var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
                 var combat = new CombatSystem(entities, fogOfWar, economy);
