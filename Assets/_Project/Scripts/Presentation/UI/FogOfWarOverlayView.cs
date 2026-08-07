@@ -63,6 +63,12 @@ namespace Nova.Presentation.UI
         private GameObject _quad;
         private uint _renderedTick;
         private bool _hasRendered;
+        // The fog INSTANCE this component is bound to. InitializeMatch builds
+        // a new FogOfWarSystem per match, whose tick counter restarts at 0 —
+        // without the reference guard a fresh match could skip repaints while
+        // its (restarted) tick collides with the previous match's rendered
+        // one, and a differently-sized map would index past the pixel buffer.
+        private FogOfWarSystem _boundFog;
 
         private void Awake()
         {
@@ -83,6 +89,19 @@ namespace Nova.Presentation.UI
 
             SetQuadActive(true);
             EnsureResources(fog);
+            if (!ReferenceEquals(fog, _boundFog))
+            {
+                // New match, new fog system: force a repaint regardless of
+                // tick values, and rebuild the texture when the grid size
+                // changed (defensive — MS-1 plays one map size today).
+                _boundFog = fog;
+                _hasRendered = false;
+                if (_texture != null && (_texture.width != fog.Width || _texture.height != fog.Height))
+                {
+                    Destroy(_texture);
+                    _texture = null;
+                }
+            }
 
             // Repaint only when the committed view actually advanced (5 Hz)
             // — or on the very first frame, before any commit, when the mask

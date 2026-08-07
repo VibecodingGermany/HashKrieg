@@ -111,6 +111,7 @@ namespace Nova.Presentation
             // reload is off — never open a session with a stale viewport
             // rectangle or a queued jump from the previous one.
             MinimapCameraLink.Reset();
+            HudPointerLink.Reset();
         }
 
         private void LateUpdate()
@@ -148,6 +149,24 @@ namespace Nova.Presentation
             {
                 FocusOn(new Vector3(worldX, 0f, worldZ));
             }
+            if (MinimapCameraLink.TryConsumeStartFocusReset())
+            {
+                ResetToStartFocus();
+            }
+        }
+
+        /// <summary>
+        /// Snaps the rig back to the serialized start framing (focus, yaw,
+        /// height) — the camera half of a match restart; the view-layer half
+        /// is UnitViewManager.ResetViews.
+        /// </summary>
+        public void ResetToStartFocus()
+        {
+            _focus = new Vector3(_startFocusX, 0f, _startFocusZ);
+            _yaw = _startYawDegrees;
+            _height = Mathf.Clamp(_startHeight, _minHeight, _maxHeight);
+            ClampFocus();
+            ApplyTransform();
         }
 
         /// <summary>
@@ -248,6 +267,14 @@ namespace Nova.Presentation
             // Ignore the cursor while it sits outside the game view (common in the editor).
             Vector3 mouse = Input.mousePosition;
             if (mouse.x < 0f || mouse.y < 0f || mouse.x > Screen.width || mouse.y > Screen.height) return axis;
+
+            // A pointer over a HUD panel belongs to the HUD (build bar,
+            // minimap, command card): travelling to the build bar at the
+            // bottom edge used to scroll the map under the click. The verdict
+            // is published by the input component — this assembly may not
+            // reference Presentation.UI (same rank), so it arrives through
+            // HudPointerLink in Nova.Gameplay.
+            if (HudPointerLink.PointerOverHud) return axis;
 
             if (mouse.x <= _edgePanMargin) axis.x -= 1f;
             else if (mouse.x >= Screen.width - _edgePanMargin) axis.x += 1f;

@@ -120,6 +120,8 @@ namespace Nova.Presentation.UI
             public float ProgressBar01 = -1f;
             /// <summary>The site card's live state line (kein Builder / unterwegs / im Bau …); null on unit and building cards.</summary>
             public string SiteStatusText;
+            /// <summary>The producer card's stall line when the head entry sits finished but cannot spawn (capacity / no free cell); null while production flows.</summary>
+            public string QueueStallText;
             public string FooterHint;
 
             public void Clear()
@@ -132,6 +134,7 @@ namespace Nova.Presentation.UI
                 QueueRows.Clear();
                 ProgressBar01 = -1f;
                 SiteStatusText = null;
+                QueueStallText = null;
                 FooterHint = null;
             }
         }
@@ -405,6 +408,24 @@ namespace Nova.Presentation.UI
                 model.QueueRows.Add(row);
             }
 
+            // A head entry clamped AT its build threshold is the sim's
+            // documented silent pause (ProductionSystem.ExecuteTick): the
+            // entity store is full, or the ring search found no free spawn
+            // cell — the bar then reads "full" forever and nothing spawns.
+            // Like the construction site before it (D-085), a stalled
+            // production names its reason instead of looking simply broken.
+            if (entryCount > 0
+                && _runner.Production.TryGetQueueEntry(rawBuilding, 0, out ushort headDefId, out ushort headRemaining, out int headProgressRaw)
+                && headRemaining > 0
+                && SimDefinitions.TryGetUnit(headDefId, out SimUnitDefinition headDef)
+                && headProgressRaw >= (headDef.BuildTicks << 16))
+            {
+                model.QueueStallText = _runner.Entities != null
+                    && _runner.Entities.ActiveCount >= _runner.Entities.Capacity
+                    ? "Produktion pausiert: Einheitenlimit erreicht"
+                    : "Produktion pausiert: kein Platz zum Ausrücken";
+            }
+
             long credits = _runner.Economy != null
                 ? _runner.Economy.GetPlayerEconomy(slot).AetheriumCredits
                 : 0L;
@@ -494,6 +515,11 @@ namespace Nova.Presentation.UI
                 }
             }
 
+            if (model.QueueStallText != null)
+            {
+                GUILayout.Label(model.QueueStallText, _siteStatusStyle, GUILayout.Height(SiteStatusHeight));
+            }
+
             if (model.FooterHint != null)
             {
                 GUILayout.Label(model.FooterHint, _hintStyle, GUILayout.Height(FooterHeight));
@@ -567,6 +593,7 @@ namespace Nova.Presentation.UI
                     if (model.QueueRows[i].Progress01 >= 0f) height += ProgressHeight;
                 }
             }
+            if (model.QueueStallText != null) height += SiteStatusHeight + _siteStatusStyle.margin.vertical;
             if (model.FooterHint != null) height += FooterHeight + _hintStyle.margin.vertical;
             return height;
         }

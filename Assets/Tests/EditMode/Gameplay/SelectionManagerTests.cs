@@ -89,5 +89,68 @@ namespace Nova.Gameplay.Tests
             Assert.AreEqual(128f, uiX);
             Assert.AreEqual(128f, uiY);
         }
+
+        // ------------------------------------------------------------------
+        // Sprint 09 §7: additive selection + control groups
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void SelectionManager_AddSingle_AddsWithoutDuplicates()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+
+            selection.SelectSingle(u1);
+            Assert.IsTrue(selection.AddSingle(u2));
+            Assert.AreEqual(2, selection.SelectedCount);
+            Assert.IsFalse(selection.AddSingle(u2), "a duplicate add is a no-op");
+            Assert.AreEqual(2, selection.SelectedCount);
+        }
+
+        [Test]
+        public void SelectionManager_SelectBoxAdditive_UnionsWithExistingSelection()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(1), SimFixed.FromInt(1)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(15), SimFixed.FromInt(15)), SimFixed.FromInt(5));
+
+            selection.SelectSingle(u1);
+            int count = selection.SelectBoxAdditive(entities, playerId: 0, minX: 10f, minY: 10f, maxX: 20f, maxY: 20f);
+
+            Assert.AreEqual(2, count, "the box content joins the previous selection instead of replacing it");
+        }
+
+        [Test]
+        public void SelectionManager_ControlGroup_SaveAndRecall_DropsTheDead()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+
+            selection.SelectBox(entities, playerId: 0, minX: 0f, minY: 0f, maxX: 20f, maxY: 20f);
+            selection.SaveControlGroup(1);
+            selection.ClearSelection();
+            Assert.AreEqual(0, selection.SelectedCount);
+            Assert.IsTrue(selection.HasControlGroup(1));
+
+            entities.DespawnUnit(u1); // one member dies before the recall
+
+            int recalled = selection.RecallControlGroup(1, entities, playerId: 0);
+            Assert.AreEqual(1, recalled, "the dead member is dropped at recall");
+            Assert.AreEqual(u2, selection.SelectedEntities[0]);
+        }
+
+        [Test]
+        public void SelectionManager_RecallEmptyGroup_IsANoOp()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            Assert.IsFalse(selection.HasControlGroup(5));
+            Assert.AreEqual(0, selection.RecallControlGroup(5, entities, playerId: 0));
+        }
     }
 }

@@ -119,6 +119,106 @@ namespace Nova.SimRunner.Tests
                 Is.EqualTo(CombatSystem.DefaultCooldownTicks), "a shot restarts the cooldown");
         }
 
+        // ------------------------------------------------------------------
+        // D-087 auto-acquisition
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void AutoAcquire_IdleArmedUnit_FiresWithoutAnyOrder()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId attacker = SpawnAt(host, 0, 10, 10);
+            EntityId target = SpawnAt(host, 1, 13, 10, maxHealth: 100);
+            // Deliberately NO explicit order: before D-087 this unit idled forever.
+
+            host.Step(); // tick 1 (odd): no committed view yet — nothing to acquire
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget.IsValid, Is.False,
+                "without a committed view nothing is Visible, so nothing is acquired");
+
+            host.Step(); // tick 2 (even): commit shows the target — acquire AND fire in one tick
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget, Is.EqualTo(target),
+                "the idle unit must pick the visible in-range hostile by itself");
+            Assert.That(HealthOf(host, target), Is.EqualTo(100 - CombatSystem.DefaultWeaponDamage),
+                "acquisition in the same tick precedes the engagement phase — the shot lands");
+        }
+
+        [Test]
+        public void AutoAcquire_HiddenTarget_IsNotAcquired()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId attacker = SpawnAt(host, 0, 10, 10, sightRadius: 1); // live sight covers only its own cell
+            EntityId target = SpawnAt(host, 1, 13, 10, maxHealth: 100);
+
+            host.Step(6);
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget.IsValid, Is.False,
+                "Explored/unseen cells grant no targeting right — auto-acquire obeys the same FoW gate as shots");
+            Assert.That(HealthOf(host, target), Is.EqualTo(100));
+        }
+
+        [Test]
+        public void AutoAcquire_NearestWins_LowestIndexWinsTies()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId attacker = SpawnAt(host, 0, 10, 10);
+            EntityId farFirst = SpawnAt(host, 1, 14, 10, maxHealth: 1000); // dist 4, lower index
+            EntityId nearSecond = SpawnAt(host, 1, 12, 10, maxHealth: 1000); // dist 2, higher index
+
+            host.Step(2);
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget, Is.EqualTo(nearSecond),
+                "the NEAREST legal target wins, regardless of spawn order");
+
+            // Two equidistant targets: the lower entity index must win — two
+            // hosts then make the same choice (lockstep determinism).
+            var host2 = TestHost.Create(Seed);
+            EntityId attacker2 = SpawnAt(host2, 0, 10, 10);
+            EntityId eastFirst = SpawnAt(host2, 1, 13, 10, maxHealth: 1000);
+            SpawnAt(host2, 1, 7, 10, maxHealth: 1000); // west, same distance, higher index
+            host2.Step(2);
+            Assert.That(host2.Entities.GetUnitRef(attacker2).AttackTarget, Is.EqualTo(eastFirst),
+                "equal distance: the lowest entity index wins the tie");
+        }
+
+        [Test]
+        public void AutoAcquire_ExplicitHeldOrder_IsNeverRetargeted()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId attacker = SpawnAt(host, 0, 10, 10, sightRadius: 20);
+            EntityId orderedFar = SpawnAt(host, 1, 17, 10, maxHealth: 1000);
+            host.Entities.GetUnitRef(attacker).AttackTarget = orderedFar;
+            SpawnAt(host, 1, 12, 10, maxHealth: 1000); // a closer hostile appears
+
+            host.Step(4);
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget, Is.EqualTo(orderedFar),
+                "an explicit order is HELD (out of range here) and never silently retargeted");
+        }
+
+        [Test]
+        public void AutoAcquire_DefensePlatform_FiresOnItsOwn()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId platform = SpawnAt(host, 0, 10, 10, maxHealth: 600);
+            host.Entities.GetUnitRef(platform).Role = UnitRole.DefensePlatform; // armed: 20 dmg, range 10, cd 10
+            EntityId attacker = SpawnAt(host, 1, 13, 10, maxHealth: 200);
+
+            host.Step(2);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget, Is.EqualTo(attacker),
+                "the only armed building must acquire by itself — it can never receive an explicit order");
+            Assert.That(HealthOf(host, attacker), Is.LessThan(200), "the platform actually fires");
+        }
+
+        [Test]
+        public void AutoAcquire_UnarmedRoles_NeverAcquire()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId builder = SpawnAt(host, 0, 10, 10);
+            host.Entities.GetUnitRef(builder).Role = UnitRole.Builder; // unarmed by definition
+            SpawnAt(host, 1, 12, 10, maxHealth: 100);
+
+            host.Step(4);
+            Assert.That(host.Entities.GetUnitRef(builder).AttackTarget.IsValid, Is.False,
+                "damage 0 means unarmed: a Builder never acquires a target");
+        }
+
         [Test]
         public void Cooldown_ExactlyFiveTicksBetweenShots()
         {

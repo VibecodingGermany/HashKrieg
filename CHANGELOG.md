@@ -18,6 +18,55 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Gefecht und Rundenrahmen (D-086, D-087, Sprint 09):** aus der Demo wird
+  eine Runde — ernten, bauen, kämpfen, gewinnen oder verlieren, neu anfangen.
+  - **Harvester fahren von selbst:** der Client-Dispatch (D-085-Präzedenz)
+    fährt beide Beine des Erntekreislaufs per Move-Intent — zum Feld bei
+    stehendem Ernteauftrag außer Reichweite, zur nächsten eigenen Raffinerie
+    bei voller Ladung. Manuelle Züge haben Vorrang; die Sim bleibt unberührt.
+  - **Zielerfassung und Feuererwiderung (D-087):** Einheiten ohne Befehl
+    erfassen das nächste sichtbare, feindliche Ziel in Reichweite selbst —
+    Gebäude eingeschlossen: die Verteidigungsplattform feuert erstmals.
+    Deterministisch (Index-Reihenfolge, Ganzzahl-Distanzquadrat, Tiebreak
+    kleinster Index); kein neuer CommandKind, kein Snapshot-Bump; die
+    kanonischen Baselines blieben unverändert. Attack-Move bleibt eigener
+    Sprint. Sechs neue Tests je Lane (tools: 428/428).
+  - **Lebensbalken** über beschädigten oder selektierten Einheiten und
+    Gebäuden (reine Präsentation).
+  - **Ergebnisbildschirm** („Sieg"/„Niederlage"/„Unentschieden" mit Zeitpunkt)
+    und **sichtbare Pause** (Overlay statt stillstehendem Bild); Knöpfe
+    **Neue Runde** (vollständiger Neustart inklusive View-/Kamera-Reset) und
+    **Hauptmenü** (designed extension point des Menüs). Anwendung beenden ist
+    nicht mehr der einzige Ausweg.
+  - **Ingame-Musik (D-086):** drei Suno-Themen als OGG-Playlist
+    (`MusicDirector`) — Matchstart blendet ein, Ergebnis blendet aus, Pause
+    läuft weiter, Menü kehrt zur Menümusik zurück; Lautstärke aus
+    `GameSettings`, live anwendbar. Suno-Ausnahme erweitert
+    ([docs/assets/Licenses.md](docs/assets/Licenses.md) 1.5.0).
+  - **Kontrollgruppen 1–9** (Strg/⌘+Zahl setzen, Zahl abrufen, Tote fallen
+    beim Abruf heraus) und **additive Auswahl mit Shift** (Klick und Box).
+  - **Ablehnungsgründe sichtbar:** ein abgelehnter Befehl erscheint als kurze
+    Einblendung über der Bauleiste statt nur im F3-Panel; die Statuszeile
+    zeigt im Leerlauf die Kamerabelegung (MMB/Space).
+- **Kaserne-Diagnose (Sprint 09 §2.1):** der Befund „keine Soldaten" ist im
+  Harness **nicht reproduzierbar** — zwei neue PlayMode-Suiten
+  (`GrayboxDemoProofTests.Barracks_ProducesVisibleInfantry`,
+  `BarracksSpawnDiagnosisTests`) beweisen Spawn in der Simulation UND sicht-
+  bare View in einem echten Match. Ursache in der gemeldeten Sitzung mit
+  hoher Wahrscheinlichkeit die damals noch pausierte Baustelle (D-085-Fix)
+  bzw. halbiertes Produktionstempo bei LOW POWER.
+
+### Behoben
+- **Harvester erntete nicht** (Client-Dispatch, s. o. — gleiche Fehlerklasse
+  wie der Builder in D-085).
+- **Rally-Geste kaperte den Rechtsklick** bei gemischter Rahmenauswahl —
+  Rally gilt nur noch bei ausschließlich selektierten Gebäuden.
+- **Randscroll unter der Bauleiste/Minimap:** die Kamera unterdrückt Edge-Pan
+  über HUD-Panels (`HudPointerLink`).
+- **Weltgesten unter dem Hauptmenü:** Eingabe ist gesperrt, solange das Menü
+  sichtbar ist.
+
+### Hinzugefügt
 - **Hauptmenü, Menümusik und Einstellungen (D-083):** Wer das Spiel startet,
   landet nicht mehr mitten in einem Match, sondern vor einem Menü mit Key Art,
   Titel „HASHKRIEG" und Musik — und kann das Spiel zum ersten Mal auch wieder

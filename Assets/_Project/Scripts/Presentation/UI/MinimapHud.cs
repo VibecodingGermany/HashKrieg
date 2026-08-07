@@ -85,6 +85,7 @@ namespace Nova.Presentation.UI
         private Color32[] _pixels;
         private uint _renderedTick;
         private bool _hasRendered;
+        private FogOfWarSystem _boundFog;
 
         private void Awake()
         {
@@ -168,6 +169,16 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void RefreshBackground(FogOfWarSystem fog, byte team)
         {
+            // A new match brings a new fog instance whose tick counter
+            // restarts at 0 — without the reference guard a restarted tick
+            // colliding with the previous match's rendered one would skip the
+            // repaint and show the last match's exploration.
+            if (!ReferenceEquals(fog, _boundFog))
+            {
+                _boundFog = fog;
+                _hasRendered = false;
+            }
+
             if (_background == null || _background.width != fog.Width || _background.height != fog.Height)
             {
                 if (_background != null) Destroy(_background);
