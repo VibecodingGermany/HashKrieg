@@ -1,10 +1,13 @@
 # Project Nova
 
-**Dokumentversion:** 0.16.0 | **Status:** unveröffentlichter Recovery-Stand | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Dokumentversion:** 0.17.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-07
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
 > **Arbeitstitel in Umstellung: _Hashkrieg_.**
+>
+> **Es ist spielbar.** Eine vollständige Runde gegen die KI läuft seit dem
+> 7. August 2026 — [ausprobieren](#4-das-spiel-ausprobieren).
 
 | Allianz | | Legion | |
 |---|---|---|---|
@@ -98,19 +101,26 @@ und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 ## 3. Projektstatus
 
-**Phase:** Implementierungs-Recovery · **Aktiv:** Sprint 7 · **Governance:** Tier 1
+**Phase:** Implementierungs-Recovery · **Governance:** Tier 1
+
+> ### 🎮 Der Kernloop ist geschlossen
+>
+> **Am 7. August 2026 wurde die erste vollständige Runde gespielt** — vom
+> Hauptmenü über Basisbau, Ernte und Truppenproduktion bis zum Gefecht und
+> zum Ergebnisbildschirm. Ernten, bauen, kämpfen, gewinnen, neu anfangen:
+> das Spiel trägt sich zum ersten Mal selbst.
 
 | Ergebnisstufe | Status |
 |---|---|
-| Spielbar | lokales 1v1 gegen eine KI, mit Menü, HUD und Siegbedingung (siehe §4) |
-| Kernloop | **fast geschlossen** — Ernte und Einheitenproduktion sind der letzte offene Schritt |
+| Spielbar | **ja** — lokales 1v1 gegen eine KI, eine Runde von Anfang bis Ende |
+| Kernloop | **geschlossen** (2026-08-07) |
 | MS-0 | offen — Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
 | MS-1 / MVP | nicht erreicht — Lücken im [ScopeLedger](docs/production/ScopeLedger.md) |
 | Alpha | nicht begonnen |
 
 ### Was seit Juli entstanden ist
 
-Vier aufeinander aufbauende Sprints haben aus einer Simulation ohne Zugang ein
+Fünf aufeinander aufbauende Sprints haben aus einer Simulation ohne Zugang ein
 Spiel gemacht, das man starten, bedienen und gewinnen kann:
 
 | | Was daraus wurde |
@@ -119,6 +129,7 @@ Spiel gemacht, das man starten, bedienen und gewinnen kann:
 | **Hauptmenü und Einstellungen** (D-083) | Menü mit Key Art, Titel und Musik statt Direktstart ins Match. Musik- und SFX-Regler, Renderdetail, vSync, Auflösung, Vollbild — als lesbares JSON gespeichert. Erstes UI-Toolkit-UI im Projekt. |
 | **Bedienbares HUD** (D-084) | Bauleiste mit allen neun Gebäuden samt Sperrgrund, Kommandokarte, Minimap mit Kamerafenster, Platzierungsvorschau, Auswahl- und Sammelpunktmarker. Alles Sichtbare ist auch anklickbar. |
 | **Bauen und Kartenbild** (D-085) | Baustellen werden fertig: Der Builder fährt selbst zur Baustelle, die Karte sagt, was sie tut („kein Builder", „im Bau, 43 %", „fertig in ~12 s"). Dazu ein Zonenmodell, das überlappende HUD-Panels konstruktionsbedingt ausschließt, und eine Wüste aus prozeduraler Textur, Streufelsen und warmem Licht — ohne ein einziges neues Asset. |
+| **Gefecht und Rundenrahmen** (D-086, D-087) | **Der Schritt, der den Loop schließt.** Einheiten und Türme erfassen Ziele selbst und erwidern Feuer — vorher brauchte jeder einzelne Schuss einen Klick. Der Harvester fährt seinen Kreislauf allein: hin, ernten, abliefern, wieder von vorn. Dazu Lebensbalken, Ergebnisbildschirm mit *Neue Runde*, sichtbare Pause, Kontrollgruppen 1–9 und Ingame-Musik. |
 
 Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich in
 Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein Simulationskern
@@ -127,14 +138,24 @@ Drop-in-Pipeline einfahren (§5).
 
 ### Was noch fehlt
 
-Ehrlich und ohne Beschönigung — der Kernloop ist an zwei Stellen offen:
+Ehrlich und ohne Beschönigung. Der Loop läuft — aber ein Spiel ist mehr als ein
+funktionierender Loop:
 
-- **Aus der Kaserne kommen keine Soldaten** und **der Harvester erntet nicht.**
-  Beides ist analysiert und steht als erster Posten im nächsten Sprint.
-- **Einheiten kämpfen nicht von selbst.** Jeder Schuss braucht heute einen Klick;
-  automatische Zielerfassung und Feuererwiderung sind der Kern des nächsten Sprints.
-- **Die Runde hat kein Ende.** „VICTORY" erscheint als Wort in einer Textzeile, die
-  Simulation läuft weiter, und der einzige Ausweg ist Programm beenden.
+- **Einheiten stehen übereinander.** Eine Move-Order schickt alle markierten
+  Einheiten auf *dieselbe* Zelle, und die Abstandsrechnung greift nur, solange
+  sie in Bewegung sind — wer ankommt, wird zum unbeweglichen Teil des Stapels.
+  Ohne Formation gibt es keine Frontlinie und kein Flankieren.
+- **Einheiten laufen durch Gebäude.** Gebäude-Grundflächen landen nie im
+  Kostenfeld der Wegfindung, also kennt die Simulation keinen belegten Raum.
+- **Kein Attack-Move.** Truppen feuern zwar von selbst, halten unterwegs aber
+  nicht an, um zu kämpfen.
+- **Keine Soundeffekte.** Musik ja, Gefechtsgeräusche nein.
+- **Kein Speichern.** Die Simulation kann ihren Zustand vollständig
+  serialisieren und hash-identisch fortsetzen — es fehlt nur das Schreiben auf
+  die Platte.
+
+Die ersten beiden Punkte sind analysiert und Inhalt des laufenden Sprints
+[Truppenführung](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md).
 
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
@@ -147,11 +168,15 @@ Gate-Regime G0–G5 mit Evidence- und Receipt-Verträgen blockiert nichts mehr; 
 ist vollständig erhalten und ruht bis Tier 3 — siehe
 [quality/README.md](quality/README.md).
 
-## 4. Das Spiel ausprobieren (Graybox)
+## 4. Das Spiel ausprobieren
 
-Lokales 1v1 gegen eine KI, mit Menü, Bauleiste, Minimap, Fog of War,
-Schadensmatrix und Siegauswertung. Was es zeigt und was noch fehlt, steht
-weiter unten — bitte vor dem ersten Start lesen.
+**Eine Runde dauert etwa 15 bis 30 Minuten** und läuft so: Menü → Neues Spiel →
+Raffinerie bauen → Harvester produzieren → Kraftwerk und Kaserne → Armee bauen →
+zur Gegnerbasis → feindliches Hauptquartier zerstören → Ergebnisbildschirm.
+
+Lokales 1v1 gegen eine KI, mit Menü, Musik, Bauleiste, Minimap, Fog of War,
+Schadensmatrix und Siegauswertung. Was läuft und was nicht, steht weiter unten —
+bitte vor dem ersten Start lesen.
 
 ### Variante 1: im Editor (empfohlen)
 
@@ -176,7 +201,8 @@ Abkürzungen für Geübte. Verbindlich ist der Code (`RtsDeviceInput`).
 | Eingabe | Wirkung |
 |---|---|
 | Linke Maustaste, Klick | Eigene Einheit oder eigenes Gebäude auswählen, sonst Auswahl leeren |
-| Linke Maustaste, Ziehen | Box-Auswahl |
+| Linke Maustaste, Ziehen | Box-Auswahl · mit `Shift` zur bestehenden Auswahl hinzufügen |
+| `Strg`+`1`…`9` · `1`…`9` | Kontrollgruppe setzen · Kontrollgruppe abrufen |
 | Rechte Maustaste | Bewegen; mit einem eigenen Produktionsgebäude in der Auswahl: Sammelpunkt setzen |
 | Mittlere Maustaste, Ziehen | Kamera drehen · `Leertaste` setzt sie zurück |
 | Pfeiltasten, Bildschirmrand | Kamera schwenken · Mausrad Zoom · `Z` / `X` drehen |
@@ -218,29 +244,31 @@ ausgeführt** — der erste Windows-Start ist gleichzeitig der erste echte Test.
 
 ### Was läuft — und was nicht
 
-**Läuft:** Lockstep-Kern mit 10 Hz, Befehle ausschließlich durch den versiegelten
-Command-Pfad; Menü und Einstellungen; Auswahl, Bewegung, Flow-Field-Pathfinding;
-Basisbau von der Bauleiste bis zum fertigen Gebäude; Produktionswarteschlangen mit
-Sammelpunkt; Fog of War; Schadens- und Panzerungsmatrix; eine KI, die baut, erntet,
-Truppen produziert und in Wellen angreift; Sieg durch Zerstörung des feindlichen
-Hauptquartiers.
+**Läuft — eine vollständige Runde, Ende zu Ende:** Lockstep-Kern mit 10 Hz,
+Befehle ausschließlich durch den versiegelten Command-Pfad; Menü, Einstellungen
+und Musik; Auswahl, Kontrollgruppen, Bewegung, Flow-Field-Pathfinding; Basisbau
+von der Bauleiste bis zum fertigen Gebäude; der Harvester-Kreislauf ohne
+Mikromanagement; Produktionswarteschlangen mit Sammelpunkt; Fog of War;
+Schadens- und Panzerungsmatrix; Einheiten und Türme, die selbst Ziele erfassen
+und Feuer erwidern; eine KI, die baut, erntet, Truppen produziert und in Wellen
+angreift; Lebensbalken, sichtbare Pause und ein Ergebnisbildschirm mit
+*Neue Runde*.
 
 **Läuft noch nicht:**
 
-- **Ernte und Einheitenproduktion.** Der Harvester fährt nicht zum Feld, und aus
-  der Kaserne kommt keine Einheit. Beides ist analysiert und steht als erster
-  Posten im nächsten Sprint. **Das ist aktuell der Grund, warum man eine Runde
-  nicht zu Ende spielen kann.**
-- **Kampf braucht Klicks.** Einheiten erfassen keine Ziele von selbst und erwidern
-  kein Feuer; jeder Schuss ist ein Einzelklick. Die Verteidigungsplattform ist
-  bewaffnet, kann aber strukturell nie feuern.
-- **Kein Rundenabschluss.** Der Ausgang steht als Wort in der Statuszeile, danach
-  läuft die Simulation weiter. Kein Ergebnisbildschirm, kein Neustart.
-- **Keine Ingame-Musik und keine Soundeffekte.** Die Menümusik ist da; im Gefecht
-  ist es still.
+- **Einheiten stapeln sich.** Eine Move-Order schickt alle markierten Einheiten
+  auf dieselbe Zelle, und angekommene Einheiten fallen aus der Abstandsrechnung
+  heraus — der Stapel bleibt. Ohne Formation gibt es keine Frontlinie.
+- **Einheiten laufen durch Gebäude.** Grundflächen landen nie im Kostenfeld der
+  Wegfindung.
+- **Kein Attack-Move.** Truppen feuern von selbst, halten unterwegs aber nicht
+  zum Kämpfen an.
+- **Keine Soundeffekte.** Musik ja, Gefechtsgeräusche nein.
+- **Lager und Radar kosten Geld und tun nichts.** Zwei von neun Gebäuden warten
+  noch auf ihre Wirkung.
 
-Der nächste Sprint schließt genau diese Liste ab:
-[09_Sprint_Gefecht_und_Rundenrahmen.md](docs/production/hashkrieg/09_Sprint_Gefecht_und_Rundenrahmen.md).
+Die ersten beiden Punkte sind analysiert und Inhalt des laufenden Sprints:
+[11_Sprint_Truppenfuehrung.md](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md).
 Die vollständige Liste der Verschiebungen steht im
 [ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll im
 [GrayboxLog](docs/production/GrayboxLog.md).
@@ -379,20 +407,19 @@ Punkt geführt.
 
 ## Nächste Schritte
 
-Der nächste Sprint schließt den Kernloop und gibt der Runde ein Ende
-([09_Sprint_Gefecht_und_Rundenrahmen.md](docs/production/hashkrieg/09_Sprint_Gefecht_und_Rundenrahmen.md)):
+Der laufende Sprint bringt den Truppen bei, sich den Platz zu teilen
+([11_Sprint_Truppenfuehrung.md](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md)):
+Formationsverteilung statt einer gemeinsamen Zielzelle, Abstand halten auch im
+Stand, und Gebäude, um die herum gelaufen wird statt hindurch.
 
-1. **Ernte und Einheitenproduktion reparieren** — ohne sie lässt sich der Rest
-   nicht einmal spielen.
-2. **Zielerfassung und Feuererwiderung** — Einheiten und Türme kämpfen von selbst,
-   statt Klick für Klick.
-3. **Rundenrahmen** — Ergebnisbildschirm, sichtbare Pause, Neustart und Rückweg
-   ins Menü.
-4. **Ingame-Musik** und die billigen Bedienbarkeits-Posten: Kontrollgruppen,
-   sichtbare Ablehnungsgründe, Steuerungslegende.
+Danach zur Bewertung, in dieser Reihenfolge:
 
-Danach zur Bewertung: Wirtschaftsdruck durch erschöpfbare Felder, Ausbau der KI,
-und die Gebäude, die heute Geld kosten und nichts tun (Lager, Radar).
+1. **Soundeffekte** — zwölf Geräusche trennen „klingt kaputt" von „klingt wie ein
+   Spiel". Das Gefecht ist bisher stumm.
+2. **Wirtschaftsdruck** — endliche Aetheriumfelder geben der Runde einen Bogen und
+   einen Grund, um Gebiet zu kämpfen.
+3. **Gebäude mit Wirkung** — Lager und Radar kosten Geld und tun nichts.
+4. **KI-Ausbau** — der Gegner spielt, aber schlicht.
 
 Die Gate-Kette G0–G5 ruht unter Tier 1 und wird erst wieder aufgenommen, wenn das
 Projekt ein Publikum hat.
@@ -412,4 +439,5 @@ Projekt ein Publikum hat.
 | 0.13.0 | 2026-07-26 | Abschnitt „Das Spiel ausprobieren" mit Editor-Start, Steuerungslegende, Player-Anleitung und ehrlicher Abgrenzung des Graybox-Stands ergänzt | Technical Writer |
 | 0.14.0 | 2026-07-26 | Abschnitt zum neuen Arbeitstitel *Hashkrieg* ergänzt: Weltentwurf, Concept-Art-Satz und Style-Guide verlinkt | Technical Writer |
 | 0.15.0 | 2026-07-26 | Neu gegliedert und bebildert: Hashkrieg-Richtung nach vorn gezogen, die offene Wirtschaftsentscheidung als eigener Abschnitt sichtbar gemacht, Mitmach-Abschnitt mit Einstiegspunkten ergänzt, Projektstatus um Graybox und Fraktionsidentität aktualisiert, Lizenzlage präzisiert | Technical Writer |
+| 0.17.0 | 2026-08-07 | **Kernloop geschlossen:** erste vollständige Runde gespielt. Sprint „Gefecht und Rundenrahmen" (D-086, D-087) als fünfte Zeile in den Werdegang aufgenommen; Projektstatus von „fast geschlossen" auf „geschlossen" gezogen und der Kopf sagt jetzt in der ersten Zeile, dass das Spiel spielbar ist; „Was noch fehlt" komplett ersetzt (die vier alten Punkte sind erledigt) durch Einheiten-Stapelung, Wegfindung durch Gebäude, fehlendes Attack-Move und stumme Gefechte; Steuerung um Kontrollgruppen und additive Auswahl ergänzt; Nächste Schritte auf Sprint 11 umgestellt; Sprint-Feld im Kopf entfernt, weil die Sprint-7-Zählung seit der Hashkrieg-Reihe nicht mehr trägt | Technical Writer |
 | 0.16.0 | 2026-08-06 | Auf den Stand nach vier Sprints gezogen (D-077, D-083, D-084, D-085): Projektstatus nennt jetzt die spielende KI, Menü, bedienbares HUD und funktionierendes Bauen; §4 korrigiert den Start (Menü statt Direktstart), führt die vollständige Steuerung und ersetzt die überholte „was die Graybox nicht kann"-Liste durch den echten offenen Rest; §5 dokumentiert die 34 3D-Assets und die Drop-in-Pipeline statt „es existiert kein 3D-Asset"; Mitmach-Tabelle und Nächste Schritte auf den laufenden Sprintplan umgestellt | Technical Writer |
