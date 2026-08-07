@@ -339,8 +339,16 @@ namespace Nova.SimRunner.Tests
             Assert.That(hostA.Kernel.CurrentTick.Value, Is.EqualTo(tickAfterStall),
                 "once the announced window is drained, the client freezes — stall is right, running on is the bug");
 
-            // B returns: the match resumes and both ends stay bit-identical.
+            // B returns: the match resumes. A keeps the lead it legitimately
+            // drained while B was silent (asserted above), and Drive stops
+            // once the SLOWER end reaches the mark — so the two do not stand
+            // on the same tick, exactly the bounded drift this test declares
+            // by design further up. The invariant of lockstep is not "same
+            // tick at the same moment", it is "same state at the same tick":
+            // level the laggard first, then compare. Comparing hashes taken
+            // at different ticks would assert nothing at all.
             Drive(server, clientA, clientB, hostA, hostB, 500);
+            DriveUntilLevel(server, clientA, clientB, hostA, hostB);
             Assert.That(hostA.Kernel.CurrentTick.Value, Is.EqualTo(hostB.Kernel.CurrentTick.Value));
             Assert.That(hostA.Kernel.CalculateStateHash(), Is.EqualTo(hostB.Kernel.CalculateStateHash()));
             server.Stop();
@@ -434,6 +442,42 @@ namespace Nova.SimRunner.Tests
                 clientB.TryStepTick(hostB.Kernel);
             }
             Assert.That(guard, Is.GreaterThan(0), "drive guard exhausted — a client wedged");
+        }
+
+        /// <summary>
+        /// Steps ONLY the end that is behind, until both kernels stand on the
+        /// same tick — the precondition for comparing state hashes at all.
+        /// <para>
+        /// The leader does not need to step again for this: completeness for
+        /// tick X is announced at session tick X - InputDelay + 1, so an end
+        /// that is ahead has already announced through the ticks the laggard
+        /// still has to execute. And the per-slot script is keyed on the
+        /// kernel tick (fires exactly once per tick value), so a laggard
+        /// catching up issues exactly the commands the leader issued at those
+        /// same ticks — stepping one side alone cannot change the outcome.
+        /// </para>
+        /// </summary>
+        private static void DriveUntilLevel(RelayServerCore server, RelayMatchClient clientA, RelayMatchClient clientB,
+            ClientHost hostA, ClientHost hostB)
+        {
+            long guard = 100_000;
+            while (hostA.Kernel.CurrentTick.Value != hostB.Kernel.CurrentTick.Value && guard-- > 0)
+            {
+                server.Poll();
+                clientA.Poll();
+                clientB.Poll();
+                if (hostA.Kernel.CurrentTick.Value < hostB.Kernel.CurrentTick.Value)
+                {
+                    hostA.RunScript();
+                    clientA.TryStepTick(hostA.Kernel);
+                }
+                else
+                {
+                    hostB.RunScript();
+                    clientB.TryStepTick(hostB.Kernel);
+                }
+            }
+            Assert.That(guard, Is.GreaterThan(0), "level-up guard exhausted — the laggard could not catch up");
         }
 
         private static void PumpUntil(RelayServerCore server, RelayMatchClient clientA, RelayMatchClient clientB,
