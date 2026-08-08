@@ -68,8 +68,11 @@ namespace Nova.Networking
         /// <summary>Wall-clock budget of a stall before the peer counts as lost (sprint A2c: 30 s).</summary>
         public const double StallTimeoutSeconds = 30.0;
 
-        private readonly TcpRelayConnection _connection = new TcpRelayConnection();
+        private readonly TcpRelayConnection _connection;
         private readonly Func<uint> _clockMilliseconds;
+        private ulong _pendingMatchToken;
+        private bool _helloPending;
+        private bool _connectAttempted;
         private LockstepBarrier _barrier;
         private CommandIngress _ingress;
         private MatchSession _session;
@@ -97,6 +100,7 @@ namespace Nova.Networking
         {
             _clockMilliseconds = clockMilliseconds
                 ?? throw new ArgumentNullException(nameof(clockMilliseconds));
+            _connection = new TcpRelayConnection(_clockMilliseconds);
             _connection.SetFrameHandler(OnFrame);
             string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (string.IsNullOrEmpty(root)) root = Path.GetTempPath();
@@ -229,12 +233,14 @@ namespace Nova.Networking
             // A match client is a single-session authority. Reusing it would
             // retain the old ingress/dedupe/barrier and is therefore a
             // fail-closed programming error: restart with a fresh client.
-            if (Phase != RelayClientPhase.Disconnected || _ingress != null || HasOffer)
+            if (_connectAttempted || Phase != RelayClientPhase.Disconnected
+                || _ingress != null || HasOffer)
             {
                 Phase = RelayClientPhase.Ended;
                 EndReason = "relay client reuse refused — create a fresh client for a new match";
                 return;
             }
+            _connectAttempted = true;
             if (string.IsNullOrWhiteSpace(host) || port < 1 || port > 65535 || matchToken == 0)
             {
                 Phase = RelayClientPhase.Ended;
@@ -247,15 +253,13 @@ namespace Nova.Networking
             _diagnosticWritten = false;
             LastDiagnosticPath = null;
             LastDiagnosticError = string.Empty;
+            _pendingMatchToken = matchToken;
+            _helloPending = true;
             if (!_connection.Connect(host, port, timeoutMilliseconds))
             {
+                ClearPendingHello();
                 Phase = RelayClientPhase.Ended;
                 EndReason = _connection.LastError ?? "connect failed";
-                return;
-            }
-            if (!_connection.SendFrame(RelayFrameType.Hello, RelayProtocol.CreateHelloPayload(matchToken)))
-            {
-                EndMatch(_connection.LastError ?? "relay hello failed");
                 return;
             }
             Phase = RelayClientPhase.WaitingOffer;
@@ -263,6 +267,7 @@ namespace Nova.Networking
 
         public void Disconnect()
         {
+            ClearPendingHello();
             _connection.Disconnect();
             DisposeDiagnosticRecordSpool();
             if (Phase != RelayClientPhase.Ended)
@@ -341,6 +346,19 @@ namespace Nova.Networking
         public void Poll()
         {
             _connection.Poll();
+
+            if (_helloPending && _connection.State == RelayConnectionState.Connected)
+            {
+                ulong matchToken = _pendingMatchToken;
+                ClearPendingHello();
+                if (!_connection.SendFrame(
+                        RelayFrameType.Hello,
+                        RelayProtocol.CreateHelloPayload(matchToken)))
+                {
+                    EndMatch(_connection.LastError ?? "relay hello failed");
+                    return;
+                }
+            }
 
             if (_connection.State == RelayConnectionState.Failed
                 && Phase != RelayClientPhase.Ended)
@@ -736,11 +754,18 @@ namespace Nova.Networking
 
         private void EndMatch(string reason)
         {
+            ClearPendingHello();
             EndReason = reason;
             Phase = RelayClientPhase.Ended;
             _stallActive = false;
             _connection.Disconnect();
             DisposeDiagnosticRecordSpool();
+        }
+
+        private void ClearPendingHello()
+        {
+            _pendingMatchToken = 0;
+            _helloPending = false;
         }
 
         private void WriteDesyncDiagnostic(uint tick)

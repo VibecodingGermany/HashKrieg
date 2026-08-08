@@ -15,6 +15,65 @@ using EntityId = Nova.Core.EntityId;
 
 namespace Nova.Gameplay.Match
 {
+    /// <summary>Expected relay slot of a manually started two-player match.</summary>
+    public enum NetworkJoinRole
+    {
+        Host = 0,
+        Guest = 1,
+    }
+
+    /// <summary>Presentation-safe progress of the menu-driven network join.</summary>
+    public enum NetworkJoinPhase
+    {
+        Idle = 0,
+        Connecting = 1,
+        CheckingStart = 2,
+        WaitingForOpponent = 3,
+        Ready = 4,
+        Failed = 5,
+    }
+
+    /// <summary>Stable, presentation-safe category for a failed network join.</summary>
+    public enum NetworkJoinFailure
+    {
+        None = 0,
+        InvalidHost = 1,
+        InvalidPort = 2,
+        InvalidMatchCode = 3,
+        RoleMismatch = 4,
+        MatchCodeRejected = 5,
+        DefinitionsMismatch = 6,
+        FingerprintMismatch = 7,
+        SnapshotMismatch = 8,
+        PeerLost = 9,
+        Stall = 10,
+        Desync = 11,
+        Technical = 12,
+    }
+
+    /// <summary>
+    /// Immutable menu-facing join status. It deliberately contains no relay
+    /// client, endpoint or match-code data.
+    /// </summary>
+    public readonly struct NetworkJoinStatus
+    {
+        public NetworkJoinStatus(
+            NetworkJoinPhase phase, NetworkJoinFailure failure, string message)
+        {
+            Phase = phase;
+            Failure = failure;
+            Message = message ?? string.Empty;
+        }
+
+        public NetworkJoinPhase Phase { get; }
+        public NetworkJoinFailure Failure { get; }
+        public string Message { get; }
+        public bool IsActive => Phase == NetworkJoinPhase.Connecting
+            || Phase == NetworkJoinPhase.CheckingStart
+            || Phase == NetworkJoinPhase.WaitingForOpponent;
+        public bool CanCancel => IsActive;
+    }
+
     /// <summary>
     /// GRAYBOX MATCH SETUP — the component that actually starts a playable
     /// match. It sits next to <see cref="MatchRunner"/> on the same
@@ -113,8 +172,13 @@ namespace Nova.Gameplay.Match
         private MatchConfig _activeConfig;
         private bool _waitingForOffer;
         private bool _waitingForStart;
+        private bool _offerAccepted;
+        private int _expectedNetworkSlot = -1;
         private bool _networkFailureReported;
         private string _networkStatusReason = string.Empty;
+        private NetworkJoinStatus _networkJoinStatus = new NetworkJoinStatus(
+            NetworkJoinPhase.Idle, NetworkJoinFailure.None,
+            "Keine Netzverbindung aktiv.");
 
         /// <summary>The runner this bootstrap drives (resolved from the same GameObject).</summary>
         public MatchRunner Runner { get; private set; }
@@ -124,7 +188,7 @@ namespace Nova.Gameplay.Match
 
         /// <summary>The current relay client during handshake and after start, or null for a local match.</summary>
         public RelayMatchClient NetworkClient =>
-            _pendingConfig?.Transport ?? _activeConfig?.Transport ?? Runner?.RelayClient;
+            _pendingConfig?.Transport ?? _activeConfig?.Transport;
 
         /// <summary>Public network lifecycle retained through stalls and terminal shutdown.</summary>
         public RelayMatchLifecycle NetworkLifecycle => NetworkClient != null
@@ -136,6 +200,9 @@ namespace Nova.Gameplay.Match
 
         public int NetworkStalledOnSlot => NetworkClient?.StalledOnSlot ?? -1;
         public double NetworkStallSeconds => NetworkClient?.StallSeconds ?? 0.0;
+
+        /// <summary>Menu-safe network progress without exposing networking types.</summary>
+        public NetworkJoinStatus JoinStatus => _networkJoinStatus;
 
         /// <summary>Seed the match was started with.</summary>
         public ulong Seed => _activeConfig != null ? _activeConfig.Seed : _seed;
@@ -224,16 +291,42 @@ namespace Nova.Gameplay.Match
 
                 try
                 {
-                    if (client.ServerDefinitionsHash64 != SimDefinitions.ComputeDefinitionsHash64())
+                    if (!_offerAccepted)
                     {
-                        throw new InvalidOperationException(
-                            $"relay definitions hash 0x{client.ServerDefinitionsHash64:X16} does not match this build");
+                        if (_expectedNetworkSlot >= 0
+                            && client.AssignedSlot != _expectedNetworkSlot)
+                        {
+                            string roleMessage = _expectedNetworkSlot == (int)NetworkJoinRole.Host
+                                ? "Rollenfehler: Der Host erwartet Slot 0 und muss zuerst verbinden."
+                                : "Rollenfehler: Der Gast erwartet Slot 1 und verbindet erst nach dem Host.";
+                            client.Disconnect();
+                            FailNetworkJoin(NetworkJoinFailure.RoleMismatch, roleMessage);
+                            return;
+                        }
+                        if (client.ServerDefinitionsHash64 != SimDefinitions.ComputeDefinitionsHash64())
+                        {
+                            throw new InvalidOperationException(
+                                $"relay definitions hash 0x{client.ServerDefinitionsHash64:X16} does not match this build");
+                        }
+
+                        // Deliberately defer building the opening by one host
+                        // frame. The status band can therefore show the real
+                        // role/definition/start-data check instead of jumping
+                        // directly from Connecting to Waiting.
+                        _offerAccepted = true;
+                        SetJoinStatus(
+                            NetworkJoinPhase.CheckingStart,
+                            "Prüfe Rolle, Definitionen und Startdaten …");
+                        return;
                     }
                     MatchConfig offered = _pendingConfig.WithOffer(client);
                     _waitingForOffer = false;
                     BuildOpening(offered);
                     SubmitNetworkProof(offered);
                     _waitingForStart = true;
+                    SetJoinStatus(
+                        NetworkJoinPhase.WaitingForOpponent,
+                        "Warte auf Gegenspieler — Start und Fingerabdruck werden geprüft …");
                 }
                 catch (Exception exception)
                 {
@@ -256,6 +349,7 @@ namespace Nova.Gameplay.Match
                     _waitingForStart = false;
                     _pendingConfig = null;
                     IsMatchReady = true;
+                    SetJoinStatus(NetworkJoinPhase.Ready, "Netzpartie ist bereit.");
                     Debug.Log(
                         $"[MatchBootstrap] Network match started as slot {_activeConfig.LocalSlot} " +
                         $"(seed 0x{_activeConfig.Seed:X16}, delay {_activeConfig.InputDelayTicks}).");
@@ -305,6 +399,115 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
+        /// Validates menu text and begins a fresh network join. The match code
+        /// is parsed only into the in-memory transport configuration and is
+        /// never echoed, logged or persisted.
+        /// </summary>
+        public bool TryStartNetworkJoin(
+            string host, string portText, string matchCode, NetworkJoinRole role)
+        {
+            if (!int.TryParse(
+                    portText, NumberStyles.None, CultureInfo.InvariantCulture,
+                    out int port))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.InvalidPort,
+                    "Der Port muss eine Zahl von 1 bis 65535 sein.");
+                return false;
+            }
+            return TryStartNetworkJoin(host, port, matchCode, role);
+        }
+
+        /// <summary>Integer-port overload for tests and non-UI hosts.</summary>
+        public bool TryStartNetworkJoin(
+            string host, int port, string matchCode, NetworkJoinRole role)
+        {
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.InvalidHost,
+                    "Die Serveradresse darf nicht leer sein.");
+                return false;
+            }
+            if (port < 1 || port > 65535)
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.InvalidPort,
+                    "Der Port muss zwischen 1 und 65535 liegen.");
+                return false;
+            }
+            if (!Enum.IsDefined(typeof(NetworkJoinRole), role))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.RoleMismatch,
+                    "Die gewählte Netzwerkrolle ist ungültig.");
+                return false;
+            }
+            if (!RelayProtocol.TryParseMatchToken(matchCode, out ulong matchToken))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.InvalidMatchCode,
+                    "Der Match-Code muss aus genau 16 Hexzeichen bestehen und darf nicht null sein.");
+                return false;
+            }
+            if (IsMatchReady || (_pendingConfig != null && _pendingConfig.IsNetworkMatch))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.Technical,
+                    "Eine Partie oder Verbindung ist bereits aktiv.");
+                return false;
+            }
+
+            ResetNetworkJoin();
+            _expectedNetworkSlot = (int)role;
+            SetJoinStatus(NetworkJoinPhase.Connecting, "Verbinde mit dem Relay …");
+
+            MatchConfig local = MatchConfig.LocalVsAi(
+                _seed, _mapWidth, _mapHeight, _entityCapacity,
+                Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
+            MatchConfig network = MatchConfig.NetworkVsHuman(
+                host.Trim(), port, matchToken, new RelayMatchClient());
+            network.Seed = local.Seed;
+            network.MapWidth = local.MapWidth;
+            network.MapHeight = local.MapHeight;
+            network.EntityCapacity = local.EntityCapacity;
+            network.StartingCredits = local.StartingCredits;
+            StartGrayboxMatch(network);
+            return _pendingConfig != null
+                && _pendingConfig.IsNetworkMatch
+                && _networkJoinStatus.Phase != NetworkJoinPhase.Failed;
+        }
+
+        /// <summary>
+        /// Cancels connect/proof waiting and clears every prepared network
+        /// opening. A later retry always constructs a fresh relay client.
+        /// </summary>
+        public bool CancelNetworkJoin()
+        {
+            if (!_networkJoinStatus.CanCancel) return false;
+            ResetNetworkJoin();
+            return true;
+        }
+
+        /// <summary>Clears terminal/cancelled join state and any prepared opening.</summary>
+        public void ResetNetworkJoin()
+        {
+            RelayMatchClient client = NetworkClient;
+            client?.Disconnect();
+            Runner?.StopNetworkMatch();
+            _pendingConfig = null;
+            _activeConfig = null;
+            _waitingForOffer = false;
+            _waitingForStart = false;
+            _offerAccepted = false;
+            _expectedNetworkSlot = -1;
+            _networkFailureReported = false;
+            _networkStatusReason = string.Empty;
+            IsMatchReady = false;
+            SetJoinStatus(NetworkJoinPhase.Idle, "Keine Netzverbindung aktiv.");
+        }
+
+        /// <summary>
         /// Starts from an explicit configuration. Local matches build
         /// synchronously; network matches connect and wait for the relay's
         /// authoritative seed, slot and delay before creating any state.
@@ -336,8 +539,13 @@ namespace Nova.Gameplay.Match
                 _pendingConfig = validated;
                 _waitingForOffer = true;
                 _waitingForStart = false;
+                _offerAccepted = false;
                 _networkFailureReported = false;
                 _networkStatusReason = string.Empty;
+                if (_networkJoinStatus.Phase == NetworkJoinPhase.Idle)
+                {
+                    SetJoinStatus(NetworkJoinPhase.Connecting, "Verbinde mit dem Relay …");
+                }
                 validated.Transport.Connect(validated.RelayHost, validated.RelayPort, validated.MatchToken);
                 if (validated.Transport.Phase == RelayClientPhase.Ended)
                 {
@@ -486,15 +694,99 @@ namespace Nova.Gameplay.Match
         private void ReportNetworkFailure(string reason)
         {
             if (_networkFailureReported) return;
+            ClassifyNetworkFailure(reason, out NetworkJoinFailure failure, out string message);
+            FailNetworkJoin(failure, message);
+        }
+
+        private void FailNetworkJoin(NetworkJoinFailure failure, string message)
+        {
+            RelayMatchClient client = NetworkClient;
+            client?.Disconnect();
+            Runner?.StopNetworkMatch();
             _networkFailureReported = true;
-            _networkStatusReason = string.IsNullOrWhiteSpace(reason)
-                ? "relay match ended without a reason"
-                : reason;
+            _networkStatusReason = string.IsNullOrWhiteSpace(message)
+                ? "Die Netzpartie wurde ohne technischen Grund beendet."
+                : message;
             _waitingForOffer = false;
             _waitingForStart = false;
-            Debug.LogError(IsMatchReady
-                ? $"[MatchBootstrap] Network match ended: {_networkStatusReason}"
-                : $"[MatchBootstrap] Network match did not start: {_networkStatusReason}");
+            _offerAccepted = false;
+            _expectedNetworkSlot = -1;
+            _pendingConfig = null;
+            if (_activeConfig != null && _activeConfig.IsNetworkMatch)
+            {
+                _activeConfig = null;
+                IsMatchReady = false;
+            }
+            SetJoinStatus(NetworkJoinPhase.Failed, _networkStatusReason, failure);
+            Debug.LogError($"[MatchBootstrap] Network join failed: {_networkStatusReason}");
+        }
+
+        private void SetJoinStatus(
+            NetworkJoinPhase phase, string message,
+            NetworkJoinFailure failure = NetworkJoinFailure.None)
+        {
+            _networkJoinStatus = new NetworkJoinStatus(phase, failure, message);
+        }
+
+        private static void ClassifyNetworkFailure(
+            string reason, out NetworkJoinFailure failure, out string message)
+        {
+            string detail = string.IsNullOrWhiteSpace(reason)
+                ? "kein technischer Detailgrund"
+                : reason.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (ContainsIgnoreCase(detail, "wrong match code"))
+            {
+                failure = NetworkJoinFailure.MatchCodeRejected;
+                message = "Der Relay hat den Match-Code abgelehnt.";
+            }
+            else if (ContainsIgnoreCase(detail, "definitions"))
+            {
+                failure = NetworkJoinFailure.DefinitionsMismatch;
+                message = "Die Spieldaten unterscheiden sich vom Relay-Build.";
+            }
+            else if (ContainsIgnoreCase(detail, "snapshot"))
+            {
+                failure = NetworkJoinFailure.SnapshotMismatch;
+                message = "Der gemeinsame Startzustand stimmt nicht überein.";
+            }
+            else if (ContainsIgnoreCase(detail, "fingerprint"))
+            {
+                failure = NetworkJoinFailure.FingerprintMismatch;
+                message = "Der Start-Fingerabdruck beider Builds stimmt nicht überein.";
+            }
+            else if (ContainsIgnoreCase(detail, "stall")
+                || ContainsIgnoreCase(detail, "delivered nothing"))
+            {
+                failure = NetworkJoinFailure.Stall;
+                message = "Die Netzpartie wartet zu lange auf Eingaben des Gegenspielers.";
+            }
+            else if (ContainsIgnoreCase(detail, "desync"))
+            {
+                failure = NetworkJoinFailure.Desync;
+                message = "Die Simulationen sind auseinandergelaufen; die Partie wurde beendet.";
+            }
+            else if (ContainsIgnoreCase(detail, "waiting for opponent timed out"))
+            {
+                failure = NetworkJoinFailure.PeerLost;
+                message = "Innerhalb von zwei Minuten ist kein Gegenspieler beigetreten.";
+            }
+            else if (ContainsIgnoreCase(detail, "peer lost")
+                || ContainsIgnoreCase(detail, "peer slot")
+                || ContainsIgnoreCase(detail, "disconnected"))
+            {
+                failure = NetworkJoinFailure.PeerLost;
+                message = "Die Verbindung zum Gegenspieler ist abgebrochen.";
+            }
+            else
+            {
+                failure = NetworkJoinFailure.Technical;
+                message = $"Technischer Netzwerkfehler: {detail}";
+            }
+        }
+
+        private static bool ContainsIgnoreCase(string text, string value)
+        {
+            return text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void OnDestroy()

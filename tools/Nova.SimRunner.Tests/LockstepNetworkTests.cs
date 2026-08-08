@@ -57,6 +57,58 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void TcpConnect_IsPollDriven_AndDisconnectCancelsAnInflightAttempt()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var connection = new TcpRelayConnection();
+            TcpClient accepted = null;
+            try
+            {
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                Assert.That(connection.Connect("127.0.0.1", port), Is.True);
+                Assert.That(connection.State, Is.EqualTo(RelayConnectionState.Connecting),
+                    "Connect must only begin the socket operation; Poll owns completion");
+
+                accepted = listener.AcceptTcpClient();
+                long guard = 100_000;
+                while (connection.State == RelayConnectionState.Connecting && guard-- > 0)
+                {
+                    connection.Poll();
+                    System.Threading.Thread.Yield();
+                }
+                Assert.That(guard, Is.GreaterThan(0));
+                Assert.That(connection.State, Is.EqualTo(RelayConnectionState.Connected));
+            }
+            finally
+            {
+                connection.Disconnect();
+                accepted?.Dispose();
+                listener.Stop();
+            }
+
+            listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                var cancelled = new TcpRelayConnection();
+                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                Assert.That(cancelled.Connect("127.0.0.1", port), Is.True);
+                Assert.That(cancelled.State, Is.EqualTo(RelayConnectionState.Connecting));
+
+                cancelled.Disconnect();
+                cancelled.Poll();
+
+                Assert.That(cancelled.State, Is.EqualTo(RelayConnectionState.Disconnected));
+                Assert.That(cancelled.LastError, Is.Null);
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+
+        [Test]
         public void BoundRelayClient_RefusesReuseWithoutOpeningASocket()
         {
             var client = new RelayMatchClient();
@@ -1541,6 +1593,65 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void CompleteProof_MayWaitForOpponentForTwoMinutes_FromProofCompletion()
+        {
+            uint now = 500;
+            var server = new RelayServerCore(
+                Token, Seed, Delay, string.Empty, _ => { }, () => now);
+            RawPeer peer = null;
+            try
+            {
+                server.Start(0);
+                peer = new RawPeer(server.Port);
+                peer.Send(RelayFrameType.Hello, RelayProtocol.CreateHelloPayload(Token));
+                long offerGuard = 100_000;
+                while (peer.Offer == null && offerGuard-- > 0)
+                {
+                    server.Poll();
+                    peer.Pump();
+                }
+                Assert.That(offerGuard, Is.GreaterThan(0));
+
+                ClientHost source = ClientHost.CreatePlayback();
+                peer.Send(RelayFrameType.Fingerprint, source.CreateFingerprint().Serialize());
+                peer.Send(RelayFrameType.InitialSnapshot, source.Kernel.SaveSnapshot());
+                // A single Poll is not enough: the OS may not have exposed
+                // both bytes yet, and advancing the injected clock first
+                // would move the proof-completion timestamp with it.
+                long proofGuard = 100_000;
+                while (server.CompleteProofPeerCount != 1 && proofGuard-- > 0)
+                {
+                    server.Poll();
+                    peer.Pump();
+                }
+                Assert.That(proofGuard, Is.GreaterThan(0),
+                    "relay did not process the complete proof before the clock advanced");
+
+                now += RelayServerCore.OpponentWaitTimeoutMilliseconds - 1;
+                server.Poll();
+                peer.Pump();
+                Assert.That(server.PeerCount, Is.EqualTo(1));
+                Assert.That(peer.RejectReason, Is.Null);
+
+                now += 1;
+                server.Poll();
+                long rejectGuard = 100_000;
+                while (peer.RejectReason == null && rejectGuard-- > 0)
+                {
+                    peer.Pump();
+                }
+                Assert.That(server.PeerCount, Is.Zero);
+                Assert.That(rejectGuard, Is.GreaterThan(0));
+                Assert.That(peer.RejectReason, Does.Contain("waiting for opponent timed out"));
+            }
+            finally
+            {
+                peer?.Dispose();
+                server.Stop();
+            }
+        }
+
+        [Test]
         public void Desync_WritesOneParseableSnapshotAndRecordStreamPerClient()
         {
             string root = Path.Combine(Path.GetTempPath(), "nova-desync-test-" + Guid.NewGuid().ToString("N"));
@@ -2160,6 +2271,9 @@ namespace Nova.SimRunner.Tests
             var client = new RelayMatchClient();
             client.Connect("127.0.0.1", server.Port, Token);
             server.AcceptClient();
+            PollClientUntil(client,
+                () => client.State == RelayConnectionState.Connected,
+                "poll-driven connection and Hello send");
             server.PumpUntilReceived(RelayFrameType.Hello, "client Hello");
             Assert.That(client.Phase, Is.EqualTo(RelayClientPhase.WaitingOffer));
             return (server, client);
@@ -2198,6 +2312,7 @@ namespace Nova.SimRunner.Tests
             while (!condition() && guard-- > 0)
             {
                 client.Poll();
+                System.Threading.Thread.Yield();
             }
             Assert.That(guard, Is.GreaterThan(0),
                 $"client pump guard exhausted waiting for: {what}");

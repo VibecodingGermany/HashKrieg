@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Nova.Core;
 using Nova.Gameplay;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.State;
 
 namespace Nova.Gameplay.Tests
@@ -56,6 +57,31 @@ namespace Nova.Gameplay.Tests
             var reader = new CommandPayloadReader(record.Payload.Span);
             Assert.IsTrue(MovePayload.TryParse(ref reader, out MovePayload move), "sealed Move payload must parse");
             return move.EntityIds;
+        }
+
+        [TestCase(1, FactionId.Alliance, 1)]
+        [TestCase(17, FactionId.Alliance, 17)]
+        [TestCase(1, FactionId.Legion, 18)]
+        [TestCase(5, FactionId.Legion, 22)]
+        [TestCase(17, FactionId.Legion, 34)]
+        public void CanonicalHotkeyDefinition_MapsToTheLocalFactionRole(
+            int canonicalId, FactionId faction, int expected)
+        {
+            Assert.That(RtsIntentDispatcher.TryResolveCanonicalDefinitionId(
+                (ushort)canonicalId, faction, out ushort actual), Is.True);
+            Assert.That(actual, Is.EqualTo((ushort)expected));
+        }
+
+        [Test]
+        public void CanonicalHotkeyDefinition_RejectsInvalidOrAlreadyLegionIds()
+        {
+            Assert.That(RtsIntentDispatcher.TryResolveCanonicalDefinitionId(
+                0, FactionId.Legion, out ushort invalid), Is.False);
+            Assert.That(invalid, Is.Zero);
+            Assert.That(RtsIntentDispatcher.TryResolveCanonicalDefinitionId(
+                SimDefinitions.ToDefinitionId(FactionId.Legion, UnitRole.Builder),
+                FactionId.Legion, out ushort alreadyMapped), Is.False);
+            Assert.That(alreadyMapped, Is.Zero);
         }
 
         [Test]

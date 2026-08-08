@@ -47,6 +47,7 @@ namespace Nova.Networking
 
         public const uint HelloTimeoutMilliseconds = 5_000;
         public const uint ProofTimeoutMilliseconds = 10_000;
+        public const uint OpponentWaitTimeoutMilliseconds = 120_000;
 
         private sealed class Peer
         {
@@ -58,6 +59,8 @@ namespace Nova.Networking
             public bool HelloOk;
             public uint ConnectedAtMilliseconds;
             public uint HelloAtMilliseconds;
+            public bool ProofComplete;
+            public uint ProofCompletedAtMilliseconds;
             public byte[] FingerprintBytes;
             public Nova.Simulation.Replays.MatchFingerprint Fingerprint;
             public byte[] InitialSnapshot;
@@ -130,6 +133,20 @@ namespace Nova.Networking
         public ulong LastDesyncSlot1Hash { get; private set; }
         internal int PendingRecordCount => _pendingRecordCount;
         internal int PendingTickCount => _pendingTicks.Count;
+#if NOVA_RELAY_TESTS
+        internal int CompleteProofPeerCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < _peers.Count; i++)
+                {
+                    if (_peers[i].ProofComplete) count++;
+                }
+                return count;
+            }
+        }
+#endif
 
         public RelayServerCore(
             ulong matchToken, ulong seed, uint inputDelayTicks,
@@ -344,6 +361,7 @@ namespace Nova.Networking
                     }
                     peer.FingerprintBytes = payload;
                     peer.Fingerprint = fingerprint;
+                    MarkProofComplete(peer);
                     return true;
                 }
 
@@ -351,6 +369,7 @@ namespace Nova.Networking
                 {
                     if (!peer.HelloOk || peer.InitialSnapshot != null) return false;
                     peer.InitialSnapshot = payload;
+                    MarkProofComplete(peer);
                     return true;
                 }
 
@@ -1117,18 +1136,38 @@ namespace Nova.Networking
             for (int i = _peers.Count - 1; i >= 0; i--)
             {
                 Peer peer = _peers[i];
-                uint started = peer.HelloOk ? peer.HelloAtMilliseconds : peer.ConnectedAtMilliseconds;
-                uint timeout = peer.HelloOk ? ProofTimeoutMilliseconds : HelloTimeoutMilliseconds;
+                uint started = !peer.HelloOk
+                    ? peer.ConnectedAtMilliseconds
+                    : peer.ProofComplete
+                        ? peer.ProofCompletedAtMilliseconds
+                        : peer.HelloAtMilliseconds;
+                uint timeout = !peer.HelloOk
+                    ? HelloTimeoutMilliseconds
+                    : peer.ProofComplete
+                        ? OpponentWaitTimeoutMilliseconds
+                        : ProofTimeoutMilliseconds;
                 if (unchecked(now - started) < timeout) continue;
 
-                string reason = peer.HelloOk
-                    ? "handshake proof timed out"
-                    : "relay hello timed out";
+                string reason = !peer.HelloOk
+                    ? "relay hello timed out"
+                    : peer.ProofComplete
+                        ? "waiting for opponent timed out"
+                        : "handshake proof timed out";
                 Send(peer, RelayFrameType.Reject,
                     RelayProtocol.CreateReasonPayload(RelayFrameType.Reject, reason));
                 _log($"peer slot {peer.Slot}: {reason}");
                 RemovePeerAt(i);
             }
+        }
+
+        private void MarkProofComplete(Peer peer)
+        {
+            if (peer.ProofComplete || peer.Fingerprint == null || peer.InitialSnapshot == null)
+            {
+                return;
+            }
+            peer.ProofComplete = true;
+            peer.ProofCompletedAtMilliseconds = _clockMilliseconds();
         }
     }
 }

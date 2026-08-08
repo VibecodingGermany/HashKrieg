@@ -1,26 +1,31 @@
 # Verteilbare Builds
 
-Ein Testbuild, den jemand anders installieren und spielen kann — signiert,
-notarisiert, als DMG.
+**Dokumentversion:** 2.0.0 | **Stand:** 2026-08-08 | **Governance-Tier:** 2
+
+Reproduzierbare Testpakete für macOS und Linux. macOS wird signiert und
+notarisiert als DMG verteilt; Linux wird als `tar.gz` mit einem von außen
+prüfbaren Commit-Stempel geliefert.
 
 ## Kurzfassung
 
 ```bash
 tools/packaging/build-mac.sh
+tools/packaging/build-linux.sh
 ```
 
-Ergebnis: `Builds/dist/ProjectNova-<commit>.dmg`. Verschicken, Empfänger zieht
-die App nach „Applications", Doppelklick. Keine Gatekeeper-Warnung, kein
-Rechtsklick-Öffnen, keine Erklärung nötig.
+Ergebnisse:
+
+- macOS: `Builds/dist/ProjectNova-<commit>.dmg`
+- Linux x64: `Builds/dist/ProjectNova-linux-x64-<commit>.tar.gz`
 
 ## Optionen
 
-| Flag | Wofür |
-|---|---|
-| *(keine)* | voll: bauen → signieren → notarisieren → DMG → notarisieren |
-| `--fast` | nur bauen, unsigniert, kein DMG — für eigenes Probespielen |
-| `--skip-build` | vorhandenen Build nur neu verpacken |
-| `--open` | Ergebnis danach öffnen |
+| Flag | macOS | Linux |
+|---|---|---|
+| *(keine)* | bauen → signieren → notarisieren → DMG | bauen → stempeln → `tar.gz` |
+| `--fast` | nur bauen, unsigniert, kein DMG | – |
+| `--skip-build` | vorhandenen Build neu verpacken | vorhandenen Build neu stempeln und verpacken |
+| `--open` | Ergebnis danach öffnen | – |
 
 Für die eigene Iteration ist `--fast` der richtige Weg: Signieren und
 Notarisieren kosten Minuten und bringen auf dem eigenen Rechner nichts. Ein
@@ -30,16 +35,18 @@ lokal gebauter Build hat kein Quarantäne-Attribut und startet ohnehin.
 
 Der Relay-Server sperrt Matches zwischen ungleichen Builds ab (Sprint 12, A4 —
 Fingerprint-Sperre). Beide Spieler brauchen also **genau denselben Commit**.
-Der Hash steht deshalb an drei Stellen:
+Der Hash steht deshalb im Paketnamen und im Player:
 
 - im DMG-Dateinamen — `ProjectNova-1526d7a.dmg`
 - in `LIESMICH.txt` im DMG
 - im `Info.plist` der App unter `NovaBuildCommit`
+- unter Linux in `ProjectNova_Data/NovaBuildCommit.txt`
 
-Die letzte Stelle lässt sich beim Empfänger ohne Rückfrage prüfen:
+Beide Player-Stempel lassen sich beim Empfänger ohne Rückfrage prüfen:
 
 ```bash
 defaults read /Applications/ProjectNova.app/Contents/Info.plist NovaBuildCommit
+cat ProjectNova_Data/NovaBuildCommit.txt
 ```
 
 Ein Build aus einem unsauberen Arbeitsbaum bekommt `-dirty` angehängt und ist
@@ -48,11 +55,22 @@ nicht — verschickt wird nur, was aus einem sauberen Commit fällt.
 
 ## Voraussetzungen
 
-Alles bereits auf dieser Maschine eingerichtet (siehe `apple-upload`-Skill):
+Für macOS:
 
 - `Developer ID Application: Dennis Westermann (VHUL8MFGQT)` im Login-Keychain
 - notarytool-Profil `apple-notary`
 - Unity mit `MacStandaloneSupport` in der Version aus `ProjectSettings/ProjectVersion.txt`
+
+Für Linux:
+
+- dieselbe gepinnte Unity-Version aus `ProjectSettings/ProjectVersion.txt`
+- das Hub-Modul `Linux Build Support (Mono)` unter
+  `PlaybackEngines/LinuxStandaloneSupport`
+
+`build-linux.sh` installiert ein fehlendes Modul nicht. Es bricht vor dem
+Build mit dem erwarteten Pfad ab. `--skip-build` verlangt stattdessen einen
+vorhandenen ausführbaren Player unter
+`Builds/Linux64/ProjectNova.x86_64`.
 
 Der Unity-Editor muss geschlossen sein — er hält eine Sperre auf `Library/`.
 Das Skript prüft das und bricht mit klarer Meldung ab.
@@ -77,8 +95,13 @@ ohne Netz.
 
 ## Was das Skript nicht löst
 
-Ein Paket macht noch kein Match zu zweit. Solange A6 aus Sprint 12
-(`MatchConfig`, beweglicher Slot) nicht steht, startet das Spiel nur Slot 0 =
-Mensch gegen Slot 1 = KI, und es gibt keine Oberfläche, in die Serveradresse
-und Match-Code eingetippt werden könnten. Das DMG ist die Auslieferung, nicht
-die Verbindung.
+Ein Paket ist noch kein Netz-Nachweis. Zwei Unity-Fenster, LAN und VPS müssen
+mit demselben gestempelten Commit tatsächlich gespielt und getrennt
+protokolliert werden. Die Skripte liefern nur das zuordenbare Artefakt.
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 2.0.0 | 2026-08-08 | Linux-x64-Build, Commit-Stempel und `tar.gz`-Verteilung ergänzt; offene Netzabnahmen ehrlich benannt | Project Nova Team |
+| 1.0.0 | 2026-08-08 | macOS-Build-, Signatur-, Notarisierungs- und DMG-Weg dokumentiert | Project Nova Team |
