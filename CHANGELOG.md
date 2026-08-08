@@ -83,6 +83,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   damit ohne Rückfrage beantwortbar. Ein Build aus unsauberem Arbeitsbaum
   bekommt `-dirty` und ist als nicht rekonstruierbar markiert. `--fast`
   überspringt Signatur und DMG fürs eigene Probespielen.
+- **Sprints 13–15 geplant, erstmals für Parallelbetrieb mit einem externen
+  Beitragenden:** Der Netzstrang (13 Netzpartie über den VPS, 14 Lobby über
+  Supabase, 15 Netzstabilität) ist so geschnitten, dass er **keine Datei unter
+  `Scripts/Simulation/` oder `Scripts/AI*` anfasst** — damit gehört der
+  Simulationsraum für die Dauer dieser Sprints allein dem Einheitenstrang
+  ([13B](docs/production/hashkrieg/13B_Sprint_Einheitenverhalten.md)), und die
+  Schreibhoheiten sind wirklich disjunkt statt zufällig überschneidungsfrei.
+  Das Regelwerk dazu steht in
+  [13-15_Parallelbetrieb.md](docs/production/hashkrieg/13-15_Parallelbetrieb.md):
+  Schreibhoheit je Pfad, Merge-Fenster mit Rebuild-Kadenz (jeder
+  simulationsverändernde Merge macht verteilte Builds ungültig, weil der
+  Fingerprint ungleiche Builds trennt), Fork-only-Zugang für fremde
+  Beitragende — und die Regel, dass ein PR Verhalten **oder** eine
+  Determinismus-Baseline ändert, nie beides, weil sonst eine unbemerkte
+  Verhaltensänderung grün durch die CI läuft. Strang C aus Sprint 12 rückt
+  dafür auf Sprint 16, weil er simulationsverändernd ist.
 
 ### Geändert
 - **Truppenführung — Einheiten teilen sich den Platz (D-088, Sprint 11):**
