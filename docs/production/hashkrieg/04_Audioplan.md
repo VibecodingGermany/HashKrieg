@@ -1,18 +1,13 @@
 # Audioplan — von null auf funktional, lizenzsauber
 
-**Version:** 0.1.0 | **Status:** Entwurf – Beschaffungs- und Umsetzungsgrundlage, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art / Audio | **Sprint:** 7
+**Version:** 0.2.0 | **Status:** Tier 0 technisch umgesetzt (D-090), manuelle Gegenhörabnahme offen | **Verantwortungsbereich:** Technical Art / Audio | **Sprint:** 12
 
 ## Zweck
 
-Das Spiel ist vollständig stumm — keine Audiodatei, keine Code-Referenz, nicht
-einmal ein `AudioListener` in der Szene. Dieses Dokument nennt die Sounds, die
-gebraucht werden, die Quellen, aus denen sie lizenzsauber kommen dürfen, und die
-technische Vorbedingung, die sonst übersehen wird.
-
-**Es muss nichts neu entworfen werden.**
-[../../tech/AudioArchitecture.md](../../tech/AudioArchitecture.md) ist vollständig
-ausspezifiziert, und D-039 hat das Backend längst entschieden. Es fehlt
-ausschließlich die Ausführung.
+Dieses Dokument hält den ausgeführten Tier-0-Stand und darunter die historische
+Beschaffungsplanung fest. Der Kampf- und HUD-Pfad besitzt jetzt zwölf
+Soundereignisse, einen D-039-konformen Unity-Service, Mixer, SFX-Regler und 35
+lizenzsaubere Kenney-CC0-Dateien. Die manuelle Gegenhörabnahme bleibt offen.
 
 ## Abhängigkeiten
 
@@ -22,6 +17,55 @@ ausschließlich die Ausführung.
 - [../../assets/AssetRegister.md](../../assets/AssetRegister.md) – Beschaffungsstrategie (enthält veraltete Audio-Zeilen, siehe §5)
 
 ---
+
+## Ausgeführter Tier-0-Stand (D-090)
+
+- **Ereignisse:** `UI_Click`, `UI_Select`, `UI_Ack`, `UI_Deny`,
+  `WPN_Kinetic_Light`, `WPN_Kinetic_Heavy`, `WPN_Explosive`, `IMP_Kinetic`,
+  `IMP_Explosive`, `DTH_Unit`, `DTH_Building`, `PRD_UnitReady`.
+  `ALR_BaseUnderAttack` bleibt Tier 1 und wurde nicht vorgezogen.
+- **Auslösung:** `VisibleCombatFrameDiffer` liefert fog-sichere Kampf-Cues;
+  Menü/HUD/Input rufen UI-Cues direkt über `AudioServiceLocator` auf. Kein
+  Audioaufruf mutiert die Simulation.
+- **Backend:** `Nova.Gameplay.Audio.IAudioService` und `UnityAudioService` sind
+  der einzige neue One-Shot-Pfad. Die zwölf `SoundEventSO`-Assets tragen
+  Kategorie, Standardpriorität, Variationen, Cooldown, Gain, Distanz und
+  Concurrency. `DTH_Building` startet Low-Frequency- und Impact-Layer atomar.
+- **Mischung:** `MIX_Master` enthält `Music`, `SFX`, `Voice` und `Ambience`.
+  Exponiert sind fünf dB-Parameter. Projektweit bleiben 32 reale Stimmen;
+  zwei sind für bestehende Musikcontroller reserviert, 30 für One-Shots und
+  höchstens 24 für räumliche Quellen. Je Schlüssel gelten 3–4 Instanzen,
+  logarithmischer Rolloff 15–120 m, keine Warteschlange und Stealing nur von
+  älteren Stimmen strikt niedrigerer Priorität. `EffectiveSfxVolume` wird mit
+  0 → −80 dB auf den SFX-Bus abgebildet.
+- **Ablage und Format:** Genau 35 unveränderte `.ogg`-Dateien liegen
+  **pack-first** unter `Audio/Sfx/Kenney/{SciFi,Impact,Interface}`. Die
+  Quelldateinamen bleiben erhalten; `.ogg` ist für unveränderte CC0-Quellen
+  ausdrücklich zulässig. `Force To Mono` gilt für die 3D-Familien, nicht für
+  UI. Kurze SFX laden dekomprimiert; Originalbytes und SHA-256 bleiben gleich.
+- **Provenienz:** Je Kenney-Pack liegt ein Batch-Sidecar mit `files[]` vor.
+  Genau drei §3-Lizenzzeilen reichen aus; keine neue §1-Zeile und kein
+  `CREDITS.md`. Das Musik-Sidecar existiert, bleibt bei allen vier Tracks
+  ehrlich `incomplete`.
+- **Legacy-Grenze:** `MenuMusicPlayer` und `MusicDirector` bleiben eine
+  ausdrücklich dokumentierte D-090-Übergangsausnahme mit Routing auf `Music`.
+  Sie sind nicht das Ziel des neuen Tier-0-One-Shot-Vertrags.
+
+## Offene Abnahme
+
+Die Budget- und Strukturtests sind automatisiert. Noch nicht durch eine
+gespielte Runde belegt sind Klangbalance, Verständlichkeit bei ungefähr
+sechzig feuernden Einheiten und die Entscheidung Kamera- versus
+Fokuspunkt-Listener. Bis dahin sind Gain, Cooldown und Priorität konservative
+Startwerte.
+
+---
+
+# Ursprüngliche Beschaffungsplanung (historisch)
+
+Die folgenden Abschnitte erklären die Ausgangslage. Aussagen wie „vollständig
+stumm", „kein Mixer" oder „Import blockiert" sind durch den obigen Stand und
+D-090 ersetzt.
 
 ## 1. Der Blocker, der vor allem anderen steht
 

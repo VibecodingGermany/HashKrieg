@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.1.0 | **Status:** Entwurf – Planungsgrundlage, kein Gate-Nachweis | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 7
+**Version:** 0.2.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 12
 
 ## Zweck
 
@@ -41,6 +41,8 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [05_Umbenennung.md](05_Umbenennung.md) | Der Rename Nova → Hashkrieg in sechs Stufen, nach Risiko sortiert |
 | [06_Narrative.md](06_Narrative.md) | Fraktionsnamen, Mechanik-als-Erzählung, realistisch baubare Minimal-Kampagne |
 | [07_CC0_Quellen.md](07_CC0_Quellen.md) | Welche Kulissen-Assets aus freien CC0-Paketen kommen statt gebaut zu werden — mit Prüfvermerk |
+| [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | Sprint 12; Strang A A1–A7 umgesetzt und A8 Stufe 1 über 10.023 TCP-Ticks nachgewiesen, manuelle Loopback-/LAN-/VPS-Stufen offen (D-089) |
+| [12B_Sprint_Sichtbares_Gefecht.md](12B_Sprint_Sichtbares_Gefecht.md) | Sprint 12 Strang B; fog-sicheres VFX- und Tier-0-Audio technisch umgesetzt, manuelle 60-Einheiten-Sicht-/Gegenhörabnahme offen (D-090) |
 
 ## Das Wichtigste in fünf Sätzen
 
@@ -82,8 +84,10 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 > | E-3 | Nur die Marke wird umbenannt, Code-Identität bleibt `Nova.*` |
 > | E-4 | Hashkrieg ist Name und Welt; die Mechanik-Inversion bleibt Reserve |
 
-Diese vier blockieren jeweils einen ganzen Strang. Alles andere im Plan ist
-Handwerk.
+Diese vier Entscheidungen sind getroffen; die folgenden Unterabschnitte
+bleiben als historische Entscheidungsgrundlage erhalten. Alles Weitere ist
+Handwerk oder in den jeweiligen Sprint-Ergebnisblöcken als Restprüfung
+ausgewiesen.
 
 ### E-1 — Wie kommen die Binärdaten in die Welt?
 
@@ -142,7 +146,8 @@ Masterplans grundlegend — sonst nichts.
 
 ## Offene Punkte
 
-- E-1 bis E-4 oben — alle vier ausstehend.
+- E-1 bis E-4 sind entschieden; offen sind nur ihre jeweils dokumentierten
+  Umsetzungsfolgen.
 - Die Aufwandsklassen (S/M/L/XL) im Masterplan sind Schätzungen aus der
   Codelage, nicht gemessene Werte. Sie sortieren, sie planen nicht.
 - Fünf Steuerdokumente stehen noch auf dem mit D-076 abgeschafften
@@ -154,9 +159,9 @@ Masterplans grundlegend — sonst nichts.
 
 ## Nächste Schritte
 
-1. Inhaber entscheidet E-1 bis E-4.
-2. Phase 0 des [Masterplans](02_Masterplan.md) ausführen — Sicherung, bevor
-   irgendetwas anderes passiert.
-3. [03_Bestellliste_Grafik.md](03_Bestellliste_Grafik.md) an den Grafiker
-   geben; die Prioritätsstufe P0 kann sofort starten und blockiert nichts
-   anderes.
+1. Sprint-12-Strang B im aktuellen macOS-Build in einem dichten Gefecht sehen
+   und gegenhören; den Befund im Umsetzungsreport ergänzen.
+2. Die offenen A8-Netzwerkstufen aus [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md)
+   mit zwei Fenstern, im LAN und auf dem VPS spielen.
+3. Den noch offenen Strang C getrennt planen, weil er Simulationszustand und
+   Baselines verändert.

@@ -1,8 +1,12 @@
 using System;
+using System.Globalization;
 using UnityEngine;
 using Nova.Core;
+using Nova.Networking;
+using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Pathfinding;
+using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 // Unity 6 introduced UnityEngine.EntityId, so the bare name is ambiguous in
 // any file that opens both Nova.Core and UnityEngine (CS0104). The alias pins
@@ -67,7 +71,7 @@ namespace Nova.Gameplay.Match
     [RequireComponent(typeof(MatchRunner))]
     public sealed class MatchBootstrap : MonoBehaviour
     {
-        /// <summary>Local (human) slot. MUST be 0 — <see cref="MatchSession"/> binds local slot 0, and the executor rejects orders for entities owned by any other slot as RejectedNotOwned.</summary>
+        /// <summary>Canonical local-match slot. A relay offer may assign the human to slot 1.</summary>
         public const byte LocalSlot = 0;
 
         /// <summary>The scripted opponent slot of the canonical two-slot match.</summary>
@@ -105,6 +109,12 @@ namespace Nova.Gameplay.Match
 
         private readonly EntityId[] _hq = new EntityId[2];
         private readonly EntityId[] _builder = new EntityId[2];
+        private MatchConfig _pendingConfig;
+        private MatchConfig _activeConfig;
+        private bool _waitingForOffer;
+        private bool _waitingForStart;
+        private bool _networkFailureReported;
+        private string _networkStatusReason = string.Empty;
 
         /// <summary>The runner this bootstrap drives (resolved from the same GameObject).</summary>
         public MatchRunner Runner { get; private set; }
@@ -112,8 +122,26 @@ namespace Nova.Gameplay.Match
         /// <summary>True once the opening position exists and the kernel is stepping.</summary>
         public bool IsMatchReady { get; private set; }
 
+        /// <summary>The current relay client during handshake and after start, or null for a local match.</summary>
+        public RelayMatchClient NetworkClient =>
+            _pendingConfig?.Transport ?? _activeConfig?.Transport ?? Runner?.RelayClient;
+
+        /// <summary>Public network lifecycle retained through stalls and terminal shutdown.</summary>
+        public RelayMatchLifecycle NetworkLifecycle => NetworkClient != null
+            ? NetworkClient.Lifecycle
+            : (_networkFailureReported ? RelayMatchLifecycle.Ended : RelayMatchLifecycle.Disconnected);
+
+        public string NetworkStatusReason =>
+            !string.IsNullOrEmpty(NetworkClient?.StatusReason) ? NetworkClient.StatusReason : _networkStatusReason;
+
+        public int NetworkStalledOnSlot => NetworkClient?.StalledOnSlot ?? -1;
+        public double NetworkStallSeconds => NetworkClient?.StallSeconds ?? 0.0;
+
         /// <summary>Seed the match was started with.</summary>
-        public ulong Seed => _seed;
+        public ulong Seed => _activeConfig != null ? _activeConfig.Seed : _seed;
+
+        /// <summary>The validated configuration of the opening position, once built.</summary>
+        public MatchConfig ActiveConfig => _activeConfig?.ValidateAndClone();
 
         /// <summary>Map size in cells (128x128 for the canonical match).</summary>
         public Vector2Int MapSize => new Vector2Int(_mapWidth, _mapHeight);
@@ -123,20 +151,20 @@ namespace Nova.Gameplay.Match
 
         // --- HUD-facing read-only geometry -------------------------------
 
-        public ushort LocalFieldId => LocalLayout.FieldId;
-        public ushort EnemyFieldId => EnemyLayout.FieldId;
+        public ushort LocalFieldId => LocalPlayerLayout.FieldId;
+        public ushort EnemyFieldId => EnemyPlayerLayout.FieldId;
 
         /// <summary>Aetherium field cell of the human player (7, 7).</summary>
-        public Vector2Int LocalFieldCell => new Vector2Int(LocalLayout.FieldX, LocalLayout.FieldY);
+        public Vector2Int LocalFieldCell => new Vector2Int(LocalPlayerLayout.FieldX, LocalPlayerLayout.FieldY);
 
         /// <summary>Aetherium field cell of the opponent (119, 119).</summary>
-        public Vector2Int EnemyFieldCell => new Vector2Int(EnemyLayout.FieldX, EnemyLayout.FieldY);
+        public Vector2Int EnemyFieldCell => new Vector2Int(EnemyPlayerLayout.FieldX, EnemyPlayerLayout.FieldY);
 
         /// <summary>Lower-left footprint origin of the human HQ (4, 4).</summary>
-        public Vector2Int LocalHqOrigin => new Vector2Int(LocalLayout.HqOriginX, LocalLayout.HqOriginY);
+        public Vector2Int LocalHqOrigin => new Vector2Int(LocalPlayerLayout.HqOriginX, LocalPlayerLayout.HqOriginY);
 
         /// <summary>Lower-left footprint origin of the opponent HQ (120, 120).</summary>
-        public Vector2Int EnemyHqOrigin => new Vector2Int(EnemyLayout.HqOriginX, EnemyLayout.HqOriginY);
+        public Vector2Int EnemyHqOrigin => new Vector2Int(EnemyPlayerLayout.HqOriginX, EnemyPlayerLayout.HqOriginY);
 
         /// <summary>Center cell of the human HQ footprint — the natural camera start focus.</summary>
         public Vector2Int LocalHqCenterCell => LocalHqOrigin + Vector2Int.one;
@@ -145,19 +173,93 @@ namespace Nova.Gameplay.Match
         public Vector2Int EnemyHqCenterCell => EnemyHqOrigin + Vector2Int.one;
 
         /// <summary>Entity handle of the human HQ (invalid until the match is set up).</summary>
-        public EntityId LocalHq => _hq[LocalSlot];
+        public EntityId LocalHq => _hq[ConfiguredLocalSlot];
 
         /// <summary>Entity handle of the opponent HQ.</summary>
-        public EntityId EnemyHq => _hq[EnemySlot];
+        public EntityId EnemyHq => _hq[ConfiguredEnemySlot];
 
         /// <summary>Entity handle of the human Builder (spawned at 13, 7 — the D-077 opening's only unit).</summary>
-        public EntityId LocalBuilder => _builder[LocalSlot];
+        public EntityId LocalBuilder => _builder[ConfiguredLocalSlot];
+
+        /// <summary>The local slot after applying the relay offer (zero for the local default).</summary>
+        public byte ConfiguredLocalSlot => _activeConfig != null ? _activeConfig.LocalSlot : LocalSlot;
+
+        private byte ConfiguredEnemySlot => ConfiguredLocalSlot == LocalSlot ? EnemySlot : LocalSlot;
+        private SlotLayout LocalPlayerLayout => ConfiguredLocalSlot == LocalSlot ? LocalLayout : EnemyLayout;
+        private SlotLayout EnemyPlayerLayout => ConfiguredLocalSlot == LocalSlot ? EnemyLayout : LocalLayout;
 
         private void Start()
         {
             if (AutoStart)
             {
                 StartGrayboxMatch();
+            }
+        }
+
+        private void Update()
+        {
+            RelayMatchClient visibleClient = NetworkClient;
+            if (visibleClient != null && visibleClient.Phase == RelayClientPhase.Ended)
+            {
+                Runner?.StopNetworkMatch();
+                ReportNetworkFailure(visibleClient.EndReason);
+                return;
+            }
+            if (_pendingConfig == null || IsMatchReady) return;
+
+            RelayMatchClient client = _pendingConfig.Transport;
+            if (_waitingForOffer)
+            {
+                // Before MatchRunner owns an ingress there is nothing for it
+                // to poll; bootstrap pumps only this short offer phase. Once
+                // initialized, MatchRunner polls on every Update, including
+                // WaitingStart, pause and stalls.
+                client.Poll();
+                if (client.Phase == RelayClientPhase.Ended)
+                {
+                    ReportNetworkFailure(client.EndReason);
+                    return;
+                }
+                if (!client.HasOffer) return;
+
+                try
+                {
+                    if (client.ServerDefinitionsHash64 != SimDefinitions.ComputeDefinitionsHash64())
+                    {
+                        throw new InvalidOperationException(
+                            $"relay definitions hash 0x{client.ServerDefinitionsHash64:X16} does not match this build");
+                    }
+                    MatchConfig offered = _pendingConfig.WithOffer(client);
+                    _waitingForOffer = false;
+                    BuildOpening(offered);
+                    SubmitNetworkProof(offered);
+                    _waitingForStart = true;
+                }
+                catch (Exception exception)
+                {
+                    client.Disconnect();
+                    Runner?.StopNetworkMatch();
+                    ReportNetworkFailure(exception.Message);
+                }
+                return;
+            }
+
+            if (_waitingForStart)
+            {
+                if (client.Phase == RelayClientPhase.Ended)
+                {
+                    ReportNetworkFailure(client.EndReason);
+                    return;
+                }
+                if (client.Phase == RelayClientPhase.Running)
+                {
+                    _waitingForStart = false;
+                    _pendingConfig = null;
+                    IsMatchReady = true;
+                    Debug.Log(
+                        $"[MatchBootstrap] Network match started as slot {_activeConfig.LocalSlot} " +
+                        $"(seed 0x{_activeConfig.Seed:X16}, delay {_activeConfig.InputDelayTicks}).");
+                }
             }
         }
 
@@ -169,10 +271,47 @@ namespace Nova.Gameplay.Match
         /// </summary>
         public void StartGrayboxMatch()
         {
-            if (IsMatchReady)
+            if (IsMatchReady || _pendingConfig != null)
             {
                 return;
             }
+
+            MatchConfig local = MatchConfig.LocalVsAi(
+                _seed, _mapWidth, _mapHeight, _entityCapacity,
+                Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
+
+            string relayHost = Environment.GetEnvironmentVariable("NOVA_RELAY_HOST");
+            if (string.IsNullOrWhiteSpace(relayHost))
+            {
+                StartGrayboxMatch(local);
+                return;
+            }
+
+            if (!TryReadNetworkEnvironment(out int relayPort, out ulong matchToken, out string error))
+            {
+                // Host was explicitly present: invalid companion values are
+                // a network-start failure, never a silent local fallback.
+                ReportNetworkFailure(error);
+                return;
+            }
+
+            MatchConfig network = MatchConfig.NetworkVsHuman(relayHost, relayPort, matchToken);
+            network.Seed = local.Seed;
+            network.MapWidth = local.MapWidth;
+            network.MapHeight = local.MapHeight;
+            network.EntityCapacity = local.EntityCapacity;
+            network.StartingCredits = local.StartingCredits;
+            StartGrayboxMatch(network);
+        }
+
+        /// <summary>
+        /// Starts from an explicit configuration. Local matches build
+        /// synchronously; network matches connect and wait for the relay's
+        /// authoritative seed, slot and delay before creating any state.
+        /// </summary>
+        public void StartGrayboxMatch(MatchConfig config)
+        {
+            if (IsMatchReady || _pendingConfig != null) return;
 
             Runner = GetComponent<MatchRunner>();
             if (Runner == null)
@@ -181,28 +320,103 @@ namespace Nova.Gameplay.Match
                 return;
             }
 
-            Runner.InitializeMatch(_seed, _mapWidth, _mapHeight, _entityCapacity);
+            MatchConfig validated;
+            try
+            {
+                validated = config.ValidateAndClone();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[MatchBootstrap] Invalid match configuration: {exception.Message}");
+                return;
+            }
 
-            // Faction assignment (economy block v2): slot 0 plays Alliance,
-            // slot 1 plays Legion. Set BEFORE StartMatch — the SetSlotFaction
+            if (validated.IsNetworkMatch)
+            {
+                _pendingConfig = validated;
+                _waitingForOffer = true;
+                _waitingForStart = false;
+                _networkFailureReported = false;
+                _networkStatusReason = string.Empty;
+                validated.Transport.Connect(validated.RelayHost, validated.RelayPort, validated.MatchToken);
+                if (validated.Transport.Phase == RelayClientPhase.Ended)
+                {
+                    ReportNetworkFailure(validated.Transport.EndReason);
+                }
+                return;
+            }
+
+            BuildOpening(validated);
+            IsMatchReady = true;
+            LogLocalMatchStarted();
+        }
+
+        private void BuildOpening(MatchConfig config)
+        {
+            _activeConfig = config.ValidateAndClone();
+            _seed = _activeConfig.Seed;
+            _mapWidth = _activeConfig.MapWidth;
+            _mapHeight = _activeConfig.MapHeight;
+            _entityCapacity = _activeConfig.EntityCapacity;
+
+            Runner.InitializeMatch(_activeConfig);
+
+            // Faction assignment (economy block v2) comes from MatchConfig.
+            // Set BEFORE StartMatch — the SetSlotFaction
             // guard forbids any change once the kernel runs, because the
             // faction bytes are part of the hashed initial state and the
             // match fingerprint. The scenario's BuildHost does the same, in
             // the same order.
-            Runner.Economy.SetSlotFaction(LocalSlot, FactionId.Alliance);
-            Runner.Economy.SetSlotFaction(EnemySlot, FactionId.Legion);
+            for (int i = 0; i < _activeConfig.ActiveSlots.Length; i++)
+            {
+                byte slot = _activeConfig.ActiveSlots[i];
+                Runner.Economy.SetSlotFaction(slot, _activeConfig.FactionPerSlot[slot]);
+            }
 
-            Runner.StartMatch();
+            if (!Runner.StartMatch())
+            {
+                throw new InvalidOperationException("the match runner refused to start the configured kernel");
+            }
 
-            // Slot order is load-bearing for entity ids: slot 0 first.
+            // Global slot order is load-bearing for entity ids and snapshots:
+            // BOTH clients build slot 0 first, then slot 1, regardless of
+            // which one the relay assigned locally.
             SetupSlot(LocalLayout);
             SetupSlot(EnemyLayout);
-            IsMatchReady = true;
+        }
 
+        private void LogLocalMatchStarted()
+        {
             Debug.Log(
                 $"[MatchBootstrap] Graybox match started (seed 0x{_seed:X16}, {_mapWidth}x{_mapHeight}, " +
                 $"capacity {_entityCapacity}, definition stats {UseDefinitionStats}, " +
-                $"start credits {Runner.Economy.GetPlayerEconomy(LocalSlot).AetheriumCredits} AE).");
+                $"start credits {Runner.Economy.GetPlayerEconomy(ConfiguredLocalSlot).AetheriumCredits} AE).");
+        }
+
+        private void SubmitNetworkProof(MatchConfig config)
+        {
+            var occupancy = new byte[CommandLimits.ReservedPlayerSlots];
+            var factions = new byte[CommandLimits.ReservedPlayerSlots];
+            for (int i = 0; i < factions.Length; i++) factions[i] = (byte)config.FactionPerSlot[i];
+            for (int i = 0; i < config.ActiveSlots.Length; i++)
+            {
+                byte slot = config.ActiveSlots[i];
+                occupancy[slot] = (byte)(Contains(config.AiSlots, slot)
+                    ? PlayerSlotOccupancy.AI
+                    : PlayerSlotOccupancy.Human);
+            }
+
+            byte[] snapshot = Runner.Kernel.SaveSnapshot();
+            MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                SimDefinitions.ComputeDefinitionsHash64(),
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
+                occupancy,
+                factions,
+                config.Seed,
+                Runner.Kernel.CalculateStateHash(),
+                config.InputDelayTicks);
+            config.Transport.SubmitLocalProof(fingerprint.Serialize(), snapshot);
         }
 
         /// <summary>
@@ -216,14 +430,79 @@ namespace Nova.Gameplay.Match
         /// overlay and minimap self-heal through their fog-instance guards,
         /// and the selection clears itself on the ingress rebind).
         /// </summary>
-        public void RestartMatch()
+        public bool RestartMatch()
         {
+            if ((_activeConfig != null && _activeConfig.IsNetworkMatch)
+                || (_pendingConfig != null && _pendingConfig.IsNetworkMatch))
+            {
+                Debug.LogError(
+                    "[MatchBootstrap] Network restart refused: a fresh relay offer and a fresh transport are required.");
+                return false;
+            }
+
+            MatchConfig restartConfig = _activeConfig != null
+                ? _activeConfig.ValidateAndClone()
+                : MatchConfig.LocalVsAi(
+                    _seed, _mapWidth, _mapHeight, _entityCapacity,
+                    Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
             if (Runner != null && Runner.IsRunning)
             {
                 Runner.PauseMatch();
             }
             IsMatchReady = false;
-            StartGrayboxMatch();
+            _activeConfig = null;
+            StartGrayboxMatch(restartConfig);
+            return IsMatchReady;
+        }
+
+        private static bool Contains(byte[] slots, byte slot)
+        {
+            for (int i = 0; i < slots.Length; i++) if (slots[i] == slot) return true;
+            return false;
+        }
+
+        private static bool TryReadNetworkEnvironment(
+            out int port, out ulong token, out string error)
+        {
+            port = 0;
+            token = 0;
+            error = string.Empty;
+            string portText = Environment.GetEnvironmentVariable("NOVA_RELAY_PORT");
+            string tokenText = Environment.GetEnvironmentVariable("NOVA_MATCH_TOKEN");
+            if (!int.TryParse(portText, NumberStyles.None, CultureInfo.InvariantCulture, out port)
+                || port < 1 || port > 65535)
+            {
+                error = "NOVA_RELAY_PORT must be an integer from 1 through 65535.";
+                return false;
+            }
+            if (!RelayProtocol.TryParseMatchToken(tokenText, out token))
+            {
+                error = "NOVA_MATCH_TOKEN must be exactly 16 unprefixed hexadecimal characters and non-zero.";
+                return false;
+            }
+            return true;
+        }
+
+        private void ReportNetworkFailure(string reason)
+        {
+            if (_networkFailureReported) return;
+            _networkFailureReported = true;
+            _networkStatusReason = string.IsNullOrWhiteSpace(reason)
+                ? "relay match ended without a reason"
+                : reason;
+            _waitingForOffer = false;
+            _waitingForStart = false;
+            Debug.LogError(IsMatchReady
+                ? $"[MatchBootstrap] Network match ended: {_networkStatusReason}"
+                : $"[MatchBootstrap] Network match did not start: {_networkStatusReason}");
+        }
+
+        private void OnDestroy()
+        {
+            // Before BuildOpening, MatchRunner does not yet own the pending
+            // transport. Bootstrap must close it itself when its GameObject
+            // is destroyed during the offer handshake.
+            _pendingConfig?.Transport?.Disconnect();
         }
 
         /// <summary>

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "audio-batch-v1",
+  "assetId": "kenney.sfx.impact-sounds",
+  "originType": "cc0-import",
+  "sourceName": "Kenney Impact Sounds 1.0",
+  "sourceUrl": "https://kenney.nl/assets/impact-sounds",
+  "licenseId": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrievedAt": "2026-08-07",
+  "sourceFileHash": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+  "attributionRequired": false,
+  "attributionText": "",
+  "redistributionAllowed": true,
+  "modifications": "Unveränderte OGG-Quelldateien; nur eine kuratierte Teilmenge wurde übernommen.",
+  "derivedFrom": "",
+  "evidenceStatus": "complete-under-D-090-tier-1-exception",
+  "verifiedBy": "",
+  "verifiedAt": "",
+  "verificationException": {
+    "decisionId": "D-090",
+    "reason": "Governance Tier 1: keine zweite menschliche Prüferin bzw. kein zweiter menschlicher Prüfer verfügbar. ZIP-, Lizenz- und Einzelhashes wurden technisch verifiziert."
+  },
+  "files": [
+    { "sourcePath": "Audio/impactMetal_light_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_000.ogg", "sourceSha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d", "targetSha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d" },
+    { "sourcePath": "Audio/impactMetal_light_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_001.ogg", "sourceSha256": "fba69c467ddd85da7b1d82e259f936b876d9ba6a3d6f1b24bdd10468e46bfe08", "targetSha256": "fba69c467ddd85da7b1d82e259f936b876d9ba6a3d6f1b24bdd10468e46bfe08" },
+    { "sourcePath": "Audio/impactMetal_light_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_002.ogg", "sourceSha256": "25a96f90a9a1f88a531e824e126f0519504625e5635e65a72e4f31611428db29", "targetSha256": "25a96f90a9a1f88a531e824e126f0519504625e5635e65a72e4f31611428db29" },
+    { "sourcePath": "Audio/impactMetal_heavy_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_000.ogg", "sourceSha256": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831", "targetSha256": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831" },
+    { "sourcePath": "Audio/impactMetal_heavy_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_001.ogg", "sourceSha256": "83554049f81f4db9209379e103c30bfa63f65c42189a03f300b045c2c82e23ae", "targetSha256": "83554049f81f4db9209379e103c30bfa63f65c42189a03f300b045c2c82e23ae" },
+    { "sourcePath": "Audio/impactMetal_heavy_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_002.ogg", "sourceSha256": "b914c8f1eb7c0f34bb165d7c77f4be0351f6be0660c13c53e65424e262e2c093", "targetSha256": "b914c8f1eb7c0f34bb165d7c77f4be0351f6be0660c13c53e65424e262e2c093" },
+    { "sourcePath": "Audio/impactMetal_medium_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_000.ogg", "sourceSha256": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003", "targetSha256": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003" },
+    { "sourcePath": "Audio/impactMetal_medium_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_001.ogg", "sourceSha256": "e8a9eaba7c4d27422e4eeb3e6c7100d5d7dc0f83e005efc98c960adcc5265337", "targetSha256": "e8a9eaba7c4d27422e4eeb3e6c7100d5d7dc0f83e005efc98c960adcc5265337" },
+    { "sourcePath": "Audio/impactMetal_medium_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_002.ogg", "sourceSha256": "7e89ce2ca0dbda95ea2b78d4b50791cab35c10d20e9f5ccd45dd0b00e99ff548", "targetSha256": "7e89ce2ca0dbda95ea2b78d4b50791cab35c10d20e9f5ccd45dd0b00e99ff548" },
+    { "sourcePath": "Audio/impactPlate_heavy_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactPlate_heavy_000.ogg", "sourceSha256": "112d4f93ddcc370b410630f971c0f5d991856102da9c76bc5c5540d388e75aaa", "targetSha256": "112d4f93ddcc370b410630f971c0f5d991856102da9c76bc5c5540d388e75aaa" },
+    { "sourcePath": "Audio/impactPlate_heavy_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactPlate_heavy_001.ogg", "sourceSha256": "142fd6c77f13d25f318265901163f70f8dfe12f87829169a570025be43de7011", "targetSha256": "142fd6c77f13d25f318265901163f70f8dfe12f87829169a570025be43de7011" }
+  ]
+}

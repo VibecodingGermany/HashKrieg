@@ -8,7 +8,7 @@
     <IsPackable>false</IsPackable>
     <!-- Same sources and determinism define as the Unity host and SimRunner
          (docs/tech/SimulationCore.md section 9; G0-B shared-sources contract). -->
-    <DefineConstants>$(DefineConstants);NOVA_FIXED_POINT</DefineConstants>
+    <DefineConstants>$(DefineConstants);NOVA_FIXED_POINT;NOVA_RELAY_TESTS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +20,11 @@
     <!-- The relay/lockstep network layer under test: engine-free assembly,
          same shared-sources contract (strands A1-A5 of sprint 12). -->
     <Compile Include="..\..\Assets\_Project\Scripts\Networking\**\*.cs" Link="Networking\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Relay process contract and lifecycle compiled directly into the
+         engine-free test lane. -->
+    <Compile Include="..\Nova.RelayServer\RelayEnvironment.cs" Link="RelayServer\RelayEnvironment.cs" />
+    <Compile Include="..\Nova.RelayServer\RelayHost.cs" Link="RelayServer\RelayHost.cs" />
+    <Compile Include="..\Nova.RelayServer\Program.cs" Link="RelayServer\Program.cs" />
     <!-- Performance harness sources under test (Program.cs entry point excluded). -->
     <Compile Include="..\Nova.SimRunner\PerfStatistics.cs" Link="SimRunner\PerfStatistics.cs" />
     <Compile Include="..\Nova.SimRunner\ScenarioArtifacts.cs" Link="SimRunner\ScenarioArtifacts.cs" />

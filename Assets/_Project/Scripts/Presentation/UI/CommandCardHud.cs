@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using Nova.Gameplay;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
@@ -493,6 +494,7 @@ namespace Nova.Presentation.UI
                 GUI.enabled = button.Enabled;
                 if (GUILayout.Button(button.Label, _buttonStyle, GUILayout.Height(ButtonHeight(button.Label))))
                 {
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                     Dispatch(button, model);
                 }
                 GUI.enabled = wasEnabled;
@@ -508,6 +510,7 @@ namespace Nova.Presentation.UI
                     GUILayout.Label(row.Label, _rowStyle, GUILayout.Height(RowHeight));
                     if (GUILayout.Button("X", _cancelStyle, GUILayout.Width(22f), GUILayout.Height(RowHeight)))
                     {
+                        AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                         _input.OrderCancelProduction(model.LeadId, row.Index);
                     }
                     GUILayout.EndHorizontal();

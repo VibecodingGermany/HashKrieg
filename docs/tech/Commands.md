@@ -1,17 +1,17 @@
 # Kanonischer Command-Vertrag
 
-**Version:** 1.1.1 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead Technical Director / Lead Multiplayer Engineer | **Sprint:** 7
+**Version:** 1.2.0 | **Status:** verbindlich für lokalen Pfad und D-089-1v1-Profil | **Verantwortungsbereich:** Lead Technical Director / Lead Multiplayer Engineer | **Sprint:** 12
 
 ## Zweck
 
 Definiert die einzige Eingangsschnittstelle für autoritative
-Zustandsänderungen. UI, KI, Local Loopback, Replay und ein späterer Transport
+Zustandsänderungen. UI, KI, Local Loopback, D-089-TCP-Relay und Replay
 verwenden dasselbe Binärformat und dieselben Validierungsregeln.
 
 ## Abhängigkeiten
 
 - [SimulationCore.md](SimulationCore.md) – Tick, IDs, Fingerprint und State
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-057 und D-061
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-057, D-061 und D-089
 - [InputSystem.md](InputSystem.md) – Client-Intents und Feedback
 - [Replication.md](Replication.md) – Command-Stream und Replay
 
@@ -23,10 +23,24 @@ besitzen die Autorität, daraus einen Command zu machen:
 1. Session bindet `PlayerSlot`.
 2. Ingress weist je Spieler eine monoton steigende `Sequence` zu.
 3. Ingress setzt `TargetTick = EnqueueTick + InputDelayTicks`.
-4. `InputDelayTicks` ist Teil des Match-Fingerprints; der MS-1-Wert ist exakt 1.
-5. `LocalLoopbackTransport` liefert die Records an denselben Ingress zurück.
+4. `InputDelayTicks` ist Teil des Match-Fingerprints. Der kanonische lokale
+   Defaultwert ist 1; `MatchConfig`/Loopback erlauben 1 bis 60. Im
+   D-089-Netzprofil ist der Wert während der Session fest, standardmäßig 3 und
+   ebenfalls gültig von 1 bis 60.
+5. Der gebundene Transport liefert Records als rohe kanonische Bytes an die
+   strukturelle Ingress-Grenze; das gilt für `LocalLoopbackTransport` und den
+   TCP-Relay-Pfad.
 6. Der Kernel akzeptiert ausschließlich einen validierten, versiegelten
    `CommandBatch`.
+
+`ICommandTransport` bleibt unverändert. Ein Transport mit eigenem
+Verbindungslebenszyklus kann zusätzlich `ICommandSubmissionReadiness`
+implementieren. `CommandIngress.TrySubmitIntent` prüft diese Bereitschaft vor
+Session-Aktion, Payloadverarbeitung und Sequenzvergabe. Ist sie nicht gegeben,
+lautet das Ergebnis `Rejected` mit `TransportNotReady`; keine Session-Aktion
+wird eingereiht und keine Sequenz verbraucht. Der Relay-Client ist nur in
+seiner Phase `Running` bereit. Transporte ohne diesen optionalen Vertrag
+behalten das bisherige Always-ready-Verhalten.
 
 Weder UI noch KI dürfen `PlayerSlot`, `Sequence` oder `TargetTick` frei wählen.
 Sequenzen beginnen bei 1. Der Wert 0 und ein Überlauf von `uint32` sind
@@ -40,13 +54,13 @@ manipulierter Prozess nur sich selbst desynchronisiert — der Replay- und
 Hash-Nachweis bleibt davon unberührt.
 
 Der Byte-Intake des Ingress (`TryAcceptRecordBytes` /
-`TryAcceptHistoricalRecordBytes`) ist öffentlich, weil der Transport ihn
-aufrufen muss. In MS-1 gilt die Vertrauensannahme, dass ausschließlich
-Transport-/Session-Code ihn aufruft; jeder Aufruf durchläuft unabhängig vom
-Aufrufer die vollständige strukturelle Validierung. Für den Replay-Import liegt
-die geforderte Fingerprint-Prüfung des Stroms beim Aufrufer — der Ingress
-erzwingt alle übrigen strukturellen Regeln, kann die Herkunftsprüfung aber
-nicht selbst leisten.
+`TryAcceptHistoricalRecordBytes`) ist öffentlich, weil lokale, Relay- und
+Replay-Transporte ihn aufrufen. Jeder Aufruf durchläuft unabhängig vom
+Aufrufer die vollständige strukturelle Validierung. Der TCP-Relay prüft davor
+zusätzlich Absenderslot, Tickfolge, Dedupe und Kapazitäten. Für den
+Replay-Import liegt die geforderte Fingerprint-Prüfung des Stroms beim
+Aufrufer — der Ingress erzwingt alle übrigen strukturellen Regeln, kann die
+Herkunftsprüfung aber nicht selbst leisten.
 
 ## 2. Kanonisches Record-Format
 
@@ -79,9 +93,12 @@ Der Header ist exakt 20 Bytes. Verbindliche Grenzen:
 | `MaxPendingRecords` | 1.024 |
 | `MaxEntityIdsPerCommand` | 100 |
 
-Ein Live-Record besitzt wegen `InputDelayTicks=1` immer
-`TargetTick=EnqueueTick+1`. Replay-Import darf historische Zielticks nur aus
-einem bereits fingerprint-geprüften Strom übernehmen.
+Ein lokaler Live-Record besitzt
+`TargetTick=EnqueueTick+InputDelayTicks`; im kanonischen lokalen Defaultprofil
+ist das `EnqueueTick+1`, der erlaubte Bereich bleibt 1 bis 60. Im
+D-089-Netzprofil gilt dieselbe Formel mit dem vor Start bewiesenen festen Wert
+aus diesem Bereich (Default 3). Replay-Import darf historische Zielticks nur
+aus einem bereits fingerprint-geprüften Strom übernehmen.
 
 ## 3. Reihenfolge und Duplikate
 
@@ -98,11 +115,10 @@ Der Dedupe- und Sequenzzustand ist autoritativ und wird in Snapshots
 serialisiert.
 
 Die Watermark-Dedupe abgeschlossener Sequenzen setzt verbindlich eine
-zuverlässige, geordnete Zustellung je Spieler voraus; der
-`LocalLoopbackTransport` erfüllt das per Konstruktion. Ein künftiger
-Netzwerk-Transport mit möglicher Unordnung darf verspätete Sequenzen nicht
-still verwerfen, sondern benötigt ein eigenes Lücken-Fehlermodell
-(Post-MVP-Netzwerk-Anforderung, keine MS-1-Änderung).
+zuverlässige, geordnete Zustellung je Spieler voraus. Sowohl
+`LocalLoopbackTransport` als auch der D-089-TCP-Pfad erfüllen das. Ein späterer
+ungeordneter Transport dürfte verspätete Sequenzen nicht still verwerfen,
+sondern benötigte ein eigenes Lücken-Fehlermodell und eine neue Entscheidung.
 
 ## 4. Zwei Validierungsstufen
 
@@ -152,6 +168,10 @@ KI-Ticks; Unpause bleibt im angehaltenen Host empfangbar. Save und Load
 verwenden den abgeschlossenen Snapshot und dürfen keinen Tick künstlich
 erzeugen.
 
+`TickComplete` ist ebenfalls kein Command und keine Session-Aktion, sondern
+ein reiner D-089-Transport-/Barrier-Frame. Er verändert weder das eingefrorene
+v1-Register noch Replay-Resultcodes oder State-Hash.
+
 Kamera, Selektion, UI-Skalierung, Rebinding und Client-Feedback sind keine
 Simulations-Commands. Nicht aktivierte Fähigkeiten, Forschung, Capture, Luft,
 Mauern und Superwaffen erhalten in Schema v1 keinen ausführbaren Payload.
@@ -167,8 +187,9 @@ G1 friert Command-Schema v1 ein. Pflichtfälle:
 5. byteidentische Duplikate und konflikthafte Duplikate;
 6. Sequenzüberlauf-/Replay-Angriffe;
 7. Queue- und Batch-Backpressure;
-8. zustandsabhängige Ablehnung ohne Mutation sowie
-9. Snapshot/Restore mit ausstehenden Commands.
+8. zustandsabhängige Ablehnung ohne Mutation;
+9. Snapshot/Restore mit ausstehenden Commands sowie
+10. `TransportNotReady` vor Session-Aktion und Sequenzvergabe.
 
 Das aktivierte Command-Inventar muss 100 % Testabdeckung besitzen.
 
@@ -179,9 +200,12 @@ Das aktivierte Command-Inventar muss 100 % Testabdeckung besitzen.
 
 ## Nächste Schritte
 
-1. Numerisches Register und Payloads in G1 test-first implementieren.
-2. UI- und KI-Adapter ausschließlich gegen `CommandIntent` bauen.
-3. Replay- und Savegame-Fixtures erst nach dem Schema-Freeze 1.0 erzeugen.
+1. Das eingefrorene numerische Register und seine Golden Bytes unverändert
+   halten.
+2. UI-, KI- und Netzwerkadapter weiterhin ausschließlich über
+   `CommandIntent` beziehungsweise den validierten Byte-Intake führen.
+3. Readiness-, Dedupe-, Barrier- und Replay-Grenzen gemeinsam in der
+   kanonischen Testsuite absichern.
 
 ## Änderungsverlauf
 
@@ -190,3 +214,4 @@ Das aktivierte Command-Inventar muss 100 % Testabdeckung besitzen.
 | 1.0.0 | 2026-07-24 | Ingress-Autorität, Little-Endian-Envelope, Dedupe und Schema-v1-Tests gemäß D-057 festgelegt | Lead Technical Director / Lead Multiplayer Engineer |
 | 1.1.0 | 2026-07-24 | Sequenz-, Record-, Batch- und Payload-Grenzen geschlossen sowie Session-Aktionen aus dem Sim-Commandstrom getrennt | Lead Technical Director / Lead Multiplayer Engineer |
 | 1.1.1 | 2026-07-25 | Review-Klarstellungen ohne Vertragsänderung: Reflection-Restrisiko der kompilierseitigen Vertrauensgrenze, Vertrauensannahme des öffentlichen Byte-Intake samt caller-seitiger Fingerprint-Prüfung beim Replay-Import und Zustellungsannahme der Watermark-Dedupe als Post-MVP-Netzwerk-Anforderung | Lead Technical Director / Lead Multiplayer Engineer |
+| 1.2.0 | 2026-08-07 | D-089-Netzprofil mit festem Delay 1–60, optionalem Submission-Readiness-Gate, TCP-Zustellungsannahme und `TickComplete` außerhalb des Commandregisters dokumentiert | Lead Technical Director / Lead Multiplayer Engineer |

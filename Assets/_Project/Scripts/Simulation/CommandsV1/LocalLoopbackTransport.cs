@@ -17,6 +17,17 @@ namespace Nova.Simulation.CommandsV1
     }
 
     /// <summary>
+    /// Optional admission gate for transports whose session is not ready to
+    /// accept intents immediately. The ingress checks this boundary before
+    /// session actions are queued or a command sequence is assigned.
+    /// Transports that do not implement it retain the always-ready behaviour.
+    /// </summary>
+    public interface ICommandSubmissionReadiness
+    {
+        bool IsReadyForCommandSubmission { get; }
+    }
+
+    /// <summary>
     /// Local loopback (MS-1): delivers each record synchronously back to the
     /// intake of the same <see cref="CommandIngress"/>. The input delay comes
     /// from the record's TargetTick, not from transport latency; delivery

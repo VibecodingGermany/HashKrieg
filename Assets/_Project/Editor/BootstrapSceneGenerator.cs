@@ -5,10 +5,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using Nova.Data;
+using Nova.Gameplay.Audio;
+using Nova.Gameplay.CombatFeedback;
 using Nova.Gameplay.Match;
 using Nova.Presentation;
 using Nova.Presentation.Maps;
 using Nova.Presentation.UI;
+using UnityEngine.Audio;
 
 namespace Nova.Editor
 {
@@ -62,10 +65,11 @@ namespace Nova.Editor
             CreateDirectionalLight();
             ConfigureAtmosphere();
             GameObject ground = CreateGroundPlane();
+            AudioSceneReferences audio = CreateAudioObject();
             MatchRunner runner = CreateMatchObject();
             CreateMapObject(runner, ground);
             GameObject ui = CreateUiObject(runner, camera);
-            CreateMainMenuObject(runner, camera, ui);
+            CreateMainMenuObject(runner, camera, ui, audio.MusicGroup);
             EnsureGlutrinneMapAsset();
 
             // The drop-in registry is rebuilt from whatever PF_* prefabs
@@ -201,11 +205,51 @@ namespace Nova.Editor
             // references and cannot carry a bool.
             bootstrap.AutoStart = false;
 
+            // CombatEffectController is presentation-only even though the
+            // assembly boundary puts it beside the view manager. Wiring it
+            // explicitly keeps the generated scene auditable; the manager's
+            // lazy fallback exists only for old scenes and tests.
+            CombatEffectController effects = matchObject.AddComponent<CombatEffectController>();
             UnitViewManager views = matchObject.AddComponent<UnitViewManager>();
             WireReference(views, "_matchRunner", runner);
             WireReference(views, "_assetMappings", ArtAssetAutoSync.LoadOrCreateRegistry());
+            WireReference(views, "_combatEffects", effects);
 
             return runner;
+        }
+
+        /// <summary>
+        /// The sole Tier-0 one-shot backend and the settings adapter. Sound
+        /// event and mixer assets are authored by Sprint12BAuthoring before
+        /// this generated scene is saved; missing assets remain loud nulls so
+        /// that the authoring validation fails instead of hiding dead audio.
+        /// </summary>
+        private static AudioSceneReferences CreateAudioObject()
+        {
+            var audioObject = new GameObject("Audio");
+            UnityAudioService service = audioObject.AddComponent<UnityAudioService>();
+            audioObject.AddComponent<SfxSettingsBridge>();
+
+            AudioMixer mixer = AssetDatabase.LoadAssetAtPath<AudioMixer>(Sprint12BAuthoring.MixerPath);
+            if (mixer == null)
+            {
+                Debug.LogError($"[BootstrapSceneGenerator] Missing mixer at {Sprint12BAuthoring.MixerPath}.");
+            }
+
+            AudioMixerGroup music = FindAudioGroup(mixer, "Music");
+            AudioMixerGroup sfx = FindAudioGroup(mixer, "SFX");
+            AudioMixerGroup weapons = FindAudioGroup(mixer, "SFX_Weapons");
+            AudioMixerGroup units = FindAudioGroup(mixer, "SFX_Units");
+            AudioMixerGroup ui = FindAudioGroup(mixer, "UI");
+
+            WireObjectArray(service, "_events", Sprint12BAuthoring.LoadSoundEvents());
+            WireReference(service, "_mixer", mixer);
+            WireReference(service, "_sfxGroup", sfx);
+            WireReference(service, "_weaponsGroup", weapons);
+            WireReference(service, "_unitsGroup", units);
+            WireReference(service, "_uiGroup", ui);
+
+            return new AudioSceneReferences(music);
         }
 
         /// <summary>
@@ -340,7 +384,11 @@ namespace Nova.Editor
         /// fields.
         /// </para>
         /// </summary>
-        private static void CreateMainMenuObject(MatchRunner runner, Camera camera, GameObject uiObject)
+        private static void CreateMainMenuObject(
+            MatchRunner runner,
+            Camera camera,
+            GameObject uiObject,
+            AudioMixerGroup musicGroup)
         {
             var menuObject = new GameObject("MainMenu");
 
@@ -354,6 +402,7 @@ namespace Nova.Editor
             // and configures the source itself (clip, loop, 2D, playback) —
             // this file wires, it does not tune.
             AudioSource source = menuObject.AddComponent<AudioSource>();
+            source.outputAudioMixerGroup = musicGroup;
 
             MenuMusicPlayer music = menuObject.AddComponent<MenuMusicPlayer>();
             WireReference(music, "_source", source);
@@ -380,7 +429,7 @@ namespace Nova.Editor
                 WireReference(frame, "_menu", menu);
             }
 
-            CreateIngameMusicObject(runner, menu);
+            CreateIngameMusicObject(runner, menu, musicGroup);
         }
 
         /// <summary>
@@ -388,10 +437,14 @@ namespace Nova.Editor
         /// MusicDirector configures the source itself, this file only wires
         /// the three MUS_Ingame clips in playlist order.
         /// </summary>
-        private static void CreateIngameMusicObject(MatchRunner runner, MainMenuController menu)
+        private static void CreateIngameMusicObject(
+            MatchRunner runner,
+            MainMenuController menu,
+            AudioMixerGroup musicGroup)
         {
             var musicObject = new GameObject("IngameMusic");
             AudioSource source = musicObject.AddComponent<AudioSource>();
+            source.outputAudioMixerGroup = musicGroup;
             var director = musicObject.AddComponent<MusicDirector>();
             WireReference(director, "_source", source);
             WireReference(director, "_runner", runner);
@@ -419,6 +472,50 @@ namespace Nova.Editor
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        private static AudioMixerGroup FindAudioGroup(AudioMixer mixer, string name)
+        {
+            if (mixer == null) return null;
+            AudioMixerGroup[] matches = mixer.FindMatchingGroups(name);
+            AudioMixerGroup exact = null;
+            for (int i = 0; i < matches.Length; i++)
+            {
+                if (matches[i] == null || matches[i].name != name) continue;
+                if (exact != null)
+                {
+                    Debug.LogError($"[BootstrapSceneGenerator] Mixer group '{name}' is ambiguous.");
+                    return null;
+                }
+                exact = matches[i];
+            }
+            if (exact == null)
+            {
+                Debug.LogError($"[BootstrapSceneGenerator] Mixer group '{name}' is missing.");
+            }
+            return exact;
+        }
+
+        /// <summary>SerializedObject equivalent of WireReference for asset arrays.</summary>
+        private static void WireObjectArray<T>(Object target, string fieldName, T[] values)
+            where T : Object
+        {
+            var serialized = new SerializedObject(target);
+            SerializedProperty property = serialized.FindProperty(fieldName);
+            if (property == null || !property.isArray)
+            {
+                Debug.LogError(
+                    $"[BootstrapSceneGenerator] {target.GetType().Name} has no serialized array " +
+                    $"'{fieldName}' — the Bootstrap scene will be wired incompletely.");
+                return;
+            }
+
+            property.arraySize = values?.Length ?? 0;
+            for (int i = 0; i < property.arraySize; i++)
+            {
+                property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         /// <summary>
         /// Assigns a private [SerializeField] object reference and logs loudly
         /// if the field disappeared, so a rename cannot silently produce a
@@ -438,6 +535,16 @@ namespace Nova.Editor
 
             property.objectReferenceValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private readonly struct AudioSceneReferences
+        {
+            public AudioMixerGroup MusicGroup { get; }
+
+            public AudioSceneReferences(AudioMixerGroup musicGroup)
+            {
+                MusicGroup = musicGroup;
+            }
         }
     }
 }

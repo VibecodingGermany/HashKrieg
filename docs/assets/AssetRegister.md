@@ -1,6 +1,6 @@
 # Asset-Register (Asset Audit)
 
-**Version:** 1.3.0 | **Status:** sprint-freigegeben – MS-1 rebaselined | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 5
+**Version:** 1.4.0 | **Status:** sprint-freigegeben – MS-1 rebaselined, Tier-0-Audio integriert | **Verantwortungsbereich:** Technical Art Director / Lead Environment Artist / Project Owner | **Sprint:** 12
 
 ## Zweck
 
@@ -182,11 +182,17 @@ Führend Budgets: [AssetBudget.md](../tech/AssetBudget.md) §5.
 
 | Posten | Kandidatenquelle | Lizenz | Kosten | Klasse |
 |---|---|---|---|---|
-| SFX (Waffen, Motoren, UI, Ambience) | **Sonniss GDC Bundles** (>200 GB, royalty-free) | royalty-free, **nicht weitervertreibbar** | 0 USD | **BUY** (kuratieren) |
-| Musik | Store-Tracks **oder** Composer-Auftrag | „für Interactive?" prüfen | 20–100 USD/Track o. Auftrag | **BUY/BUILD** |
+| Tier-0-SFX (Waffen, Treffer, Tod, UI, Produktion) | **Kenney Sci-Fi / Impact / Interface Sounds**; 35 unveränderte OGGs integriert (D-090) | CC0 1.0, öffentliches Repo erlaubt | 0 € | **BUY – integriert/kuratiert** |
+| Weitere SFX/Ambience | Kenney-CC0 oder Eigenerzeugung; Sonniss nur als nicht repo-fähige Build-Reserve | je Quelle; Sonniss-Rohdateien nicht weitervertreibbar | 0 € im MS-1 | **BUY/BUILD – offen** |
+| Musik | vier vorhandene Suno-Tracks (Menü + drei Ingame), zweckgebundene D-083/D-086-Ausnahme | kommerziell laut Inhabertarif; Provenienz noch unvollständig | vorhandener Abotarif | **BUILD – integriert, Nachweis offen** |
 | Sprache/Commander-VO | Auftrag (Signature, [CommanderSystem.md](../gamedesign/CommanderSystem.md)) | Auftrag/eigen | Auftrag | **BUILD** |
 
-Sonniss-Dateien dürfen **nicht** in das öffentliche Repo (Repo-Hygiene, [ProcurementStrategy.md](ProcurementStrategy.md) §5). Audio-Kohärenz entsteht über die Mixing-/Mastering-Kette (Voice-Management für 100+ Einheiten, [AssetBudget.md](../tech/AssetBudget.md) §5).
+Sonniss-Dateien dürfen **nicht** als Rohdateien in das öffentliche Repo
+(Repo-Hygiene, [ProcurementStrategy.md](ProcurementStrategy.md) §5). Sie sind
+deshalb keine primäre MS-1-Quelle. Tier 0 verwendet ausschließlich die drei
+Kenney-CC0-Packs. Audio-Kohärenz entsteht über den D-090-Mixer und das feste
+Voice-Management; die vier Musikdatensätze bleiben bis zu echten Original-
+belegen als `incomplete` markiert.
 
 ### 3.12 UI
 
@@ -229,11 +235,16 @@ verschiebt Commander-Portraits, Key Art und Voice vollständig hinter MS-1.
 
 | Klasse | Schwerpunkt | Beispiele |
 |---|---|---|
-| **BUY** | menschliche Einheiten (Basis), Critters, Icons, SFX, Basis-Animationen, Terrain-Tool | Allianz/Legion-Infanterie, Sonniss-SFX, CC0-Animationen |
+| **BUY** | menschliche Einheiten (Basis), Critters, Icons, SFX, Basis-Animationen, Terrain-Tool | Allianz/Legion-Infanterie, Kenney-CC0-SFX, CC0-Animationen |
 | **MODIFY** | Gebäude Allianz/Legion, Fahrzeuge/Luft, Biome, Kristall-Basis, VFX, HUD-Rahmen | Synty-Kitbash + Teamfarben-/LOD-Pass |
 | **BUILD** | **alle Evolvierten**, Aetherium (Geometrie+Shader+VFX), Fraktions-Signaturen, RTS-UI-Layout, Commander-VO/Art | siehe [BuildBacklog.md](BuildBacklog.md) |
 
-**Kostenschätzung Kauf-Anteil (D-054):** **0 €** (Open-Source & KI-Pipeline). Alle Basis-Assets werden über freie CC0-Quellen (Quaternius, Kenney, Sonniss Audio) und KI-Generatoren (Hunyuan3D, Meshy, SD) bezogen. Q-035 ist geschlossen (0 €). Der dominierende Realaufwand liegt im **BUILD/MODIFY-Personalaufwand** der Community (v. a. komplette Evolvierten-Fraktion + Aetherium) – quantifiziert in [BuildBacklog.md](BuildBacklog.md), Eingabe für die Aufwandsschätzung R-16 in Sprint 6.
+**Kostenschätzung Kauf-Anteil (D-054):** **0 €** für den regulären MS-1-
+Beschaffungspfad. Basis-Assets kommen aus freigegebenen CC0-Quellen wie
+Quaternius und Kenney oder aus ausdrücklich erlaubten Generatorpfaden. Die
+Suno-Musik ist die eng begrenzte, bereits bestehende D-083/D-086-Ausnahme und
+kein neuer Audio-Kauf aus D-090. Q-035 bleibt geschlossen. Der dominierende
+Realaufwand liegt im **BUILD/MODIFY-Personalaufwand** der Community.
 
 ## Offene Punkte
 
@@ -256,3 +267,4 @@ verschiebt Commander-Portraits, Key Art und Voice vollständig hinter MS-1.
 | 1.2.0 | 2026-07-24 | Vollspielinventar vom verbindlichen Allianz-/Legion-MS-1-Produktionsumfang gemäß D-056 getrennt | Technical Art Director / Lead Environment Artist |
 | 1.2.1 | 2026-07-24 | Commander-Art und -Voice im Detailregister eindeutig als Post-MVP-Bedarf markiert | Technical Art Director / Lead Environment Artist |
 | 1.3.0 | 2026-07-25 | Synty-/Kauf-Zuordnungen in §3.3–3.5 als „ersetzt durch D-054" markiert (stehen gelassen, nicht gelöscht); neue Spalte „MS-1-Strategie (D-054)" mit CC0-Base/AI-Generated/Hybrid je Fraktion ergänzt, Rollen-Zuordnung übernommen aus SourceCatalog_MS1.md §5 | Producer |
+| 1.4.0 | 2026-08-08 | Audio §3.11 auf den tatsächlichen D-090-Stand fortgeschrieben: 35 Kenney-CC0-SFX integriert, Sonniss nur Reserve außerhalb des öffentlichen Rohdatei-Repos, vier Suno-Musiktracks mit unvollständiger Provenienz; Rollup und 0-€-Aussage korrigiert | Producer / Agent (Umsetzung) |

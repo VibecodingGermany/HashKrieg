@@ -8,13 +8,12 @@ namespace Nova.Presentation.UI
     /// The player's persistent game settings (main-menu sprint). Plain
     /// JsonUtility-serializable data — public fields, no properties — stored
     /// as one JSON file under <c>Application.persistentDataPath</c>. There is
-    /// deliberately no PlayerPrefs and no AudioMixer behind this: the values
-    /// map straight onto engine calls
-    /// (<see cref="GameSettingsStore.ApplyToEngine"/>).
+    /// deliberately no PlayerPrefs behind this: engine settings map onto
+    /// <see cref="GameSettingsStore.ApplyToEngine"/>, while the audio adapters
+    /// apply music and SFX values to their respective backends.
     /// <para>
-    /// SFX volume/enabled is stored and applied to future SFX sources only —
-    /// the game has no sound effects yet, so the field is honest dead weight
-    /// by design (the settings UI labels it as such).
+    /// SFX volume/enabled is consumed by <see cref="SfxSettingsBridge"/> and
+    /// reaches the SFX mixer bus immediately.
     /// </para>
     /// </summary>
     [Serializable]
@@ -50,7 +49,7 @@ namespace Nova.Presentation.UI
         /// <summary>Music volume a source should actually use right now (0 when muted).</summary>
         public float EffectiveMusicVolume => musicEnabled ? musicVolume : 0f;
 
-        /// <summary>Volume future SFX sources should apply. 0 when muted.</summary>
+        /// <summary>Linear SFX-bus volume. 0 when muted.</summary>
         public float EffectiveSfxVolume => sfxEnabled ? sfxVolume : 0f;
 
         /// <summary>Clamps every field into a range the engine calls tolerate.</summary>
@@ -144,9 +143,9 @@ namespace Nova.Presentation.UI
 
         /// <summary>
         /// Maps the values onto engine calls: quality level, vSync and
-        /// resolution/fullscreen. Audio is NOT applied here — the menu's music
-        /// source listens to <see cref="Applied"/>, and future SFX sources
-        /// read <see cref="GameSettings.EffectiveSfxVolume"/> when they spawn.
+        /// resolution/fullscreen. Audio remains adapter-owned: music and SFX
+        /// listeners consume <see cref="Applied"/> without coupling this data
+        /// gateway to a concrete backend.
         /// </summary>
         public static void ApplyToEngine(GameSettings settings)
         {

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ba8c31bfbc644c15b541a6de8936d23, type: 3}
+  m_Name: SND_IMP_Kinetic
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Audio.SoundEventSO
+  EventId: 7
+  Category: 2
+  DefaultPriority: 0
+  Variations:
+  - Layers:
+    - {fileID: 8300000, guid: 87854dadc26e94df9a754eba5186484a, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: c55b4936c82da4b51a2e4b2b6ebf6956, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: 60fd965c3b8f745b6926dc79b4a993eb, type: 3}
+    Gain: 1
+  MaxConcurrent: 4
+  CooldownSeconds: 0.02
+  Spatialized: 1
+  Gain: 0.75
+  MinDistance: 15
+  MaxDistance: 120

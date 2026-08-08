@@ -2,6 +2,7 @@
 // (see docs/production/MVPRecoveryPlan.md). Replaced when the new Input System and the real UI land.
 using UnityEngine;
 using Nova.Gameplay;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Victory;
 
@@ -57,11 +58,18 @@ namespace Nova.Presentation.UI
 
         private void OnGUI()
         {
-            if (_runner == null || _bootstrap == null || !_bootstrap.IsMatchReady) return;
+            if (_runner == null || _bootstrap == null) return;
             if (_menu != null && _menu.IsMenuVisible) return;
 
-            VictorySystem victory = _runner.Victory;
-            if (victory == null) return;
+            bool isMatchReady = _bootstrap.IsMatchReady;
+            VictorySystem victory = isMatchReady ? _runner.Victory : null;
+            string networkEndReason = isMatchReady
+                ? _runner.RelayEndReason
+                : _bootstrap.NetworkStatusReason;
+            int stalledOnSlot = isMatchReady && _runner.IsRelayMatch && _runner.RelayCommandsAllowed
+                ? _bootstrap.NetworkStalledOnSlot
+                : -1;
+            if (victory == null && string.IsNullOrEmpty(networkEndReason) && stalledOnSlot < 0) return;
 
             EnsureStyles();
 
@@ -69,16 +77,37 @@ namespace Nova.Presentation.UI
             Matrix4x4 previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            if (victory.IsDecided)
+            if (victory != null && victory.IsDecided)
             {
                 DrawResultPanel(victory);
             }
-            else if (!_runner.IsRunning)
+            else if (!string.IsNullOrEmpty(networkEndReason))
+            {
+                DrawNetworkStatusPanel("NETZWERKFEHLER", networkEndReason);
+            }
+            else if (stalledOnSlot >= 0)
+            {
+                DrawNetworkStatusPanel(
+                    "VERBINDUNG",
+                    $"Warte auf Spieler {stalledOnSlot + 1} … {_bootstrap.NetworkStallSeconds:0.0}s");
+            }
+            else if (victory != null && !_runner.IsRunning)
             {
                 DrawPausePanel();
             }
 
             GUI.matrix = previousMatrix;
+        }
+
+        private void DrawNetworkStatusPanel(string headline, string detail)
+        {
+            Rect rect = CenteredRect(110f);
+            GUI.Box(rect, GUIContent.none, HudChrome.OpaquePanelStyle);
+            GUILayout.BeginArea(rect);
+            GUILayout.Space(HudChrome.OpaquePanelStyle.padding.top);
+            GUILayout.Label(headline, _headlineStyle);
+            GUILayout.Label(detail, _bodyStyle);
+            GUILayout.EndArea();
         }
 
         private void DrawResultPanel(VictorySystem victory)
@@ -114,10 +143,12 @@ namespace Nova.Presentation.UI
             GUILayout.Space(14f);
             if (GUILayout.Button("Neue Runde", _buttonStyle, GUILayout.Height(34f)))
             {
+                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                 RestartRound();
             }
             if (GUILayout.Button("Hauptmenü", _buttonStyle, GUILayout.Height(30f)))
             {
+                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                 ReturnToMenu();
             }
             GUILayout.EndArea();
@@ -134,10 +165,12 @@ namespace Nova.Presentation.UI
             GUILayout.Space(10f);
             if (GUILayout.Button("Fortsetzen (P)", _buttonStyle, GUILayout.Height(30f)))
             {
+                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                 _runner.StartMatch();
             }
             if (GUILayout.Button("Hauptmenü", _buttonStyle, GUILayout.Height(26f)))
             {
+                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                 ReturnToMenu();
             }
             GUILayout.EndArea();

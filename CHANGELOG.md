@@ -13,10 +13,58 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.12.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.16.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Zwei-Spieler-Lockstep über eigenen TCP-Relay (D-089, Sprint 12 Strang A):**
+  Der bisher nur vorbereitete Netzwerkpfad ist als Engine-freie
+  Zwei-Slot-Implementierung verdrahtet: TCP-Handshake mit Match-Token,
+  Slot-/Seed-/Delay-Angebot, Fingerprint- und Initialsnapshot-Sperre,
+  `TickComplete`-Barrier, State-Hash-Vergleich alle 50 Ticks sowie geordnete
+  Endzustände bei Desync, Peer-Verlust und Protokollverletzung. Ein optionaler
+  `ICommandSubmissionReadiness`-Vertrag lässt `ICommandTransport` unverändert
+  und weist Eingaben vor Session-Aktion und Sequenzvergabe mit
+  `TransportNotReady` ab, bis der Relay-Client tatsächlich `Running` ist.
+  `MatchConfig`, `MatchBootstrap` und `MatchRunner` tragen Slot, Fraktionen,
+  AI-Slots, Seed, Delay und Transport bis in die Tickschleife; AI entsteht nur
+  für konfigurierte Slots, Netzwerkpausen sind gesperrt und die UI liest den
+  Lebenszyklus nur über Gameplay-Properties von `MatchRunner` und
+  `MatchBootstrap`. Der nicht simulierende Server schreibt
+  statt erfundener Replay-Resultcodes das gehärtete Transportformat
+  `NOVAREC2` (lückenlose Leer-/Command-Ticks, exakte Counts/Dedupe/Caps,
+  50-Tick-Checkpoints, terminaler Footer, 64-MiB-Grenze und atomare
+  `.partial`→`.novarec`-Publikation); Client-Diagnostik nutzt einen begrenzten
+  On-Disk-Spool und atomare Publikation. Hinzu kommen ein self-contained
+  `linux-x64`-Publish-Baum, gepinnter GitHub-Actions-Test/Bundle-Workflow,
+  gehärtete systemd-Unit und transaktionales `bootstrap`/`deploy`/`rollback`
+  über unveränderliche SHA-Releases. Nachgewiesen sind 547/547
+  SimRunner-Tests, Relay-Build und lokale Prozess-/Bundle-Smokes sowie A8
+  Stufe 1 mit zwei echten TCP-Clients bis Tick 10.023, Checkpoints alle 50
+  Ticks und identischem Live-/Playback-Endhash. Offen bleiben zwei
+  Unity-Fenster, LAN und VPS (A8 Stufen 2–4), ein echtes Linux-/systemd-/VPS-
+  Deploy und ein Live-Lauf des Workflows. Der Unity-EditMode-Versuch endete vor
+  den Tests am Lizenzhandshake `505 Unsupported protocol version 1.18.1`; eine
+  gespielte Netzwerkpartie und vollständige DoD werden nicht behauptet.
+- **Sicht- und hörbares Gefechtsfeedback (D-090, Sprint 12 Strang B):** Ein
+  fog-sicherer, rein lesender Zustands-Differ leitet Schuss, Treffer, sicheren
+  Tod und eigene fertige Einheiten aus sichtbaren Snapshots ab, ohne
+  Simulation, Netzwerk, Replays oder Hash-Baselines zu verändern. Gepoolte und
+  hart gedeckelte Unity-Bordmittel liefern Mündungsstoß, höchstens 0,1 s lange
+  Hitscan-Spur, Trefferfunken, Rauch und einen 0,8-s-Todes-Hold mit
+  slot-sicherer View-Rückgabe. Der D-039-konforme `UnityAudioService` spielt
+  zwölf Tier-0-Ereignisse über `MIX_Master` mit 30 One-Shot-/24 räumlichen
+  Stimmen, atomaren Layern, Prioritäts-Stealing und wirksamem SFX-Regler.
+  Importiert wurden genau 35 unveränderte Kenney-CC0-OGGs samt Pack-Sidecars;
+  die vier Suno-Musikdatensätze bleiben mit ihren real fehlenden Belegen
+  ausdrücklich unvollständig. Hinzu kommen ein headless Quellcode-Guard,
+  Budget-/Differ-/Pooltests und idempotentes Unity-Authoring. Nachgewiesen sind
+  549/549 SimRunner-Tests, 521/521 Unity-EditMode-Tests, der neue
+  Slot-Reuse-PlayMode-Test sowie ein erfolgreicher universeller macOS-Build.
+  Der PlayMode-Gesamtlauf steht bei 8/9, weil der bestehende headless
+  `BarracksSpawnDiagnosisTests` an `RenderTexture.Create` scheitert; die
+  manuelle 60-Einheiten-Gegenhör-/Sichtabnahme bleibt offen.
 ### Geändert
 - **Truppenführung — Einheiten teilen sich den Platz (D-088, Sprint 11):**
   eine Armee ist kein Haufen mehr. Zwölf markierte Einheiten kommen als

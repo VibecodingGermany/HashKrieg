@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
 
@@ -17,6 +18,17 @@ namespace Nova.Networking
         Running = 3,
         /// <summary>Match ended ordered (desync, peer lost, stall timeout or reject).</summary>
         Ended = 4,
+    }
+
+    /// <summary>Stable public lifecycle used by presentation and host code.</summary>
+    public enum RelayMatchLifecycle
+    {
+        Disconnected = 0,
+        Connecting = 1,
+        WaitingStart = 2,
+        Running = 3,
+        Stalled = 4,
+        Ended = 5,
     }
 
     /// <summary>
@@ -48,7 +60,7 @@ namespace Nova.Networking
     /// (snapshot + record stream) at that point.
     /// </para>
     /// </summary>
-    public sealed class RelayMatchClient : INetworkTransport
+    public sealed class RelayMatchClient : INetworkTransport, ICommandSubmissionReadiness
     {
         /// <summary>Interval of the state-hash reports the relay compares (5 s at 10 Hz).</summary>
         public const int StateHashIntervalTicks = 50;
@@ -57,6 +69,7 @@ namespace Nova.Networking
         public const double StallTimeoutSeconds = 30.0;
 
         private readonly TcpRelayConnection _connection = new TcpRelayConnection();
+        private readonly Func<uint> _clockMilliseconds;
         private LockstepBarrier _barrier;
         private CommandIngress _ingress;
         private MatchSession _session;
@@ -64,12 +77,30 @@ namespace Nova.Networking
         private readonly Dictionary<uint, int> _localRecordsByTick = new Dictionary<uint, int>();
         private uint _stalledSinceMs = uint.MaxValue;
         private bool _stallActive;
+        private bool _localInputClosed;
         private uint _pingCounter;
-        private long _pingSentMs = -1;
+        private uint _pingSentMs;
+        private bool _pingOutstanding;
+        private DiagnosticRecordSpool _diagnosticRecordSpool;
+        private string _diagnosticCaptureError = string.Empty;
+        private readonly Dictionary<uint, CheckpointEvidence> _checkpointEvidence =
+            new Dictionary<uint, CheckpointEvidence>();
+        private SimulationKernel _lastKernel;
+        private bool _diagnosticWritten;
 
         public RelayMatchClient()
+            : this(() => unchecked((uint)Environment.TickCount))
         {
+        }
+
+        internal RelayMatchClient(Func<uint> clockMilliseconds)
+        {
+            _clockMilliseconds = clockMilliseconds
+                ?? throw new ArgumentNullException(nameof(clockMilliseconds));
             _connection.SetFrameHandler(OnFrame);
+            string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (string.IsNullOrEmpty(root)) root = Path.GetTempPath();
+            DiagnosticDirectory = Path.Combine(root, "ProjectNova", "NetworkDiagnostics");
         }
 
         // ------------------------------------------------------------------
@@ -77,6 +108,24 @@ namespace Nova.Networking
         // ------------------------------------------------------------------
 
         public RelayClientPhase Phase { get; private set; } = RelayClientPhase.Disconnected;
+
+        /// <summary>Presentation-safe lifecycle that keeps terminal and stall states explicit.</summary>
+        public RelayMatchLifecycle Lifecycle
+        {
+            get
+            {
+                if (Phase == RelayClientPhase.Ended) return RelayMatchLifecycle.Ended;
+                if (Phase == RelayClientPhase.Disconnected) return RelayMatchLifecycle.Disconnected;
+                if (Phase == RelayClientPhase.WaitingOffer) return RelayMatchLifecycle.Connecting;
+                if (Phase == RelayClientPhase.WaitingStart) return RelayMatchLifecycle.WaitingStart;
+                return _stallActive ? RelayMatchLifecycle.Stalled : RelayMatchLifecycle.Running;
+            }
+        }
+
+        /// <summary>Terminal/rejection reason, retained after the socket closes.</summary>
+        public string StatusReason => Phase == RelayClientPhase.Ended
+            ? EndReason
+            : RejectReason;
 
         /// <summary>Offer payload of the server; valid once <see cref="Phase"/> reached WaitingStart inputs.</summary>
         public bool HasOffer { get; private set; }
@@ -96,6 +145,15 @@ namespace Nova.Networking
         public bool Desynced { get; private set; }
         public uint DesyncTick { get; private set; }
 
+        /// <summary>Directory for per-client <c>*.novadiag</c> files; configurable for tests and hosts.</summary>
+        public string DiagnosticDirectory { get; set; }
+
+        /// <summary>Path written for the last desync, or null when no diagnosis was written.</summary>
+        public string LastDiagnosticPath { get; private set; }
+
+        /// <summary>Diagnostic write failure, or empty after a successful/no write.</summary>
+        public string LastDiagnosticError { get; private set; } = string.Empty;
+
         // ------------------------------------------------------------------
         // Stall surface
         // ------------------------------------------------------------------
@@ -108,7 +166,14 @@ namespace Nova.Networking
 
         /// <summary>Seconds the current stall has lasted (0 when not stalled).</summary>
         public double StallSeconds =>
-            _stallActive ? (Environment.TickCount - _stalledSinceMs) / 1000.0 : 0.0;
+            _stallActive
+                ? ElapsedMilliseconds(_clockMilliseconds(), _stalledSinceMs) / 1000.0
+                : 0.0;
+
+        internal static uint ElapsedMilliseconds(uint now, uint startedAt)
+        {
+            return unchecked(now - startedAt);
+        }
 
         // ------------------------------------------------------------------
         // INetworkTransport
@@ -124,9 +189,23 @@ namespace Nova.Networking
             }
         }
 
+        /// <summary>Raw RTT measurement retained for diagnostics.</summary>
         public uint? RoundTripMilliseconds { get; private set; }
 
-        public string LastError => _connection.LastError;
+        /// <summary>RTT in canonical 100-ms simulation ticks, rounded up.</summary>
+        public uint? RoundTripTicks => RoundTripMilliseconds.HasValue
+            ? (RoundTripMilliseconds.Value + (1000u / Nova.Core.SimClock.TicksPerSecond) - 1)
+                / (1000u / Nova.Core.SimClock.TicksPerSecond)
+            : (uint?)null;
+
+        public string LastError => !string.IsNullOrEmpty(EndReason) ? EndReason : _connection.LastError;
+
+        /// <summary>
+        /// The ingress may mint neither stream records nor session actions
+        /// until the relay's authoritative Start frame has arrived.
+        /// </summary>
+        public bool IsReadyForCommandSubmission =>
+            Phase == RelayClientPhase.Running && !_localInputClosed;
 
         /// <summary>Binds this client as the transport of the local session's ingress (exactly once).</summary>
         public void BindIngress(CommandIngress ingress)
@@ -147,25 +226,45 @@ namespace Nova.Networking
         /// <summary>Connect overload with explicit timeout (INetworkTransport signature-free; the token rides in Hello).</summary>
         public void Connect(string host, int port, ulong matchToken, int timeoutMilliseconds)
         {
+            // A match client is a single-session authority. Reusing it would
+            // retain the old ingress/dedupe/barrier and is therefore a
+            // fail-closed programming error: restart with a fresh client.
+            if (Phase != RelayClientPhase.Disconnected || _ingress != null || HasOffer)
+            {
+                Phase = RelayClientPhase.Ended;
+                EndReason = "relay client reuse refused — create a fresh client for a new match";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(host) || port < 1 || port > 65535 || matchToken == 0)
+            {
+                Phase = RelayClientPhase.Ended;
+                EndReason = "invalid relay endpoint or match token";
+                return;
+            }
+            DisposeDiagnosticRecordSpool();
+            _diagnosticCaptureError = string.Empty;
+            _checkpointEvidence.Clear();
+            _diagnosticWritten = false;
+            LastDiagnosticPath = null;
+            LastDiagnosticError = string.Empty;
             if (!_connection.Connect(host, port, timeoutMilliseconds))
             {
                 Phase = RelayClientPhase.Ended;
                 EndReason = _connection.LastError ?? "connect failed";
                 return;
             }
-            _connection.SendFrame(RelayFrameType.Hello, RelayProtocol.CreateHelloPayload(matchToken));
+            if (!_connection.SendFrame(RelayFrameType.Hello, RelayProtocol.CreateHelloPayload(matchToken)))
+            {
+                EndMatch(_connection.LastError ?? "relay hello failed");
+                return;
+            }
             Phase = RelayClientPhase.WaitingOffer;
-        }
-
-        /// <summary>INetworkTransport.Connect without a token is not meaningful for the match client; kept for interface completeness.</summary>
-        void INetworkTransport.Connect(string host, int port)
-        {
-            throw new NotSupportedException("RelayMatchClient.Connect requires the match token: use Connect(host, port, matchToken).");
         }
 
         public void Disconnect()
         {
             _connection.Disconnect();
+            DisposeDiagnosticRecordSpool();
             if (Phase != RelayClientPhase.Ended)
             {
                 Phase = RelayClientPhase.Disconnected;
@@ -184,8 +283,12 @@ namespace Nova.Networking
             {
                 throw new InvalidOperationException("SubmitLocalProof requires a received server offer.");
             }
-            _connection.SendFrame(RelayFrameType.Fingerprint, fingerprintBytes);
-            _connection.SendFrame(RelayFrameType.InitialSnapshot, initialSnapshotBytes);
+            if (!_connection.SendFrame(RelayFrameType.Fingerprint, fingerprintBytes)
+                || !_connection.SendFrame(RelayFrameType.InitialSnapshot, initialSnapshotBytes))
+            {
+                EndMatch(_connection.LastError ?? "relay proof submission failed");
+                return;
+            }
             Phase = RelayClientPhase.WaitingStart;
         }
 
@@ -206,12 +309,22 @@ namespace Nova.Networking
         public void Send(byte[] recordBytes)
         {
             if (_ingress == null) throw new InvalidOperationException("BindIngress must precede Send.");
+            // ICommandTransport.Send cannot return a verdict. The hard
+            // fail-closed guarantee here is therefore state-based: before
+            // Start, no bytes reach either the local ingress or the socket,
+            // and no barrier/accounting state changes.
+            if (Phase != RelayClientPhase.Running || _localInputClosed) return;
+
             CommandIngressResult result = _ingress.TryAcceptRecordBytes(recordBytes, out _);
-            if (result == CommandIngressResult.Rejected)
+            if (result != CommandIngressResult.Accepted)
             {
                 return;
             }
-            _connection.SendFrame(RelayFrameType.CommandRecord, recordBytes);
+            if (!_connection.SendFrame(RelayFrameType.CommandRecord, recordBytes))
+            {
+                EndMatch(_connection.LastError ?? "relay command send failed");
+                return;
+            }
             if (Nova.Simulation.CommandsV1.CommandRecord.TryDeserialize(recordBytes, out var sentRecord, out int consumed)
                 && consumed == recordBytes.Length)
             {
@@ -229,6 +342,13 @@ namespace Nova.Networking
         {
             _connection.Poll();
 
+            if (_connection.State == RelayConnectionState.Failed
+                && Phase != RelayClientPhase.Ended)
+            {
+                EndMatch(_connection.LastError ?? "relay connection failed");
+                return;
+            }
+
             if (Phase == RelayClientPhase.Running)
             {
                 // RTT cadence: one ping every ~5 s of host frames (callers
@@ -237,11 +357,18 @@ namespace Nova.Networking
                 if (_pingCounter >= 300)
                 {
                     _pingCounter = 0;
-                    var probe = new byte[4];
-                    RelayProtocol.WriteUInt32(probe, 0, unchecked((uint)Environment.TickCount));
-                    if (_connection.SendFrame(RelayFrameType.Ping, probe))
+                    if (!_pingOutstanding)
                     {
-                        _pingSentMs = Environment.TickCount;
+                        uint sentAt = _clockMilliseconds();
+                        var probe = new byte[4];
+                        RelayProtocol.WriteUInt32(probe, 0, sentAt);
+                        if (!_connection.SendFrame(RelayFrameType.Ping, probe))
+                        {
+                            EndMatch(_connection.LastError ?? "relay ping send failed");
+                            return;
+                        }
+                        _pingSentMs = sentAt;
+                        _pingOutstanding = true;
                     }
                 }
 
@@ -261,7 +388,15 @@ namespace Nova.Networking
         public bool TryStepTick(SimulationKernel kernel)
         {
             if (kernel == null) throw new ArgumentNullException(nameof(kernel));
+            _lastKernel = kernel;
             if (Phase != RelayClientPhase.Running) return false;
+
+            if (!_localInputClosed)
+            {
+                _localInputClosed = true;
+                AnnounceLocalCompleteness(includeCurrentInputTick: true);
+                if (Phase != RelayClientPhase.Running) return false;
+            }
 
             uint nextTick = kernel.CurrentTick.Value + 1;
             if (!_barrier.IsTickReady(nextTick))
@@ -269,7 +404,7 @@ namespace Nova.Networking
                 if (!_stallActive)
                 {
                     _stallActive = true;
-                    _stalledSinceMs = unchecked((uint)Environment.TickCount);
+                    _stalledSinceMs = _clockMilliseconds();
                     DebugLog?.Invoke($"slot {AssignedSlot} stalls at tick {nextTick} waiting on slot {_barrier.WaitingOnSlot(nextTick)}");
                 }
                 StalledOnSlot = _barrier.WaitingOnSlot(nextTick);
@@ -290,15 +425,68 @@ namespace Nova.Networking
             }
             kernel.StepTick();
             _session.AdvanceTick();
+            _localInputClosed = false;
+
+            // Diagnostics are derived from what the kernel actually
+            // applied, never from attempted sends or merely received bytes.
+            for (int i = 0; i < batch.Count; i++)
+            {
+                if (_diagnosticRecordSpool == null)
+                {
+                    _diagnosticRecordSpool = new DiagnosticRecordSpool();
+                }
+                if (!_diagnosticRecordSpool.TryAppend(
+                        batch.Records[i].Serialize(), out string captureError))
+                {
+                    _diagnosticCaptureError = captureError;
+                    LastDiagnosticError = captureError;
+                    EndMatch(captureError);
+                    return true;
+                }
+            }
             _barrier.PruneThrough(nextTick);
             _localRecordsByTick.Remove(nextTick);
 
-            AnnounceLocalCompleteness();
-
             if (nextTick % StateHashIntervalTicks == 0)
             {
-                _connection.SendFrame(RelayFrameType.StateHash,
-                    RelayProtocol.CreateStateHashPayload(_session.LocalSlot, nextTick, kernel.CalculateStateHash()));
+                ulong stateHash = kernel.CalculateStateHash();
+                byte[] snapshot = kernel.SaveSnapshot();
+                if (!DesyncDiagnostic.TryReadSnapshotIdentity(
+                        snapshot, out uint snapshotTick, out ulong snapshotHash, out string snapshotError)
+                    || snapshotTick != nextTick || snapshotHash != stateHash)
+                {
+                    EndMatch(
+                        $"checkpoint capture failed at tick {nextTick}: " +
+                        (string.IsNullOrEmpty(snapshotError)
+                            ? $"snapshot identity was tick {snapshotTick}, hash 0x{snapshotHash:X16}"
+                            : snapshotError));
+                    return true;
+                }
+                long recordBytes = _diagnosticRecordSpool?.ByteLength ?? 0;
+                if (!DesyncDiagnostic.CanFit(
+                        snapshot.Length, recordBytes, out string budgetError))
+                {
+                    _diagnosticCaptureError = budgetError;
+                    LastDiagnosticError = budgetError;
+                    EndMatch(budgetError);
+                    return true;
+                }
+                _checkpointEvidence[nextTick] = new CheckpointEvidence(stateHash, snapshot);
+                while (_checkpointEvidence.Count > 2)
+                {
+                    uint oldest = uint.MaxValue;
+                    foreach (uint bufferedTick in _checkpointEvidence.Keys)
+                    {
+                        if (bufferedTick < oldest) oldest = bufferedTick;
+                    }
+                    _checkpointEvidence.Remove(oldest);
+                }
+                if (!_connection.SendFrame(RelayFrameType.StateHash,
+                        RelayProtocol.CreateStateHashPayload(_session.LocalSlot, nextTick, stateHash)))
+                {
+                    EndMatch(_connection.LastError ?? "relay state-hash send failed");
+                    return true;
+                }
             }
             return true;
         }
@@ -316,108 +504,233 @@ namespace Nova.Networking
             switch (type)
             {
                 case RelayFrameType.Offer:
-                    if (RelayProtocol.TryParseOffer(payload, out byte slot, out byte[] activeSlots,
-                            out ulong seed, out uint delay, out ulong serverDefsHash))
+                    if (Phase != RelayClientPhase.WaitingOffer
+                        || !RelayProtocol.TryParseOffer(payload, out byte slot, out byte[] activeSlots,
+                            out ulong seed, out uint delay, out ulong serverDefsHash)
+                        || !HasValidOfferRoles(slot, activeSlots, seed))
                     {
-                        AssignedSlot = slot;
-                        ActiveSlots = activeSlots;
-                        Seed = seed;
-                        InputDelayTicks = delay;
-                        ServerDefinitionsHash64 = serverDefsHash;
-                        HasOffer = true;
-                        _barrier = new LockstepBarrier(slot, activeSlots);
-                        _announcedThrough = 0;
+                        ProtocolViolation("invalid or unexpected Offer");
+                        return;
                     }
+                    AssignedSlot = slot;
+                    ActiveSlots = activeSlots;
+                    Seed = seed;
+                    InputDelayTicks = delay;
+                    ServerDefinitionsHash64 = serverDefsHash;
+                    HasOffer = true;
+                    _barrier = new LockstepBarrier(slot, activeSlots);
+                    _announcedThrough = 0;
                     break;
 
                 case RelayFrameType.Start:
-                    if (Phase == RelayClientPhase.WaitingStart)
+                    if (Phase != RelayClientPhase.WaitingStart
+                        || payload.Length != 0
+                        || _session == null || _ingress == null || _barrier == null)
                     {
-                        Phase = RelayClientPhase.Running;
-                        AnnounceLocalCompleteness();
+                        ProtocolViolation("invalid or unexpected Start");
+                        return;
                     }
+                    Phase = RelayClientPhase.Running;
+                    _localInputClosed = false;
+                    AnnounceLocalCompleteness(includeCurrentInputTick: false);
                     break;
 
                 case RelayFrameType.Reject:
-                    RejectReason = RelayProtocol.ParseReasonPayload(payload);
+                    string rejectReason = RelayProtocol.ParseReasonPayload(payload);
+                    if (Phase == RelayClientPhase.Disconnected
+                        || Phase == RelayClientPhase.Ended
+                        || string.IsNullOrEmpty(rejectReason))
+                    {
+                        ProtocolViolation("invalid or unexpected Reject");
+                        return;
+                    }
+                    RejectReason = rejectReason;
                     EndMatch($"rejected by relay: {RejectReason}");
                     break;
 
                 case RelayFrameType.CommandRecord:
-                    if (Phase == RelayClientPhase.Running
-                        && Nova.Simulation.CommandsV1.CommandRecord.TryDeserialize(payload, out var record, out int consumed)
-                        && consumed == payload.Length)
+                    if (Phase != RelayClientPhase.Running
+                        || _session == null || _ingress == null || _barrier == null
+                        || !Nova.Simulation.CommandsV1.CommandRecord.TryDeserialize(
+                            payload, out var record, out int consumed)
+                        || consumed != payload.Length
+                        || !IsActiveRemoteSlot(record.PlayerSlot))
                     {
-                        // The intake revalidates structurally; the barrier
-                        // counts the arrival regardless of the intake verdict
-                        // (a rejected foreign record cannot affect the seal).
-                        if (record.PlayerSlot != _session.LocalSlot)
-                        {
-                            _barrier.NoteRemoteRecord(record.PlayerSlot, record.TargetTick);
-                            Nova.Simulation.CommandsV1.CommandIngressResult intake = _ingress.TryAcceptRecordBytes(payload, out CommandRejectReason intakeReason);
-                            DebugLog?.Invoke($"slot {AssignedSlot}: record(slot {record.PlayerSlot}, tick {record.TargetTick}, seq {record.Sequence}, {record.Kind}) intake={intake}/{intakeReason}");
-                        }
+                        ProtocolViolation("invalid or unexpected CommandRecord");
+                        return;
                     }
+                    Nova.Simulation.CommandsV1.CommandIngressResult intake =
+                        _ingress.TryAcceptRecordBytes(payload, out CommandRejectReason intakeReason);
+                    if (intake != CommandIngressResult.Accepted)
+                    {
+                        ProtocolViolation($"CommandRecord intake rejected ({intakeReason})");
+                        return;
+                    }
+                    LockstepBarrierVerdict recordVerdict =
+                        _barrier.NoteRemoteRecord(record.PlayerSlot, record.TargetTick);
+                    if (recordVerdict != LockstepBarrierVerdict.Accepted)
+                    {
+                        ProtocolViolation(
+                            $"CommandRecord barrier rejected ({recordVerdict})");
+                        return;
+                    }
+                    DebugLog?.Invoke($"slot {AssignedSlot}: record(slot {record.PlayerSlot}, tick {record.TargetTick}, seq {record.Sequence}, {record.Kind}) intake={intake}/{intakeReason}");
                     break;
 
                 case RelayFrameType.TickComplete:
-                    if (RelayProtocol.TryParseTickComplete(payload, out byte completeSlot, out uint completeTick, out int recordCount)
-                        && completeSlot != AssignedSlot)
+                    if (Phase != RelayClientPhase.Running
+                        || _barrier == null
+                        || !RelayProtocol.TryParseTickComplete(
+                            payload, out byte completeSlot, out uint completeTick, out int recordCount)
+                        || !IsActiveRemoteSlot(completeSlot))
                     {
-                        DebugLog?.Invoke($"slot {AssignedSlot}: complete(slot {completeSlot}, tick {completeTick}, n={recordCount})");
-                        _barrier?.NoteTickComplete(completeSlot, completeTick, recordCount);
+                        ProtocolViolation("invalid or unexpected TickComplete");
+                        return;
+                    }
+                    DebugLog?.Invoke($"slot {AssignedSlot}: complete(slot {completeSlot}, tick {completeTick}, n={recordCount})");
+                    LockstepBarrierVerdict completeVerdict =
+                        _barrier.NoteRemoteTickComplete(
+                            completeSlot, completeTick, recordCount);
+                    if (completeVerdict != LockstepBarrierVerdict.Accepted)
+                    {
+                        ProtocolViolation(
+                            $"TickComplete barrier rejected ({completeVerdict})");
+                        return;
                     }
                     break;
 
                 case RelayFrameType.Desync:
-                    if (RelayProtocol.TryParseSlotTick(payload, out _, out uint desyncTick))
+                    if (Phase != RelayClientPhase.Running
+                        || !RelayProtocol.TryParseSlotTick(
+                            payload, out byte desyncSlot, out uint desyncTick)
+                        || desyncSlot != byte.MaxValue
+                        || desyncTick == 0
+                        || desyncTick % StateHashIntervalTicks != 0
+                        || !_checkpointEvidence.ContainsKey(desyncTick))
                     {
-                        Desynced = true;
-                        DesyncTick = desyncTick;
-                        EndMatch($"desync reported by the relay at tick {desyncTick}");
+                        ProtocolViolation("invalid or unexpected Desync");
+                        return;
                     }
+                    Desynced = true;
+                    DesyncTick = desyncTick;
+                    WriteDesyncDiagnostic(desyncTick);
+                    EndMatch($"desync reported by the relay at tick {desyncTick}");
                     break;
 
                 case RelayFrameType.PeerLost:
-                    if (RelayProtocol.TryParseSlotTick(payload, out byte lostSlot, out _))
+                    if (Phase != RelayClientPhase.Running
+                        || !RelayProtocol.TryParseSlotTick(
+                            payload, out byte lostSlot, out uint lostTick)
+                        || !IsActiveRemoteSlot(lostSlot)
+                        || lostTick != 0)
                     {
-                        EndMatch($"peer slot {lostSlot} lost the relay connection");
+                        ProtocolViolation("invalid or unexpected PeerLost");
+                        return;
                     }
+                    EndMatch($"peer slot {lostSlot} lost the relay connection");
                     break;
 
                 case RelayFrameType.Pong:
-                    if (_pingSentMs >= 0 && RelayProtocol.TryParsePing(payload, out _))
+                    if (Phase != RelayClientPhase.Running
+                        || !_pingOutstanding
+                        || !RelayProtocol.TryParsePing(payload, out uint probe)
+                        || probe != _pingSentMs)
                     {
-                        RoundTripMilliseconds = unchecked((uint)(Environment.TickCount - _pingSentMs));
-                        _pingSentMs = -1;
+                        ProtocolViolation("invalid or unexpected Pong");
+                        return;
                     }
+                    RoundTripMilliseconds = ElapsedMilliseconds(
+                        _clockMilliseconds(), _pingSentMs);
+                    _pingOutstanding = false;
+                    break;
+
+                default:
+                    ProtocolViolation($"unexpected frame type {type}");
                     break;
             }
         }
 
+        private static bool HasValidOfferRoles(
+            byte assignedSlot, byte[] activeSlots, ulong seed)
+        {
+            if (seed == 0 || activeSlots == null
+                || activeSlots.Length != RelayServerCore.MaxPeers)
+            {
+                return false;
+            }
+            var seen = new bool[CommandLimits.ReservedPlayerSlots];
+            bool assignedIsActive = false;
+            for (int i = 0; i < activeSlots.Length; i++)
+            {
+                byte activeSlot = activeSlots[i];
+                if (activeSlot >= seen.Length || seen[activeSlot]) return false;
+                seen[activeSlot] = true;
+                assignedIsActive |= activeSlot == assignedSlot;
+            }
+            return assignedIsActive;
+        }
+
+        private bool IsActiveRemoteSlot(byte slot)
+        {
+            return _session != null
+                && slot != _session.LocalSlot
+                && _session.IsActiveSlot(slot);
+        }
+
+        private void ProtocolViolation(string detail)
+        {
+            EndMatch($"relay protocol violation: {detail}");
+        }
+
         /// <summary>
-        /// Pipelined local announcement: with input delay D, no new local
-        /// record for tick X can be minted once the session tick passed
-        /// X - D — so every tick up to CurrentTick + D - 1 is announced
-        /// complete now, one tick of network slack ahead of its execution.
+        /// Pipelined local announcement: Start may safely prefill through
+        /// CurrentTick + D - 1. At the beginning of a step attempt, local
+        /// input is closed first, which makes CurrentTick + D final too;
+        /// that current window is announced before the barrier is queried.
         /// The announced count is the LOCAL slot's records only, tracked at
         /// Send time: the ingress pending pool mixes in the peers' records
         /// and must never leak into a slot's own completeness claim.
         /// </summary>
-        private void AnnounceLocalCompleteness()
+        private void AnnounceLocalCompleteness(bool includeCurrentInputTick)
         {
             if (_barrier == null || _session == null || Phase != RelayClientPhase.Running) return;
-            uint through = _session.CurrentTick + _session.InputDelayTicks - 1;
-            for (uint tick = _announcedThrough + 1; tick <= through; tick++)
+            uint offset = includeCurrentInputTick
+                ? _session.InputDelayTicks
+                : _session.InputDelayTicks - 1;
+            if (_session.CurrentTick > uint.MaxValue - offset)
+            {
+                EndMatch("local completeness window overflowed");
+                return;
+            }
+            uint through = _session.CurrentTick + offset;
+            if (through == uint.MaxValue)
+            {
+                EndMatch("local completeness window reached the final representable tick");
+                return;
+            }
+            if (through <= _announcedThrough) return;
+
+            uint tick = _announcedThrough + 1;
+            while (true)
             {
                 _localRecordsByTick.TryGetValue(tick, out int count);
-                _barrier.NoteLocalTickComplete(tick, count);
-                _connection.SendFrame(RelayFrameType.TickComplete,
-                    RelayProtocol.CreateTickCompletePayload(_session.LocalSlot, tick, count));
-            }
-            if (through > _announcedThrough)
-            {
-                _announcedThrough = through;
+                if (!_connection.SendFrame(RelayFrameType.TickComplete,
+                        RelayProtocol.CreateTickCompletePayload(_session.LocalSlot, tick, count)))
+                {
+                    EndMatch(_connection.LastError ?? "relay tick-complete send failed");
+                    return;
+                }
+                LockstepBarrierVerdict localVerdict =
+                    _barrier.NoteLocalTickComplete(tick, count);
+                if (localVerdict != LockstepBarrierVerdict.Accepted)
+                {
+                    ProtocolViolation(
+                        $"local TickComplete barrier rejected ({localVerdict})");
+                    return;
+                }
+                _announcedThrough = tick;
+                if (tick == through) break;
+                tick++;
             }
         }
 
@@ -427,6 +740,61 @@ namespace Nova.Networking
             Phase = RelayClientPhase.Ended;
             _stallActive = false;
             _connection.Disconnect();
+            DisposeDiagnosticRecordSpool();
+        }
+
+        private void WriteDesyncDiagnostic(uint tick)
+        {
+            if (_diagnosticWritten) return;
+            _diagnosticWritten = true;
+            if (!_checkpointEvidence.TryGetValue(tick, out CheckpointEvidence evidence))
+            {
+                LastDiagnosticError = $"no verified checkpoint evidence was buffered for tick {tick}";
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_diagnosticCaptureError))
+            {
+                LastDiagnosticError = _diagnosticCaptureError;
+                return;
+            }
+            if (_diagnosticRecordSpool == null)
+            {
+                _diagnosticRecordSpool = new DiagnosticRecordSpool();
+            }
+
+            if (DesyncDiagnostic.TryWrite(
+                    DiagnosticDirectory, AssignedSlot, tick, evidence.StateHash, evidence.SnapshotBytes,
+                    _diagnosticRecordSpool, out string path, out string error))
+            {
+                LastDiagnosticPath = path;
+                LastDiagnosticError = string.Empty;
+                DebugLog?.Invoke($"slot {AssignedSlot}: wrote desync diagnosis to {path}");
+            }
+            else
+            {
+                LastDiagnosticError = error;
+                DebugLog?.Invoke($"slot {AssignedSlot}: desync diagnosis failed: {error}");
+            }
+            DisposeDiagnosticRecordSpool();
+        }
+
+        private void DisposeDiagnosticRecordSpool()
+        {
+            _diagnosticRecordSpool?.Dispose();
+            _diagnosticRecordSpool = null;
+        }
+
+        private readonly struct CheckpointEvidence
+        {
+            public ulong StateHash { get; }
+            public byte[] SnapshotBytes { get; }
+
+            public CheckpointEvidence(ulong stateHash, byte[] snapshotBytes)
+            {
+                StateHash = stateHash;
+                SnapshotBytes = snapshotBytes;
+            }
         }
     }
 }

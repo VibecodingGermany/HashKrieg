@@ -1,34 +1,83 @@
-# Networking – Zielarchitektur Lockstep über autoritativem Command-Relay
+# Networking – 1v1-Lockstep über TCP-Command-Relay
 
-**Version:** 0.3.1 | **Status:** Post-MVP-Zielbild | **Verantwortungsbereich:** Lead Multiplayer Engineer | **Sprint:** 4
+**Version:** 0.4.0 | **Status:** D-089-Implementierungsvertrag; manuelle Netzwerkabnahme offen | **Verantwortungsbereich:** Lead Multiplayer Engineer | **Sprint:** 12
 
 ## Zweck
 
-Definiert die Netzwerk-Zielarchitektur von Project Nova gemäß **D-033**: deterministisches Lockstep über einem autoritativen Command-Relay-Server (Eigenbau-UDP; Fallback = reduzierter MP-Scope, D-051). Festgelegt werden Server-Rollen inkl. Trust-Anchor (Post-Match-Re-Simulation, D-046), Protokoll-Design, Lobby-/Match-Flow, Disconnect-Regel (final), Host-Migration-Bewertung, NAT/Traversal, Regions-/Ping-Anforderungen und die Maphack-Lage. Was konkret über die Leitung wandert (Commands, Hashes, Snapshots), spezifiziert [./Replication.md](./Replication.md); das Simulationsmodell selbst liegt in [./GameState.md](./GameState.md) (geplant, D-033/D-035).
+Definiert das in Sprint 12 implementierte 1v1-Netzprofil aus **D-089**:
+deterministisches Lockstep zweier Client-Simulationen über einen nicht
+simulierenden TCP-Command-Relay. Der ältere D-033/D-046-Entwurf für UDP,
+Lobby, Reconnect, Observer und serverseitige Ergebnisarbitration bleibt unten
+als historisches Vollspiel-Zielbild erhalten, ist aber kein Vertrag des
+implementierten Profils. Replikations- und Aufzeichnungsgrenzen stehen in
+[Replication.md](Replication.md), der Betrieb in
+[RelayServer.md](RelayServer.md).
 
-Geltungsbereich: **MS-1 = `LocalLoopbackTransport` ohne Netzwerk** über die
-kanonische Command-Pipeline; das nachfolgende Relay-Modell ist ein
-unverbindliches Post-MVP-Zielbild.
+Geltungsbereich: `LocalLoopback` mit kanonischem Default-Delay 1 und erlaubtem
+Bereich 1 bis 60 sowie genau ein Netzprofil für zwei menschliche Slots mit
+standardmäßig Delay 3 und demselben erlaubten Bereich. Eine gespielte
+Netzwerkpartie ist noch nicht nachgewiesen.
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-056 (MS-1-Umfang), D-057 (kanonische Simulation und `LocalLoopback`), D-060 (Unity-Pin), D-061 (Abnahme), D-018/D-025 (spätere Modus-Phasen)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-057 (kanonische Simulation und `LocalLoopback`), D-089 (implementiertes TCP-1v1), D-033/D-046 (teilweise ersetztes historisches Zielbild)
 - [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md) – Modellvergleich, Bandbreitenrechnung, Determinismus-Fallstricke, §6 Umsetzungsoptionen
 - [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerModes.md) – Lobby-/Teamregeln (§4), Beobachter/Replays (§6), MatchSettings
 - [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) – Match-Ergebnis-Regeln, technischer Abbruch (§ Konflikt, siehe Offene Punkte)
 - [./Replication.md](./Replication.md) – Replikationsumfang, Desync-Detektion, Reconnect, Replays
+- [./RelayServer.md](./RelayServer.md) – Prozess-, Environment-, systemd-, Deploy- und Firewallvertrag
 - [./GameState.md](./GameState.md) – geplant: Command-Modell, Tick-Loop, Serialisierung (D-033-Regeln 1–5)
 
-## MS-1-Override (D-056/D-057/D-061)
+## Sprint-12-Implementierungsprofil (D-089)
 
-Die nachfolgende Relay-, Lobby-, NAT-, Regionen- und Online-Architektur ist
-vollständig Post-MVP. MS-1 verwendet ausschließlich den in
-[Replication.md](Replication.md) definierten `LocalLoopback` über dieselbe
-Command-Pipeline; es gibt keinen Netzwerktransport und keine Relay-Abnahme in
-G0–G5. Der kanonische State, Hash, Replay und Save/Load werden dennoch so
-implementiert, dass ein späterer Transport sie konsumieren kann.
+### Rollen und Datenfluss
 
-## 1. Zielarchitektur (ab Beta)
+- Jeder Client simuliert den vollständigen Gameplay-State lokal über denselben
+  deterministischen Kernel. Es gibt keinen laufenden Entity-State-Sync.
+- Der Relay nimmt genau zwei TCP-Clients an, bindet jeden an seinen Slot,
+  validiert Frames und Command-Records und verteilt den bestätigten Strom. Er
+  simuliert nicht und besitzt keine Ergebnisautorität.
+- `TickComplete { slot, targetTick, recordCount }` ist ein reiner
+  Transport-Frame. Der Client markiert seine lokale Completion selbst und
+  sendet sie an den Relay; die Tickausführung wartet nicht auf ein Echo dieses
+  eigenen Frames. Die Remote-Completion wird erst nach serverseitiger Prüfung
+  von Tickfolge, exakter Anzahl, Dedupe und Caps an den anderen Client
+  weitergeleitet. Dessen Barrier öffnet mit lokaler Markierung, vollständig
+  eingetroffenen Remote-Records und validierter Remote-Completion. Bei
+  aktivierter Aufzeichnung persistiert der Relay den Tick erst nach bestätigter
+  Completion beider Slots. Fehlende Vollständigkeit stallt die Simulation,
+  statt einen Leertick zu erfinden.
+- Alle 50 Ticks melden beide Clients ihren State-Hash. Gleichheit erzeugt einen
+  bestätigten Checkpoint; Ungleichheit beendet beide Clients als Desync. Der
+  Server re-simuliert nicht.
+
+### Start und Session
+
+Der Relay bietet Slot, aktive Slots, Seed, Input-Delay und Definitionshash an.
+Vor `Start` müssen beide Peers denselben vollständigen Fingerprint und einen
+byteidentischen Initialsnapshot beweisen; der Beweis bindet insbesondere Seed,
+Delay, Definitionshash und Initialzustand. Das Netzprofil verwendet
+standardmäßig drei Input-Delay-Ticks, erlaubt 1 bis 60 und ändert den Wert
+nicht während einer Session. Der kanonische lokale Defaultwert ist ein Tick;
+`MatchConfig`/Loopback erlauben ebenfalls 1 bis 60.
+
+`ICommandTransport` bleibt unverändert. Ein Transport kann zusätzlich
+`ICommandSubmissionReadiness` implementieren; die Ingress prüft die
+Bereitschaft vor Session-Aktion und Sequenzvergabe. Der Relay-Client erlaubt
+Commands nur in `Running`. `MatchConfig`, `MatchBootstrap` und `MatchRunner`
+tragen Konfiguration und Barrier bis in die Spielschleife; eine lokale Pause
+ist im Relay-Match gesperrt.
+
+### Ende und ausgeschlossener Umfang
+
+Implementierte terminale Pfade sind Desync, Peer-Verlust,
+Protokollverletzung, Transportfehler und Barrier-Timeout. Nicht implementiert
+sind `MatchComplete`, Reconnect, UDP, Lobby/Matchmaking, Observer, mehr als zwei
+Spieler und eine serverseitige Ergebnissimulation. Der rohe TCP-Port wird nicht
+durch nginx oder WebSocket ersetzt. Details zu Token, Port und Betrieb stehen
+in [RelayServer.md](RelayServer.md).
+
+## 1. Historisches Vollspiel-Zielbild (D-033/D-046, nicht implementiert)
 
 ```
 ┌─────────┐  Commands (zu Tick T+2)   ┌──────────────────┐   Commands (zu Tick T+2)  ┌─────────┐
@@ -44,9 +93,14 @@ implementiert, dass ein späterer Transport sie konsumieren kann.
 
 **Jeder Client simuliert das komplette Match lokal und deterministisch.** Über das Netz wandern ausschließlich Spieler-Commands und Validierungs-Hashes – kein State-Sync (D-033; Bandbreitenbegründung Research §2.5: <5 kB/s pro Spieler statt 200–300 kB/s).
 
-### 1.1 Server-Rollen (Autorität)
+### 1.1 Historische Server-Rollen (nicht implementiert)
 
-Der Relay-Server ist **autoritativ über Befehle, Takt und Ergebnis** (TPD §9, aufgelöst in Research §6/§7):
+> **Historischer Entwurf:** Die folgende Ergebnisautorität und
+> Post-Match-Re-Simulation sind nicht Teil von D-089. Im implementierten Profil
+> simuliert der Relay nicht und entscheidet kein Ergebnis.
+
+Der damalige Entwurf sah den Relay-Server **autoritativ über Befehle, Takt und
+Ergebnis** (TPD §9, aufgelöst in Research §6/§7):
 
 | Rolle | Beschreibung |
 |---|---|
@@ -61,15 +115,22 @@ Der Server simuliert **nicht** selbst (kein Gameplay-State) – das hält Hostin
 ### 1.2 MVP-Ausprägung: lokaler Server
 
 Im MS-1-Singleplayer führt `LocalLoopbackTransport` Records an denselben
-Ingress zurück. Der fingerprinted lokale `InputDelayTicks`-Wert ist 1; Schema,
-Sortierung, Dedupe und Fehlermodell stehen verbindlich in
+Ingress zurück. Der kanonische fingerprinted lokale Defaultwert für
+`InputDelayTicks` ist 1; der zulässige Konfigurationsbereich ist 1 bis 60.
+Schema, Sortierung, Dedupe und Fehlermodell stehen verbindlich in
 [Commands.md](Commands.md).
 
-## 2. Eigenbau-UDP-Relay (Primärpfad)
+## 2. Historischer Eigenbau-UDP-Entwurf (durch D-089 ersetzt)
 
 ### 2.1 Transport: Reliable-Ordered-Layer über UDP
 
-Begründung Eigenbau: Das Nachrichtenvolumen ist winzig und homogen (Command-Batches, Hashes), die Anforderungen speziell (Tick-Takt, keine Head-of-Line-Blockade bei Positions-unabhängigen Acks), und der Sim-Kern ist ohnehin Pflicht (Research §6, "Favorit"). TCP ist ausgeschlossen (Head-of-Line-Blocking würde Tick-Batches stauen). Auf UDP wird ein schmaler Zuverlässigkeits-Layer gelegt:
+Historische Begründung: Das Nachrichtenvolumen ist winzig und homogen
+(Command-Batches, Hashes), die Anforderungen speziell (Tick-Takt, keine
+Head-of-Line-Blockade bei Positions-unabhängigen Acks), und der Sim-Kern ist
+ohnehin Pflicht (Research §6, „Favorit“). Dieser ersetzte Entwurf schloss TCP
+wegen angenommener Head-of-Line-Blockade aus und legte auf UDP einen schmalen
+Zuverlässigkeits-Layer. D-089 traf für das implementierte 1v1 die gegenteilige
+Wahl und verwendet TCP. Der historische UDP-Layer hätte umfasst:
 
 - **Reliable-Ordered nur für Command- und Kontroll-Kanäle** (Sequenznummer + Ack-Bitmap, Retransmit nach 2×RTT oder spätestens 150 ms).
 - **Unreliable für Hash-/Heartbeat-Kanal** (Hashes sind redundant, alle N Ticks neu – Verlust egal).
@@ -121,9 +182,15 @@ namespace Nova.Net
 - Der Server unterscheidet daraus **Netz-Lag** (verspätete Commands bei normaler Ausführungszeit → Stall-Zähler, §2.3) von **CPU-Lag** (hohe Ausführungszeit bei pünktlichem Versand: der Client rechnet zu langsam und bremst das Match für alle).
 - **Konsequenz bei CPU-Lag: keine KI-Übernahme** – der Spieler ist verbunden und sendet. Stattdessen erhält der betroffene Spieler einen **Qualitätshinweis** (Hardware/Last) und die Lobby eine Kennzeichnung; anhaltender CPU-Lag ist ein akzeptiertes Restrisiko des Lockstep-Modells und fließt in die Beta-Telemetry ein.
 
-## 3. Fallback: Reduzierter MP-Scope (D-051)
+## 3. Historischer Fallback: Reduzierter MP-Scope (D-051)
 
-Primärpfad ist und bleibt der Eigenbau-UDP-Relay (D-033). Ein Photon-Quantum-Fallback existiert **nicht mehr** (D-051): Ein Quantum-Wechsel wäre faktisch ein Rewrite (Gameplay-Code in Quantum-DSL/ECS, Verlust von `Nova.Simulation`, SimRunner (D-036) und sämtlichen Fixtures), kein Fallback – und die früheren Trigger-Kriterien („vertretbarer Aufwand", „1,5×-Budget", „ein Sprint") waren nicht messbar (Review F-05).
+Im historischen D-033-Zielbild war der Eigenbau-UDP-Relay der Primärpfad; für
+das implementierte D-089-Profil gilt stattdessen TCP. Ein Photon-Quantum-
+Fallback existiert **nicht mehr** (D-051): Ein Quantum-Wechsel wäre faktisch
+ein Rewrite (Gameplay-Code in Quantum-DSL/ECS, Verlust von `Nova.Simulation`,
+SimRunner (D-036) und sämtlichen Fixtures), kein Fallback – und die früheren
+Trigger-Kriterien („vertretbarer Aufwand", „1,5×-Budget", „ein Sprint") waren
+nicht messbar (Review F-05).
 
 Scheitert der Eigenbau-Pfad, ist der Fallback ein **reduzierter MP-Scope auf derselben Architektur**:
 
@@ -135,7 +202,7 @@ Scheitert der Eigenbau-Pfad, ist der Fallback ein **reduzierter MP-Scope auf der
 
 Ein vollständiger Strategiewechsel (Quantum o. ä.) ist davon strikt getrennt: Er wäre eine **neue Grundsatzentscheidung** nach totalem Scheitern des Eigenbaus – kein „Fallback" – und bedürfte eines eigenen DecisionLog-Eintrags mit Alternativprüfung. Die 5 Architekturregeln aus D-033 bleiben in jedem Fall gültig.
 
-## 4. Lobby- und Match-Flow
+## 4. Historischer Lobby- und Match-Flow (nicht implementiert)
 
 Fachliche Regeln: [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerModes.md) §4 (Host-Lobby, max. 6 Slots, Slot-Optionen, Ready-Check, Text-Chat; kein Voice-Chat, D-029). Technischer Ablauf:
 
@@ -144,7 +211,7 @@ Fachliche Regeln: [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerM
 3. **Lauf:** §2.3. KI-Slots laufen **auf dem Server? Nein** – KI ist command-erzeugend wie ein Spieler; im Relay-Modell läuft jede KI-Instanz auf genau einem fest zugewiesenen Client/Prozess (bei reinem PvP-Mix: beim Slot-Inhaber bzw. round-robin verteilt). Ihre Commands durchlaufen dieselbe Validierung. (Zuordnungsregel: Offene Punkte; die **Übernahme**-KI nach Disconnect ist dagegen entschieden – deterministisches Sim-Ereignis auf allen Clients, D-046, §5.)
 4. **Ende:** Ergebnis aus der lokalen Simulation; Clients melden Ergebnis-Hash, Server bestätigt und persistiert Match-Record (Replay, [./Replication.md](./Replication.md) §5).
 
-## 5. Disconnect-Regel (FINAL)
+## 5. Historische Disconnect-Regel (nicht implementiert)
 
 **Entscheidung: KI-Übernahme nach Grace-Period – kein Pause-Vote, keine sofortige Auto-Niederlage.**
 
@@ -160,20 +227,23 @@ Fachliche Regeln: [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerM
 
 **Konflikt (aufgelöst):** [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) definierte ursprünglich "Verbindungsverlust > 120 s = Niederlage". Diese Regel ist durch die finale Festlegung **ersetzt** (KI-Übernahme statt Auto-Niederlage, D-038); die Angleichung von VictoryConditions.md und MultiplayerModes.md §3.2 ist erfolgt (beide verweisen auf dieses Dokument als führend).
 
-## 6. Host-Migration-Bewertung
+## 6. Historische Host-Migration-Bewertung
 
 **Im Relay-Modell entfällt klassische Host-Migration.** Der autoritative Knoten ist der dedizierte Relay-Server, kein Spieler-Client; ein Client-Ausfall (auch des Lobby-"Hosts") berührt weder Takt noch Command-Kanonizität. Verbleibende Fälle:
 
 - **Lobby-Host-Wechsel (pre-match):** UI-Rolle, wird vom Server einfach dem nächsten Client zugewiesen – keine Migration von Spielzustand nötig. Der in MultiplayerModes.md §4 offene Punkt "techn. Machbarkeit im Lockstep-Relay" ist damit beantwortet: trivial, da kein Host-State existiert.
 - **Server-Ausfall mid-match:** nicht abgedeckt (Match bricht ab, Command-Log bis zum Ausfall liegt serverseitig vor → technisch wäre Fortsetzung via Snapshot + neuer Session denkbar, wird **nicht** verplant; akzeptiertes Restrisiko, Dokumentation in Offene Punkte).
 
-## 7. NAT/Traversal, Regionen, Ping
+## 7. Historischer UDP-NAT-/Regionen-/Ping-Entwurf
 
-- **NAT/Traversal:** Im Relay-Modell bauen alle Clients nur **ausgehende** UDP-Verbindungen zum Server auf – kein P2P, kein STUN/TURN, keine Port-Forwarding-Problematik. Symmetrische NATs sind unproblematisch. Firewall-Fallback: Relay zusätzlich auf Port 443/UDP erreichbar machen (Beta-Ops-Entscheidung).
+- **NAT/Traversal (historisch):** Der ersetzte Entwurf nahm ausgehende
+  UDP-Verbindungen und einen optionalen Port `443/UDP` an. D-089 verwendet
+  ausgehendes TCP zum rohen Relay-Port; weder `443/UDP` noch WebSocket/nginx
+  sind implementiert.
 - **Regionen (Beta):** Start mit **EU-Zentral** (Primärzielgruppe H1, D-007); Region wird der Session als Matchmaking-/Lobby-Parameter mitgegeben. US-East als zweite Region erst nach Beta-Telemetry.
 - **Ping-Anforderungen:** Weiches Limit **RTT ≤ 150 ms** für gutes Spielgefühl (2-Tick-Fenster = 200 ms); darüber greift der adaptive Input-Delay (§2.3) bis max. 6 Ticks (600 ms), darüber gilt der Spieler als stall-gefährdet (Stall-Schwelle §2.3). Lobby zeigt RTT pro Slot an.
 
-## 8. Maphack-Lage
+## 8. Historische Vollspiel-Maphack-Bewertung
 
 Gemäß D-033 **akzeptiert bis Ranked-Re-Evaluierung**: Jeder Client besitzt den vollständigen Simulationszustand (Lockstep-Struktur), Fog-of-War ist rein clientseitig – clientseitige FoW-Aufhebung ist nicht verhinderbar (SC2-Präzedenz). Gegenmaßnahmen heute: Manipulations-Cheats erzeugen Desyncs und sind per Hash-Validierung + Replay nachweisbar (§1.1, [./Replication.md](./Replication.md) §2); im Konfliktfall liefert die Post-Match-Re-Simulation den Schuldspruch (D-046). Für Ranked (unter Vorbehalt, D-018) bleibt serverseitiges Sichtgrid-Filtering als Re-Evaluationspunkt offen (Research §5).
 
@@ -181,24 +251,25 @@ Gemäß D-033 **akzeptiert bis Ranked-Re-Evaluierung**: Jeder Client besitzt den
 
 ## Offene Punkte
 
-- **Konflikt VictoryConditions.md (aufgelöst, D-038):** Die frühere Regel "Verbindungsverlust > 120 s = Niederlage" widersprach der finalen KI-Übernahme-Regel (§5) – Angleichung erfolgt (VictoryConditions.md 0.3.1, MultiplayerModes.md 0.3.2; dieses Dokument führend).
-- **KI-Slot-Ausführungsort regulärer KI-Slots** (§4.3): feste Zuordnung pro Slot (Command-erzeugend) vs. deterministische KI auf allen Clients wie bei der Übernahme-KI. Die **Übernahme-KI nach Disconnect ist entschieden** (deterministisches Sim-Ereignis, kein Server-Prozess, kein SPOF – D-046, §5). Rest zu entscheiden mit Beta-Infrastrukturplanung.
-- **Server-Ausfall mid-match:** Fortsetzungs-Szenario bewusst nicht verplant; Restrisiko für lange Matches (20–35 min) dokumentieren.
-- **Relay-Backend-Technologie:** Implementierungssprache/-Hosting des Relay-Servers (z. B. .NET auf Basis von `Nova.Simulation`-nahen Serializern) ist Sprint-6-/Beta-Thema; Research nennt Backend-Dienst explizit orthogonal.
-- **Post-MVP-Netzprofil:** MS-1 bleibt unveränderlich bei 10 Hz und
-  `InputDelayTicks = 1`. Ein späteres Onlineprofil darf davon nur mit neuer
-  D-ID und eigener Replay-/Kompatibilitätsbewertung abweichen; es verändert
-  keinen Vertrag in G0–G5.
-- **Verschlüsselung/Integrität des UDP-Stroms** (DTLS vs. eigenes HMAC-Tagging): vor Beta-Extern-Tests festzulegen.
+- A8 Stufen 2–4 stehen aus: zwei Unity-Fenster über Loopback, zwei Rechner im
+  LAN und eine vollständige Partie über den VPS.
+- Das aktuelle TCP-Profil hat keine dokumentierte TLS-Schicht. Vor einer
+  breiteren Internetfreigabe sind Transportverschlüsselung, Tokenwechsel und
+  ein enger Firewall-/Betriebsrahmen neu zu entscheiden.
+- `MatchComplete`, Reconnect, Lobby/Matchmaking, Observer, mehr als zwei Slots,
+  UDP/RUDP und serverseitige Ergebnisarbitration benötigen jeweils einen neuen
+  Vertrag. Die historischen §§1–8 aktivieren diese Funktionen nicht.
+- Ein Relay-Ausfall beendet die laufende Session; Fortsetzung oder Migration
+  ist nicht implementiert.
 
 ## Nächste Schritte
 
-1. ~~Angleichung von [../gamedesign/VictoryConditions.md](../gamedesign/VictoryConditions.md) (technischer Abbruch) und [../gamedesign/MultiplayerModes.md](../gamedesign/MultiplayerModes.md) §3.2~~ – **erledigt (D-038, 2026-07-21)**; die Host-Migration-Frage aus MultiplayerModes.md §4 ist oben (§6) beantwortet.
-2. Erst nach bestandenem G5 eine eigene Online-Architekturentscheidung mit
-   Relay-Hosting, Regionen, Sicherheitsprofil und abweichendem Input-Delay
-   vorbereiten.
-3. Bis dahin das Zielbild nicht implementieren und keine G0–G5-Gates daran
-   koppeln.
+1. A8 Stufe 2 lokal in zwei Unity-Fenstern durchführen und erst danach LAN und
+   VPS prüfen.
+2. Den in [RelayServer.md](RelayServer.md) beschriebenen Linux-/systemd-Pfad
+   erst nach ausdrücklicher Deploy-Freigabe auf dem VPS ausführen.
+3. Erweiterungen des engen D-089-Profils separat entscheiden; die historischen
+   Vollspielabschnitte sind Anforderungen, keine Implementierungszusage.
 
 ## Änderungsverlauf
 
@@ -209,3 +280,4 @@ Gemäß D-033 **akzeptiert bis Ranked-Re-Evaluierung**: Jeder Client besitzt den
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead Multiplayer Engineer |
 | 0.3.0 | 2026-07-24 | Online-Architektur als Post-MVP abgegrenzt und MS-1 auf `LocalLoopback` gemäß D-056/D-057/D-061 festgelegt | Lead Multiplayer Engineer |
 | 0.3.1 | 2026-07-24 | Veralteten Phase-0-/8-Hz-Pfad entfernt und Online-Arbeit strikt hinter G5 verschoben | Lead Multiplayer Engineer |
+| 0.4.0 | 2026-08-07 | D-089-1v1-Profil (TCP, fester Barrier, Startproof, 50-Tick-Hashes und enge Scopegrenze) als implementierten Vertrag vorangestellt; widersprechenden UDP-/Lobby-/Reconnect-Entwurf als historisch markiert | Lead Multiplayer Engineer / Technical Writer |

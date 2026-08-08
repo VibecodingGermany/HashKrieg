@@ -105,9 +105,23 @@ namespace Nova.Networking
             if (State != RelayConnectionState.Connected || _stream == null) return;
             try
             {
+                if (_client.Client.Poll(0, SelectMode.SelectRead) && _client.Available == 0)
+                {
+                    LastError = "relay closed the connection";
+                    State = RelayConnectionState.Failed;
+                    CloseSocket();
+                    return;
+                }
                 while (_client.Available > 0)
                 {
-                    int read = _stream.Read(_readBuffer, 0, _readBuffer.Length);
+                    int readCapacity = Math.Min(
+                        _readBuffer.Length, _cutter.RemainingCapacity);
+                    if (readCapacity <= 0)
+                    {
+                        throw new RelayFrameFormatException(
+                            "Relay frame carry could not be drained.");
+                    }
+                    int read = _stream.Read(_readBuffer, 0, readCapacity);
                     if (read <= 0)
                     {
                         LastError = "relay closed the connection";
@@ -116,10 +130,16 @@ namespace Nova.Networking
                         return;
                     }
                     _cutter.Feed(_readBuffer.AsSpan(0, read));
-                }
-                while (_cutter.TryTakeFrame(out RelayFrameType type, out byte[] payload))
-                {
-                    _onFrame?.Invoke(type, payload);
+                    while (_cutter.TryTakeFrame(
+                        out RelayFrameType type, out byte[] payload))
+                    {
+                        _onFrame?.Invoke(type, payload);
+                        if (State != RelayConnectionState.Connected
+                            || _client == null || _stream == null)
+                        {
+                            return;
+                        }
+                    }
                 }
             }
             catch (Exception exception)
