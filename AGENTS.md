@@ -1,13 +1,13 @@
 # AGENTS.md – Arbeitsregeln für KI-Agenten & Mitwirkende
 
-**Dokumentversion:** 4.0.0 | **Governance-Tier:** 1 ([GOVERNANCE.md](GOVERNANCE.md))
+**Dokumentversion:** 4.1.0 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers | **Sprint:** 13.0 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Verbindliche Betriebsanleitung für jeden KI-Coding-Agenten (Claude, Kimi, Codex,
 Cursor u. a.) und jede Person, die an *Project Nova* arbeitet. **Lies diese Datei
 zuerst.** Sie wird von den gängigen Agenten-Tools automatisch als Kontext geladen.
 
 Welche Regeln in welcher Projektphase gelten, steht in [GOVERNANCE.md](GOVERNANCE.md).
-Aktiv ist **Tier 1: zwei Entwickler, kein Publikum.**
+Aktiv ist **Tier 2: externe Beitragende, zwei Maintainer.**
 
 ## 1. Projekt in einem Absatz
 
@@ -53,10 +53,13 @@ Zusätzlich, wenn zutreffend:
 - Echte Entscheidung getroffen? → D-ID im [DecisionLog](docs/production/DecisionLog.md)
 - Spielverhalten geändert? → einmal im laufenden Spiel ansehen und im PR beschreiben
 - Neues oder entferntes Dokument? → [docs/README.md](docs/README.md)-Index nachziehen
+- Tier-2-PR? → Freigabe des anderen Maintainers auf dem aktuellen Head;
+  externer PR zusätzlich mit bestätigter
+  [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md)
+- Vertrag oder öffentliche Doku? → Kopfversion und Änderungsverlauf pflegen
 
-Nicht mehr verlangt (Tier 1): Versionsbump und Änderungsverlauf-Tabelle in jedem
-berührten Dokument, Gate-Evidence, Receipt-Ketten, Performance-Evidenz mit
-`environmentId`-Bindung.
+Weiterhin nicht verlangt: Gate-Evidence, Receipt-Ketten und Performance-Evidenz
+mit `environmentId`-Bindung. Sie wachen erst mit Tier 3 auf.
 
 ## 4. Tests und Verifikation
 
@@ -112,9 +115,9 @@ Das Wichtigste:
 - **Keine toten internen Links** – die CI prüft das hart.
 - **Entscheidungen** bekommen fortlaufende D-IDs, bleiben bei Revision stehen
   (Status „ersetzt durch D-xxx"), keine stillen Umschreibungen.
-- Versionskopfzeile und Änderungsverlauf-Tabelle sind **freiwillig**; Git ist der
-  Änderungsverlauf. Ausnahme: `quality/content/mvp-v1.json` ist ein Vertrag und
-  bleibt versioniert.
+- Verträge und öffentliche Doku führen eine Kopfversion und einen
+  Änderungsverlauf; für interne Arbeitsnotizen bleibt Git der Verlauf. Ausnahme
+  mit Maschinenvertrag: `quality/content/mvp-v1.json` bleibt versioniert.
 
 ## 7. Git-Konventionen
 
@@ -159,3 +162,4 @@ gh pr create --fill --base main
 | 3.0.0 | 2026-07-24 | D-059/D-060/D-061: Recovery-Status, Unity-Pin, kurze Topic-Branches, per-action Agentenautorität, Quality-Evidence-Regeln | Orchestrator |
 | 3.1.0–3.7.0 | 2026-07-24 – 2026-07-26 | Ausbau des Gate-Evidenzregimes (D-062 bis D-067) | Orchestrator |
 | 4.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Gate-Kette, Receipt-Verträge und Evidenzpflicht schlafen gelegt; DoD von 13 auf 4 Punkte; Doku-Ritual freiwillig; Sprint-Ritual entfernt; `dotnet test` als kanonischer CI-Check verankert | Orchestrator |
+| 4.1.0 | 2026-08-08 | D-091: Governance-Tier 2 für externe Beiträge aktiviert; Maintainer-Review/CLA für fremde PRs und Versionspflicht für Verträge/öffentliche Doku ergänzt | Dennis Westermann / Michael Falk |

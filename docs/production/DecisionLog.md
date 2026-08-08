@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.28.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 12
+**Version:** 1.29.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 13.0
 
 ## Zweck
 
@@ -2412,6 +2412,94 @@ technisch umgesetzt, nicht als vollständig spielerisch abgenommen bezeichnet.
 
 ---
 
+### D-091 | verbindlich ab Merge | Sprint 13.0 (Tier 2, Source-available-Beiträge und PR-Schutz)
+
+**Status:** Inhaberentscheidung vom 2026-08-08 (Dennis Westermann). Sie wird
+mit dem Merge dieses Freigabe-PR wirksam. Michael Falk (`@travelhawk`) und Dennis
+Westermann (`@cubetribe`) sind die einzigen Maintainer mit Merge-Zugang zu
+`main`.
+
+**Kontext:** Ein externer Beitragender arbeitet am Einheitenstrang. Das bisherige
+Tier 1 setzt Vertrauen zwischen zwei Maintainers voraus und enthält weder einen
+standardisierten Code-Lizenztext noch eine Regel, die externe Beiträge auf dem
+aktuellen Commit an eine Maintainer-Freigabe und einen kommerziellen
+Relizenzierungsweg bindet. Die vorhandene Branch Protection schützt `main`
+bereits vor Direkt-Pushes und beschränkt den Zugang auf die beiden Maintainer,
+hatte aber noch keine Required Checks für externe Review- und Baseline-Regeln.
+
+**Alternativen:**
+
+1. Tier 1 beibehalten und den externen PR vertagen — verworfen, weil die
+   Zusammenarbeit bereits begonnen hat und Regeln erst vor dem ersten PR wirken.
+2. Tier 2 mit einer proprietären Eigenlizenz und Copyright-Abtretung — verworfen,
+   weil eine Eigenlizenz mehr Rechts- und Pflegeaufwand erzeugt und eine
+   Abtretung für freiwillige Beiträge unnötig schwergewichtig ist.
+3. Tier 2 mit MIT — verworfen, weil MIT kommerzielle Forks, Unterlizenzierung
+   und Verkauf durch Dritte erlaubt und damit dem späteren Vermarktungsziel
+   widerspricht.
+4. **Tier 2 mit PolyForm Noncommercial 1.0.0 und einer nicht-exklusiven
+   Contributor License Agreement (CLA)** — gewählt: Quellzugang, Änderungen und
+   Weitergabe bleiben für nicht-kommerzielle Zwecke möglich; der Projektinhaber
+   erhält für externe Beiträge mit dokumentierter CLA-Zustimmung ein
+   gesondertes Recht zur kommerziellen Nutzung und Relizenzierung, ohne den
+   Beitragenden das Copyright abzunehmen.
+
+**Entscheidung:** Mit dem Merge dieses PR ist **Governance-Tier 2** aktiv.
+
+1. Der unveränderte Text von `PolyForm-Noncommercial-1.0.0` liegt als
+   [`LICENSE`](../../LICENSE) im Repository. Er gilt für originale
+   Projekt-Quellen und -Dokumentation, deren jeweilige Rechteinhaber sie unter
+   diesen Bedingungen freigegeben haben, soweit keine abweichende Datei- oder
+   Drittanbieter-Lizenz gilt. Asset-, Schrift-, Audio- und Markenrechte bleiben
+   ausdrücklich getrennt ([`NOTICE`](../../NOTICE),
+   [Licenses.md](../assets/Licenses.md)).
+2. Für jeden externen PR wird vor dem Merge die Zustimmung zur
+   [`CONTRIBUTOR_LICENSE_AGREEMENT.md`](../../CONTRIBUTOR_LICENSE_AGREEMENT.md)
+   dokumentiert.
+   Der Beitragende behält sein Copyright; Dennis Westermann
+   (`VibecodingGermany`) erhält ein dauerhaftes, weltweites, nicht-exklusives,
+   gebührenfreies Recht zur kommerziellen Nutzung, Unterlizenzierung und
+   Relizenzierung des Beitrags. Bestehende und nicht von einer dokumentierten
+   CLA-Zustimmung erfasste Beiträge bleiben bei ihren jeweiligen
+   Rechteinhabern; D-091 unterstellt weder eine rückwirkende CLA noch eine
+   Copyright-Abtretung.
+3. Nur `@cubetribe` und `@travelhawk` dürfen nach `main` mergen. Jeder PR eines
+   jeden Autors braucht eine `APPROVED`-Review des jeweils anderen Maintainers
+   auf dem aktuellen Head-Commit. Externe PRs brauchen zusätzlich die
+   CLA-Zustimmung und den `external-contributor-review`-Check. Native
+   Code-Owner-Review ordnet dafür jeden Pfad den beiden Maintainers zu.
+4. Ein PR darf Simulationsverhalten und die vier benannten Golden-/Fingerprint-
+   Baselines nicht zusammen ändern. Der einzige Ausnahmeweg ist das dokumentierte
+   Maintainer-Label `baseline-reset-approved`.
+5. `integrity` läuft auf jedem PR. Verträge und öffentliche Doku führen wieder
+   Kopfversion und Änderungsverlauf; neue D-IDs dokumentieren mindestens drei
+   Alternativen.
+
+**Konsequenzen:** `CODEOWNERS` bindet jeden Pfad an die beiden Maintainers und
+markiert die GitHub-Steuerfläche ausdrücklich, kann aber die fachliche
+Schreibhoheit nicht abbilden; deren Quelle bleibt
+[13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md).
+Die neuen Review- und Baseline-Jobs laufen als eng begrenzte, metadata-only
+`pull_request_target`-Prüfungen aus dem geschützten Zielbranch, checken niemals
+PR-Code aus und erhalten ausschließlich Leserechte. Sie werden erst nach ihrem
+Merge und einem erfolgreichen Lauf in einem Folge-PR als Required Checks in die
+Branch Protection aufgenommen. Nach einer neuen Freigabe wird der jüngste
+`external-contributor-review`-Lauf erneut gestartet; die native Branch
+Protection bleibt der maßgebliche Review-Schutz. Im selben Rollout wird eine
+Code-Owner-Review auf jedem Pfad, eine erforderliche Freigabe und das Verwerfen
+veralteter Freigaben aktiviert; bis dahin ist die bestehende Beschränkung auf
+beide Maintainer unverändert wirksam.
+Die verpflichtende Negativkontrolle mit einem absichtlich falschen PR steht
+ebenfalls noch aus.
+
+**Verworfen:** PolyForm Shield — erlaubt kommerzielle, nicht konkurrierende
+Nutzung und erzeugt bei einem Spiel eine unscharfe Konkurrenzgrenze;
+Copyright-Abtretung — weitergehender als nötig; Selbst-Merge außerhalb einer
+Steuerfläche — lässt sich nicht mit verbindlicher nativer Code-Owner-Prüfung
+kombinieren und bietet weniger Vier-Augen-Schutz.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2511,3 +2599,4 @@ technisch umgesetzt, nicht als vollständig spielerisch abgenommen bezeichnet.
 | 1.26.0 | 2026-08-07 | D-088 aufgenommen: Truppenführung — Formationsverteilung mit geteiltem Flow-Ziel und `GoalGridPos` (Entity-Store v5), Separation im Stand (gedämpft, Totzone, Index-Tiebreak), Gebäude-Footprints ins Kostenfeld mit Push-out; Epoch-Restore-Vertrag von Vergleich auf Adoption geändert, Flow-Cache regeneriert an Ort statt Leerung; Baselines bewusst neu gesetzt | Project Owner / Agent (Umsetzung) |
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
+| 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |

@@ -13,11 +13,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.16.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.17.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Freigabe für externe Beiträge (D-091, Sprint 13.0):** Der unveränderte
+  Text der `PolyForm-Noncommercial-1.0.0`-Lizenz, ein Scope-/Asset-`NOTICE` und
+  eine nicht-exklusive Contributor License Agreement schaffen den
+  Source-available-Beitragsweg, ohne kommerzielle Forks allgemein freizugeben.
+  Die CLA gilt nur für Beiträge mit dokumentierter Zustimmung und erfasst
+  bestehende Rechte anderer Beitragender nicht rückwirkend.
+  Neue PR-Checks prüfen externe Maintainer-Freigabe auf dem aktuellen Head und
+  die Trennung von Simulationsverhalten und Determinismus-Baselines. Jeder PR
+  erhält im vorgesehenen Remote-Rollout eine Freigabe des jeweils anderen
+  Maintainers. Die beiden Metadatenchecks laufen aus dem geschützten
+  Zielbranch, erhalten ausschließlich Leserechte und checken oder führen keinen
+  Fork-PR-Code aus. Die Remote-Aktivierung als Required
+  Checks samt Peer-Review und der absichtlich falsche Negativ-PR stehen
+  ausdrücklich noch aus.
 - **Zwei-Spieler-Lockstep über eigenen TCP-Relay (D-089, Sprint 12 Strang A):**
   Der bisher nur vorbereitete Netzwerkpfad ist als Engine-freie
   Zwei-Slot-Implementierung verdrahtet: TCP-Handshake mit Match-Token,
@@ -101,6 +115,10 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   dafür auf Sprint 16, weil er simulationsverändernd ist.
 
 ### Geändert
+- **Governance-Tier 2 (D-091):** Externe Beiträge erfolgen nur aus Forks;
+  `@cubetribe` (Dennis Westermann) und `@travelhawk` (Michael Falk) bleiben die
+  einzigen Accounts mit Merge-Zugang zu `main`. `integrity` läuft auf jedem PR;
+  Verträge und öffentliche Doku führen wieder Version und Änderungsverlauf.
 - **Truppenführung — Einheiten teilen sich den Platz (D-088, Sprint 11):**
   eine Armee ist kein Haufen mehr. Zwölf markierte Einheiten kommen als
   Gruppe nebeneinander an statt übereinander, frisch gebaute Truppen bilden

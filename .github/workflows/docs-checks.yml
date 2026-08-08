@@ -2,22 +2,14 @@ name: Docs Checks
 
 # Guenstige, abhaengigkeitsfreie Doku-Pruefung: tote interne Links und UTF-8.
 #
-# Seit D-076 (Governance-Tier 1) ohne Node/Ajv und ohne Kopplung an den
-# schlafenden Gate-Apparat. Die Evidence-Selbsttests sind in den
-# integrity-Job von quality-gate.yml gewandert, wo sie hingehoeren.
+# Seit D-076 ohne Node/Ajv und ohne Kopplung an den schlafenden Gate-Apparat.
+# Der Job ist als Required Check konfiguriert und hat deshalb bewusst keinen
+# Pfadfilter: ein manchmal fehlender Required Check blockiert PRs.
 
 on:
   pull_request:
-    paths:
-      - '**/*.md'
-      - '.github/scripts/check_docs.py'
-      - '.github/workflows/docs-checks.yml'
   push:
     branches: [main]
-    paths:
-      - '**/*.md'
-      - '.github/scripts/check_docs.py'
-      - '.github/workflows/docs-checks.yml'
   # Handstart auf beliebigem Branch: gh workflow run "Docs Checks" --ref <branch>
   # Laeuft dann ohne Pfadfilter - wer von Hand startet, will pruefen.
   workflow_dispatch:

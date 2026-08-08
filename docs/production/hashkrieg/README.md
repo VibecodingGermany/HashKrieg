@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.3.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen; Sprints 13–15 geplant, Parallelbetrieb mit externem Beitragenden geregelt | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 13
+**Version:** 0.4.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen; Sprint 13.0 bereitet externe Beiträge unter Tier 2 vor | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 13
 
 ## Zweck
 
@@ -22,7 +22,7 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 
 ## Abhängigkeiten
 
-- [../../../GOVERNANCE.md](../../../GOVERNANCE.md) – Governance-Tier 1 (D-076): Nachweis ist grüne CI plus gespielte Runde
+- [../../../GOVERNANCE.md](../../../GOVERNANCE.md) – Governance-Tier 2 (D-091): Nachweis ist grüne CI plus gespielte Runde
 - [../MVPContentManifest.md](../MVPContentManifest.md) – autorisierter MS-1-Sollinhalt
 - [../ScopeLedger.md](../ScopeLedger.md) – registrierte Zurückstellungen
 - [../DemoRunbook.md](../DemoRunbook.md) – heutiger spielbarer Umfang
@@ -43,6 +43,7 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [07_CC0_Quellen.md](07_CC0_Quellen.md) | Welche Kulissen-Assets aus freien CC0-Paketen kommen statt gebaut zu werden — mit Prüfvermerk |
 | [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | Sprint 12; Strang A A1–A7 umgesetzt und A8 Stufe 1 über 10.023 TCP-Ticks nachgewiesen, manuelle Loopback-/LAN-/VPS-Stufen offen (D-089) |
 | [12B_Sprint_Sichtbares_Gefecht.md](12B_Sprint_Sichtbares_Gefecht.md) | Sprint 12 Strang B; fog-sicheres VFX- und Tier-0-Audio technisch umgesetzt, manuelle 60-Einheiten-Sicht-/Gegenhörabnahme offen (D-090) |
+| [13-0_Sprint_Freigabe.md](13-0_Sprint_Freigabe.md) | Sprint 13.0; Lizenz, Tier-2-Wechsel, Maintainer-/Fork-Modell und CI-Wächter vor dem ersten externen PR |
 | [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Regelwerk für die parallele Arbeit ab Sprint 13** — Schreibhoheit, Determinismus-Baselines, Merge-Fenster, Zugangsmodell für externe Beitragende |
 | [13_Sprint_Netzpartie.md](13_Sprint_Netzpartie.md) | Sprint 13 (Maintainer); Verbindungsdialog, Relay auf dem VPS, A8 Stufen 2–4 als gespielte Abnahme |
 | [13B_Sprint_Einheitenverhalten.md](13B_Sprint_Einheitenverhalten.md) | Sprint 13B (externer Beitragender, PR-only); Einheitenverhalten, KI und Legion-Waffenidentität — fortlaufend parallel zu 13–15 |
@@ -164,10 +165,11 @@ Masterplans grundlegend — sonst nichts.
 
 ## Nächste Schritte
 
-1. **Tier-2-Wechsel als D-ID entscheiden.** Der erste PR von ausserhalb des
-   Maintainer-Kreises steht bevor; [../../../GOVERNANCE.md](../../../GOVERNANCE.md)
-   nennt genau das als Auslöser. Ohne den Eintrag rutscht das Projekt in ein
-   Tier, dessen Regeln niemand angeschaltet hat.
+1. **Sprint 13.0 mergen und den Remote-Rollout abschließen.** D-091 entscheidet
+   den Tier-2-Wechsel; die neuen Required Checks, eine Maintainer-Peer-Review
+   und native Code-Owner-Prüfung müssen nach ihrem ersten erfolgreichen
+   Folge-PR-Lauf in der Branch Protection aktiviert und mit einem bewusst falschen PR negativ
+   getestet werden.
 2. Sprint-12-Strang B im aktuellen macOS-Build in einem dichten Gefecht sehen
    und gegenhören; den Befund im Umsetzungsreport ergänzen.
 3. Die offenen A8-Netzwerkstufen aus [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md)
@@ -177,3 +179,9 @@ Masterplans grundlegend — sonst nichts.
    Simulationszustand und Baselines und hebt damit die Trennung auf, die den
    Parallelbetrieb erst möglich macht (siehe
    [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md)).
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 0.4.0 | 2026-08-08 | Sprint 13.0 und D-091 als Voraussetzung für externe Beiträge unter Tier 2 ergänzt | Producer / Agent (Umsetzung) |

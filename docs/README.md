@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.16.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 12 Stränge A und B technisch umgesetzt; manuelle Netzwerk- und Gefechtsabnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 12
+**Version:** 0.17.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 12 Stränge A und B technisch umgesetzt; Parallelbetrieb für externe Beiträge vorbereitet | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 13.0
 
 ## Zweck
 
@@ -14,6 +14,9 @@ Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 - [../GOVERNANCE.md](../GOVERNANCE.md) – Tier-Modell, aktives Governance-Tier
 - [../AGENTS.md](../AGENTS.md) und
   [../CONTRIBUTING.md](../CONTRIBUTING.md) – Arbeits- und PR-Regeln
+- [../LICENSE](../LICENSE), [../NOTICE](../NOTICE) und
+  [../CONTRIBUTOR_LICENSE_AGREEMENT.md](../CONTRIBUTOR_LICENSE_AGREEMENT.md) –
+  Lizenzgrenze und Beitragsrechte
 - [meta/DocumentationStandard.md](meta/DocumentationStandard.md) –
   Dokumentationsstandard
 
@@ -21,7 +24,7 @@ Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 
 | Stufe | Status |
 |---|---|
-| Governance | **Tier 1** – zwei Entwickler, kein Publikum (D-076) |
+| Governance | **Tier 2** – externe Beitragende, zwei Maintainer (D-091) |
 | Sprint 12 | Strang A A1–A7 umgesetzt, A8 Stufe 1 nachgewiesen und Stufen 2–4 offen (D-089); Strang B technisch umgesetzt, 60-Einheiten-Gegenhör-/Sichtabnahme offen (D-090) |
 | Spielbar | lokales 1v1 auf der Glutrinne-Graybox (Ablauf: `production/DemoRunbook.md`) |
 | MS-0 | offen – Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
@@ -182,6 +185,7 @@ gelisteten Kernverträge.
   [Sprint 12 „Zu zweit"](production/hashkrieg/12_Sprint_Zu_Zweit.md) –
   Strang A A1–A7 implementiert, headless A8 Stufe 1 nachgewiesen;
   Zwei-Fenster-, LAN- und VPS-Partie offen
+- [Sprint 13.0 „Freigabe für den Parallelbetrieb"](production/hashkrieg/13-0_Sprint_Freigabe.md) – PolyForm-Lizenz, Tier-2-Entscheidung, Maintainer-/Fork-Modell und CI-Wächter vorbereitet; die externe PR-Negativkontrolle steht noch aus
 - [Sprint 12 Strang B „Sichtbares Gefecht"](production/hashkrieg/12B_Sprint_Sichtbares_Gefecht.md) –
   VFX, Tier-0-SFX, Mixer, Provenienz und Quellgrenzen technisch umgesetzt;
   manuelle 60-Einheiten-Gegenhör-/Sichtabnahme offen
@@ -262,3 +266,4 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.14.0 | 2026-07-26 | Hashkrieg-Weltentwurf und Concept-Art-Strang indexiert: Lore.md, ConceptArtStyleGuide.md und concept-art/README.md aufgenommen; kein Gate-Status | Technical Writer |
 | 0.15.0 | 2026-08-05 | GB-003 indexiert: DemoRunbook.md und StatusSnapshot_2026-08-05.md aufgenommen (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Vorbereitung); ScopeLedger 0.4.0 und GrayboxLog 0.3.0 fortgeschrieben; kein Gate-Status | Technical Writer |
 | 0.16.0 | 2026-08-07 | D-089-Netzprofil, RelayServer-Runbook und Sprint-12-Strang-A-Stand indexiert; manuelle Netzwerkabnahme ausdrücklich offen | Technical Writer |
+| 0.17.0 | 2026-08-08 | D-091 und Sprint 13.0 indexiert: Tier-2-Beitragsmodell, Lizenz- und Merge-Schutz vorbereitet | Technical Writer |

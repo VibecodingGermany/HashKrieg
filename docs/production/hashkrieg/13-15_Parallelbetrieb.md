@@ -1,6 +1,6 @@
 # Parallelbetrieb Sprint 13–15 — zwei Stränge, eine Simulation
 
-**Status:** verbindlich | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
+**Version:** 1.2.1 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers und Strangverantwortliche | **Sprint:** 13–15 | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
 
 ## Warum es dieses Dokument gibt
 
@@ -180,21 +180,20 @@ in Ordnung und ausdrücklich gewollt — es verlangt nur ein sauberes Modell.
 |---|---|
 | **Zugang** | **Fork.** Kein Collaborator-Eintrag, kein Push auf dieses Repository, keine Mitgliedschaft in `trusted-coders` |
 | **Beitrag** | ausschliesslich Pull Request vom Fork nach `main` |
-| **Merge** | nur Maintainer. Die Push-Restriktion auf `main` erzwingt das strukturell, unabhängig von Reviewregeln |
-| **Review** | jeder fremde PR wird von einem Maintainer gelesen, bevor er gemergt wird — das ist Tier 2 |
-| **CI** | alle Workflows laufen auf `pull_request`, nicht `pull_request_target`. Ein Fork-PR bekommt damit einen schreibgeschützten Token und keine Secrets |
+| **Merge** | nur `@cubetribe` (Dennis Westermann) und `@travelhawk` (Michael Falk). Die Push-Restriktion auf `main` erzwingt das strukturell |
+| **Review** | jeder PR braucht eine `APPROVED`-Review des jeweils anderen Maintainers auf dem aktuellen Head-Commit; bei Fremd-PRs prüft `external-contributor-review` zusätzlich CLA und explizite Maintainer-Freigabe und wird nach seinem ersten erfolgreichen Folge-PR-Lauf als Required Check geschaltet |
+| **CI** | Code ausführende Workflows laufen auf `pull_request`. Die beiden reinen Metadatenprüfungen laufen aus dem geschützten Zielbranch auf `pull_request_target`, erhalten nur Leserechte und checken niemals PR-Code aus |
 
-**Das löst einen Tier-Wechsel aus.** [GOVERNANCE.md](../../../GOVERNANCE.md)
-nennt als Auslöser für Tier 2 wörtlich den „erster PR von außerhalb des
-Maintainer-Kreises". Der Wechsel ist eine Inhaberentscheidung und gehört als
-D-ID in den [DecisionLog](../DecisionLog.md), bevor der erste fremde PR
-aufschlägt — sonst rutschen wir stillschweigend in ein Tier, dessen Regeln
-niemand angeschaltet hat.
+**Der Tier-Wechsel ist entschieden.** D-091 aktiviert Tier 2 mit dem Merge des
+Freigabe-PR, also vor dem ersten fremden PR. Die noch ausstehende Negativkontrolle
+des Baseline-Wächters ist keine Lizenz, einen PR vorher zu mergen.
 
 Was Tier 2 gegenüber heute konkret ändert:
 
-- fremde PRs brauchen Maintainer-Review (Selbst-Merge bleibt für Maintainer)
-- DecisionLog-D-IDs werden Pflicht, nicht nur bei „echten" Entscheidungen
+- jeder PR braucht eine Maintainer-Peer-Review; Fremd-PRs zusätzlich CLA und
+  den gezielten `external-contributor-review`-Check
+- echte Architektur-, Design- und Prozessentscheidungen erhalten eine D-ID; ab
+  Tier 2 dokumentiert jede neue D-ID mindestens drei bewertete Alternativen
 - Verträge und öffentliche Doku brauchen Pflichtaufbau und Versionsbump
 - der `integrity`-Job läuft auf jedem PR statt nur bei `quality/**`
 
@@ -215,4 +214,6 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
+| 1.2.0 | 2026-08-08 | D-091: konkrete Merge-Accounts, Maintainer-Peer-Review, CLA-/Review-Prüfung und vorbereiteter Tier-2-Rollout ergänzt | Producer / Agent (Umsetzung) |
+| 1.2.1 | 2026-08-08 | Metadata-only Checks auf vertrauenswürdigen Zielbranch-Kontext gehärtet und D-ID-Pflicht auf echte Entscheidungen vereinheitlicht | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-08 | Erstfassung: Schreibhoheit, Baseline-Regel, Merge-Fenster und Zugangsmodell für den Parallelbetrieb 13–15 | Producer / Agent (Umsetzung) |

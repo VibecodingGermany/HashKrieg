@@ -1,11 +1,21 @@
 # Governance – Project Nova
 
-**Aktives Tier: 1 — zwei Entwickler, kein Publikum**
+**Version:** 2.1.1 | **Status:** verbindlich ab Merge des Sprint-13.0-PR; Tier-2-Remote-Rollout offen | **Verantwortungsbereich:** Maintainers | **Sprint:** 13.0
+
+## Zweck
+
+**Aktives Tier: 2 — externe Beitragende, zwei Maintainer**
 
 Dieses Repository regelt seine Prozessstrenge über **Tiers** statt über eine feste
 Regelmenge. Jede Regel gehört zu genau einem Tier. Regeln höherer Tiers werden
 nicht gelöscht, sondern **schlafen gelegt** – zusammen mit dem Auslöser, der sie
 weckt. Hochskalieren heißt dann: Tier wechseln, nicht neu erfinden.
+
+## Abhängigkeiten
+
+- [AGENTS.md](AGENTS.md) – Arbeitsregeln für Agenten und Menschen
+- [CONTRIBUTING.md](CONTRIBUTING.md) – Branch-, PR- und Review-Ablauf
+- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – Tier-Entscheidungen D-076 und D-091
 
 ## Warum es Tiers gibt
 
@@ -37,7 +47,7 @@ Spielrunde.
 
 ## Die Tiers
 
-| | Tier 1 (aktiv) | Tier 2 | Tier 3 |
+| | Tier 1 | Tier 2 (aktiv) | Tier 3 |
 |---|---|---|---|
 | **Lage** | zwei Entwickler, kein Publikum | fremde Beitragende | Veröffentlichung, Geld, Nutzer |
 | **Auslöser** | Status quo | erster PR von außerhalb des Maintainer-Kreises, oder mehr als zwei aktive Maintainer | Steam-Seite, bezahlter Build, Publisher-Vertrag, oder Nutzerdaten im Spiel |
@@ -48,7 +58,7 @@ Ein Tier-Wechsel ist eine Inhaberentscheidung und wird als D-ID im
 
 ## Was in welchem Tier gilt
 
-| Mechanismus | Tier 1 (jetzt) | ab Tier 2 | ab Tier 3 |
+| Mechanismus | Tier 1 | Tier 2 (jetzt) | ab Tier 3 |
 |---|---|---|---|
 | `main` geschützt, PR-only | ✅ | ✅ | ✅ |
 | Conventional Commits | ✅ | ✅ | ✅ |
@@ -58,8 +68,8 @@ Ein Tier-Wechsel ist eine Inhaberentscheidung und wird als D-ID im
 | **CI: `dotnet test` (Simulationstests)** | ✅ | ✅ | ✅ |
 | CI: tote interne Doku-Links | ✅ | ✅ | ✅ |
 | CHANGELOG-Eintrag | pro PR | pro PR | pro PR |
-| DecisionLog D-IDs | bei echten Entscheidungen | ✅ | ✅ |
-| Merge | Selbst-Merge erlaubt | fremde PRs brauchen Maintainer-Review | zwei Freigaben |
+| DecisionLog D-IDs | bei echten Architektur-, Design- oder Prozessentscheidungen | ebenso | ebenso |
+| Merge | Selbst-Merge erlaubt | jeder PR braucht eine Freigabe des anderen Maintainers; extern zusätzlich CLA | zwei Freigaben |
 | Doku: Pflichtaufbau, Versionsbump, Änderungsverlauf | nur `quality/content/mvp-v1.json` | für Verträge und öffentliche Doku | überall |
 | DecisionLog: ≥3 Alternativen je Entscheidung | ✖ | ✅ | ✅ |
 | Sprint-Ritual (8 Pflichtschritte) | ✖ | ✖ | ✅ |
@@ -70,7 +80,7 @@ Ein Tier-Wechsel ist eine Inhaberentscheidung und wird als D-ID im
 
 ✅ gilt · ✖ gilt nicht · 💤 schlafend, Code bleibt im Repo
 
-## Was „fertig" in Tier 1 heißt
+## Was „fertig" in Tier 1 und 2 heißt
 
 Ein Meilenstein ist erreicht, wenn **beides** zutrifft:
 
@@ -92,16 +102,14 @@ nicht als Gate-Buchhaltung.
 Der Gate-Apparat bleibt vollständig im Repository unter [`quality/`](quality/):
 Schemata, Validator, Szenarien, Manifest und der Authorize-Pfad in
 [`.github/workflows/quality-gate.yml`](.github/workflows/quality-gate.yml).
-Nichts davon ist gelöscht. Der `integrity`-Job läuft weiterhin, wenn ein PR
-`quality/**` anfasst – der Apparat verrottet also nicht unbemerkt.
+Nichts davon ist gelöscht. Seit D-091 läuft der `integrity`-Job auf jedem PR –
+der Apparat verrottet also nicht unbemerkt, während externe Beiträge eingehen.
 
 Zum Aufwecken bei Tier 3:
 
 1. Tier-Wechsel als D-ID entscheiden.
-2. In [`.github/workflows/quality-gate.yml`](.github/workflows/quality-gate.yml)
-   den Pfadfilter des `integrity`-Jobs entfernen.
-3. Das geschützte Environment `quality-gate` mit Required Reviewers anlegen.
-4. [`docs/production/MVPRecoveryPlan.md`](docs/production/MVPRecoveryPlan.md)
+2. Das geschützte Environment `quality-gate` mit Required Reviewers anlegen.
+3. [`docs/production/MVPRecoveryPlan.md`](docs/production/MVPRecoveryPlan.md)
    wieder als führend für Meilensteinstatus erklären.
 
 Der Detailvertrag steht unverändert in
@@ -112,4 +120,27 @@ Der Detailvertrag steht unverändert in
 - [AGENTS.md](AGENTS.md) – Arbeitsregeln für Agenten und Menschen
 - [CONTRIBUTING.md](CONTRIBUTING.md) – Branch-, PR- und Review-Ablauf
 - [docs/meta/DocumentationStandard.md](docs/meta/DocumentationStandard.md) – Doku-Regeln
-- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – D-076 begründet dieses Modell
+- [docs/production/DecisionLog.md](docs/production/DecisionLog.md) – D-076 begründet das Tier-Modell; D-091 aktiviert Tier 2
+
+## Offene Punkte
+
+- Nach dem Merge müssen `integrity`, `baseline-guard` und
+  `external-contributor-review` nach ihren ersten erfolgreichen Läufen in
+  Folge-PRs als Required Checks in der Branch Protection hinterlegt werden.
+- Der Remote-Rollout setzt außerdem eine erforderliche, stale-dismissed
+  Maintainer-Freigabe auf dem aktuellen Head, native Code-Owner-Reviews und das
+  `baseline-reset-approved`-Label.
+
+## Nächste Schritte
+
+1. Sprint 13.0 als PR einbringen und die neue CI auf dem geschützten Zielbranch
+   ausführen lassen.
+2. Danach die offene Remote-Konfiguration setzen und mit einem absichtlich
+   falschen Baseline-PR negativ prüfen.
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 2.1.0 | 2026-08-08 | D-091: Tier 2, externe Beitragsregeln und den noch ausstehenden Remote-Rollout dokumentiert | Dennis Westermann / Michael Falk |
+| 2.1.1 | 2026-08-08 | D-ID-Pflicht in allen Tiers auf echte Architektur-, Design- und Prozessentscheidungen präzisiert | Dennis Westermann |

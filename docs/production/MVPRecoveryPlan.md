@@ -1,11 +1,11 @@
 # MVP-Recovery-Plan
 
-**Version:** 2.0.0 | **Status:** Evidenzvertrag SCHLAFEND (D-076) – Gate-Inhalte weiter gültig | **Verantwortungsbereich:** Producer / Lead Technical Director | **Sprint:** 7
+**Version:** 2.1.0 | **Status:** Evidenzvertrag SCHLAFEND (D-076/D-091) – Gate-Inhalte weiter gültig | **Verantwortungsbereich:** Producer / Lead Technical Director | **Sprint:** 7
 
 > **Achtung, Statuswechsel seit D-076 (2026-08-06).**
 > Der **Evidenzvertrag** dieses Plans (§2 und alles, was daran hängt: Receipt-Ketten,
 > Trusted Tooling, `environmentId`-Bindung, Autorisierungsläufe) ist unter
-> Governance-Tier 1 **nicht in Kraft**. Dieses Dokument ist **nicht mehr führend
+> Governance-Tier 1 oder 2 **nicht in Kraft**. Dieses Dokument ist **nicht mehr führend
 > für den Meilensteinstatus** – das ist [Milestones.md](Milestones.md) in
 > Verbindung mit [../../GOVERNANCE.md](../../GOVERNANCE.md).
 >
@@ -55,7 +55,7 @@ erreicht.
 
 Die Reihenfolge `G0 → G1 einschließlich V1–V5a → G2 → G3 → G4 → G5` bleibt die
 **empfohlene Arbeitsreihenfolge**, weil jedes Gate auf dem vorigen aufbaut. Sie
-ist unter Tier 1 aber **keine Sperre** mehr: Arbeit an einem späteren Gate darf
+ist unter Tier 1 oder 2 aber **keine Sperre** mehr: Arbeit an einem späteren Gate darf
 beginnen, bevor ein früheres formal abgeschlossen ist – genau so ist die
 Graybox-Spur entstanden. Was dabei hinter dem Sollinhalt zurückbleibt, gehört in
 den [ScopeLedger](ScopeLedger.md).
@@ -375,3 +375,4 @@ gültiges Ergebnis, Core-Action-Trace und Checkpoint-Kette vorliegen.
 | 1.3.1 | 2026-07-24 | Punkt- und Performance-Metrikartefakte im D-062/D-063-Übergang eindeutig getrennt | Producer / Lead Technical Director / Lead QA Engineer |
 | 1.4.0 | 2026-07-24 | D-064: Schema 1.2 auf Integritätsprüfung begrenzt und G0-A Trusted-Gate-Bootstrap vor G0-B eingeführt | Producer / Lead Technical Director / Lead QA Engineer |
 | 1.5.0 | 2026-07-25 | D-066: G0-A in fail-closed Integrity-Basis G0-A1 und zweiphasigen Receipt-Authorizer G0-A2 geteilt | Producer / Lead Technical Director / Lead QA Engineer |
+| 2.1.0 | 2026-08-08 | D-091: Evidenzvertrag ausdrücklich auch für Governance-Tier 2 schlafend gestellt | Producer / Lead Technical Director |
