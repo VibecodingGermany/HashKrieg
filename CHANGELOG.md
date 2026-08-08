@@ -65,6 +65,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Der PlayMode-Gesamtlauf steht bei 8/9, weil der bestehende headless
   `BarracksSpawnDiagnosisTests` an `RenderTexture.Create` scheitert; die
   manuelle 60-Einheiten-Gegenhör-/Sichtabnahme bleibt offen.
+- **Art-Paket ist reproduzierbar geworden — `tools/art/build_art_package.sh`:**
+  Der Paketinhalt wird nicht mehr von Hand zusammengestellt, sondern aus
+  `.gitignore` abgeleitet — alles, was git im Art-Baum ausschliesst, gehört ins
+  Paket, und nur das. Damit können Repo-Ausschluss und Paketinhalt nicht mehr
+  auseinanderlaufen. Vor dem Packen prüft das Skript, dass zu jedem Asset sein
+  `.meta` vorliegt, und bricht sonst ab: ein Paket ohne GUIDs bräche
+  Material-, Prefab- und Registry-Referenzen bei jedem Entwickler anders.
+- **Verschickbare macOS-Builds — `tools/packaging/build-mac.sh`:** Ein Lauf
+  baut den universellen Player (Intel und Apple Silicon), signiert ihn mit
+  Developer ID unter Hardened Runtime, notarisiert App und DMG getrennt und
+  legt `Builds/dist/ProjectNova-<commit>.dmg` ab. Der Empfänger zieht die App
+  nach „Applications" und startet sie ohne Gatekeeper-Warnung. Der Commit-Hash
+  steht im DMG-Namen, in `LIESMICH.txt` und als `NovaBuildCommit` im
+  `Info.plist`, weil der Relay Matches zwischen ungleichen Builds absichtlich
+  ablehnt (Sprint 12, A4) — die Frage „welchen Build hast du eigentlich?" ist
+  damit ohne Rückfrage beantwortbar. Ein Build aus unsauberem Arbeitsbaum
+  bekommt `-dirty` und ist als nicht rekonstruierbar markiert. `--fast`
+  überspringt Signatur und DMG fürs eigene Probespielen.
+
 ### Geändert
 - **Truppenführung — Einheiten teilen sich den Platz (D-088, Sprint 11):**
   eine Armee ist kein Haufen mehr. Zwölf markierte Einheiten kommen als
@@ -96,6 +115,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   - **KI-Folgefix:** die Skirmish-KI wählt Bau-Laufziele footprint-frei;
     ihre feste Westseiten-Regel konnte in einem Nachbargebäude enden und
     die Baustelle dauerhaft pausieren.
+- **Art-Paket auf den Nachschub-Stand gehoben
+  ([docs/assets/AssetPackage.md](docs/assets/AssetPackage.md) 1.1.0):** Das
+  verteilte Paket enthielt noch den Erstimport-Stand vom 2026-08-06 und damit
+  weder das ersetzte Allianz-HQ und den ersetzten BattleTank noch das neue
+  Aetherium-Mesh. Neue Kennzahlen in §3 (276 Dateien, rund 109 MB, neuer
+  SHA-256), Paketname auf die Marke umgestellt (`Hashkrieg_Art_MS1_*` nach
+  E-1/E-3), §5 auf das Build-Skript umgestellt. Ausdrücklich festgehalten ist
+  jetzt auch der Freigabeweg: personengebundene Ordnerfreigabe statt
+  Link-Sharing, und kein Ordnerlink im öffentlichen Repository — solange die
+  Lizenzfelder der KI-generierten Modelle offen sind, ist die Freigabe an
+  benannte Personen die gedeckte Variante, eine Veröffentlichung nicht.
+- **Unity-Projekteinstellungen nachgezogen:** Static Batching für Standalone
+  aktiviert (`m_BuildTargetBatching`), und die URP-Shader-Prefiltering-Flags in
+  `NovaUrp.asset` sowie die Runtime-Settings-Liste in
+  `UniversalRenderPipelineGlobalSettings.asset` stehen auf dem Stand, den der
+  Editor beim macOS-Build erzeugt hat. Ohne diese Dateien im Repo bekäme jeder
+  Mitarbeitende beim ersten Öffnen des Projekts denselben Diff erneut als
+  ungewollte lokale Änderung. Das Define `SENTIS_ANALYTICS_ENABLED` kommt vom
+  Paket `com.unity.ai.inference` und wird vom Editor gesetzt, nicht von Hand.
 
 ### Verifikation (D-088)
 - `dotnet test tools/Nova.SimRunner.Tests`: **438/438 grün** (neun neue
