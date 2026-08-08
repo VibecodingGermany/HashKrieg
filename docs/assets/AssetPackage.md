@@ -1,6 +1,6 @@
 # Art-Asset-Paket (ausserhalb des Repositories)
 
-**Version:** 1.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
+**Version:** 1.1.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -17,8 +17,8 @@ und wie man es installiert.
 
 ## 1. Warum ausserhalb des Repos
 
-Der MS-1-Art-Stand umfasst rund **105 MB** Binärdaten (92 MB PNG-Texturen,
-13,7 MB FBX-Meshes). Das Repository ist derzeit 77 MB gross; der Drop würde es
+Der MS-1-Art-Stand umfasst rund **110 MB** Binärdaten (94 MB PNG-Texturen,
+15 MB FBX-Meshes). Das Repository ist derzeit 77 MB gross; der Drop würde es
 mehr als verdoppeln — und zwar **dauerhaft**, weil Git-Historie Binärdaten nie
 wieder vergisst. Sie später herauszunehmen bräuchte einen History-Rewrite auf
 `main`, den [AGENTS.md](../../AGENTS.md) §2 Regel 2 ausdrücklich verbietet.
@@ -53,15 +53,42 @@ wenn das Asset selbst es nicht tut — inklusive der offenen Punkte darin.
 
 | | |
 |---|---|
-| Datei | `ProjectNova_Art_MS1_2026-08-06.zip` |
-| Grösse | rund 113 MB |
-| Inhalt | 272 Dateien: je 34× `.fbx`, `.png`, `.mat`, `.prefab` plus 136 `.meta` |
-| SHA-256 | `02afd4f4fd245ae6bd70d41b170b675e09948fe12ae5b529c9bd659abbf7fd68` |
+| Datei | `Hashkrieg_Art_MS1_2026-08-08_0904.zip` |
+| Grösse | rund 109 MB |
+| Inhalt | 276 Dateien: 35× `.fbx`, 35× `.png`, 34× `.mat`, 34× `.prefab` plus 138 `.meta` |
+| SHA-256 | `214605f00ce3b356a6178c1308af06125d5e87f7c2d181974896a2ff69f1635b` |
+| Repo-Stand | `eef73ae` |
 | Ablage | geteilter Ordner, **Zugang auf Anfrage** |
+
+**Der Dateiname trägt Datum und Uhrzeit**, weil an einem Tag mehrfach
+nachgeliefert werden kann: zwei Pakete vom selben Tag wären sonst nicht
+unterscheidbar, und im geteilten Ordner überschriebe eines das andere still.
+Liegen dort mehrere Zips, gilt das mit der spätesten Uhrzeit.
+
+**Der Repo-Stand gehört zur Paketkennung.** Die `.meta`-GUIDs im Paket müssen
+zu den Prefab- und Registry-Referenzen im Repository passen; ohne den Commit
+ist ein Paket nur halb bestimmt. Das Build-Skript gibt ihn mit aus und
+vermerkt, ob der Arbeitsbaum beim Packen sauber war.
+
+Die Zahlen sind nicht mehr symmetrisch: Das Aetherium aus dem Nachschub-Import
+([AssetImport_2026-08-06_Nachschub.md](AssetImport_2026-08-06_Nachschub.md))
+bringt Mesh und Textur mit, aber weder Material noch Prefab — es wird derzeit
+von nichts referenziert. Daher 35 Meshes gegen 34 Materialien.
+
+**Der Paketname trägt jetzt die Marke** (`Hashkrieg_`, vorher `ProjectNova_`).
+Das folgt E-1/E-3 aus
+[../production/hashkrieg/00_Entscheidungen.md](../production/hashkrieg/00_Entscheidungen.md):
+umbenannt wird die Marke, die Code-Identität bleibt `Nova.*`. Ein Paket ist
+Marke.
 
 **Zugang:** Das Paket wird nicht öffentlich verlinkt. Wer am Projekt mitentwickelt,
 bekommt den Ordner auf Anfrage freigeschaltet — kurze Mail an
-**hey@dennis-westermann.de**, Betreff „Project Nova Art-Paket".
+**hey@dennis-westermann.de**, Betreff „Hashkrieg Art-Paket".
+
+Der Link zum geteilten Ordner steht **bewusst nicht in diesem Dokument**: Das
+Repository ist öffentlich, ein Link hier wäre die Veröffentlichung, die §
+„Offene Punkte" gerade ausschliesst. Die Freigabe läuft pro Person über die
+Ordnerfreigabe, nicht über einen Link im Repo.
 
 Der Grund steht unter „Offene Punkte": Solange die Lizenzfelder der Assets
 ungeklärt sind, ist eine Weitergabe an einen unbestimmten Personenkreis nicht
@@ -98,8 +125,17 @@ Neue Assets kommen **ins Paket, nicht ins Repo**. Ablauf:
 
 1. Asset nach [ArtAssetStandard.md](ArtAssetStandard.md) §1–§2 benennen und ablegen.
 2. `PROVENANCE.json` daneben anlegen — die **wird** eingecheckt.
-3. Paket neu packen, hochladen, und in §3 Dateiname, Grösse und SHA-256
-   fortschreiben.
+3. `tools/art/build_art_package.sh` laufen lassen. Das Skript legt das Zip
+   unter `output/art-package/` ab und gibt die Kennzahlen aus.
+4. Die ausgegebenen Werte in §3 fortschreiben, `README.txt` daneben auf den
+   neuen Stand bringen, dann **beide** Dateien in den geteilten Ordner laden.
+
+**Der Paketinhalt wird nicht von Hand gepflegt.** Das Skript leitet ihn aus
+`.gitignore` ab: alles, was git im Art-Baum ausschliesst, gehört ins Paket —
+und nur das. Damit können Repo-Ausschluss und Paketinhalt nicht auseinander
+laufen; wer eine `.gitignore`-Regel ändert, ändert das Paket automatisch mit.
+Vor dem Packen prüft das Skript, dass zu jedem Asset sein `.meta` vorliegt, und
+bricht sonst ab — ein Paket ohne GUIDs wäre schlimmer als gar keines (§3).
 
 ## Offene Punkte
 
@@ -116,11 +152,17 @@ Neue Assets kommen **ins Paket, nicht ins Repo**. Ablauf:
 
 ## Nächste Schritte
 
-1. Geteilten Ordner anlegen, Paket hochladen, Link in §3 eintragen.
-2. Lizenzfelder der Provenienzdatensätze bei Tripo nachziehen.
+1. Paket und `README.txt` in den geteilten Ordner laden.
+2. **Ordnerfreigabe auf benannte Personen stellen, kein Link-Sharing.** Solange
+   die Lizenzfelder offen sind, ist genau die personengebundene Freigabe die
+   gedeckte Variante — „jeder mit dem Link" ist es nicht.
+3. Lizenzfelder der Provenienzdatensätze nachziehen: Tripo aus dem Erstimport,
+   und den bislang unbenannten Generator der drei Nachschub-Modelle
+   ([AssetImport_2026-08-06_Nachschub.md](AssetImport_2026-08-06_Nachschub.md) §5).
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-08-06 | Erstfassung: Art-Assets als externes Paket statt im Repo; Ausschlussregeln, Paketinhalt, Installations- und Erweiterungsablauf | Producer / Technical Art |
+| 1.1.0 | 2026-08-08 | Paket auf den Nachschub-Stand gehoben (HQ und BattleTank ersetzt, Aetherium neu): neue Kennzahlen in §3, Paketname auf die Marke umgestellt; §5 auf das neue Build-Skript `tools/art/build_art_package.sh` umgestellt, das den Inhalt aus `.gitignore` ableitet; Freigabeweg und Link-Verzicht ausdrücklich festgehalten | Producer / Agent (Umsetzung) |
