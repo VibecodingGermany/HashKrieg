@@ -1,6 +1,6 @@
 name: Tests
 
-# Der kanonische Check des Projekts (Governance-Tier 1, D-076).
+# Der kanonische Check des Projekts (Governance-Tier 2, D-091).
 #
 # Nova.SimRunner.Tests kompiliert dieselben Core-/Simulation-Quellen wie der
 # Unity-Host (siehe csproj: Compile Include ..\..\Assets\_Project\Scripts\...)
@@ -39,10 +39,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      # Tag-gepinnt statt SHA-gepinnt: die exakte SDK-Version kommt aus
-      # global.json (8.0.318, rollForward disable), die Runner-Images liefern
-      # sie nicht zuverlaessig mit.
-      - uses: actions/setup-dotnet@v4
+      # Action und SDK sind reproduzierbar gepinnt: die Action auf ihren
+      # Commit, die SDK-Version in global.json (8.0.318, rollForward disable).
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
       - name: Restore

@@ -1,6 +1,6 @@
 # Sprint 13: Die erste echte Netzpartie — zwei Menschen, zwei Rechner, ein Server
 
-**Status:** geplant | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) (A1–A7 umgesetzt, A8 Stufen 2–4 offen) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Leitsatz:** der Beweis ist eine gespielte Runde, kein grüner Test
+**Version:** 1.1.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang | **Sprint:** 13 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) (A1–A7 umgesetzt, A8 Stufen 2–4 offen) | **Parallel zu:** [13.0](13-0_Sprint_Freigabe.md), [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human (13.1 ist Oberfläche) | **Leitsatz:** der Beweis ist eine gespielte Runde, kein grüner Test
 
 ## Ziel
 
@@ -64,15 +64,17 @@ Zwei Rechner, getrennte Netze, Relay im Internet. Das ist das Sprintziel.
 Ergebnis kommt in den [GrayboxLog](../GrayboxLog.md): Commit, Dauer, Ticks,
 Endzustand beider Seiten, und was sich falsch angefühlt hat.
 
-### 13.6 · Der Baseline-Wächter
+### 13.6 · ~~Der Baseline-Wächter~~ → verschoben
 
-Ein CI-Job, der fehlschlägt, wenn ein PR Simulationsverhalten **und** eine
-Determinismus-Baseline im selben Zug ändert (Regel siehe
-[13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md)). Überschreibbar durch ein
-Maintainer-Label, damit ein bewusster Baseline-Reset weiterhin möglich ist.
+Liegt jetzt als Paket F4 in
+[Sprint 13.0](13-0_Sprint_Freigabe.md). Grund: Der Strang, der den Wächter
+auslösen wird, fängt vor diesem Sprint an. Ein Wächter, der später kommt als die
+PRs, die er prüfen soll, prüft nichts.
 
-Dieses Paket ist die Voraussetzung dafür, dass Sprint 13B ohne ständiges
-Nachfassen laufen kann.
+Die Nummer bleibt frei, damit Verweise auf „Paket 13.7" gültig bleiben.
+
+**Folge für diesen Sprint:** Er fasst `.github/workflows/` nicht mehr an und ist
+damit auch gegen Sprint 13.0 schreibkonfliktfrei.
 
 ### 13.7 · Der Linux-Build
 
@@ -99,9 +101,12 @@ belegbar.
 | `Scripts/Gameplay/Match/` | 13.1, und die Systemregistrierung auf Zuruf aus 13B (siehe [Parallelbetrieb](13-15_Parallelbetrieb.md), „Neue Systeme") |
 | `Scripts/Networking/` | nur falls ein Abnahmefund es erzwingt |
 | `tools/Nova.RelayServer/`, `docs/tech/RelayServer.md` | 13.2 |
-| `.github/workflows/` | 13.6 |
 | `tools/packaging/` | 13.7 |
 | `docs/production/GrayboxLog.md` | 13.3–13.5 |
+
+Disjunkt gegen [13B](13B_Sprint_Einheitenverhalten.md) (Simulation und AI) und
+gegen [13.0](13-0_Sprint_Freigabe.md) (Governance, `.github/workflows/`,
+Wurzeldateien). Alle drei können nebeneinander laufen.
 
 **Keine Datei unter `Scripts/Simulation/` oder `Scripts/AI*`.** Wenn ein
 Abnahmefund eine Simulationsänderung verlangt, wird er notiert und an
@@ -125,6 +130,24 @@ Sprint 13B übergeben — nicht hier gefixt.
 | Der VPS-Relay ist erreichbar, aber ohne Token offen | Match-Token ist Pflicht, nicht Option; Firewall-Regel wird dokumentiert |
 | NAT/Firewall verhindert Stufe 4 | Stufe 3 zuerst; scheitert Stufe 4 am Netz und nicht am Code, wird das so notiert |
 | Ein 13B-Merge mitten in der Abnahme | Merge-Fenster ist während Abnahmeläufen zu |
+| **Kein zweiter Mensch verfügbar** | Der eigentliche Engpass dieses Sprints, siehe unten |
+
+### Der zweite Mensch
+
+13.1 bis 13.3 sind allein machbar. **13.4 und 13.5 nicht** — sie verlangen
+definitionsgemäß zwei Menschen an zwei Rechnern. Das ist keine Technik-, sondern
+eine Verfügbarkeitsfrage, und sie entscheidet über das Sprintziel.
+
+| Kandidat | Was fehlt |
+|---|---|
+| Der zweite Maintainer | Zeit; Rückkehr in den nächsten Wochen angekündigt |
+| Der Einheitenstrang | ein Linux-Build — genau Paket 13.7 |
+
+Daraus folgt die Reihenfolge: **13.7 wird früh gebaut, nicht am Ende.** Er ist
+nicht Beiwerk, sondern die Bedingung dafür, dass Stufe 3 und 4 überhaupt jemanden
+zum Mitspielen haben. Steht kein zweiter Mensch bereit, endet der Sprint sauber
+nach 13.3 und die Stufen 3 und 4 werden als offen ausgewiesen, statt sie als
+erledigt zu behaupten.
 
 ## Fertig wenn
 
@@ -133,18 +156,25 @@ Sprint 13B übergeben — nicht hier gefixt.
    einem Siegzustand gespielt.
 3. Der Ablauf steht im GrayboxLog — mit Commit, Ticks, Endzustand beider Seiten.
 4. Ein Dritter kann aus dem Runbook heraus einen Relay aufsetzen, ohne zu fragen.
-5. Der Baseline-Wächter läuft auf jedem PR.
-6. Es gibt einen Linux-Build, und mindestens eine Abnahmestufe wurde
+5. Es gibt einen Linux-Build, und mindestens eine Abnahmestufe wurde
    plattformübergreifend gespielt.
 
-Punkt 2 ist nicht durch Punkt 1 ersetzbar. Genau das ist der Sinn von Tier 1.
+Punkt 2 ist nicht durch Punkt 1 ersetzbar. Genau das ist der Sinn der
+verhaltensbezogenen Abnahme.
 
 ## Changelog-Notiz
 
 Netzpartie zu zweit über den eigenen Relay spielbar: Verbindungsdialog mit
 ehrlichen Fehlerzuständen, Relay-Betrieb auf dem VPS, A8 Stufen 2–4
-nachgewiesen, Baseline-Wächter in CI.
+nachgewiesen und Linux-Build bereitgestellt.
 
 ## Versionsrelevanz
 
 `minor` — neue spielbare Fähigkeit, keine Vertragsbrüche.
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 1.1.0 | 2026-08-08 | Paket 13.6 (Baseline-Wächter) nach [Sprint 13.0](13-0_Sprint_Freigabe.md) verschoben, weil der auslösende Strang früher anfängt; damit auch `.github/workflows/` aus der Schreibhoheit raus und der Sprint gegen 13.0 konfliktfrei. Paket 13.7 (Linux-Build) ergänzt und als Vorbedingung für Abnahmestufe 3 markiert. Abschnitt „Der zweite Mensch" ergänzt: 13.4 und 13.5 sind verfügbarkeits-, nicht technikbegrenzt | Producer / Agent (Umsetzung) |
+| 1.0.0 | 2026-08-08 | Erstfassung | Producer / Agent (Umsetzung) |

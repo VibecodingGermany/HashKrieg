@@ -1,0 +1,47 @@
+name: External Contributor Review
+
+# D-091: every PR authored by someone other than the two maintainers needs a
+# CLA acknowledgment and an approval on its current head commit. This
+# metadata-only workflow operates with read-only permissions, reads its
+# implementation from main, and never checks out or executes pull-request code.
+# After an approval is submitted, rerun the latest failed check; native branch
+# protection remains the authoritative approval gate.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: external-contributor-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  external-contributor-review:
+    name: external-contributor-review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Verify contributor terms and maintainer approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" | jq -s 'add // []' > "$RUNNER_TEMP/reviews.json"
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""' > "$RUNNER_TEMP/pr-body.txt"
+          python3 .github/scripts/check_external_contributor_review.py --self-test
+          python3 .github/scripts/check_external_contributor_review.py \
+            --author "$PR_AUTHOR" \
+            --head-sha "$PR_HEAD_SHA" \
+            --body "$RUNNER_TEMP/pr-body.txt" \
+            --reviews "$RUNNER_TEMP/reviews.json"

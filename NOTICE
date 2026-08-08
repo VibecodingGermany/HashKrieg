@@ -1,0 +1,27 @@
+Required Notice: Copyright 2026 the respective Project Nova contributors.
+
+# Project Nova / Hashkrieg notice
+
+**Version:** 1.0.1 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Project Owner | **Sprint:** 13.0
+
+The [PolyForm Noncommercial License 1.0.0](LICENSE) applies only to original
+Project Nova source code and project documentation that the respective
+copyright holder has authorized under those terms, unless a file carries a
+different license or notice. Each contributor retains copyright in their
+contribution. This notice records neither a copyright assignment nor
+retroactive acceptance of the Contributor License Agreement.
+
+It does not grant rights to artwork, audio, fonts, 3D models, textures, other
+game assets, trademarks, or third-party dependencies. Those materials retain
+their own notices and licenses; see [docs/assets/Licenses.md](docs/assets/Licenses.md)
+and the relevant provenance records.
+
+`Project Nova` and `Hashkrieg` are project names of VibecodingGermany / Dennis
+Westermann. This notice grants no trademark permission.
+
+## Change history
+
+| Version | Date | Change | Owner |
+|---|---|---|---|
+| 1.0.0 | 2026-08-08 | Initial code, documentation, asset, and trademark scope notice | Dennis Westermann |
+| 1.0.1 | 2026-08-08 | Clarified contributor ownership and excluded retroactive CLA acceptance | Dennis Westermann |

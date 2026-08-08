@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.18.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-08
+**Dokumentversion:** 0.19.1 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-08
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -101,7 +101,7 @@ und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 ## 3. Projektstatus
 
-**Phase:** Implementierungs-Recovery · **Governance:** Tier 1
+**Phase:** Implementierungs-Recovery · **Governance:** Tier 2
 
 > ### 🎮 Der Kernloop ist geschlossen
 >
@@ -173,9 +173,12 @@ Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
 Was stattdessen als Nachweis zählt, definiert [GOVERNANCE.md](GOVERNANCE.md):
 **grüne CI plus eine gespielte und protokollierte Runde.**
 
-Seit D-076 gilt **Governance-Tier 1** (zwei Entwickler, kein Publikum). Das
-Gate-Regime G0–G5 mit Evidence- und Receipt-Verträgen blockiert nichts mehr; es
-ist vollständig erhalten und ruht bis Tier 3 — siehe
+Seit D-091 gilt **Governance-Tier 2**: Externe Beiträge kommen ausschließlich
+aus Forks, und nur Dennis Westermann (`@cubetribe`) und Michael Falk
+(`@travelhawk`) dürfen nach `main` mergen. Nach dem Tier-2-Remote-Rollout braucht
+jeder PR eine Freigabe des jeweils anderen Maintainers. Das Gate-Regime G0–G5
+mit Evidence- und Receipt-Verträgen blockiert nichts mehr; es ist vollständig
+erhalten und ruht bis Tier 3 — siehe
 [quality/README.md](quality/README.md).
 
 ## 4. Das Spiel ausprobieren
@@ -396,26 +399,38 @@ Project Nova/
 gefolgt von Squash-Merge und linearer Historie. Es gibt keinen dauerhaften
 Integrationsbranch.
 
-Pflichtchecks sind `docs-check` und für Quality-Verträge `integrity`. Dieser
-Teil des `quality-gate` prüft nur Verträge und Negative Controls. Ein
-Authorize-Job existiert bis G0-A2 bewusst nicht. Eine Änderung am Trust-Bundle
-wird ohne Gate-Fortschritt gemergt und kann sich nicht selbst autorisieren.
+In Tier 2 laufen `tests`, `docs-check`, `integrity` und `baseline-guard` auf
+jedem PR; für externe PRs kommt `external-contributor-review` hinzu. Nach dem
+ersten erfolgreichen Lauf der neuen Checks in einem Folge-PR werden sie im
+GitHub-Rollout als Required Checks geschaltet. Dieser Teil des `quality-gate`
+prüft nur Verträge und Negative Controls. Der vorhandene Authorize-Job bleibt
+bis G0-A2 schlafend und läuft nicht im normalen PR-Pfad. Eine Änderung am
+Trust-Bundle wird ohne Gate-Fortschritt gemergt und kann sich nicht selbst
+autorisieren.
 
-## 11. Lizenz
+## 11. Lizenz und Beiträge
 
-© 2026 VibecodingGermany / Dennis Westermann. **Alle Rechte vorbehalten.**
+Soweit die jeweiligen Rechteinhaber sie unter diesen Bedingungen freigegeben
+haben, stehen originale Quellen und Projekt-Dokumentation unter
+[PolyForm Noncommercial 1.0.0](LICENSE): nicht-kommerzielle Nutzung, Änderungen
+und Weitergabe sind erlaubt; eine allgemeine kommerzielle Nutzung nicht. Die
+Lizenz ist source-available, aber keine OSI-Open-Source-Lizenz.
 
-Es liegt derzeit **keine Open-Source-Lizenz** vor. Ansehen, Ausprobieren und
-Mitwirken per Pull Request sind ausdrücklich erwünscht; eine Weiterverbreitung
-als eigenes Werk ist nicht freigegeben. Wer beitragen möchte, kann das tun —
-die Lizenzfrage wird vor einer Veröffentlichung geklärt und ist als offener
-Punkt geführt.
+Kunst, Audio, Schriften, 3D-Modelle, Texturen, Marken und Drittanbieterpakete
+sind davon ausgenommen und behalten ihre eigenen Rechte — siehe
+[NOTICE](NOTICE) und [Lizenzregister](docs/assets/Licenses.md).
+
+Externe Beiträge sind willkommen, aber nur als Fork-PR. Mit dem gesetzten
+CLA-Häkchen im PR akzeptiert der Beitragende die
+[Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md), damit der
+Projektinhaber angenommene Beiträge später auch kommerziell relizenzieren darf.
+Dieser zusätzliche Relizenzierungsweg gilt nur für Beiträge mit dokumentierter
+CLA-Zustimmung. Frühere Beiträge und Rechte anderer Beitragender werden dadurch
+nicht rückwirkend übertragen.
 
 ## Offene Punkte
 
 - **Die Wirtschaftsfrage aus §2** ist die wichtigste offene Entscheidung.
-- Eine formale Lizenz ist noch festzulegen. Sie entscheidet, unter welchen
-  Bedingungen Beiträge Dritter angenommen werden können.
 - Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses Repositories
   noch nicht vollzogen — Repo, Code und Wiki laufen weiter unter *Project Nova*.
 - Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
@@ -435,7 +450,7 @@ Zur Bewertung, in dieser Reihenfolge:
 5. **Gebäude mit Wirkung und KI-Ausbau** — Lager und Radar warten auf ihre
    Funktion; der Gegner spielt, aber schlicht.
 
-Die Gate-Kette G0–G5 ruht unter Tier 1 und wird erst wieder aufgenommen, wenn das
+Die Gate-Kette G0–G5 ruht unter Tier 2 und wird erst wieder aufgenommen, wenn das
 Projekt ein Publikum hat.
 
 ## Änderungsverlauf
@@ -443,6 +458,8 @@ Projekt ein Publikum hat.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.18.0 | 2026-08-08 | Sprint 11 und Sprint 12 A/B in Projektstatus, Spielanleitung, Grenzen und nächste Schritte übernommen; Truppenführung, TCP-Relay sowie VFX/SFX nicht länger als fehlend bezeichnet; macOS-Testbuild korrekt als universell und ad-hoc-signiert dokumentiert | Technical Writer |
+| 0.19.0 | 2026-08-08 | D-091: Source-available Lizenz, CLA und Tier-2-Beitragsmodell ergänzt; die zwei Maintainer mit Merge-Recht und die Asset-/Markenabgrenzung klar benannt | Technical Writer |
+| 0.19.1 | 2026-08-08 | CLA-Wirkung auf Beiträge mit dokumentierter Zustimmung begrenzt; keine rückwirkende Rechteübertragung unterstellt | Technical Writer |
 | 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
 | 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
 | 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |

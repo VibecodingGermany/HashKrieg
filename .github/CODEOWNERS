@@ -1,18 +1,25 @@
-# CODEOWNERS – automatische Review-Zuweisung für Project Nova
+# CODEOWNERS – automatic review routing for Project Nova
 #
-# Syntax: <pfad-muster>   <owner(s)>
-# Letzter passender Eintrag gewinnt.
-#
-# Wirkung als Merge-BLOCKER nur, wenn in der Branch Protection von `main`
-# "Require review from Code Owners" aktiv ist. Ist das aus (Standard hier),
-# dient CODEOWNERS als hilfreiche automatische Reviewer-Zuweisung.
+# Merge authority comes from the protected-main push restriction, not from this
+# file: only @cubetribe and @travelhawk may merge into main. Once native
+# code-owner review is enabled, every PR requires an approval by the other
+# maintainer. The detailed day-to-day stream ownership remains authoritative in
+# docs/production/hashkrieg/13-15_Parallelbetrieb.md.
 
-# Standard: inhaltliche Änderungen reviewt das trusted-coders-Team
-*                         @VibecodingGermany/trusted-coders
+# Every path is owned by the two maintainers for the required peer review.
+*                                               @cubetribe @travelhawk
 
-# Governance, Prozess & Release: Owner-Hoheit
-/AGENTS.md                @cubetribe
-/CONTRIBUTING.md          @cubetribe
-/CHANGELOG.md             @cubetribe
-/.github/                 @cubetribe
-/docs/meta/               @cubetribe
+# CI, PR policy, code-owner policy, and their enforcement scripts.
+/.github/                                      @cubetribe @travelhawk
+
+# Repository governance and commercial-relicensing terms.
+/AGENTS.md                                     @cubetribe @travelhawk
+/GOVERNANCE.md                                 @cubetribe @travelhawk
+/CONTRIBUTING.md                               @cubetribe @travelhawk
+/CONTRIBUTOR_LICENSE_AGREEMENT.md              @cubetribe @travelhawk
+/LICENSE                                       @cubetribe @travelhawk
+/NOTICE                                        @cubetribe @travelhawk
+/CHANGELOG.md                                  @cubetribe @travelhawk
+/docs/meta/                                    @cubetribe @travelhawk
+/docs/production/DecisionLog.md                @cubetribe @travelhawk
+/docs/production/hashkrieg/                    @cubetribe @travelhawk

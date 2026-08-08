@@ -1,14 +1,13 @@
 # Dokumentationsstandard
 
-**Version:** 2.0.0 | **Status:** verbindlich (Governance-Tier 1) | **Verantwortungsbereich:** Technical Writer | **Sprint:** 7
+**Version:** 2.1.0 | **Status:** verbindlich (Governance-Tier 2) | **Verantwortungsbereich:** Technical Writer | **Sprint:** 13.0
 
 ## Zweck
 
-Definiert, wie Dokumentation in diesem Repository geschrieben wird. Seit D-076
-gilt **Governance-Tier 1** ([../../GOVERNANCE.md](../../GOVERNANCE.md)): Der
-Standard beschreibt gute Praxis und erzwingt nur noch das, was maschinell
-prüfbar und wirklich teuer im Fehlerfall ist – tote Links, kaputtes UTF-8,
-unparsebare Maschinenverträge.
+Definiert, wie Dokumentation in diesem Repository geschrieben wird. Seit D-091
+gilt **Governance-Tier 2** ([../../GOVERNANCE.md](../../GOVERNANCE.md)): Tote
+Links, UTF-8 und Maschinenverträge bleiben harte Regeln; Verträge und öffentliche
+Dokumentation führen wieder einen nachvollziehbaren Aufbau und Versionsstand.
 
 Was früher hier stand und jetzt schläft: der Evidenz- und Gate-Vertrag. Er liegt
 unverändert in [`../../quality/README.md`](../../quality/README.md) und
@@ -18,7 +17,7 @@ unverändert in [`../../quality/README.md`](../../quality/README.md) und
 
 - [../../GOVERNANCE.md](../../GOVERNANCE.md) – Tier-Modell, aktives Tier
 - [../production/DecisionLog.md](../production/DecisionLog.md) – D-001, D-005,
-  D-047, D-076
+  D-047, D-076, D-091
 - [`../../quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json) –
   einziger weiterhin voll versionierter Vertrag
 
@@ -26,7 +25,9 @@ unverändert in [`../../quality/README.md`](../../quality/README.md) und
 
 1. **Klein und fokussiert:** ein Dokument behandelt ein Thema.
 2. **Relative Links:** interne Abhängigkeiten werden relativ verlinkt. Tote
-   interne Links brechen die CI – das ist die einzige harte Doku-Regel.
+   interne Links brechen die CI. In Tier 2 sind außerdem der unten definierte
+   Aufbau und ein nachvollziehbarer Versionsstand für Verträge und öffentliche
+   Dokumentation verbindlich.
 3. **Sprache:** deutsche Projektprosa; Code, Identifier und Pfade englisch.
 4. **Keine Platzhalter:** keine leeren Zukunftsdokumente.
 5. **Single Source of Truth:** ein Zahlenwert hat genau eine führende Quelle;
@@ -37,9 +38,10 @@ unverändert in [`../../quality/README.md`](../../quality/README.md) und
 7. **Maschinenlesbare Verträge:** JSON-Manifeste und Szenarien werden gemeinsam
    mit ihrer Markdown-Erklärung geändert und müssen parsebar bleiben.
 
-## 2. Empfohlener Aufbau
+## 2. Aufbau
 
-Bewährt, aber **nicht erzwungen**:
+Für Verträge und öffentliche Doku verbindlich, für interne Arbeitsnotizen
+empfohlen:
 
 1. Titel,
 2. Kopfzeile `Version | Status | Verantwortungsbereich | Sprint`,
@@ -49,19 +51,22 @@ Bewährt, aber **nicht erzwungen**:
 6. Offene Punkte,
 7. Nächste Schritte.
 
-Die Kopfzeile ist empfohlen, weil sie beim Überfliegen des Wikis den Reifegrad
-zeigt; die CI meldet ihr Fehlen als Hinweis, nicht als Fehler. Bestehende
-Dokumente behalten ihren Aufbau – niemand muss sie umbauen.
+Bestehende interne Dokumente behalten ihren Aufbau, bis sie inhaltlich berührt
+werden. Öffentliche Einstiegstexte, Governance- und Prozessdokumente sowie
+Verträge werden bei einer Änderung auf diesen Aufbau gezogen.
+
+Unveränderte standardisierte Lizenztexte bleiben wortgetreu und erhalten keinen
+projektspezifischen Kopf oder Änderungsverlauf. Operative Vorlagen und
+Maschinenkonfigurationen wie PR-Templates und Workflow-YAML dokumentiert Git;
+ihre menschenlesbaren Verträge bleiben die versionierten Prozessdokumente.
 
 ## 3. Versionierung und Änderungsverlauf
 
-**Freiwillig.** Git ist der Änderungsverlauf: `git log --follow <datei>` liefert
-Datum, Autor und Begründung genauer als jede handgepflegte Tabelle, und niemand
-vergisst ihn.
+Für Verträge und öffentliche Doku verpflichtend. Git ergänzt den Verlauf:
+`git log --follow <datei>` liefert Datum, Autor und Begründung genauer als jede
+handgepflegte Tabelle.
 
-Wo eine Tabelle bereits existiert, darf sie stehen bleiben und weitergeführt
-werden – vor allem in Governance-Dateien, wo die Absicht hinter einer Änderung
-zählt. Sie ist nur keine Bedingung mehr für einen Merge.
+Wo eine Tabelle bereits existiert, wird sie in diesen Dokumenten weitergeführt.
 
 **Ausnahme mit Versionspflicht:**
 [`../../quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json) ist ein
@@ -80,9 +85,8 @@ im [DecisionLog](../production/DecisionLog.md) mit:
 - den Konsequenzen und
 - einer Zeile zu dem, was verworfen wurde und warum.
 
-Die frühere Pflicht zu mindestens drei ausformulierten Alternativen entfällt in
-Tier 1 (D-076). Sie kommt ab Tier 2 zurück. Bestehende Einträge werden **nicht**
-zurückgebaut.
+Ab Tier 2 dokumentiert jede neue D-ID mindestens drei bewertete Alternativen.
+Bestehende Einträge werden **nicht** zurückgebaut.
 
 Revidierte Einträge bleiben sichtbar und werden `ersetzt durch D-xxx`
 beziehungsweise `teilweise ersetzt` markiert. MS-1-Overrides dürfen ein
@@ -92,7 +96,8 @@ explizit benennen.
 ## 5. Gate-Evidenz (schlafend)
 
 Der vollständige Evidenzvertrag – Schema, Semantikvalidator, Receipt-Kette,
-Trusted Tooling, Performance-Methodenprofile – ist unter Tier 1 nicht in Kraft.
+Trusted Tooling, Performance-Methodenprofile – ist unter Tier 1 und 2 nicht in
+Kraft.
 Er steht unverändert in [`../../quality/README.md`](../../quality/README.md) und
 [MVPRecoveryPlan.md](../production/MVPRecoveryPlan.md) §2 und wacht mit Tier 3
 wieder auf.
@@ -113,6 +118,7 @@ Menschlich zu prüfen bleibt:
 
 - Werteautorität (kopiert das Dokument Zahlen, die woanders geführt werden?),
 - `[Unreleased]`-Eintrag im CHANGELOG,
+- Kopfversion und Änderungsverlauf für Verträge und öffentliche Doku,
 - keine unbelegten Fertig-Behauptungen.
 
 Review-Regeln stehen in [../../CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
@@ -125,8 +131,8 @@ Review-Regeln stehen in [../../CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
 
 1. Bestehende Dokumente bei der nächsten inhaltlichen Berührung entschlacken,
    nicht auf Vorrat.
-2. Beim Wechsel auf Tier 2 die D-ID-Alternativenpflicht und die Doku-Versionierung
-   für öffentliche Dokumente wieder aktivieren.
+2. Beim Wechsel auf Tier 3 den Evidenzvertrag gemäß
+   [GOVERNANCE.md](../../GOVERNANCE.md) wieder aktivieren.
 
 ## Änderungsverlauf
 
@@ -136,3 +142,4 @@ Review-Regeln stehen in [../../CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
 | 1.1.0 | 2026-07-21 | Grundprinzip „Single Source of Truth für Werte" ergänzt (D-047) | Technical Writer |
 | 1.2.0–1.7.0 | 2026-07-24 – 2026-07-25 | Ausbau der Evidence-Autorität (D-061 bis D-066) | Technical Writer |
 | 2.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Pflichtaufbau, Versionsbump und Änderungsverlauf freiwillig; Evidenzvertrag als schlafend nach `quality/README.md` verwiesen; D-ID-Alternativenpflicht bis Tier 2 ausgesetzt | Technical Writer |
+| 2.1.0 | 2026-08-08 | D-091: Tier-2-Pflichten für Verträge und öffentliche Doku sowie ≥3 Alternativen je neuer D-ID wieder aktiviert; Gate-Evidenz bleibt bis Tier 3 schlafend | Technical Writer |

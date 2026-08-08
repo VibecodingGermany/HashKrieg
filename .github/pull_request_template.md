@@ -7,6 +7,14 @@
 - [ ] `dotnet test tools/Nova.SimRunner.Tests` lokal grün
 - [ ] Zeile unter `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md)
 - [ ] Echte Entscheidung getroffen? → D-ID im [DecisionLog](../docs/production/DecisionLog.md), sonst streichen
+- [ ] Bei Simulationsänderung: keine Determinismus-Baseline im selben PR geändert
 
-<!-- Governance-Tier 1: kein Gate-Nachweis, keine Evidence, kein Versionsbump je Dokument.
-     Was in welcher Phase gilt: GOVERNANCE.md -->
+## Externe Beiträge
+
+<!-- Für @cubetribe und @travelhawk nicht erforderlich. Alle anderen PRs werden
+     erst nach der bestätigten Maintainer-Prüfung und dem folgenden Häkchen grün. -->
+- [ ] I agree to the Contributor License Agreement
+
+<!-- Governance-Tier 2: D-IDs für echte Entscheidungen und Versionen für
+     Verträge/öffentliche Doku sind verpflichtend. Was in welcher Phase gilt:
+     GOVERNANCE.md -->
