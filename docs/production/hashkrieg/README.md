@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.2.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 12
+**Version:** 0.3.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen; Sprints 13–15 geplant, Parallelbetrieb mit externem Beitragenden geregelt | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 13
 
 ## Zweck
 
@@ -43,6 +43,11 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [07_CC0_Quellen.md](07_CC0_Quellen.md) | Welche Kulissen-Assets aus freien CC0-Paketen kommen statt gebaut zu werden — mit Prüfvermerk |
 | [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | Sprint 12; Strang A A1–A7 umgesetzt und A8 Stufe 1 über 10.023 TCP-Ticks nachgewiesen, manuelle Loopback-/LAN-/VPS-Stufen offen (D-089) |
 | [12B_Sprint_Sichtbares_Gefecht.md](12B_Sprint_Sichtbares_Gefecht.md) | Sprint 12 Strang B; fog-sicheres VFX- und Tier-0-Audio technisch umgesetzt, manuelle 60-Einheiten-Sicht-/Gegenhörabnahme offen (D-090) |
+| [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Regelwerk für die parallele Arbeit ab Sprint 13** — Schreibhoheit, Determinismus-Baselines, Merge-Fenster, Zugangsmodell für externe Beitragende |
+| [13_Sprint_Netzpartie.md](13_Sprint_Netzpartie.md) | Sprint 13 (Maintainer); Verbindungsdialog, Relay auf dem VPS, A8 Stufen 2–4 als gespielte Abnahme |
+| [13B_Sprint_Einheitenverhalten.md](13B_Sprint_Einheitenverhalten.md) | Sprint 13B (externer Beitragender, PR-only); Einheitenverhalten, KI und Legion-Waffenidentität — fortlaufend parallel zu 13–15 |
+| [14_Sprint_Lobby.md](14_Sprint_Lobby.md) | Sprint 14 (Maintainer); Match per Code über Supabase, Fraktionswahl, Build-Abgleich vor dem Verbinden |
+| [15_Sprint_Netzstabilitaet.md](15_Sprint_Netzstabilitaet.md) | Sprint 15 (Maintainer); Reconnect, Desync-Erstbefund, adaptive Eingabeverzögerung, Dauerbetrieb des Relays |
 
 ## Das Wichtigste in fünf Sätzen
 
@@ -159,9 +164,16 @@ Masterplans grundlegend — sonst nichts.
 
 ## Nächste Schritte
 
-1. Sprint-12-Strang B im aktuellen macOS-Build in einem dichten Gefecht sehen
+1. **Tier-2-Wechsel als D-ID entscheiden.** Der erste PR von ausserhalb des
+   Maintainer-Kreises steht bevor; [../../../GOVERNANCE.md](../../../GOVERNANCE.md)
+   nennt genau das als Auslöser. Ohne den Eintrag rutscht das Projekt in ein
+   Tier, dessen Regeln niemand angeschaltet hat.
+2. Sprint-12-Strang B im aktuellen macOS-Build in einem dichten Gefecht sehen
    und gegenhören; den Befund im Umsetzungsreport ergänzen.
-2. Die offenen A8-Netzwerkstufen aus [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md)
-   mit zwei Fenstern, im LAN und auf dem VPS spielen.
-3. Den noch offenen Strang C getrennt planen, weil er Simulationszustand und
-   Baselines verändert.
+3. Die offenen A8-Netzwerkstufen aus [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md)
+   mit zwei Fenstern, im LAN und auf dem VPS spielen — das ist
+   [Sprint 13](13_Sprint_Netzpartie.md).
+4. Strang C ist geplant als **Sprint 16**, nach dem Netzstrang: er verändert
+   Simulationszustand und Baselines und hebt damit die Trennung auf, die den
+   Parallelbetrieb erst möglich macht (siehe
+   [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md)).
