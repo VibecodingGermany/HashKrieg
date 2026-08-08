@@ -1,10 +1,11 @@
 namespace Nova.Simulation.CommandsV1
 {
     /// <summary>
-    /// Structural rejection reasons (docs/tech/Commands.md section 4). A
-    /// structural failure is rejected before the command enters the canonical
-    /// stream and is never recorded; the value is deterministic for a given
-    /// input and therefore safe to log and test against.
+    /// Intent-submission and structural intake rejection reasons
+    /// (docs/tech/Commands.md section 4). Every rejection happens before the
+    /// command enters the canonical stream and is never recorded. Structural
+    /// values are deterministic for a given input; submission readiness also
+    /// exposes the host lifecycle without consuming a sequence.
     /// </summary>
     public enum CommandRejectReason : ushort
     {
@@ -45,6 +46,9 @@ namespace Nova.Simulation.CommandsV1
 
         // Bytes after a fully parsed record (the intake accepts exactly one).
         TrailingBytes = 20,
+
+        // Submission boundary (before session actions or sequence assignment).
+        TransportNotReady = 21,
     }
 
     /// <summary>Outcome of handing one record to the ingress.</summary>

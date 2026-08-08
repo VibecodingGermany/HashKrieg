@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 
 namespace Nova.Presentation.UI
@@ -35,8 +36,8 @@ namespace Nova.Presentation.UI
     /// HONESTY RULES (sprint §5/§6): "Laden" is shown, disabled and labelled —
     /// the snapshot layer can restore a full match, but nothing ever writes to
     /// disk, so offering it would be a lie and hiding it would raise the wrong
-    /// question. The SFX sliders persist a value that nothing consumes yet and
-    /// say so, and the render-detail dropdown names what it does not change.
+    /// question. The SFX controls apply immediately through the D-090 mixer
+    /// bridge; the render-detail dropdown still names what it does not change.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -45,8 +46,7 @@ namespace Nova.Presentation.UI
         private const string LoadHintText = "kommt später — es gibt noch kein Speicherformat";
 
         private const string SfxHintText =
-            "Noch ohne Wirkung: das Spiel hat bisher keine Soundeffekte. Der Wert wird gespeichert " +
-            "und gilt, sobald es welche gibt.";
+            "Wirkt sofort auf UI-, Waffen-, Treffer- und Einheitensounds.";
 
         private const string QualityHintText =
             "Wirkt auf LOD-Abstand, Anisotropie, Texturauflösung und Partikelbudget. Renderskalierung, " +
@@ -608,6 +608,9 @@ namespace Nova.Presentation.UI
         {
             GameSettingsStore.Current.Sanitize();
             if (_music != null) _music.ApplyVolume(GameSettingsStore.Current);
+            AudioServiceLocator.Current?.SetBusVolume(
+                AudioBus.Sfx,
+                GameSettingsStore.Current.EffectiveSfxVolume);
 
             if (!_settingsDirty)
             {
@@ -649,7 +652,14 @@ namespace Nova.Presentation.UI
         private Button MakeButton(string text, Action onClick)
         {
             var button = new Button { text = text };
-            if (onClick != null) button.clicked += onClick;
+            if (onClick != null)
+            {
+                button.clicked += () =>
+                {
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Click);
+                    onClick();
+                };
+            }
 
             ApplyFont(button, _bodyFont);
             button.style.fontSize = _buttonFontSize;

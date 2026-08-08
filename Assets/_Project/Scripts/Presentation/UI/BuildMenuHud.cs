@@ -1,6 +1,7 @@
 using System.Text;
 using UnityEngine;
 using Nova.Gameplay;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
@@ -317,6 +318,7 @@ namespace Nova.Presentation.UI
                 GUI.enabled = available;
                 if (GUI.Button(rect, ButtonLabel(role, in def, buttonWidth), _buttonStyle))
                 {
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                     _input.EnterPlacementMode(def.DefinitionId);
                 }
                 GUI.enabled = wasEnabled;

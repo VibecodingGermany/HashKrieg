@@ -1,12 +1,12 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.15.0 | **Status:** unveröffentlichter Recovery-Stand – G0-A1 Mergekandidat, G0-A2 offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.16.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 12 Stränge A und B technisch umgesetzt; manuelle Netzwerk- und Gefechtsabnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 12
 
 ## Zweck
 
-Zentraler Einstieg in das versionierte Project-Nova-Wiki. Die Version 0.12.0
-rebaselined Planung und technische Verträge; sie ist kein Game-Release und
-kein bestandenes Gate.
+Zentraler Einstieg in das versionierte Project-Nova-Wiki. Der aktuelle Stand
+bündelt die technische Umsetzung der Sprint-12-Stränge A und B; er ist kein
+Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 
 ## Abhängigkeiten
 
@@ -22,7 +22,7 @@ kein bestandenes Gate.
 | Stufe | Status |
 |---|---|
 | Governance | **Tier 1** – zwei Entwickler, kein Publikum (D-076) |
-| Sprint 7 | aktiv |
+| Sprint 12 | Strang A A1–A7 umgesetzt, A8 Stufe 1 nachgewiesen und Stufen 2–4 offen (D-089); Strang B technisch umgesetzt, 60-Einheiten-Gegenhör-/Sichtabnahme offen (D-090) |
 | Spielbar | lokales 1v1 auf der Glutrinne-Graybox (Ablauf: `production/DemoRunbook.md`) |
 | MS-0 | offen – Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
 | MS-1 / MVP | nicht erreicht – Lücken in [ScopeLedger](production/ScopeLedger.md) |
@@ -128,7 +128,9 @@ gelisteten Kernverträge.
 - [AssetBudget](tech/AssetBudget.md)
 - [Testing](tech/Testing.md)
 - [Deployment](tech/Deployment.md)
-- [Networking](tech/Networking.md) – Post-MVP-Transportziel
+- [Networking](tech/Networking.md) – D-089-1v1-Profil und historisches Vollspiel-Zielbild
+- [RelayServer](tech/RelayServer.md) – Konfiguration, systemd, Artefakt,
+  Deploy, Rollback, Firewall und ehrlicher Abnahmestand des TCP-Relays
 - Architecture Reviews: [Performance](tech/review/Review_Performance.md),
   [Wartbarkeit](tech/review/Review_Wartbarkeit_Prozess.md),
   [Architektur-Kohärenz](tech/review/Review_ArchitekturKohaerenz.md),
@@ -148,7 +150,7 @@ gelisteten Kernverträge.
   Spezifikationsblätter der 34 MS-1-Art-Assets
 - [SourceCatalog_MS1](assets/SourceCatalog_MS1.md) (0.2.0, Entwurf) –
   CC0-/KI-Beschaffungskatalog und Lizenzbefunde
-- [Provenance](assets/Provenance.md) (0.1.0, Entwurf) –
+- [Provenance](assets/Provenance.md) (0.2.0, verbindlicher Workflow) –
   Provenienz- und Lizenznachweisverfahren je Asset
 - [AssetPackage](assets/AssetPackage.md) (1.0.0) – warum die 3D-Assets als
   Paket ausserhalb des Repos liegen, Inhalt und Installationsablauf
@@ -176,6 +178,13 @@ gelisteten Kernverträge.
 - [ScopeLedger](production/ScopeLedger.md) – Zurückstellungen der Graybox-Spur, verweist auf Manifest-Schlüsselpfade
 - [DemoRunbook](production/DemoRunbook.md) (0.1.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, bekannte Grenzen, Asset-Ablage
 - [StatusSnapshot 2026-08-05](production/StatusSnapshot_2026-08-05.md) (0.1.0) – datierter Projektstand vor dem Eintreffen der ersten 3D-Assets
+- [Hashkrieg-Planungsmappe](production/hashkrieg/README.md) und
+  [Sprint 12 „Zu zweit"](production/hashkrieg/12_Sprint_Zu_Zweit.md) –
+  Strang A A1–A7 implementiert, headless A8 Stufe 1 nachgewiesen;
+  Zwei-Fenster-, LAN- und VPS-Partie offen
+- [Sprint 12 Strang B „Sichtbares Gefecht"](production/hashkrieg/12B_Sprint_Sichtbares_Gefecht.md) –
+  VFX, Tier-0-SFX, Mixer, Provenienz und Quellgrenzen technisch umgesetzt;
+  manuelle 60-Einheiten-Gegenhör-/Sichtabnahme offen
 - Sprintberichte: [0](production/sprints/Sprint00_Report.md),
   [1](production/sprints/Sprint01_Report.md),
   [2](production/sprints/Sprint02_Report.md),
@@ -214,14 +223,20 @@ kann keine Datei einen Gate-Pass erzeugen.
 ## Offene Punkte
 
 - Q-018 und Q-019 bleiben offen und nicht MS-1-blockierend.
-- G0-A2 und damit Gate G0 sind noch nicht nachgewiesen.
+- Sprint 12 A8 Stufen 2–4 (zwei Unity-Fenster, LAN, VPS) sind nicht gespielt.
+- Für Strang B fehlt die manuelle Sicht-/Gegenhörabnahme mit einem dichten
+  Gefecht; der automatisierte PlayMode-Gesamtlauf bleibt wegen des bestehenden
+  headless `RenderTexture.Create`-Fehlers in `BarracksSpawnDiagnosisTests` bei
+  8/9, während der neue Slot-Reuse-Test grün ist.
+- Die vier Suno-Musikdatensätze benennen echte, noch fehlende Ursprungs- oder
+  Konvertierungsbelege und bleiben bis zu deren Lieferung `incomplete`.
 
 ## Nächste Schritte
 
-1. G0-A1 ohne Gate-Fortschritt geschützt mergen.
-2. G0-A2 als separaten zweiphasigen Receipt-Authorizer implementieren.
-3. Am nachfolgenden sauberen Subject G0-B belegen.
-4. G1/V1–V5a erst nach bestandenem G0 sequenziell umsetzen.
+1. Den vorliegenden macOS-Build visuell und auditiv im dichten Gefecht prüfen.
+2. A8 mit zwei Unity-Fenstern, danach im LAN und auf dem VPS spielen.
+3. Erst danach den Gesamt-Sprint als gespielt beziehungsweise DoD-fertig
+   bezeichnen; Strang C bleibt ein eigener offener Simulationsumfang.
 
 ## Änderungsverlauf
 
@@ -246,3 +261,4 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.13.0 | 2026-07-26 | Graybox-Spur indexiert: GrayboxLog und ScopeLedger aufgenommen; Art-Strang-D-IDs nach der Merge-Kollision auf D-069–D-073 nachgeführt | Technical Writer |
 | 0.14.0 | 2026-07-26 | Hashkrieg-Weltentwurf und Concept-Art-Strang indexiert: Lore.md, ConceptArtStyleGuide.md und concept-art/README.md aufgenommen; kein Gate-Status | Technical Writer |
 | 0.15.0 | 2026-08-05 | GB-003 indexiert: DemoRunbook.md und StatusSnapshot_2026-08-05.md aufgenommen (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Vorbereitung); ScopeLedger 0.4.0 und GrayboxLog 0.3.0 fortgeschrieben; kein Gate-Status | Technical Writer |
+| 0.16.0 | 2026-08-07 | D-089-Netzprofil, RelayServer-Runbook und Sprint-12-Strang-A-Stand indexiert; manuelle Netzwerkabnahme ausdrücklich offen | Technical Writer |

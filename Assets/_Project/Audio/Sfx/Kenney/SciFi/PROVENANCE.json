@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "audio-batch-v1",
+  "assetId": "kenney.sfx.sci-fi-sounds",
+  "originType": "cc0-import",
+  "sourceName": "Kenney Sci-Fi Sounds 1.0",
+  "sourceUrl": "https://kenney.nl/assets/sci-fi-sounds",
+  "licenseId": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrievedAt": "2026-08-07",
+  "sourceFileHash": "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04",
+  "attributionRequired": false,
+  "attributionText": "",
+  "redistributionAllowed": true,
+  "modifications": "Unveränderte OGG-Quelldateien; nur eine kuratierte Teilmenge wurde übernommen.",
+  "derivedFrom": "",
+  "evidenceStatus": "complete-under-D-090-tier-1-exception",
+  "verifiedBy": "",
+  "verifiedAt": "",
+  "verificationException": {
+    "decisionId": "D-090",
+    "reason": "Governance Tier 1: keine zweite menschliche Prüferin bzw. kein zweiter menschlicher Prüfer verfügbar. ZIP-, Lizenz- und Einzelhashes wurden technisch verifiziert."
+  },
+  "files": [
+    { "sourcePath": "Audio/laserSmall_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_000.ogg", "sourceSha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1", "targetSha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1" },
+    { "sourcePath": "Audio/laserSmall_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_001.ogg", "sourceSha256": "ab87913aba9790a0c5fa173d086267ba521ad522fcad2252271db49988313cf5", "targetSha256": "ab87913aba9790a0c5fa173d086267ba521ad522fcad2252271db49988313cf5" },
+    { "sourcePath": "Audio/laserSmall_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_002.ogg", "sourceSha256": "e70139466c3e801358c9041ee17db7ff82c0e9a9cdf44647ad0ea6b9f8458f63", "targetSha256": "e70139466c3e801358c9041ee17db7ff82c0e9a9cdf44647ad0ea6b9f8458f63" },
+    { "sourcePath": "Audio/laserLarge_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_000.ogg", "sourceSha256": "a56d95794cd732d6c2d66ce488c14cf557fe526c282897c9a77675c2bd9b77e6", "targetSha256": "a56d95794cd732d6c2d66ce488c14cf557fe526c282897c9a77675c2bd9b77e6" },
+    { "sourcePath": "Audio/laserLarge_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_001.ogg", "sourceSha256": "e678aca631495b7dfef4ac625f0349875ccac81a60f538d530e072241af3e4bd", "targetSha256": "e678aca631495b7dfef4ac625f0349875ccac81a60f538d530e072241af3e4bd" },
+    { "sourcePath": "Audio/laserLarge_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_002.ogg", "sourceSha256": "e5e0b6ccc4d5720c8174a3e5b7cc6f9be3057352a89cbb2e99a00efc6fe5cc11", "targetSha256": "e5e0b6ccc4d5720c8174a3e5b7cc6f9be3057352a89cbb2e99a00efc6fe5cc11" },
+    { "sourcePath": "Audio/explosionCrunch_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_000.ogg", "sourceSha256": "4b597d658d0ae101f0a030fbeea5fc3a4292ab85f017470a8254a8e7959cbd69", "targetSha256": "4b597d658d0ae101f0a030fbeea5fc3a4292ab85f017470a8254a8e7959cbd69" },
+    { "sourcePath": "Audio/explosionCrunch_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_001.ogg", "sourceSha256": "fdd04d6f0032d4d57c134ad37f3587d2d00e58c9572715275bd8cf4f43593576", "targetSha256": "fdd04d6f0032d4d57c134ad37f3587d2d00e58c9572715275bd8cf4f43593576" },
+    { "sourcePath": "Audio/explosionCrunch_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_002.ogg", "sourceSha256": "be2b8ddc62e4a24c91e2e77793de98549ce216faf2f323a917e7d6f34321ff97", "targetSha256": "be2b8ddc62e4a24c91e2e77793de98549ce216faf2f323a917e7d6f34321ff97" },
+    { "sourcePath": "Audio/lowFrequency_explosion_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/lowFrequency_explosion_000.ogg", "sourceSha256": "3cb48d86dab63140cfb9aaeea4d4a6846abaca5831d157d8adbec0490da26343", "targetSha256": "3cb48d86dab63140cfb9aaeea4d4a6846abaca5831d157d8adbec0490da26343" },
+    { "sourcePath": "Audio/lowFrequency_explosion_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/lowFrequency_explosion_001.ogg", "sourceSha256": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b", "targetSha256": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b" }
+  ]
+}

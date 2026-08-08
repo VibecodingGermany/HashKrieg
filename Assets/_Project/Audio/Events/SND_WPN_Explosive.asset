@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ba8c31bfbc644c15b541a6de8936d23, type: 3}
+  m_Name: SND_WPN_Explosive
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Audio.SoundEventSO
+  EventId: 6
+  Category: 1
+  DefaultPriority: 1
+  Variations:
+  - Layers:
+    - {fileID: 8300000, guid: 3afcfbbf2085f4ae883c20a96ac325de, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: f0d6923ee451347e3ac280c95a81bf2a, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: bd8bb48f2aa8746c4a24c0f69c2dac78, type: 3}
+    Gain: 1
+  MaxConcurrent: 3
+  CooldownSeconds: 0.06
+  Spatialized: 1
+  Gain: 0.9
+  MinDistance: 15
+  MaxDistance: 120

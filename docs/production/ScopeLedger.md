@@ -1,6 +1,6 @@
 # Scope-Ledger der Graybox-Spur
 
-**Version:** 0.5.0 | **Status:** Entwurf – Register (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.6.0 | **Status:** laufendes Register – Graybox-Entwurf D-067 plus verbindliche 12B-Abweichungen D-090 | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 12
 
 ## Zweck
 
@@ -91,6 +91,32 @@ Ergebnisstatistik). Der D-056-MS-1-Override schließt sie ausdrücklich aus; sie
 bleiben also nicht hinter dem verbindlichen Inhalt zurück, sondern liegen
 außerhalb davon. Dieses Register führt nur Rückstände gegenüber MS-1.
 
+## Sprint 12 Strang B – Planabweichungen (D-090)
+
+Dieser getrennte Abschnitt kopiert keine Werte aus dem MS-1-Manifest. Er hält
+die vom Inhaber verlangten Abweichungen zwischen dem historischen
+[12B-Ausführungsplan](hashkrieg/12B_Sprint_Sichtbares_Gefecht.md) und dem
+implementierten Gefechtsfeedback fest. D-090 ist die führende Entscheidung.
+
+| Planpunkt | Ausgeführter Stand | Rückkehr / Restprüfung |
+|---|---|---|
+| Prozeduraler radialer Partikelverlauf | Unity-Partikelsysteme, Meshes und Laufzeitmaterialien ohne erzeugte oder importierte Textur | nur bei nachgewiesenem visuellen Bedarf neu bewerten |
+| Sichtbares Projektil | höchstens 0,1-s-Hitscan-Spur mit beim Auslösen kopiertem Endpunkt; kein Nachführen und keine Flugzeit | Vertrag bleibt, solange Kampf Hitscan ist |
+| Differ direkt in zwei parallelen Slot-Arrays | dedizierter `VisibleCombatFrameDiffer` mit vollständiger `EntityId`, Fog-Sicht und `TryGetUnit` | kein Rückbau geplant |
+| Tod aus jedem sichtbaren Verschwinden | sichere, bewusst unvollständige Heuristik: eigene mobile Einheiten direkt; Gebäude/fremde Einheiten nur bei Tickdelta 1 und genau einem sichtbaren korrelierten Schuss; Mehrdeutiges bleibt stumm | bessere Ereignisquelle nur mit eigener Entscheidung, ohne Fog-Leak |
+| Gebäudetrümmer-/Decal-Fläche | Rauch, Trefferstoß und 0,8-s-Absacken; kein persistenter Rückstand | Content-/Performance-Entscheidung nach visueller Abnahme |
+| direkter `AudioSource.PlayOneShot` im Effektcontroller | D-039-konformer Aufruf über `IAudioService`/`UnityAudioService` | historische Musikcontroller separat migrieren |
+| `ALR_BaseUnderAttack` in Tier 0 | ausgelassen: Tier 1, keine ausgewählte Quelle und kein auditiv abgenommener 20-s-Vertrag | späterer Audio-Tier-1-Sprint |
+| semantisch umbenannte WAV-SFX | genau 35 unveränderte Kenney-OGGs in pack-first-Ablage, 11 Sci-Fi / 11 Impact / 13 Interface | Quelldateien und Hashes bleiben stabil |
+| optionale Flipbook-Stufe 5 | ausgelassen | nur bei belegtem Mehrwert nach Stufen 1–4 |
+| B5-A/B-State-Hash-Test mit Effektschalter | headless Quellcode-Guard für Produktionsquellen außerhalb `Simulation/**`; `RawUnits` wegen bestehender Altlasten nicht global gesperrt | Guard bei neuen Präsentationspfaden erweitern |
+| vollständige Musikprovenienz | ein Musik-Sidecar vorhanden, alle vier Datensätze ehrlich `incomplete`; fehlende lokale Ursprungsdateien/Befehle bleiben benannt | Inhaber liefert nur echte Originalbelege nach |
+| Vier-Augen-Prüfer im Sidecar | `verifiedBy` bleibt im Tier-1-Zweierbetrieb mit Begründung leer | zweiten realen Prüfer nachtragen, falls verfügbar |
+| Fokuspunkt-Listener | vorhandener Kamera-Listener bleibt bestehen | per Gegenhören mit Fokuspunkt vergleichen |
+| lückenlose Cues nach jedem Tick | Tick-Sprünge dürfen Zwischen-Cues verlieren; es gibt kein nachträgliches Effektgewitter | bei künftigem Sim→View-Eventstrom neu bewerten |
+| öffentliche Unity-Mixer-Authoring-API | idempotentes Editorwerkzeug nutzt reflektierte Unity-6000.5.4f1-Interna und bricht bei Signaturdrift hart ab | bei Unity-Upgrade gezielt validieren |
+| separater Effekt-Schalter | nicht umgesetzt; der geplante B5-Zweck wird durch den Quellcode-Guard erfüllt | nur mit eigenem Accessibility-/Performance-Bedarf |
+
 ## Offene Punkte
 
 - D-067 ist ein Entwurf. Ohne Ratifizierung deckt keine Klausel diese Zeilen –
@@ -125,3 +151,4 @@ außerhalb davon. Dieses Register führt nur Rückstände gegenüber MS-1.
 | 0.3.0 | 2026-07-26 | Fraktions-Sitzung: Zeilen `factions[1]`, `factions[1].identity.harvesterCargoAE` und `weaponProfile` auf den Stand der Fraktions-Achse (D-075) fortgeschrieben — Cargo und Waffentabelle sind implementiert, `salvo`/`splash` bleibt als bewusster Konflikt registriert; drei Anhang-Zeilen ergänzt (Tempo-Umrechnung m/s ↔ m/tick, Harvester-Panzerungsklasse Vehicles vs. Simulationszuordnung, Allianz-Schadenstyp Energie vs. Kinetisch — D-047 gewinnt derzeit); Anhang-Einleitung über D-074 hinaus auf D-047/D-075 verbreitert | Technical Writer |
 | 0.4.0 | 2026-08-05 | Sitzung GB-003: Zeilen `map.id`/`map.biome` und `map.aetheriumFields` auf den Stand des Glutrinne-Blockouts fortgeschrieben (Wüsten-Präsentation und Kristallmarker, weiterhin kein Terrain-System und nur zwei registrierte Felder; nicht entfernt – es gibt keinen auflösenden Gate-Nachweis) | Technical Writer |
 | 0.5.0 | 2026-08-05 | Sitzung GB-004: Zeile `persistence.pauseRequired` fortgeschrieben (Pause an P gebunden; kein Pausenmenü – Zeile bleibt bis G2) | Technical Writer |
+| 0.6.0 | 2026-08-08 | Separaten D-090-Abschnitt mit sämtlichen bekannten Abweichungen des ausgeführten Sprint-12-Strangs B ergänzt; Graybox-Hauptregister und Manifestverweise unverändert erhalten | Technical Writer / Agent (Umsetzung) |

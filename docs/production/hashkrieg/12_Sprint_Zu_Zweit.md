@@ -1,6 +1,81 @@
 # Sprint: Zu zweit — Netzwerk über eigenen Server, sichtbares Gefecht, Wirtschaftsdruck
 
-**Status:** geplant (2026-08-07) | **Vorgänger:** [11_Sprint_Truppenfuehrung.md](11_Sprint_Truppenfuehrung.md) (umgesetzt, D-088) | **Leitsatz:** der zweite Spieler ist ein Mensch
+**Status:** Gesamt-Sprint offen — Stränge A und B technisch umgesetzt; A8 Stufen 2–4, manuelle B-Gefechtsabnahme und Strang C offen (2026-08-08) | **Vorgänger:** [11_Sprint_Truppenfuehrung.md](11_Sprint_Truppenfuehrung.md) (umgesetzt, D-088) | **Leitsatz:** der zweite Spieler ist ein Mensch
+
+## Ergebnis Strang A (2026-08-07)
+
+> Dieser Block beschreibt den ausgeführten Stand. Der danach erhaltene Text
+> ist die ursprüngliche Sprintplanung. Wo der Plan noch `ReplayFile`, UDP-
+> Zielbild oder offene A6-Verdrahtung nennt, führt die vom Inhaber freigegebene
+> Entscheidung [D-089](../DecisionLog.md). Der historische B-Plan wird durch
+> [D-090](../DecisionLog.md), den Ergebnisblock unten und das ausgelagerte
+> [12B-Dokument](12B_Sprint_Sichtbares_Gefecht.md) eingeordnet.
+
+| Paket | Ergebnis |
+|---|---|
+| **A1** | `INetworkTransport`, TCP-Verbindung, Relay-Protokoll und Client-/Server-Lebenszyklus liegen Engine-frei in `Nova.Networking`. Eingehende Command-Records passieren dieselbe rohe `CommandIngress`-Grenze wie der lokale Pfad. |
+| **A2** | Der Lockstep-Barrier ist implementiert: `TickComplete` bleibt reiner Transport-Frame. Der Client markiert seine lokale Completion selbst und wartet nicht auf deren Relay-Echo; die Remote-Completion öffnet den Barrier erst nach exakter Servervalidierung und vollständigem Record-Eingang. Bei aktivierter Aufzeichnung persistiert der Relay erst nach bestätigter Completion beider Slots. Ein optionaler `ICommandSubmissionReadiness`-Vertrag lässt `ICommandTransport` unverändert; vor `Running` werden Intents und Session-Aktionen ohne Sequenzverbrauch als `TransportNotReady` abgelehnt. Lokaler Default ist 1, Netz-Default 3; `MatchConfig`/Loopback und Netzprofil erlauben 1–60. |
+| **A3** | `Nova.RelayServer` nimmt genau zwei TCP-Peers an, prüft Slot, Tickfolge, Counts, Dedupe und Caps, verteilt Records/Barrier-Frames und simuliert nicht. Statt erfundener Resultcodes im kanonischen `ReplayFile` schreibt er den eigenen Transportrecord `NOVAREC2`: lückenlose Tickframes einschließlich Leerticks, 50-Tick-Checkpoints, terminaler Footer und atomare `.partial`→`.novarec`-Publikation unter einem 64-MiB-Limit. |
+| **A4** | `Offer`, Fingerprint und Initialsnapshot sperren den Start auf identischen Seed, Delay, Definitionshash, vollständigen Fingerprint und byteidentischen Initialzustand. Mismatch, Timeout und Protokollverletzung starten kein Match. |
+| **A5** | Beide Clients senden alle 50 Ticks ihren State-Hash. Ein Mismatch beendet die Session; die Client-Diagnostik nutzt einen begrenzten On-Disk-Spool, kann mehr als 65.536 Records aufnehmen und publiziert atomar. Ein Desync-Hash muss genau einem Peer entsprechen. |
+| **A6** | `MatchConfig`, `MatchBootstrap` und `MatchRunner` sind verdrahtet: Seed, lokaler Slot, Fraktionen, AI-Slots, Delay und Transport kommen aus der Konfiguration; `AiSession` entsteht nur für konfigurierte AI-Slots. Der Barrier sitzt in der Tickschleife, Pause ist im Relay-Match deaktiviert, und `RtsDeviceInput` liest nur `MatchRunner.IsRelayMatch`, `RelayCommandsAllowed` und `RelayEndReason`. Damit ist der Spielpfad technisch angeschlossen, aber noch nicht manuell als Netzwerkpartie abgenommen. |
+| **A7** | Ein self-contained `linux-x64`-Publish-Baum, GitHub-Actions-Test/Bundle-Workflow, gehärtete systemd-Unit, root-sicheres Env-Beispiel und transaktionales `deploy.sh bootstrap/deploy/rollback` sind vorhanden. Der Workflow enthält ausdrücklich kein SSH, keine Secrets und kein Deploy. Das vollständige Runbook steht in [../../tech/RelayServer.md](../../tech/RelayServer.md). |
+| **A8** | **Stufe 1 nachgewiesen:** zwei echte TCP-Clients liefen über den Relay 10.023 Ticks; Checkpoints lagen alle 50 Ticks vor, beide Live-Zustände blieben identisch und das engine-freie `NOVAREC2`-Playback berechnete denselben Endhash. **Stufen 2–4 offen:** keine Zwei-Fenster-Runde, kein LAN-Match und kein VPS-Match. |
+
+### Verifikation und ehrliche Grenze
+
+- `dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore --nologo`:
+  **547/547 grün, 0 übersprungen, 11 s**. Darin lief
+  `TwoClients_OverRealRelay_StayBitIdentical_ThroughTick10023` erneut grün; die
+  vollständige `LockstepNetworkTests`-Klasse war zusätzlich 62/62 grün (3 s),
+  der gezielte Fail-Closed-/Delay-/Timing-Pass 23/23 grün (156 ms).
+- `dotnet build tools/Nova.RelayServer/Nova.RelayServer.csproj -c Release --no-restore --nologo`:
+  **0 Warnungen, 0 Fehler**. Konfigurations-,
+  Argument-, SIGTERM-, Bundle-, Prüfsummen- und gehärtete Extraktor-Smokes
+  liefen lokal. Ein offline erzeugter `linux-x64`-Publish-Baum enthielt 186
+  Dateien; das ELF wurde auf dem macOS-arm64-Host nicht gestartet.
+- Unity EditMode wurde angestoßen, erreichte die Tests aber nicht: Der
+  Lizenzhandshake brach mit `505 Unsupported protocol version 1.18.1` ab.
+  Es gibt kein Test-XML und keinen grünen Unity-Testnachweis.
+- Nicht gelaufen sind ein echtes Linux-/systemd-/root-Deployment, ein Live-Lauf
+  des GitHub-Workflows und jedes VPS-Deployment. Es wurden keine Zugangsdaten
+  verwendet.
+- Damit sind A1–A7 implementiert und A8 Stufe 1 bewiesen; eine gespielte
+  Netzwerkpartie, die Stufen 2–4 und die vollständige Definition of Done des
+  Sprintziels bleiben offen. `GrayboxLog.md` wurde mangels gespielter Runde
+  nicht fortgeschrieben.
+
+## Ergebnis Strang B (2026-08-08)
+
+> D-090 ist der ausgeführte Vertrag. Der nachfolgende Strang-B-Text bleibt als
+> ursprüngliche Sprintplanung erhalten und ist keine zweite Ist-Quelle.
+
+| Paket | Ergebnis |
+|---|---|
+| **B1** | `VisibleCombatFrameDiffer` leitet Schuss, Treffer, sicheren Tod und eigene fertige mobile Einheiten ausschließlich aus der Fog-Sicht und `TryGetUnit`-Snapshots ab. Gleiche Ticks werden ignoriert, Tick-Rücklauf setzt die Baseline zurück; Zwischen-Cues bei Tick-Sprüngen dürfen verloren gehen. Mehrdeutiges Verschwinden bleibt stumm. |
+| **B2** | `CombatEffectController` liefert mit Unity-Bordmitteln Mündungsstoß, höchstens 0,1 s lange kopierte Hitscan-Spur, Trefferstoß und kurze Lichter. Der globale Aktivdeckel ist 64, der Lichtdeckel 8; Überlauf wird verworfen. |
+| **B3** | Bestätigte Tode halten den View 0,8 s, trennen Picking/Collider sofort und geben exakt die gebundene Poolidentität frei. Gebäude erhalten Rauch, aber keine persistente Trümmer-/Decal-Fläche. Ein PlayMode-Test deckt Slot-Wiederverwendung ab. |
+| **B4** | Genau 35 unveränderte Kenney-CC0-OGGs liegen pack-first unter `Audio/Sfx/Kenney`: 11 Sci-Fi, 11 Impact, 13 Interface. Drei Batch-Sidecars enthalten Einzelhashes; vier Suno-Musikdatensätze benennen ihre verbleibenden Beleglücken ausdrücklich als `incomplete`. |
+| **B5** | Der ursprüngliche A/B-Effektschaltertest ist durch einen headless Quellcode-Guard ersetzt. Er scannt Produktionsquellen außerhalb `Simulation/**`, verbietet dort `GetUnitRef(` und nicht erlaubte `.Random`-Memberzugriffe; `RawUnits` bleibt wegen bestehender Altlasten außerhalb des minimalen Vertrags. |
+| **Audio** | `UnityAudioService` ist der D-039-konforme Tier-0-One-Shot-Owner. Zwölf `SND_*`-Events laufen über `MIX_Master`, 30 One-Shot-/24 räumliche Stimmen, 3–4 Instanzen je Schlüssel, atomare Layer, Prioritäts-Stealing und den vorhandenen SFX-Regler. `ALR_BaseUnderAttack` bleibt Tier 1. Die beiden Legacy-Musikcontroller sind als Übergangsausnahme mit zwei reservierten Stimmen dokumentiert. |
+
+### Verifikation und ehrliche Grenze Strang B
+
+- SimRunner/Quellgrenzen: **549/549 grün**, 0 übersprungen.
+- Unity EditMode: **521/521 grün**. Unity PlayMode: **8/9**; der neue
+  `CombatDeathViewHoldTests.RecycledSlotCannotReuseTheHeldCorpseView` ist grün,
+  allein der bestehende headless `BarracksSpawnDiagnosisTests` scheitert an
+  `RenderTexture.Create`.
+- Unity-Authoring validierte 35 Importer, zwölf Events, Mixerbusse/-parameter
+  sowie genau einen Listener, Service, SFX-Bridge und Effektcontroller in der
+  Bootstrap-Szene.
+- Ein frischer universeller macOS-Build (arm64 und x86_64) wurde erfolgreich
+  erstellt. Die manuelle Sicht-/Gegenhörabnahme mit einem dichten Gefecht,
+  insbesondere etwa sechzig feuernden Einheiten, ist **nicht** als bestanden
+  behauptet.
+- Vollständige Abweichungen, Quellen und Restprüfungen stehen in
+  [D-090](../DecisionLog.md), im [ScopeLedger](../ScopeLedger.md) und im
+  [12B-Umsetzungsreport](../../../reports/v8.6.0/sprint-12-strang-b/02-umsetzungsreport.md).
 
 Der größte Sprint dieser Reihe, bewusst. Er trägt drei Stränge, weil sie sich
 nicht ins Gehege kommen: **A** baut neuen Code in eine heute leere Assembly und
@@ -412,7 +487,7 @@ A1 → A2 → A3 → A4 → A5 → A6 → A7 → A8        (Sprintzweck, nicht v
 | **Lobby, Matchmaking, Accounts** | Ein gemeinsamer Match-Code reicht. Alles darüber ist Backend-Arbeit ohne Spielwert |
 | **Mehr als zwei Spieler** | Die Slot-Struktur trägt acht, der Server soll zwei können. Aufmachen, wenn zwei laufen |
 | **UDP/RUDP, Rollback, Prediction** | Siehe A3. Erst messen, dann optimieren |
-| **Audio Tier 0** | B1 baut den Kanal, den Audio braucht. Der Katalog selbst wartet auf die Lizenzerweiterung in `Licenses.md` §1 um Audioquellen — eine Inhaberentscheidung, kein Handwerk |
+| **Audio Tier 0** | Historischer Planstand; durch D-090 ersetzt. Zwölf Events und 35 Kenney-CC0-OGGs sind technisch umgesetzt, ohne neue §1-Lizenzzeile; `ALR_BaseUnderAttack` bleibt Tier 1 |
 | **Skelettanimation** | Kein Rig, kein `.anim` im Projekt. Siehe B3 |
 | **Attack-Move** | Unverändert aus Sprint 11: neuer `CommandKind` gegen das eingefrorene v1-Register. Und im Netzwerkkontext ändert er zusätzlich den Fingerprint |
 

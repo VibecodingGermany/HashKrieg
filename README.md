@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.17.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-07
+**Dokumentversion:** 0.18.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-08
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -120,8 +120,8 @@ und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 ### Was seit Juli entstanden ist
 
-Fünf aufeinander aufbauende Sprints haben aus einer Simulation ohne Zugang ein
-Spiel gemacht, das man starten, bedienen und gewinnen kann:
+Aufeinander aufbauende Sprints haben aus einer Simulation ohne Zugang ein Spiel
+gemacht, das man starten, bedienen und gewinnen kann:
 
 | | Was daraus wurde |
 |---|---|
@@ -130,32 +130,42 @@ Spiel gemacht, das man starten, bedienen und gewinnen kann:
 | **Bedienbares HUD** (D-084) | Bauleiste mit allen neun Gebäuden samt Sperrgrund, Kommandokarte, Minimap mit Kamerafenster, Platzierungsvorschau, Auswahl- und Sammelpunktmarker. Alles Sichtbare ist auch anklickbar. |
 | **Bauen und Kartenbild** (D-085) | Baustellen werden fertig: Der Builder fährt selbst zur Baustelle, die Karte sagt, was sie tut („kein Builder", „im Bau, 43 %", „fertig in ~12 s"). Dazu ein Zonenmodell, das überlappende HUD-Panels konstruktionsbedingt ausschließt, und eine Wüste aus prozeduraler Textur, Streufelsen und warmem Licht — ohne ein einziges neues Asset. |
 | **Gefecht und Rundenrahmen** (D-086, D-087) | **Der Schritt, der den Loop schließt.** Einheiten und Türme erfassen Ziele selbst und erwidern Feuer — vorher brauchte jeder einzelne Schuss einen Klick. Der Harvester fährt seinen Kreislauf allein: hin, ernten, abliefern, wieder von vorn. Dazu Lebensbalken, Ergebnisbildschirm mit *Neue Runde*, sichtbare Pause, Kontrollgruppen 1–9 und Ingame-Musik. |
+| **Truppenführung** (D-088) | Formationen verteilen Gruppen deterministisch auf freie Zielzellen, Separation wirkt auch im Stand und Gebäude-Footprints liegen im Kostenfeld. Einheiten kommen als Gruppe an und laufen um Gebäude statt hindurch. |
+| **Zwei-Spieler-Netzpfad** (D-089) | TCP-Relay, Startbeweis, Lockstep-Barrier, State-Hash-Vergleich, `NOVAREC2`-Aufzeichnung und die Verdrahtung durch `MatchConfig`, `MatchBootstrap` und `MatchRunner` sind implementiert. A8 Stufe 1 ist nachgewiesen; zwei Unity-Fenster, LAN und VPS bleiben offen. |
+| **Sichtbares und hörbares Gefecht** (D-090) | Fog-sicher abgeleitete Schuss-, Treffer- und Todesereignisse treiben gepoolte VFX und zwölf Tier-0-Audioereignisse. 35 unveränderte Kenney-CC0-OGGs sind mit Provenienz und Hashes eingebunden; die manuelle 60-Einheiten-Abnahme bleibt offen. |
 
-Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich in
-Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein Simulationskern
-mit rund 900 automatisierten Tests, und **34 3D-Assets**, die über eine
-Drop-in-Pipeline einfahren (§5).
+Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich
+in Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein
+deterministischer Simulationskern mit **549/549 bestandenen Headless-Tests**,
+eine Unity-Baseline von **521/521 EditMode** und **8/9 PlayMode** — einziger
+Fehler ist der bekannte headless-`RenderTexture`-Fall — sowie **34 3D-Assets**,
+die über eine Drop-in-Pipeline einfahren (§5). Die nach dem Unity-Lauf
+ergänzten Audio-/Death-Hold-Assertions sind kompiliert, aber nicht erneut
+ausgeführt.
 
 ### Was noch fehlt
 
 Ehrlich und ohne Beschönigung. Der Loop läuft — aber ein Spiel ist mehr als ein
 funktionierender Loop:
 
-- **Einheiten stehen übereinander.** Eine Move-Order schickt alle markierten
-  Einheiten auf *dieselbe* Zelle, und die Abstandsrechnung greift nur, solange
-  sie in Bewegung sind — wer ankommt, wird zum unbeweglichen Teil des Stapels.
-  Ohne Formation gibt es keine Frontlinie und kein Flankieren.
-- **Einheiten laufen durch Gebäude.** Gebäude-Grundflächen landen nie im
-  Kostenfeld der Wegfindung, also kennt die Simulation keinen belegten Raum.
 - **Kein Attack-Move.** Truppen feuern zwar von selbst, halten unterwegs aber
   nicht an, um zu kämpfen.
-- **Keine Soundeffekte.** Musik ja, Gefechtsgeräusche nein.
+- **Netzwerkabnahme und Betrieb stehen aus.** Der Zwei-Spieler-Pfad ist
+  verdrahtet und headless nachgewiesen; zwei Unity-Fenster, LAN, Linux/systemd,
+  VPS und der Live-Workflow sind noch nicht vollständig ausgeführt.
+- **Gefechtsdichte ist noch nicht manuell abgenommen.** VFX und SFX sind
+  implementiert; die geplante Sicht- und Gegenhörprüfung mit 60 Einheiten
+  bleibt offen.
+- **Strang C ist offen.** Endliche Aetheriumfelder, wirksames Lager und Radar,
+  Low-Power-Wirkung sowie die übrigen Wirtschafts- und Platzierungsregeln sind
+  noch nicht umgesetzt.
 - **Kein Speichern.** Die Simulation kann ihren Zustand vollständig
   serialisieren und hash-identisch fortsetzen — es fehlt nur das Schreiben auf
   die Platte.
 
-Die ersten beiden Punkte sind analysiert und Inhalt des laufenden Sprints
-[Truppenführung](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md).
+Der ausgeführte Stand und die offenen Abnahmen stehen im
+[Sprintbericht 12](docs/production/hashkrieg/12_Sprint_Zu_Zweit.md) und im
+[ausgelagerten Strang-B-Bericht](docs/production/hashkrieg/12B_Sprint_Sichtbares_Gefecht.md).
 
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
@@ -229,8 +239,12 @@ liegen also nur auf der Maschine, die sie gebaut hat. Neu bauen im Batchmode:
   -executeMethod Nova.Editor.BuildScript.BuildMacOSArm64   # oder BuildWindows64
 ```
 
-**macOS** — `Builds/MacOSArm64/ProjectNova.app` ist ein **unsigniertes, lokales
-Artefakt** ohne Notarisierung; Gatekeeper blockiert den ersten Start:
+**macOS** — der aktuelle lokale Test-Build
+`Builds/MacOSArm64/ProjectNova.app` ist ein universelles Mach-O für `x86_64`
+und `arm64` und gültig **ad hoc signiert**. Er ist weder notarisiert noch ein
+reproduzierbarer Release und liegt wegen `Builds/` nicht in Git. Gatekeeper kann
+bei einem kopierten oder heruntergeladenen, quarantänemarkierten Build warnen;
+den folgenden Schritt deshalb nur für einen vertrauenswürdigen Build verwenden:
 
 ```bash
 xattr -dr com.apple.quarantine "Builds/MacOSArm64/ProjectNova.app"
@@ -246,29 +260,30 @@ ausgeführt** — der erste Windows-Start ist gleichzeitig der erste echte Test.
 
 **Läuft — eine vollständige Runde, Ende zu Ende:** Lockstep-Kern mit 10 Hz,
 Befehle ausschließlich durch den versiegelten Command-Pfad; Menü, Einstellungen
-und Musik; Auswahl, Kontrollgruppen, Bewegung, Flow-Field-Pathfinding; Basisbau
+und Musik; Auswahl, Kontrollgruppen, Formationen, Separation und
+Flow-Field-Pathfinding um Gebäude; Basisbau
 von der Bauleiste bis zum fertigen Gebäude; der Harvester-Kreislauf ohne
 Mikromanagement; Produktionswarteschlangen mit Sammelpunkt; Fog of War;
 Schadens- und Panzerungsmatrix; Einheiten und Türme, die selbst Ziele erfassen
-und Feuer erwidern; eine KI, die baut, erntet, Truppen produziert und in Wellen
-angreift; Lebensbalken, sichtbare Pause und ein Ergebnisbildschirm mit
-*Neue Runde*.
+und Feuer erwidern; fog-sichere Schuss-, Treffer- und Todes-VFX samt
+Gefechts-SFX; eine KI, die baut, erntet, Truppen produziert und in Wellen
+angreift; Lebensbalken, sichtbare Pause und ein Ergebnisbildschirm mit *Neue
+Runde*.
 
 **Läuft noch nicht:**
 
-- **Einheiten stapeln sich.** Eine Move-Order schickt alle markierten Einheiten
-  auf dieselbe Zelle, und angekommene Einheiten fallen aus der Abstandsrechnung
-  heraus — der Stapel bleibt. Ohne Formation gibt es keine Frontlinie.
-- **Einheiten laufen durch Gebäude.** Grundflächen landen nie im Kostenfeld der
-  Wegfindung.
 - **Kein Attack-Move.** Truppen feuern von selbst, halten unterwegs aber nicht
   zum Kämpfen an.
-- **Keine Soundeffekte.** Musik ja, Gefechtsgeräusche nein.
+- **Netzwerk und Gefechtsdichte sind noch nicht vollständig manuell
+  abgenommen.** A8 Stufen 2–4 sowie die 60-Einheiten-Sicht-/Gegenhörprüfung
+  bleiben offen.
+- **Strang C ist offen.** Wirtschaftsdruck, Low Power und die ausstehenden
+  Gebäude- und Platzierungsregeln fehlen noch.
 - **Lager und Radar kosten Geld und tun nichts.** Zwei von neun Gebäuden warten
   noch auf ihre Wirkung.
 
-Die ersten beiden Punkte sind analysiert und Inhalt des laufenden Sprints:
-[11_Sprint_Truppenfuehrung.md](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md).
+Die vollständigen Grenzen stehen im aktuellen
+[Sprintbericht](docs/production/hashkrieg/12_Sprint_Zu_Zweit.md).
 Die vollständige Liste der Verschiebungen steht im
 [ScopeLedger](docs/production/ScopeLedger.md), das Sitzungsprotokoll im
 [GrayboxLog](docs/production/GrayboxLog.md).
@@ -314,7 +329,7 @@ Mithilfe ist willkommen — besonders in diesen Bereichen:
 | **3D-Assets bauen** aus den Concept-Art-Vorlagen | [Bildstandard](docs/assets/ConceptArtStyleGuide.md) und [AssetBudget](docs/tech/AssetBudget.md) |
 | **an der Simulation arbeiten** (C#, deterministisch, Unity-frei) | [SimulationCore](docs/tech/SimulationCore.md) und [CodingGuidelines](docs/tech/CodingGuidelines.md) |
 | **die KI stärker machen** — sie spielt, aber schlicht | [SkirmishAi_Spec](docs/tech/modules/SkirmishAi_Spec.md) |
-| **Sound beisteuern** — im Gefecht ist es bisher still | [Audioplan](docs/production/hashkrieg/04_Audioplan.md) |
+| **Sound testen oder ausbauen** — Tier 0 ist integriert, dichte Gefechtsmischung sowie Tier 1/2 sind offen | [Audioplan](docs/production/hashkrieg/04_Audioplan.md) und [Sprint 12B](docs/production/hashkrieg/12B_Sprint_Sichtbares_Gefecht.md) |
 | **Doku verbessern** | [DocumentationStandard](docs/meta/DocumentationStandard.md) |
 
 Zwei Dinge, die den Einstieg leichter machen: Der Simulationskern ist
@@ -407,19 +422,18 @@ Punkt geführt.
 
 ## Nächste Schritte
 
-Der laufende Sprint bringt den Truppen bei, sich den Platz zu teilen
-([11_Sprint_Truppenfuehrung.md](docs/production/hashkrieg/11_Sprint_Truppenfuehrung.md)):
-Formationsverteilung statt einer gemeinsamen Zielzelle, Abstand halten auch im
-Stand, und Gebäude, um die herum gelaufen wird statt hindurch.
+Zur Bewertung, in dieser Reihenfolge:
 
-Danach zur Bewertung, in dieser Reihenfolge:
-
-1. **Soundeffekte** — zwölf Geräusche trennen „klingt kaputt" von „klingt wie ein
-   Spiel". Das Gefecht ist bisher stumm.
-2. **Wirtschaftsdruck** — endliche Aetheriumfelder geben der Runde einen Bogen und
+1. **Netzwerkabnahme** — zwei Unity-Fenster, LAN und VPS schließen A8 Stufen
+   2–4; Linux/systemd und der Live-Workflow müssen ebenfalls real laufen.
+2. **Gefechtsfeedback manuell abnehmen** — ungefähr 60 feuernde Einheiten,
+   SFX-Regler, Klangbalance und Kamera-Listener gegenhören und ansehen.
+3. **Wirtschaftsdruck** — endliche Aetheriumfelder geben der Runde einen Bogen und
    einen Grund, um Gebiet zu kämpfen.
-3. **Gebäude mit Wirkung** — Lager und Radar kosten Geld und tun nichts.
-4. **KI-Ausbau** — der Gegner spielt, aber schlicht.
+4. **Attack-Move** — Truppen sollen unterwegs Gegner bekämpfen, ohne jeden
+   Kontakt einzeln befohlen zu bekommen.
+5. **Gebäude mit Wirkung und KI-Ausbau** — Lager und Radar warten auf ihre
+   Funktion; der Gegner spielt, aber schlicht.
 
 Die Gate-Kette G0–G5 ruht unter Tier 1 und wird erst wieder aufgenommen, wenn das
 Projekt ein Publikum hat.
@@ -428,6 +442,7 @@ Projekt ein Publikum hat.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 0.18.0 | 2026-08-08 | Sprint 11 und Sprint 12 A/B in Projektstatus, Spielanleitung, Grenzen und nächste Schritte übernommen; Truppenführung, TCP-Relay sowie VFX/SFX nicht länger als fehlend bezeichnet; macOS-Testbuild korrekt als universell und ad-hoc-signiert dokumentiert | Technical Writer |
 | 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
 | 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
 | 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ba8c31bfbc644c15b541a6de8936d23, type: 3}
+  m_Name: SND_UI_Select
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Audio.SoundEventSO
+  EventId: 1
+  Category: 0
+  DefaultPriority: 1
+  Variations:
+  - Layers:
+    - {fileID: 8300000, guid: f673d784f97b04927ac4e0f30723e2a6, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: 134a29d972a5d48039efbd795962ee85, type: 3}
+    Gain: 1
+  - Layers:
+    - {fileID: 8300000, guid: fe350d750dbef4d4a9d860678ec825cc, type: 3}
+    Gain: 1
+  MaxConcurrent: 3
+  CooldownSeconds: 0.08
+  Spatialized: 0
+  Gain: 0.8
+  MinDistance: 15
+  MaxDistance: 120

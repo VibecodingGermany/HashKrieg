@@ -1,5 +1,6 @@
 using UnityEngine;
 using Nova.Core;
+using Nova.Gameplay;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
 using EntityId = Nova.Core.EntityId;
@@ -30,17 +31,11 @@ namespace Nova.Gameplay.Match
 
         private void Start()
         {
-            // AI-less debug scene: the 500 debug units below belong to slot 1,
-            // which is the skirmish AI's seat in a default match — opting out
-            // keeps this flow-field demo free of AI build orders.
+            // AI-less local debug scene. The units use the session's own slot
+            // so their movement can enter through the same ownership-checked
+            // command ingress as real device input.
             _matchRunner.InitializeMatch(seed: 0xAE70123456789000UL, width: _mapWidth, height: _mapHeight, maxUnits: 1024, enableSkirmishAi: false);
             _viewManager.Initialize(_matchRunner);
-
-            // The debug units below are spawned for playerId 1 while the session's
-            // local slot is 0. UnitViewManager now renders only the committed Fog
-            // of War view of the viewer team, so without this override this debug
-            // scene would render nothing at all.
-            _viewManager.SetViewerTeamOverride(1);
 
             _matchRunner.StartMatch();
 
@@ -56,18 +51,42 @@ namespace Nova.Gameplay.Match
             // Re-calculate flow field after adding obstacle
             _matchRunner.Pathfinding.RequestFlowField(targetPos);
 
-            // Spawn units at bottom-left corner
+            // Spawn units at bottom-left, then submit one canonical MoveTo
+            // intent. RtsIntentDispatcher chunks the 500 ids at the schema-v1
+            // limit; no presentation/debug code mutates UnitState by ref.
+            byte localSlot = _matchRunner.Session.LocalSlot;
+            var unitIds = new EntityId[_unitCount];
             for (int i = 0; i < _unitCount; i++)
             {
                 float spawnX = 10f + (i % 25) * 1.2f;
                 float spawnY = 10f + (i / 25) * 1.2f;
 
-                EntityId id = _matchRunner.Entities.SpawnUnit(1, new Transform2D(SimFixed.FromFloat(spawnX), SimFixed.FromFloat(spawnY)), moveSpeed: SimFixed.FromFloat(6.0f), radius: SimFixed.FromFloat(0.4f));
-                ref UnitState unit = ref _matchRunner.Entities.GetUnitRef(id);
-                unit.SetTarget(targetPos);
+                unitIds[i] = _matchRunner.Entities.SpawnUnit(
+                    localSlot,
+                    new Transform2D(SimFixed.FromFloat(spawnX), SimFixed.FromFloat(spawnY)),
+                    moveSpeed: SimFixed.FromFloat(6.0f),
+                    radius: SimFixed.FromFloat(0.4f));
             }
 
-            Debug.Log($"[PathfindingTestBootstrap] Spawned {_unitCount} units heading to target {_destinationCell} around wall obstacle.");
+            var stateView = new UnitCommandStateView(
+                _matchRunner.Entities,
+                _matchRunner.Pathfinding,
+                _matchRunner.Economy,
+                _matchRunner.Construction,
+                _matchRunner.Production);
+            var dispatcher = new RtsIntentDispatcher(_matchRunner.Ingress, stateView);
+            IntentDispatchResult result = dispatcher.MoveTo(
+                unitIds,
+                SimFixed.FromInt(targetPos.X),
+                SimFixed.FromInt(targetPos.Y));
+            if (!result.Accepted)
+            {
+                Debug.LogError($"[PathfindingTestBootstrap] MoveTo was rejected: {result}.");
+                return;
+            }
+
+            Debug.Log($"[PathfindingTestBootstrap] Spawned {_unitCount} local units and submitted " +
+                      $"{result.CommandCount} MoveTo chunks toward {_destinationCell} around the wall obstacle.");
         }
 
         private void OnDrawGizmos()

@@ -7,7 +7,8 @@
         "Nova.Core",
         "Nova.Simulation",
         "Nova.Gameplay",
-        "Nova.AI"
+        "Nova.AI",
+        "Nova.Networking"
     ],
     "includePlatforms": [
         "Editor"

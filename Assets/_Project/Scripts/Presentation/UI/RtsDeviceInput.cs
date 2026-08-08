@@ -3,6 +3,7 @@
 using System;
 using UnityEngine;
 using Nova.Gameplay;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
@@ -403,7 +404,7 @@ namespace Nova.Presentation.UI
             _legend =
                 "LMB click/drag select | RMB move — with an own producer building selected: set its rally point | S stop | " +
                 "A attack enemy under cursor (else plain move; armed units auto-acquire visible in-range enemies, D-087) | " +
-                "H harvest nearest field | R return cargo | P pause/resume\n" +
+                "H harvest nearest field | R return cargo | P pause/resume (local match only)\n" +
                 "Build (build bar below or hotkey — a ghost follows the cursor; LMB place | RMB/ESC cancel): " +
                 $"B {_buildingDefId} | Shift+B {_altBuildingDefId} | C {_storageDefId} | V {_vehicleFactoryDefId} | " +
                 $"T {_researchLabDefId} | G {_radarDefId} | F {_defensePlatformDefId} | Y {_refineryDefId}\n" +
@@ -437,6 +438,15 @@ namespace Nova.Presentation.UI
         private bool EnsureDispatcher()
         {
             if (_runner == null) return false;
+
+            if (_runner.IsRelayMatch && !_runner.RelayCommandsAllowed)
+            {
+                string relayEndReason = _runner.RelayEndReason;
+                _lastCommandStatus = string.IsNullOrEmpty(relayEndReason)
+                    ? "Waiting for the relay match to start — commands are locked"
+                    : $"Network match ended: {relayEndReason}";
+                return false;
+            }
 
             CommandIngress ingress = _runner.Ingress;
             if (ingress == null) return false;
@@ -894,7 +904,11 @@ namespace Nova.Presentation.UI
             // simply restarts the tick pump.
             if (Input.GetKeyDown(KeyCode.P))
             {
-                if (_runner.IsRunning)
+                if (_runner.IsRelayMatch)
+                {
+                    _lastCommandStatus = "Pause/resume is unavailable in a relay match";
+                }
+                else if (_runner.IsRunning)
                 {
                     _runner.PauseMatch();
                     _lastCommandStatus = "Match paused (P resumes)";
@@ -1281,6 +1295,7 @@ namespace Nova.Presentation.UI
                 ? _selection.SelectBoxAdditive(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY)
                 : _selection.SelectBox(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY);
             _lastCommandStatus = additive ? $"Box select (added): {count} unit(s) selected" : $"Box select: {count} unit(s)";
+            if (count > 0) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
         }
 
         /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>; additive with Shift, else replace (a plain click on empty ground clears).</summary>
@@ -1292,13 +1307,15 @@ namespace Nova.Presentation.UI
             {
                 if (additive)
                 {
-                    _selection.AddSingle(picked);
+                    bool added = _selection.AddSingle(picked);
                     _lastCommandStatus = $"Added entity {picked.Index} ({_selection.SelectedCount} selected)";
+                    if (added) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
                 }
                 else
                 {
                     _selection.SelectSingle(picked);
                     _lastCommandStatus = $"Selected entity {picked.Index}";
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Select);
                 }
                 return;
             }
@@ -1458,6 +1475,10 @@ namespace Nova.Presentation.UI
             _lastCommandStatus = result.Accepted
                 ? $"{label}: accepted ({result.CommandCount} cmd, {result.EntityIdCount} ids)"
                 : $"{label}: {result.Result} ({result.RejectReason})";
+            AudioServiceLocator.Play2D(
+                result.Accepted ? SoundEventId.UI_Ack : SoundEventId.UI_Deny,
+                AudioCategory.Ui,
+                result.Accepted ? VoicePriority.Normal : VoicePriority.High);
             if (!result.Accepted && !string.Equals(previous, _lastCommandStatus, StringComparison.Ordinal))
             {
                 Debug.LogWarning($"[RtsDeviceInput] {_lastCommandStatus}");

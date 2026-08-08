@@ -1,6 +1,6 @@
-# Provenienznachweis für Art-Assets
+# Provenienznachweis für Art- und Audio-Assets
 
-**Version:** 0.1.0 | **Status:** Entwurf – MS-1 Art-Strang, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Project Owner | **Sprint:** 7
+**Version:** 0.2.0 | **Status:** verbindlicher Import-Workflow – reale und unvollständige Belege werden getrennt ausgewiesen | **Verantwortungsbereich:** Producer / Project Owner | **Sprint:** 12
 
 ## Zweck
 
@@ -66,8 +66,17 @@ In Zweifelsfällen zur Lizenzauslegung selbst (z. B. Reichweite einer Klausel) t
 
 Der Provenienz-Datensatz wird in zwei Formaten geführt:
 
-1. **Sidecar-Datei** `<AssetOrdner>/PROVENANCE.json` — liegt direkt neben dem Mesh/der Textur/der Audiodatei, für die sie gilt. Enthält genau einen Datensatz mit den in §1 definierten Feldern.
+1. **Sidecar-Datei** `<AssetOrdner>/PROVENANCE.json` — liegt direkt neben dem Mesh/der Textur/der Audiodatei, für die sie gilt. Enthält genau einen Datensatz mit den in §1 definierten Feldern. Zwei dokumentierte Containerformen erweitern diese Einzelregel, ohne ihre Prüfbarkeit zu lockern:
+   - Ein unverändert importiertes Audio-Paket darf als `schemaVersion: "audio-batch-v1"` genau einen Pack-Datensatz mit `files[]` führen. Jedes Element bindet `sourcePath`, `targetPath`, `sourceSha256` und `targetSha256`; bei unveränderten Dateien müssen beide Einzelhashes identisch sein.
+   - Mehrere bereits gemeinsam in einem Ordner liegende KI-Musiktitel dürfen in einem Sidecar unter `records[]` geführt werden. Jeder Eintrag bleibt ein vollständiger §1-Datensatz und trägt zusätzlich `evidenceStatus: "complete" | "incomplete"`, damit eine Beleglücke nicht als Freigabe erscheint.
 2. **Aggregierter Ledger** `docs/assets/provenance-ledger.json` — ein Sammelindex, der alle Sidecar-Datensätze referenziert bzw. dupliziert, um eine repo-weite Übersicht ohne Verzeichnis-Traversierung zu ermöglichen.
+
+Bei Governance-Tier 1 darf D-090 die nicht verfügbare zweite Person als eng
+begrenzte Verifikationsausnahme festhalten. Dann bleiben `verifiedBy` und
+`verifiedAt` leer und der Datensatz enthält zwingend
+`verificationException.decisionId`, `verificationException.reason` sowie
+`evidenceStatus`. Diese Ausnahme ersetzt keine fehlenden Quellen-, Lizenz- oder
+Hashbelege und macht einen ansonsten unvollständigen Datensatz nicht vollständig.
 
 Beide Formate werden in diesem Abschnitt beispielhaft dargestellt. **Die folgenden JSON-Blöcke sind Beispiele, kein reales Asset** — sie verwenden bewusst fiktive Bezeichner (`example.building.Sample`) und dürfen nicht als tatsächlicher Repo-Inhalt missverstanden werden. Die Dateien selbst werden durch dieses Dokument nicht angelegt.
 
@@ -160,7 +169,7 @@ Vor Aufnahme eines Art-Assets ins Repository durchläuft es folgende Schritte:
 4. **`PROVENANCE.json` schreiben** — vollständigen Datensatz gemäß §1 als Sidecar-Datei neben dem Asset ablegen.
 5. **Ledger-Eintrag** — Referenz-Eintrag in `docs/assets/provenance-ledger.json` ergänzen.
 6. **Attribution nach `CREDITS.md`** — falls `attributionRequired: true`, Eintrag in der passenden Tabelle von `CREDITS.md` im Repo-Root ergänzen. Existiert die Datei noch nicht, wird sie in diesem Schritt aus der Vorlage in §6 erzeugt — vorher nicht.
-7. **Vier-Augen-Verifikation** — eine zweite Person prüft Datensatz, Hash und Lizenzeinstufung gegenzeichnet über `verifiedBy`/`verifiedAt`.
+7. **Vier-Augen-Verifikation** — eine zweite Person prüft Datensatz, Hash und Lizenzeinstufung gegenzeichnet über `verifiedBy`/`verifiedAt`. Im Governance-Tier-1-Solo-Setup ist ausschließlich die oben definierte, explizit per D-ID protokollierte Ausnahme zulässig; die Felder werden nicht mit einem erfundenen Prüfer befüllt.
 
 ### Ausschlusskriterien
 
@@ -234,16 +243,17 @@ Freigabe-Workflow (§3) und bestätigter Vier-Augen-Verifikation.
 
 ## Offene Punkte
 
-- `docs/assets/provenance-ledger.json` und die ersten `PROVENANCE.json`-Sidecar-Dateien existieren noch nicht und werden erst beim ersten tatsächlichen Asset-Import gemäß §3 angelegt.
+- Der Ledger und reale Sidecars existieren. Unvollständige Bestandsdatensätze bleiben als solche markiert, bis ihre jeweiligen `_TODO`-Belege geschlossen sind.
 - Die Whitelist zulässiger `licenseId`-Werte für ein künftiges Prüfskript (§4) ist noch nicht als eigenständiges maschinenlesbares Artefakt formalisiert.
 
 ## Nächste Schritte
 
-1. Beim ersten realen Asset-Import: `PROVENANCE.json` und `provenance-ledger.json` gemäß §2–3 tatsächlich anlegen.
+1. Bei jedem Import Sidecar und Ledger gemäß §2–3 gemeinsam fortschreiben.
 2. Bei Bedarf: künftiges Prüfskript gemäß §4 spezifizieren und umsetzen, sobald eine ausreichende Anzahl realer Provenienz-Datensätze vorliegt.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 0.2.0 | 2026-08-08 | D-090: prüfbaren Audio-Batch mit Einzelhashes, Music-`records[]`, `evidenceStatus` und ehrliche Tier-1-Verifikationsausnahme ergänzt | Producer / Audio |
 | 0.1.0 | 2026-07-25 | Erstfassung: Provenienz-Datensatzschema, Ablageformat (Sidecar + Ledger) mit Beispielen, Freigabe-Workflow mit Ausschlusskriterien, künftige Prüfbarkeitsanforderungen und Abgrenzung zu Licenses.md | Producer |

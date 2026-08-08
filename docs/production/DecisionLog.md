@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.26.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 7
+**Version:** 1.28.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 12
 
 ## Zweck
 
@@ -313,13 +313,19 @@ als Post-MVP-/Vollspiel-Zielbild bestehen.
 
 ---
 
-### D-033 | teilweise ersetzt durch D-057 | Sprint 3 (Q-013 – Simulations- & Multiplayer-Modell)
+### D-033 | teilweise ersetzt durch D-057/D-089 | Sprint 3 (Q-013 – Simulations- & Multiplayer-Modell)
 
 **Kontext:** Simulations- und Multiplayer-Architektur; Research-Vorlage [../research/Multiplayer_Simulation.md](../research/Multiplayer_Simulation.md), Vorverhandlung [sprints/Sprint01_Report.md](sprints/Sprint01_Report.md) §3.
 **Alternativen:** (a) Striktes deterministisches Lockstep ab sofort (Fixed-Point überall, Unity-Physik-Verbot – bremst den MVP, ohne SP-Nutzen); (b) Server-autoritativer State-Sync (bei 500 voll sichtbaren Einheiten ~200–300 kB/s pro Client, Interest Management greift bei RTS-Gesamtsicht nicht – strukturell ungeeignet laut Research); (c) **Determinismus-fähige, befehlsgetriebene Tick-Simulation jetzt; deterministisches Lockstep über autoritativem Command-Relay-Server als Zielarchitektur ab Beta.**
 **Entscheidung:** (c).
 **Begründung:** Die fünf Architekturregeln (Command-getriebener fester Tick, strikte Simulation/View-Trennung ohne UnityEngine-APIs im Sim-Pfad, eigener seedbarer PRNG, serialisierbarer State, Singleplayer als "lokaler Server") machen MP später zu einem Transport-Thema statt eines Rewrites, ohne den MVP mit Fixed-Point-Disziplin zu belasten. Lockstep über Command-Relay erfüllt TPD §9 (Server autoritativ über Befehle, Takt, Match-Ergebnis) und liefert Replays/Beobachter gratis. Maphack-Risiko (voller Zustand auf jedem Client) ist für MVP/Koop akzeptabel (SC2-Präzedenz); für Ranked Pflicht-Re-Evaluierung mit serverseitigem Sichtgrid.
 **Konsequenzen:** Networking.md/Replication.md/GameState.md spezifizieren die 5 Regeln; Float im MVP erlaubt, Fixed-Point-Umstellung fester Bestandteil der Beta-MP-Arbeiten; Phase-0-Spike validiert Fixed-Point-Determinismus ARM↔x86; Netzwerk-Framework: Eigenbau-UDP-Relay primär, Photon Quantum 3 als dokumentierter Fallback; Disconnect-Regel (KI-Übernahme) und Host-Migration in Networking.md final zu definieren.
+
+**Fortschreibung:** D-057 ersetzte Float-/Persistence-Anteile; D-089 ersetzt
+für das implementierte 1v1-Profil den UDP-Primärpfad durch TCP und nimmt dem
+nicht simulierenden Relay die in D-033 angenommene Ergebnisautorität. Die fünf
+Grundregeln der befehlsgetriebenen deterministischen Simulation bleiben
+verbindlich. Der historische Wortlaut bleibt zur Nachvollziehbarkeit stehen.
 
 ### D-034 | verbindlich | Sprint 3 (Q-014 – Pathfinding)
 
@@ -656,6 +662,12 @@ das Risiko.
 **Konsequenzen:** Q-039 ist geschlossen. Die Float-Zeitpunkt-Klausel aus D-033
 und die Toleranz-Hash-Klausel aus D-045 sind ersetzt. Numerische Toleranzen
 gelten nur für nicht autoritative Diagnostik, nie als Hashdistanz.
+
+**Fortschreibung D-089:** „MS-1 exakt 1“ in Klausel 3 bezeichnet den
+kanonischen lokalen Defaultwert, nicht eine API-Bereichssperre.
+`MatchConfig`/Loopback akzeptieren 1 bis 60; das Netzprofil verwendet
+standardmäßig 3 aus demselben Bereich. Der tatsächlich gewählte Wert bleibt
+fingerprinted und während einer Session fest.
 
 ### D-058 | verbindlich | Sprint 7 (MVP-Kapazität, Cache und FoW; Q-032)
 
@@ -2186,6 +2198,220 @@ werden jetzt footprint-frei gewählt. Attack-Move bleibt ausgespart
 
 ---
 
+### D-089 | verbindlich | Sprint 12 Strang A (TCP-Lockstep-Relay und Betriebspfad)
+
+**Status:** verbindlich — vom Inhaber am 2026-08-07 freigegeben. Gilt für das
+implementierte 1v1-Netzprofil; der lokale Pfad und der kanonische Sim-Replay-
+Vertrag aus D-057 bleiben erhalten.
+
+**Kontext:** D-033 legte deterministisches Lockstep über einen nicht
+simulierenden Command-Relay als Ziel fest, enthielt aber einen nicht
+implementierten UDP/RUDP-Entwurf und schrieb dem Server Ergebnisautorität zu.
+Sprint 12 brauchte einen kleinen, nachweisbaren Zwei-Spieler-Pfad mit
+zuverlässiger geordneter Zustellung, einem echten Barrier, einer ehrlichen
+Aufzeichnung und einem betreibbaren Linux-Artefakt.
+
+**Alternativen:** (a) den historischen Reliable-Ordered-Layer über UDP vor dem
+ersten 1v1 bauen; (b) einen serverautoritativen State-Sync beziehungsweise eine
+permanent serverseitige Simulation einführen; (c) das vorhandene kanonische
+`ReplayFile` auch für den nicht simulierenden Relay verwenden; (d) **TCP für
+den 1v1-Transport, Client-Simulation und ein getrenntes Relay-Transportformat.**
+
+**Entscheidung:** (d), mit folgenden verbindlichen Grenzen:
+
+1. **Transport und Autorität.** Der 1v1-Relay verwendet TCP und damit
+   zuverlässige, geordnete Zustellung. Er simuliert keinen Gameplay-State und
+   entscheidet kein Match-Ergebnis. Er vergibt genau zwei Slots, validiert
+   Frame, Absenderslot, Command-Struktur, Tickfolge, angekündigte Counts,
+   Dedupe und Kapazitätsgrenzen und verteilt die bestätigten Records.
+   `TickComplete` ist ausschließlich ein Transport-/Barrier-Frame; er ist kein
+   `CommandKind`, erreicht die Ingress nicht und steht weder im kanonischen
+   Sim-Replay noch im State-Hash.
+2. **Start- und Eingabevertrag.** Der kanonische lokale Defaultwert für den
+   Input-Delay ist 1; `MatchConfig`/Loopback erlauben wie das Netzprofil 1 bis
+   60. Das Netzprofil verwendet standardmäßig 3. Der Delay ist während der
+   Session fest. Startbeweis und Fingerprint binden beide Peers an denselben
+   Delay, Seed, Definitionshash und Initialsnapshot; erst danach geht der
+   Client in `Running`. `ICommandTransport` bleibt unverändert. Daneben steht der
+   optionale Vertrag `ICommandSubmissionReadiness`: Die Ingress prüft ihn vor
+   Session-Aktion und Sequenzvergabe und antwortet bei fehlender Bereitschaft
+   mit `Rejected`/`TransportNotReady`, ohne eine Sequenz zu verbrauchen. Der
+   Relay-Transport ist nur in `Running` bereit.
+3. **Barrier und Desync.** Jeder Client markiert seine lokale Completion selbst,
+   nachdem seine lokalen Records in der Ingress liegen, und sendet
+   `TickComplete` an den Relay; er wartet vor der Tickausführung nicht auf ein
+   Echo der eigenen Completion. Die Completion des anderen Slots erreicht den
+   Client erst, nachdem der Relay Tickfolge und exakte Record-Anzahl validiert
+   und den Frame weitergeleitet hat. Der Client-Barrier öffnet mit lokaler
+   Markierung plus vollständig eingetroffenen Remote-Records und validierter
+   Remote-Completion. Bei aktivierter Aufzeichnung persistiert der Relay einen
+   Tick erst, wenn er die Completions beider Slots bestätigt hat. Fehlende
+   Vollständigkeit erzeugt Stall statt Spekulation. Alle 50 Ticks vergleichen
+   die Clients über den Relay ihre State-Hashes; bei Abweichung endet die
+   Session. Ein gespeicherter Desync-Hash muss exakt einem der beiden
+   Peer-Hashes entsprechen, sonst ist die Evidenz ungültig.
+4. **Getrennte Aufzeichnungsformate.** `ReplayFile` bleibt der kanonische
+   Sim-Replay einschließlich deterministischer Resultcodes. Der nicht
+   simulierende Relay kann diese Resultcodes nicht wahrheitsgemäß erzeugen und
+   schreibt deshalb `NOVAREC2`: lückenlose Tickframes einschließlich leerer
+   Ticks, serverseitig exakt geprüfte Counts/Dedupe/Caps, Checkpoints alle 50
+   Ticks und einen terminalen Footer mit Reason sowie terminalem, persistiertem
+   und letztem Checkpoint-Tick. Geschrieben wird zunächst `.partial`; nur eine
+   vollständig versiegelte Aufnahme wird atomar als `.novarec` publiziert.
+   Der Reader prüft Struktur und Footer; das engine-freie Playback verifiziert
+   die gespeicherten Checkpoints und liefert den berechneten Endhash. Erst der
+   Soak vergleicht diesen berechneten Wert mit dem Live-Endhash; der Footer
+   selbst behauptet keinen Endhash.
+   Relay-Aufnahme und Client-Diagnostik verwenden denselben 64-MiB-Höchstwert.
+5. **Client-Diagnostik.** Der Client hält den Record-Strom als begrenzten
+   On-Disk-Spool statt als dauerhaft wachsende Liste; damit sind mehr als
+   65.536 Records möglich. Snapshot, Checkpoint-Identität und Recordstrom
+   werden fail-closed geprüft und über `.partial` atomar publiziert.
+   `NOVAREC1` und `NOVADIAG1` waren unveröffentlichte Wegwerfformate; es gibt
+   keine Migration oder Kompatibilitätszusage.
+6. **Spiel- und Betriebspfad.** `MatchConfig`, `MatchBootstrap` und
+   `MatchRunner` tragen Seed, Slot, Fraktionen, AI-Slots, Delay und Transport;
+   AI-Sessions entstehen nur für konfigurierte AI-Slots. Der Barrier sitzt in
+   der Tickschleife, eine lokale Pause ist im Relay-Match gesperrt, und die UI
+   liest den Netzwerklebenszyklus nur über Gameplay-Properties von
+   `MatchRunner` und `MatchBootstrap`. Der
+   `Nova.RelayServer` wird als self-contained `linux-x64`-Publish-Baum in einem
+   doppelt gehashten Bundle geliefert. Konfiguration kommt ausschließlich aus
+   der Umgebung; das Match-Token ist Pflicht, exakt 16 unpräfixierte
+   Hexzeichen und ungleich null. systemd läuft unprivilegiert als
+   `novarelay`, und `deploy.sh` aktiviert unveränderliche SHA-Releases mit
+   atomaren `current`-/`previous`-Links sowie Readiness und Rollback.
+
+**Verworfen:** UDP/RUDP jetzt — zusätzliche Zuverlässigkeits-, Ack- und
+Retransmit-Fehlerklasse ohne Bedarf bei zwei Spielern und 10 Hz;
+serverautorativer State-Sync — bricht die vorhandene deterministische
+Client-Simulation; `TickComplete` als Command — würde das eingefrorene
+Command-v1-Register und die Replay-/Hashgrenze verletzen; `ReplayFile` ohne
+Resultcodes — würde eine Autorität vortäuschen, die der Relay nicht besitzt.
+
+**Konsequenzen:** D-033 ist hinsichtlich UDP-Primärpfad und Ergebnisautorität
+für dieses Profil teilweise ersetzt; seine fünf Grundregeln bleiben bestehen.
+Der Post-Match-Trust-Anchor aus D-046 ist nicht Teil dieser Implementierung.
+Ebenso nicht enthalten sind `MatchComplete`, Reconnect, UDP, Observer,
+Matchmaking und mehr als zwei Spieler. A8 Stufe 1 belegt zwei echte TCP-Clients
+über 10.023 Ticks, 50-Tick-Checkpoints und identische Live-/Playback-Endhashes.
+Die manuelle Abnahme mit zwei Unity-Fenstern, im LAN und über den VPS steht aus;
+es ist deshalb noch keine gespielte Netzwerkpartie oder vollständige
+Sprint-Abnahme behauptet. Betrieb und Grenzen stehen in
+[../tech/RelayServer.md](../tech/RelayServer.md).
+
+---
+
+### D-090 | verbindlich | Sprint 12 Strang B (fog-sicheres Gefechtsfeedback und Tier-0-Audio)
+
+**Status:** verbindlich — vom Inhaber am 2026-08-08 mit dem Auftrag bestätigt,
+Strang B vollständig umzusetzen und jede Abweichung vom Ausführungsplan
+nachvollziehbar festzuhalten. Gilt ausschließlich für Präsentation, Audio und
+Asset-Provenienz; Simulation, Netzwerkzustand, Replays, Fingerprints und
+deterministische Baselines bleiben unverändert.
+
+**Kontext:** Der Simulationskampf war funktional, aber visuell und akustisch
+kaum lesbar. Die Simulation darf wegen Determinismus und Fog of War weder
+Unity-Effekte auslösen noch verborgene Ereignisse an die Präsentation melden.
+Der 12B-Plan enthielt außerdem widersprüchliche oder nicht ausführbare Details:
+direkten `AudioSource.PlayOneShot`-Zugriff trotz D-039, einen unlaufenden
+A/B-Effektschaltertest, eine zu vollständige Todeserkennung aus gepolltem
+Zustand sowie Anforderungen an Trümmer, Texturen und einen Tier-1-Alarm ohne
+gesicherte Quelle.
+
+**Entscheidung:** Strang B wird als rein lesende, fog-sichere
+Präsentationsschicht umgesetzt:
+
+1. **Ereignisableitung.** `VisibleCombatFrameDiffer` liest ausschließlich die
+   durch `FogOfWarSystem.GetVisibleEntities(viewerTeam)` freigegebene Menge und
+   deren `TryGetUnit`-Snapshots; er mutiert weder Simulation noch Netzwerk.
+   Derselbe Tick wird ignoriert, bei Tick-Rücklauf wird die Baseline verworfen.
+   Nach einem Sprung über mehrere Ticks dürfen Zwischen-Cues verloren gehen;
+   erfundene oder nachträglich aufgestaute Ereignisse sind ausdrücklich
+   verboten.
+2. **Bewusst unvollständige Todesheuristik.** Das Verschwinden einer eigenen,
+   mobilen, nicht generischen Einheit darf als Tod gelten. Gebäude, Baustellen
+   und fremde Einheiten gelten nur dann als Tod, wenn genau ein Tick vergangen
+   ist und genau ein sichtbarer Schuss eindeutig korreliert; bei einem fremden
+   Schützen muss dieser zum Betrachterteam gehören. Mehrdeutiges Verschwinden
+   bleibt stumm. Diese Untererkennung ist der Preis dafür, Fog-Informationen
+   nicht zu leaken.
+3. **VFX-Vertrag.** Mündungsstoß, Treffer, Todesstoß, Rauch und Hitscan-Spur
+   verwenden Unity-Bordmittel und Laufzeitmaterialien ohne importierte oder
+   prozedural erzeugte Textur. Höchstens 64 Effekte und acht kurzlebige Lichter
+   sind gleichzeitig aktiv. Der sichtbare Hitscan kopiert seinen Endpunkt beim
+   Auslösen, läuft höchstens 0,1 s und folgt dem Ziel nicht. Über Budget wird
+   verworfen, nicht aufgestaut. Die optionale Flipbook-Stufe 5 entfällt.
+4. **Tod und Poolidentität.** Ein bestätigter Tod hält den bestehenden View
+   0,8 s, löst Picking und Collider sofort und gibt danach exakt die gebundene
+   Poolidentität frei; Slot-Wiederverwendung darf keinen Leichen-View erben.
+   Gebäude erhalten Rauch und Absacken, aber keine persistente Trümmer- oder
+   Decal-Fläche.
+5. **Audio nach D-039.** Tier-0-One-Shots laufen ausschließlich über
+   `IAudioService`/`UnityAudioService`; der Effektcontroller besitzt keine
+   `AudioSource` und ruft `PlayOneShot` nicht direkt auf. Die zwölf Schlüssel
+   sind `WPN_Kinetic_Light`, `WPN_Kinetic_Heavy`, `WPN_Explosive`,
+   `IMP_Kinetic`, `IMP_Explosive`, `DTH_Unit`, `DTH_Building`, `UI_Click`,
+   `UI_Select`, `UI_Ack`, `UI_Deny` und `PRD_UnitReady`.
+   `DTH_Building` reserviert und startet Low-Frequency- plus Impact-Layer
+   atomar. `ALR_BaseUnderAttack` bleibt Tier 1 und ist nicht Teil von 12B.
+6. **Stimmen und Mischung.** Das Projektlimit bleibt 32 reale Stimmen; zwei
+   sind für die vorhandenen Musikpfade reserviert, daher besitzt der neue
+   One-Shot-Pool 30 Stimmen, davon höchstens 24 räumlich. Je Schlüssel gelten
+   drei bis vier gleichzeitige Instanzen. Atomare Layer werden vollständig
+   reserviert oder gar nicht gestartet. Bei Bedarf wird die älteste Stimme
+   strikt niedrigerer Priorität gestohlen; es gibt keine Warteschlange.
+   Weltklänge nutzen logarithmischen Rolloff von 15 bis 120 m. Der lineare
+   Einstellungswert 0 wird als −80 dB abgebildet. Die angeforderte Priorität
+   steuert auch `AudioSource.priority`.
+7. **Legacy-Musik als Übergangsausnahme.** `MenuMusicPlayer` und
+   `MusicDirector` behalten vorerst ihre vorhandenen `AudioSource`-Lebenszyklen
+   und werden über den Music-Mixerbus geführt. Damit ist D-039 für den neuen
+   Tier-0-One-Shot-Pfad erfüllt, aber noch nicht für alle historischen
+   Musikpfade. Deren Migration bleibt eine ausdrücklich benannte Restschuld;
+   die zwei reservierten Stimmen verhindern eine falsche 32-Stimmen-Zusage.
+8. **Mixer und Listener.** `MIX_Master` enthält `Master` mit den Kindern
+   `Music`, `SFX`, `Voice` und `Ambience`; Master-, Music-, SFX-, Voice- und
+   Ambience-dB sind exponiert. Der vorhandene Listener bleibt an der Kamera.
+   Ein Fokuspunkt-Listener ist eine spätere Gegenhörentscheidung. Die
+   idempotente Editor-Autorisierung verwendet in Unity 6000.5.4f1 reflektierte
+   interne Mixer-APIs und bricht bei fehlender Signatur hart ab; dies ist ein
+   bewusstes versionssensitives Wartungsrisiko.
+9. **Assets und Provenienz.** Importiert werden genau 35 unveränderte Kenney-
+   OGGs in pack-first-Ablage: 11 Sci-Fi-, 11 Impact- und 13 Interface-Dateien.
+   Die Quelldateinamen und SHA-256 bleiben erhalten. Je Pack gilt ein
+   `PROVENANCE.json` mit `files[]`; im Tier-1-Zweierbetrieb bleibt
+   `verifiedBy` mit begründeter Ausnahme leer. Die vier vorhandenen Suno-
+   Musikdatensätze bleiben ausdrücklich `incomplete`: beim Menütrack fehlen
+   ursprüngliche lokale MP3 und Konvertierungsbefehl, bei Ingame 01 privater
+   Cover-Stamm und exakter Befehl, bei Ingame 02/03 jeweils der exakte
+   Konvertierungsbefehl. Fehlende Belege werden nicht rekonstruiert oder
+   erfunden.
+10. **Determinismuswache.** Der geplante A/B-Hash-Test wird durch einen
+    headless laufenden Quellcode-Guard ersetzt. Er scannt ausschließlich
+    Produktionsquellen unter `Assets/_Project/Scripts/**` außerhalb
+    `Simulation/**`, verbietet dort `GetUnitRef(` und fremde `.Random`-
+    Memberzugriffe und erlaubt explizit `UnityEngine.Random`/`System.Random`.
+    Tests werden nicht gescannt. `RawUnits` wird wegen bestehender Altlasten
+    nicht global verboten; der neue Differ selbst bleibt nachweislich auf
+    Fog-Sicht und `TryGetUnit` beschränkt.
+11. **Weitere Planabweichungen.** Es gibt keinen separaten Effektschalter;
+    Bloom/VFX und SFX werden über bestehende Präsentations- beziehungsweise
+    SFX-Einstellungen geführt. Cooldowns, Gain und Prioritäten verwenden
+    konservative Startwerte, weil der Plan keine auditiv abgenommenen
+    Einzelwerte vorgab. Ihre endgültige Abstimmung bleibt Teil der manuellen
+    Gefechtsabnahme.
+
+**Konsequenzen:** Der Kampf erhält sicht- und hörbares Feedback, ohne einen
+Simulationsvertrag oder eine Baseline zu ändern. Automatische Tests können
+Budgets, Fog-Grenzen, Ereignisregeln, Poolidentität, Authoring und
+Quellabhängigkeiten belegen; ob die Mischung mit etwa sechzig feuernden
+Einheiten trägt und die Kamera als Listener gut klingt, kann nur eine gespielte
+Gegenhör-/Sichtabnahme entscheiden. Bis diese gelaufen ist, wird Strang B als
+technisch umgesetzt, nicht als vollständig spielerisch abgenommen bezeichnet.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2283,3 +2509,5 @@ werden jetzt footprint-frei gewählt. Attack-Move bleibt ausgespart
 | 1.24.0 | 2026-08-06 | D-085 aufgenommen: Baumodell — Builder-Modell bleibt, Builder wird beim Platzieren per Move-Intent über den normalen Command-Pfad automatisch zur Baustelle geschickt (Reichweitenregel unangetastet, keine neuen Baselines); verworfen: C&C-Modell und Hybridmodell wegen Bruch der Hash-/Replay-/Fingerprint-Baselines; Baustellen-Zustandsanzeige ist Teil der Entscheidung | Project Owner / Agent (Umsetzung) |
 | 1.25.0 | 2026-08-07 | D-086 (Suno-Ausnahme um Ingame-Musik erweitert, drei Themen als OGG im Repo) und D-087 (Auto-Zielerfassung und Feuererwiderung im CombatSystem; Baselines unverändert, sechs neue Tests je Lane; Attack-Move ausgespart) aufgenommen | Project Owner / Agent (Umsetzung) |
 | 1.26.0 | 2026-08-07 | D-088 aufgenommen: Truppenführung — Formationsverteilung mit geteiltem Flow-Ziel und `GoalGridPos` (Entity-Store v5), Separation im Stand (gedämpft, Totzone, Index-Tiebreak), Gebäude-Footprints ins Kostenfeld mit Push-out; Epoch-Restore-Vertrag von Vergleich auf Adoption geändert, Flow-Cache regeneriert an Ort statt Leerung; Baselines bewusst neu gesetzt | Project Owner / Agent (Umsetzung) |
+| 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
+| 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |

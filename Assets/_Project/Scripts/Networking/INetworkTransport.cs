@@ -31,8 +31,12 @@ namespace Nova.Networking
     /// </summary>
     public interface INetworkTransport : ICommandTransport
     {
-        /// <summary>Opens the connection to the relay endpoint. Non-blocking; completion surfaces via <see cref="State"/>.</summary>
-        void Connect(string host, int port);
+        /// <summary>
+        /// Opens the connection to the relay endpoint and authenticates the
+        /// match with <paramref name="matchToken"/>. The token is protocol
+        /// data only: implementations must never log or persist it.
+        /// </summary>
+        void Connect(string host, int port, ulong matchToken);
 
         /// <summary>Closes the connection (idempotent).</summary>
         void Disconnect();
@@ -43,8 +47,11 @@ namespace Nova.Networking
         /// <summary>Current lifecycle state.</summary>
         RelayConnectionState State { get; }
 
-        /// <summary>Last measured round trip in milliseconds, or null before the first pong.</summary>
-        uint? RoundTripMilliseconds { get; }
+        /// <summary>
+        /// Last measured round trip expressed in canonical simulation ticks,
+        /// rounded up, or null before the first pong.
+        /// </summary>
+        uint? RoundTripTicks { get; }
 
         /// <summary>Human-readable last transport error, or null.</summary>
         string LastError { get; }

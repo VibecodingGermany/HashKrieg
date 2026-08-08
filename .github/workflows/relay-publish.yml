@@ -1,48 +1,213 @@
 name: Relay Publish
 
-# Baut die Relay-Server-Binary als self-contained linux-x64-Artefakt
-# (docs/tech/RelayServer.md). Der Produktionsserver installiert kein
-# .NET-SDK - er zieht nur die fertige Binary aus diesem Lauf.
-
 on:
-  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Assets/_Project/Scripts/Core/**"
+      - "Assets/_Project/Scripts/Simulation/**"
+      - "Assets/_Project/Scripts/Networking/**"
+      - "tools/Nova.RelayServer/**"
+      - "tools/Nova.SimRunner.Tests/**"
+      - "global.json"
+      - ".github/workflows/relay-publish.yml"
   push:
     branches: [main]
     paths:
-      - "Assets/_Project/Scripts/Networking/**"
-      - "Assets/_Project/Scripts/Simulation/**"
       - "Assets/_Project/Scripts/Core/**"
+      - "Assets/_Project/Scripts/Simulation/**"
+      - "Assets/_Project/Scripts/Networking/**"
       - "tools/Nova.RelayServer/**"
+      - "tools/Nova.SimRunner.Tests/**"
+      - "global.json"
+      - ".github/workflows/relay-publish.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: relay-publish-${{ github.ref }}
+  group: relay-publish-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   publish:
-    name: publish
+    name: test-publish-smoke-bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      # Tag-gepinnt statt SHA-gepinnt: die exakte SDK-Version kommt aus
-      # global.json (siehe tests.yml), die Runner-Images liefern sie nicht
-      # zuverlaessig mit.
-      - uses: actions/setup-dotnet@v4
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
-      - name: Publish
+
+      - name: Verify exact SDK
+        shell: bash
+        run: test "$(dotnet --version)" = "8.0.318"
+
+      - name: Restore
+        run: |
+          dotnet restore tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj
+          dotnet restore tools/Nova.RelayServer/Nova.RelayServer.csproj -r linux-x64
+
+      - name: Run canonical tests
+        run: >
+          dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj
+          -c Release --no-restore --nologo
+          --logger "console;verbosity=normal"
+
+      - name: Publish complete self-contained linux-x64 tree
         run: >
           dotnet publish tools/Nova.RelayServer/Nova.RelayServer.csproj
           -c Release -r linux-x64 --self-contained true
-          -p:PublishSingleFile=true
+          --no-restore
+          -p:PublishSingleFile=false
+          -p:DebugSymbols=false
+          -p:DebugType=None
           -o publish
-      - uses: actions/upload-artifact@v4
+
+      - name: Verify publish tree and deploy syntax
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -x publish/nova-relay
+          test -f publish/nova-relay.dll
+          test -f publish/nova-relay.runtimeconfig.json
+          test "$(find publish -type f | wc -l)" -gt 3
+          bash -n tools/Nova.RelayServer/deploy/deploy.sh
+          shellcheck -x tools/Nova.RelayServer/deploy/deploy.sh
+
+      - name: Smoke missing token returns EX_CONFIG
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +e
+          env -u NOVA_MATCH_TOKEN \
+            -u NOVA_RELAY_BIND -u NOVA_RELAY_PORT -u NOVA_RELAY_SLOT_COUNT \
+            -u NOVA_INPUT_DELAY_TICKS -u NOVA_RECORD_DIR -u NOVA_RELAY_SEED \
+            ./publish/nova-relay \
+            >missing-token.stdout 2>missing-token.stderr
+          status=$?
+          set -e
+          test "${status}" -eq 78
+
+          smoke_token="1111111111111111"
+          set +e
+          env NOVA_MATCH_TOKEN="${smoke_token}" ./publish/nova-relay --unexpected \
+            >unknown-argument.stdout 2>unknown-argument.stderr
+          status=$?
+          set -e
+          test "${status}" -eq 78
+          ! grep -Fq "${smoke_token}" unknown-argument.stdout unknown-argument.stderr
+
+      - name: Smoke ready and ordered SIGTERM
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          smoke_token="1111111111111111"
+          relay_port="$(python3 - <<'PY'
+          import socket
+          with socket.socket() as listener:
+              listener.bind(("127.0.0.1", 0))
+              print(listener.getsockname()[1])
+          PY
+          )"
+          record_dir="${RUNNER_TEMP}/nova-relay-records"
+          env -u NOVA_RELAY_SEED \
+            NOVA_MATCH_TOKEN="${smoke_token}" \
+            NOVA_RELAY_BIND="127.0.0.1" \
+            NOVA_RELAY_PORT="${relay_port}" \
+            NOVA_RELAY_SLOT_COUNT="2" \
+            NOVA_RECORD_DIR="${record_dir}" \
+            ./publish/nova-relay >relay-smoke.log 2>&1 &
+          relay_pid=$!
+          cleanup() {
+            if kill -0 "${relay_pid}" 2>/dev/null; then
+              kill -TERM "${relay_pid}" 2>/dev/null || true
+              wait "${relay_pid}" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 100); do
+            if grep -Fq '[Relay] ready on ' relay-smoke.log; then
+              ready=1
+              break
+            fi
+            kill -0 "${relay_pid}" 2>/dev/null || break
+            sleep 0.1
+          done
+          test "${ready}" -eq 1
+          test "$(grep -Fc '[Relay] ready on ' relay-smoke.log)" -eq 1
+          ! grep -Fq "${smoke_token}" relay-smoke.log
+
+          kill -TERM "${relay_pid}"
+          set +e
+          wait "${relay_pid}"
+          status=$?
+          set -e
+          trap - EXIT
+          test "${status}" -eq 0
+          test "$(grep -Fc '[Relay] stopped.' relay-smoke.log)" -eq 1
+          ! grep -Fq "${smoke_token}" relay-smoke.log
+          test -d "${record_dir}"
+          test -z "$(find "${record_dir}" -name '.nova-relay-write-probe-*' -print -quit)"
+
+      - name: Build checksummed deployment bundle
+        shell: bash
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "${BUILD_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          install -d -m 0755 bundle/app bundle/deploy dist
+          cp -a publish/. bundle/app/
+          cp -a tools/Nova.RelayServer/deploy/. bundle/deploy/
+          find bundle -type d -exec chmod 0755 {} +
+          find bundle -type f -exec chmod 0644 {} +
+          chmod 0755 bundle/app/nova-relay bundle/deploy/deploy.sh
+          printf 'commit_sha=%s\nsdk_version=8.0.318\nruntime=linux-x64\n' \
+            "${BUILD_SHA}" >bundle/BUILD_INFO
+          (
+            cd bundle
+            { find app deploy -type f -print0; printf 'BUILD_INFO\0'; } \
+              | sort -z \
+              | xargs -0 sha256sum
+          ) >bundle/SHA256SUMS
+
+          archive_name="hashkrieg-relay-${BUILD_SHA}-linux-x64.tar.gz"
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            --mtime='UTC 1970-01-01' -czf "dist/${archive_name}" \
+            -C bundle app deploy BUILD_INFO SHA256SUMS
+          (
+            cd dist
+            sha256sum "${archive_name}" >"${archive_name}.sha256"
+            sha256sum -c "${archive_name}.sha256"
+          )
+          test -s "dist/${archive_name}"
+          test -s "dist/${archive_name}.sha256"
+          install -d -m 0755 bundle-verify
+          tar -xzf "dist/${archive_name}" -C bundle-verify
+          (
+            cd bundle-verify
+            sha256sum -c SHA256SUMS
+          )
+          test -x bundle-verify/app/nova-relay
+          test -f bundle-verify/deploy/hashkrieg-relay.service
+          test -f bundle-verify/deploy/hashkrieg-relay.env.example
+          test -x bundle-verify/deploy/deploy.sh
+
+      - name: Upload main deployment bundle
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: nova-relay-linux-x64
-          path: publish
+          name: hashkrieg-relay-${{ github.sha }}-linux-x64
+          path: |
+            dist/hashkrieg-relay-${{ github.sha }}-linux-x64.tar.gz
+            dist/hashkrieg-relay-${{ github.sha }}-linux-x64.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 30

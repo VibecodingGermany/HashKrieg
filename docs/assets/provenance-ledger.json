@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "0.1.0",
-  "generatedAt": "2026-08-06",
-  "note": "Erzeugt aus dem Tripo-Import. Alle Eintraege sind UNVOLLSTAENDIG: die lizenz- und rechterelevanten Felder sind leer und in '_TODO' je Datensatz benannt. Bis diese gefuellt und vier-augen-verifiziert sind, ist die Provenienzpflicht aus docs/assets/Provenance.md NICHT erfuellt.",
+  "schemaVersion": "0.2.0",
+  "generatedAt": "2026-08-08",
+  "note": "Gemischter Provenienzindex: 34 Tripo-Datensaetze bleiben mit ihren _TODO-Feldern unvollstaendig; drei Kenney-Audiopacks sind unter der D-090-Tier-1-Verifikationsausnahme technisch vollstaendig; vier Suno-Musikdatensaetze bleiben mit benannten Belegluecken unvollstaendig. Sidecars sind die vollstaendige Datensatzquelle, dieser Ledger dupliziert oder referenziert sie.",
   "records": [
     {
       "assetId": "alliance.building.Barracks",
@@ -1260,6 +1260,160 @@
         "aiModelVersion: konkrete Tripo-Modellversion eintragen",
         "verifiedBy + verifiedAt: Vier-Augen-Verifikation durchfuehren und eintragen"
       ]
+    },
+    {
+      "assetId": "kenney.sfx.sci-fi-sounds",
+      "originType": "cc0-import",
+      "sourceName": "Kenney Sci-Fi Sounds 1.0",
+      "sourceUrl": "https://kenney.nl/assets/sci-fi-sounds",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrievedAt": "2026-08-07",
+      "sourceFileHash": "119340f351a5098ad814f78719438c0da355a9ce8a4c8a3af6a8d48aa3d49e04",
+      "attributionRequired": false,
+      "redistributionAllowed": true,
+      "modifications": "Unveraenderte OGG-Quelldateien; kuratierte Teilmenge.",
+      "evidenceStatus": "complete-under-D-090-tier-1-exception",
+      "verifiedBy": "",
+      "verifiedAt": "",
+      "sidecarPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/PROVENANCE.json",
+      "verificationException": {
+        "decisionId": "D-090",
+        "reason": "Governance Tier 1: keine zweite menschliche Verifikation verfuegbar; ZIP-, Lizenz- und Einzelhashes technisch verifiziert."
+      },
+      "files": [
+        { "sourcePath": "Audio/laserSmall_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_000.ogg", "sourceSha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1", "targetSha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1" },
+        { "sourcePath": "Audio/laserSmall_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_001.ogg", "sourceSha256": "ab87913aba9790a0c5fa173d086267ba521ad522fcad2252271db49988313cf5", "targetSha256": "ab87913aba9790a0c5fa173d086267ba521ad522fcad2252271db49988313cf5" },
+        { "sourcePath": "Audio/laserSmall_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserSmall_002.ogg", "sourceSha256": "e70139466c3e801358c9041ee17db7ff82c0e9a9cdf44647ad0ea6b9f8458f63", "targetSha256": "e70139466c3e801358c9041ee17db7ff82c0e9a9cdf44647ad0ea6b9f8458f63" },
+        { "sourcePath": "Audio/laserLarge_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_000.ogg", "sourceSha256": "a56d95794cd732d6c2d66ce488c14cf557fe526c282897c9a77675c2bd9b77e6", "targetSha256": "a56d95794cd732d6c2d66ce488c14cf557fe526c282897c9a77675c2bd9b77e6" },
+        { "sourcePath": "Audio/laserLarge_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_001.ogg", "sourceSha256": "e678aca631495b7dfef4ac625f0349875ccac81a60f538d530e072241af3e4bd", "targetSha256": "e678aca631495b7dfef4ac625f0349875ccac81a60f538d530e072241af3e4bd" },
+        { "sourcePath": "Audio/laserLarge_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/laserLarge_002.ogg", "sourceSha256": "e5e0b6ccc4d5720c8174a3e5b7cc6f9be3057352a89cbb2e99a00efc6fe5cc11", "targetSha256": "e5e0b6ccc4d5720c8174a3e5b7cc6f9be3057352a89cbb2e99a00efc6fe5cc11" },
+        { "sourcePath": "Audio/explosionCrunch_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_000.ogg", "sourceSha256": "4b597d658d0ae101f0a030fbeea5fc3a4292ab85f017470a8254a8e7959cbd69", "targetSha256": "4b597d658d0ae101f0a030fbeea5fc3a4292ab85f017470a8254a8e7959cbd69" },
+        { "sourcePath": "Audio/explosionCrunch_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_001.ogg", "sourceSha256": "fdd04d6f0032d4d57c134ad37f3587d2d00e58c9572715275bd8cf4f43593576", "targetSha256": "fdd04d6f0032d4d57c134ad37f3587d2d00e58c9572715275bd8cf4f43593576" },
+        { "sourcePath": "Audio/explosionCrunch_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/explosionCrunch_002.ogg", "sourceSha256": "be2b8ddc62e4a24c91e2e77793de98549ce216faf2f323a917e7d6f34321ff97", "targetSha256": "be2b8ddc62e4a24c91e2e77793de98549ce216faf2f323a917e7d6f34321ff97" },
+        { "sourcePath": "Audio/lowFrequency_explosion_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/lowFrequency_explosion_000.ogg", "sourceSha256": "3cb48d86dab63140cfb9aaeea4d4a6846abaca5831d157d8adbec0490da26343", "targetSha256": "3cb48d86dab63140cfb9aaeea4d4a6846abaca5831d157d8adbec0490da26343" },
+        { "sourcePath": "Audio/lowFrequency_explosion_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/SciFi/lowFrequency_explosion_001.ogg", "sourceSha256": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b", "targetSha256": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b" }
+      ]
+    },
+    {
+      "assetId": "kenney.sfx.impact-sounds",
+      "originType": "cc0-import",
+      "sourceName": "Kenney Impact Sounds 1.0",
+      "sourceUrl": "https://kenney.nl/assets/impact-sounds",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrievedAt": "2026-08-07",
+      "sourceFileHash": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+      "attributionRequired": false,
+      "redistributionAllowed": true,
+      "modifications": "Unveraenderte OGG-Quelldateien; kuratierte Teilmenge.",
+      "evidenceStatus": "complete-under-D-090-tier-1-exception",
+      "verifiedBy": "",
+      "verifiedAt": "",
+      "sidecarPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/PROVENANCE.json",
+      "verificationException": {
+        "decisionId": "D-090",
+        "reason": "Governance Tier 1: keine zweite menschliche Verifikation verfuegbar; ZIP-, Lizenz- und Einzelhashes technisch verifiziert."
+      },
+      "files": [
+        { "sourcePath": "Audio/impactMetal_light_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_000.ogg", "sourceSha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d", "targetSha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d" },
+        { "sourcePath": "Audio/impactMetal_light_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_001.ogg", "sourceSha256": "fba69c467ddd85da7b1d82e259f936b876d9ba6a3d6f1b24bdd10468e46bfe08", "targetSha256": "fba69c467ddd85da7b1d82e259f936b876d9ba6a3d6f1b24bdd10468e46bfe08" },
+        { "sourcePath": "Audio/impactMetal_light_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_light_002.ogg", "sourceSha256": "25a96f90a9a1f88a531e824e126f0519504625e5635e65a72e4f31611428db29", "targetSha256": "25a96f90a9a1f88a531e824e126f0519504625e5635e65a72e4f31611428db29" },
+        { "sourcePath": "Audio/impactMetal_heavy_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_000.ogg", "sourceSha256": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831", "targetSha256": "e07045693e4a2b3d165c424e3dab4c781d9ff8880a386880ac89a51315d7f831" },
+        { "sourcePath": "Audio/impactMetal_heavy_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_001.ogg", "sourceSha256": "83554049f81f4db9209379e103c30bfa63f65c42189a03f300b045c2c82e23ae", "targetSha256": "83554049f81f4db9209379e103c30bfa63f65c42189a03f300b045c2c82e23ae" },
+        { "sourcePath": "Audio/impactMetal_heavy_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_heavy_002.ogg", "sourceSha256": "b914c8f1eb7c0f34bb165d7c77f4be0351f6be0660c13c53e65424e262e2c093", "targetSha256": "b914c8f1eb7c0f34bb165d7c77f4be0351f6be0660c13c53e65424e262e2c093" },
+        { "sourcePath": "Audio/impactMetal_medium_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_000.ogg", "sourceSha256": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003", "targetSha256": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003" },
+        { "sourcePath": "Audio/impactMetal_medium_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_001.ogg", "sourceSha256": "e8a9eaba7c4d27422e4eeb3e6c7100d5d7dc0f83e005efc98c960adcc5265337", "targetSha256": "e8a9eaba7c4d27422e4eeb3e6c7100d5d7dc0f83e005efc98c960adcc5265337" },
+        { "sourcePath": "Audio/impactMetal_medium_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactMetal_medium_002.ogg", "sourceSha256": "7e89ce2ca0dbda95ea2b78d4b50791cab35c10d20e9f5ccd45dd0b00e99ff548", "targetSha256": "7e89ce2ca0dbda95ea2b78d4b50791cab35c10d20e9f5ccd45dd0b00e99ff548" },
+        { "sourcePath": "Audio/impactPlate_heavy_000.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactPlate_heavy_000.ogg", "sourceSha256": "112d4f93ddcc370b410630f971c0f5d991856102da9c76bc5c5540d388e75aaa", "targetSha256": "112d4f93ddcc370b410630f971c0f5d991856102da9c76bc5c5540d388e75aaa" },
+        { "sourcePath": "Audio/impactPlate_heavy_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Impact/impactPlate_heavy_001.ogg", "sourceSha256": "142fd6c77f13d25f318265901163f70f8dfe12f87829169a570025be43de7011", "targetSha256": "142fd6c77f13d25f318265901163f70f8dfe12f87829169a570025be43de7011" }
+      ]
+    },
+    {
+      "assetId": "kenney.sfx.interface-sounds",
+      "originType": "cc0-import",
+      "sourceName": "Kenney Interface Sounds 1.0",
+      "sourceUrl": "https://kenney.nl/assets/interface-sounds",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "retrievedAt": "2026-08-07",
+      "sourceFileHash": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+      "attributionRequired": false,
+      "redistributionAllowed": true,
+      "modifications": "Unveraenderte OGG-Quelldateien; kuratierte Teilmenge.",
+      "evidenceStatus": "complete-under-D-090-tier-1-exception",
+      "verifiedBy": "",
+      "verifiedAt": "",
+      "sidecarPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/PROVENANCE.json",
+      "verificationException": {
+        "decisionId": "D-090",
+        "reason": "Governance Tier 1: keine zweite menschliche Verifikation verfuegbar; ZIP-, Lizenz- und Einzelhashes technisch verifiziert."
+      },
+      "files": [
+        { "sourcePath": "Audio/click_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_001.ogg", "sourceSha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9", "targetSha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9" },
+        { "sourcePath": "Audio/click_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_002.ogg", "sourceSha256": "adcd1f4adc35f1b41bc1b5bbefeff7aa44f2f3f0d96d3199b544140c7c1e761c", "targetSha256": "adcd1f4adc35f1b41bc1b5bbefeff7aa44f2f3f0d96d3199b544140c7c1e761c" },
+        { "sourcePath": "Audio/click_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_003.ogg", "sourceSha256": "2fa929138bc3a0f432696588f66eac94b8f6d463905ec8808c6461ce4b054292", "targetSha256": "2fa929138bc3a0f432696588f66eac94b8f6d463905ec8808c6461ce4b054292" },
+        { "sourcePath": "Audio/select_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_001.ogg", "sourceSha256": "aec0c31ea934a35936ae0d2ab8fac8123c93aa5647f935853a58dbaf90278b7a", "targetSha256": "aec0c31ea934a35936ae0d2ab8fac8123c93aa5647f935853a58dbaf90278b7a" },
+        { "sourcePath": "Audio/select_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_002.ogg", "sourceSha256": "4cc6ac5341b9b2c86fef80c347de028e9ab9f2e037586ac7d9fa59a403a1c012", "targetSha256": "4cc6ac5341b9b2c86fef80c347de028e9ab9f2e037586ac7d9fa59a403a1c012" },
+        { "sourcePath": "Audio/select_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_003.ogg", "sourceSha256": "9a612fd2f513d52a296906b41071c990f75defe56be3bee60d2d4e2423b51b8b", "targetSha256": "9a612fd2f513d52a296906b41071c990f75defe56be3bee60d2d4e2423b51b8b" },
+        { "sourcePath": "Audio/confirmation_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_001.ogg", "sourceSha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a", "targetSha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a" },
+        { "sourcePath": "Audio/confirmation_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_002.ogg", "sourceSha256": "33b17a9a9a2397c62b285c52c33a907fdffb476909c99e42dde603f6a7a8b12c", "targetSha256": "33b17a9a9a2397c62b285c52c33a907fdffb476909c99e42dde603f6a7a8b12c" },
+        { "sourcePath": "Audio/confirmation_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_003.ogg", "sourceSha256": "3091bf0be0497f825769ee0733ca7bdc3bcd59bd6c6e8f2ba8f93d580ff38022", "targetSha256": "3091bf0be0497f825769ee0733ca7bdc3bcd59bd6c6e8f2ba8f93d580ff38022" },
+        { "sourcePath": "Audio/confirmation_004.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_004.ogg", "sourceSha256": "568967a3d9f8a8f6af54ea01729c4882284308f2a27d78c07ffd7ee0d6951661", "targetSha256": "568967a3d9f8a8f6af54ea01729c4882284308f2a27d78c07ffd7ee0d6951661" },
+        { "sourcePath": "Audio/error_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_001.ogg", "sourceSha256": "46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433", "targetSha256": "46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433" },
+        { "sourcePath": "Audio/error_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_002.ogg", "sourceSha256": "76810ec365f41078fd0507101da5bb7b8730fe011dde43908329fdabd8575e79", "targetSha256": "76810ec365f41078fd0507101da5bb7b8730fe011dde43908329fdabd8575e79" },
+        { "sourcePath": "Audio/error_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_003.ogg", "sourceSha256": "885b28175c7b511118bcffab95675b48bbac9005cf6514656ebdad979276b3ab", "targetSha256": "885b28175c7b511118bcffab95675b48bbac9005cf6514656ebdad979276b3ab" }
+      ]
+    },
+    {
+      "assetId": "shared.audio.MUS_MainMenu_Hashkrieg",
+      "originType": "ai-generated",
+      "sidecarPath": "Assets/_Project/Audio/Music/PROVENANCE.json",
+      "sourceUrl": "https://suno.com/song/313c68f8-1fdc-4ef6-b032-811dba6ba017",
+      "sourceFileHash": "56b4dfce40687784f9c3053e109e9062cb94e1b477dea81cff53de1ed3c039b2",
+      "targetPath": "Assets/_Project/Audio/Music/MUS_MainMenu_Hashkrieg.ogg",
+      "targetFileHash": "390110185c1baf6c92bd4dadf04bfbaeb7281373eebca24f6edbfa7b71fd00e6",
+      "evidenceStatus": "incomplete",
+      "todo": [
+        "Das am 2026-08-06 verwendete lokale Quell-MP3 fehlt; sourceFileHash stammt vom offiziellen CDN-Abruf 2026-08-08.",
+        "Exakte Trim-/Loop-/Konvertierungskommandozeile nachtragen."
+      ]
+    },
+    {
+      "assetId": "shared.audio.MUS_Ingame_Hashkrieg_01",
+      "originType": "ai-generated",
+      "sidecarPath": "Assets/_Project/Audio/Music/PROVENANCE.json",
+      "sourceUrl": "https://suno.com/song/a8df5e7e-9bd1-4cbd-8a3f-61c4d3c8ee72",
+      "sourceFileHash": "19fe5a78078382786fd47e9656ece8cd60d61a531bdc768da88176ac211415f3",
+      "targetPath": "Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_01.ogg",
+      "targetFileHash": "0a2cc647c75a0d854b83624eff5856b9815ba6fffda2f7a62e39973d206e87c3",
+      "evidenceStatus": "incomplete",
+      "todo": [
+        "Private Suno-Coverwurzel identifizieren und als eigenen Bezahltarif-Track belegen.",
+        "Exakte Konvertierungskommandozeile nachtragen."
+      ]
+    },
+    {
+      "assetId": "shared.audio.MUS_Ingame_Hashkrieg_02",
+      "originType": "ai-generated",
+      "sidecarPath": "Assets/_Project/Audio/Music/PROVENANCE.json",
+      "sourceUrl": "https://suno.com/song/5ab15ecd-7982-4a1f-8323-8b5de7fad213",
+      "sourceFileHash": "a8ebe5d760c178b39ff5c22aa96a9d7d9e7312cc3c47a8a395a7f7dd3f1ee7bf",
+      "targetPath": "Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_02.ogg",
+      "targetFileHash": "4e1e32b45dacd5fa1492703b13825c90e03162378ca071f9ec61739dac8ad8ab",
+      "evidenceStatus": "incomplete",
+      "todo": ["Exakte Konvertierungskommandozeile nachtragen."]
+    },
+    {
+      "assetId": "shared.audio.MUS_Ingame_Hashkrieg_03",
+      "originType": "ai-generated",
+      "sidecarPath": "Assets/_Project/Audio/Music/PROVENANCE.json",
+      "sourceUrl": "https://suno.com/song/4041a03b-f7d8-462c-8115-18cf2655b145",
+      "sourceFileHash": "c9f862e2bb4e222bff06ca52b389736f4911671519fafe35da076e18c97f2b99",
+      "targetPath": "Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_03.ogg",
+      "targetFileHash": "32e2c985b4a204310123fb0d85effdc325308d4576b28dcc3b07218c53dd4992",
+      "evidenceStatus": "incomplete",
+      "todo": ["Exakte Konvertierungskommandozeile nachtragen."]
     }
   ]
 }

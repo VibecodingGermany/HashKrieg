@@ -1,9 +1,15 @@
 using System;
+using System.Globalization;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Snapshots;
 
 namespace Nova.Networking
 {
+    internal sealed class RelayFrameFormatException : Exception
+    {
+        public RelayFrameFormatException(string message) : base(message) { }
+    }
+
     /// <summary>Frame types of the relay wire protocol v1 (<see cref="RelayProtocol.ProtocolVersion"/>).</summary>
     public enum RelayFrameType : byte
     {
@@ -59,11 +65,37 @@ namespace Nova.Networking
         /// <summary>Wire protocol version; a mismatch is rejected at Hello.</summary>
         public const byte ProtocolVersion = 1;
 
+        /// <summary>Environment/configuration form of a match token: exactly one unsigned 64-bit hex value.</summary>
+        public const int MatchTokenHexCharacters = 16;
+
+        /// <summary>Supported lockstep input-delay corridor. Values outside it are rejected at every boundary.</summary>
+        public const uint MinInputDelayTicks = 1;
+        public const uint MaxInputDelayTicks = 60;
+
         /// <summary>Hard cap of one frame's payload (record frames are a few KB at most; snapshots dominate).</summary>
         public const int MaxFramePayloadBytes = 8 * 1024 * 1024;
 
         /// <summary>Header size: u32 payload length + u8 frame type.</summary>
         public const int HeaderBytes = 5;
+
+        /// <summary>
+        /// Parses the shared match token without accepting prefixes, signs,
+        /// whitespace or culture-specific characters. Error paths must never
+        /// include the source text.
+        /// </summary>
+        public static bool TryParseMatchToken(string text, out ulong matchToken)
+        {
+            matchToken = 0;
+            return text != null
+                && text.Length == MatchTokenHexCharacters
+                && ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out matchToken)
+                && matchToken != 0;
+        }
+
+        public static bool IsSupportedInputDelay(uint inputDelayTicks)
+        {
+            return inputDelayTicks >= MinInputDelayTicks && inputDelayTicks <= MaxInputDelayTicks;
+        }
 
         /// <summary>Writes one complete frame into <paramref name="dst"/>; returns the byte count written.</summary>
         public static int WriteFrame(byte[] dst, int offset, RelayFrameType type, ReadOnlySpan<byte> payload)
@@ -115,6 +147,11 @@ namespace Nova.Networking
 
         public static byte[] CreateOfferPayload(byte slot, byte[] activeSlots, ulong seed, uint inputDelayTicks, ulong serverDefinitionsHash64)
         {
+            if (activeSlots == null) throw new ArgumentNullException(nameof(activeSlots));
+            if (!IsSupportedInputDelay(inputDelayTicks))
+            {
+                throw new ArgumentOutOfRangeException(nameof(inputDelayTicks));
+            }
             var bytes = new byte[1 + 1 + activeSlots.Length + 8 + 4 + 8];
             bytes[0] = slot;
             bytes[1] = (byte)activeSlots.Length;
@@ -144,11 +181,16 @@ namespace Nova.Networking
             seed = ReadUInt64(payload, offset);
             inputDelayTicks = ReadUInt32(payload, offset + 8);
             serverDefinitionsHash64 = ReadUInt64(payload, offset + 12);
-            return true;
+            return IsSupportedInputDelay(inputDelayTicks);
         }
 
         public static byte[] CreateTickCompletePayload(byte slot, uint targetTick, int recordCount)
         {
+            if (targetTick == 0) throw new ArgumentOutOfRangeException(nameof(targetTick));
+            if (recordCount < 0 || recordCount > CommandLimits.MaxBatchRecordsPerTick)
+            {
+                throw new ArgumentOutOfRangeException(nameof(recordCount));
+            }
             var bytes = new byte[1 + 4 + 2];
             bytes[0] = slot;
             WriteUInt32(bytes, 1, targetTick);
@@ -165,7 +207,7 @@ namespace Nova.Networking
             slot = payload[0];
             targetTick = ReadUInt32(payload, 1);
             recordCount = ReadUInt16(payload, 5);
-            return true;
+            return targetTick != 0 && recordCount <= CommandLimits.MaxBatchRecordsPerTick;
         }
 
         public static byte[] CreateStateHashPayload(byte slot, uint tick, ulong stateHash)
@@ -252,19 +294,33 @@ namespace Nova.Networking
         /// </summary>
         public sealed class FrameCutter
         {
+            private const int MaxCarryBytes = MaxFramePayloadBytes + HeaderBytes;
             private byte[] _buffer = new byte[64 * 1024];
             private int _length;
+
+            /// <summary>
+            /// Bytes that may be read before callers must drain complete
+            /// frames. This keeps carry bounded to one maximum-size frame
+            /// even when more valid frames are already available on TCP.
+            /// </summary>
+            internal int RemainingCapacity => MaxCarryBytes - _length;
 
             /// <summary>Appends <paramref name="chunk"/> to the carry buffer.</summary>
             public void Feed(ReadOnlySpan<byte> chunk)
             {
-                if (_length + chunk.Length > _buffer.Length)
+                long requiredLong = (long)_length + chunk.Length;
+                if (requiredLong > MaxCarryBytes)
                 {
-                    int newSize = Math.Max(_buffer.Length * 2, _length + chunk.Length);
-                    if (newSize > MaxFramePayloadBytes + HeaderBytes)
-                    {
-                        throw new InvalidOperationException("Relay frame stream exceeds the protocol cap.");
-                    }
+                    throw new RelayFrameFormatException(
+                        "Relay frame carry exceeds the protocol cap; drain complete frames before feeding more bytes.");
+                }
+                int required = (int)requiredLong;
+                if (required > _buffer.Length)
+                {
+                    int grown = _buffer.Length <= MaxCarryBytes / 2
+                        ? _buffer.Length * 2
+                        : MaxCarryBytes;
+                    int newSize = Math.Max(grown, required);
                     var bigger = new byte[newSize];
                     Array.Copy(_buffer, 0, bigger, 0, _length);
                     _buffer = bigger;
@@ -282,7 +338,8 @@ namespace Nova.Networking
                 uint payloadLength = ReadUInt32(_buffer, 0);
                 if (payloadLength > MaxFramePayloadBytes)
                 {
-                    throw new InvalidOperationException($"Relay frame declares {payloadLength} payload bytes (cap {MaxFramePayloadBytes}).");
+                    throw new RelayFrameFormatException(
+                        $"Relay frame declares {payloadLength} payload bytes (cap {MaxFramePayloadBytes}).");
                 }
                 int frameBytes = HeaderBytes + (int)payloadLength;
                 if (_length < frameBytes) return false;

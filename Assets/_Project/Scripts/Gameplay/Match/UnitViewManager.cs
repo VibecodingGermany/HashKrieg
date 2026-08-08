@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Nova.Core;
 using Nova.Data;
+using Nova.Gameplay.CombatFeedback;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Combat;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.State;
@@ -23,9 +25,10 @@ namespace Nova.Gameplay.Match
     /// committed team view, which already contains the viewer's own entities
     /// plus every foreign entity standing in a <c>Visible</c> cell. The raw
     /// entity store is never iterated here, so no proxy exists for a hidden
-    /// entity and world picking cannot leak a target id. Entities that die or
-    /// leave vision return their view to a per-shape pool within the same
-    /// frame.
+    /// entity and world picking cannot leak a target id. Fog/ambiguous losses
+    /// return within the frame; a safely confirmed death is detached from
+    /// picking and held for its 0.8-second presentation before exact pool
+    /// return.
     /// </para>
     /// <para>
     /// Graybox readability: shape encodes the <see cref="UnitRole"/> and colour
@@ -91,6 +94,9 @@ namespace Nova.Gameplay.Match
         [SerializeField] private MatchRunner _matchRunner;
         [SerializeField] private GameObject _unitPrefab;
 
+        [Tooltip("Presentation-only combat effects. Added lazily for older generated scenes that predate Sprint 12B.")]
+        [SerializeField] private CombatEffectController _combatEffects;
+
         [Tooltip("Optional art-pipeline registry (ArtAssetAutoSync). A definition id with a registered PF_* prefab renders as that prefab; everything without one keeps its graybox primitive.")]
         [SerializeField] private AssetMappingRegistrySO _assetMappings;
         [SerializeField] private float _interpolationSpeed = 25f;
@@ -128,6 +134,9 @@ namespace Nova.Gameplay.Match
         // sweep is O(visible) instead of O(entity capacity).
         private readonly List<int> _activeIndices = new List<int>(256);
         private readonly List<EntityId> _visibleScratch = new List<EntityId>(256);
+        private readonly List<VisibleCombatSample> _combatSamples = new List<VisibleCombatSample>(256);
+        private readonly List<CombatFeedbackEvent> _combatEvents = new List<CombatFeedbackEvent>(64);
+        private readonly VisibleCombatFrameDiffer _combatDiffer = new VisibleCombatFrameDiffer();
         // Keyed by the view GameObject itself, NOT by GetInstanceID(): Unity 6
         // marks Object.GetInstanceID() obsolete-as-error (CS0619). Object
         // overrides Equals/GetHashCode by instance id, so the reference is a
@@ -137,6 +146,8 @@ namespace Nova.Gameplay.Match
         // Prefab views pool per SOURCE prefab, not globally: a recycled
         // Alliance-HQ instance must never resurface as a Legion-Harvester.
         private readonly Dictionary<GameObject, Stack<GameObject>> _prefabPools = new Dictionary<GameObject, Stack<GameObject>>();
+        private readonly List<DeathViewHold> _deathHolds = new List<DeathViewHold>(16);
+        private readonly Dictionary<Material, Material> _transparentMaterialCache = new Dictionary<Material, Material>();
         private MaterialPropertyBlock _propertyBlock;
         // Scratch for the all-renderers tint upload (no per-call allocation).
         private readonly List<Renderer> _tintScratch = new List<Renderer>(8);
@@ -166,6 +177,9 @@ namespace Nova.Gameplay.Match
         /// <summary>Number of entities that currently own a live view (i.e. are visible to the viewer team).</summary>
         public int VisibleViewCount => _activeIndices.Count;
 
+        /// <summary>Views currently held outside the slot table for the 0.8-second death presentation.</summary>
+        public int ActiveDeathHoldCount => _deathHolds.Count;
+
         /// <summary>
         /// Team slot whose committed Fog-of-War view drives the rendered set.
         /// Negative means "follow <see cref="MatchSession.LocalSlot"/>".
@@ -178,6 +192,7 @@ namespace Nova.Gameplay.Match
             _unitPrefab = unitPrefab;
 
             EnsureBuffers();
+            EnsureCombatEffects();
         }
 
         /// <summary>
@@ -190,6 +205,7 @@ namespace Nova.Gameplay.Match
             if (_viewerTeamOverride == team) return;
             _viewerTeamOverride = team;
             ReleaseAllViews();
+            ResetCombatFeedback();
         }
 
         /// <summary>
@@ -235,6 +251,7 @@ namespace Nova.Gameplay.Match
 
         private void LateUpdate()
         {
+            AdvanceDeathHolds(Time.deltaTime);
             if (_matchRunner == null || !_matchRunner.IsRunning) return;
 
             EntityManager entities = _matchRunner.Entities;
@@ -248,6 +265,7 @@ namespace Nova.Gameplay.Match
                     Debug.LogError("[UnitViewManager] No FogOfWarSystem on the MatchRunner; rendering nothing rather than revealing hidden entities.");
                 }
                 ReleaseAllViews();
+                ResetCombatFeedback();
                 return;
             }
 
@@ -260,10 +278,53 @@ namespace Nova.Gameplay.Match
             //    entities (own units included, foreign units only in Visible
             //    cells). Nothing here touches EntityManager.RawUnits.
             _visibleScratch.Clear();
+            _combatSamples.Clear();
             fog.GetVisibleEntities(viewerTeam, _visibleScratch);
 
-            float blend = 1f - Mathf.Exp(-Mathf.Max(0f, _interpolationSpeed) * Time.deltaTime);
+            // Build the complete fog-safe snapshot before touching a view.
+            // A dead slot can be recycled by the simulation in the same tick;
+            // diffing first lets BeginDeathHold detach the old object before
+            // the replacement is allowed to acquire from that pool.
+            for (int i = 0; i < _visibleScratch.Count; i++)
+            {
+                EntityId id = _visibleScratch[i];
+                if (!entities.TryGetUnit(id, out UnitState unit)) continue;
+                int slot = id.Index;
+                if (slot < 0 || slot >= _viewInstances.Length) continue;
 
+                WeaponProfile weapon = ResolveWeaponProfile(in unit);
+                _combatSamples.Add(new VisibleCombatSample(
+                    unit.Id,
+                    unit.PlayerId,
+                    unit.Role,
+                    CombatSamplePosition(slot, in unit),
+                    unit.CurrentHealth,
+                    unit.WeaponCooldownTicks,
+                    unit.AttackTarget,
+                    weapon.DamageType));
+            }
+
+            // The differ runs before the visibility sweep: a confirmed death
+            // can detach the old view from its slot while the exact pool key is
+            // still available. Fog/despawn losses never enter a death hold.
+            _combatEvents.Clear();
+            _combatDiffer.Observe(
+                _matchRunner.Kernel.CurrentTick.Value,
+                viewerTeam,
+                _combatSamples,
+                _combatEvents);
+            EnsureCombatEffects();
+            for (int i = 0; i < _combatEvents.Count; i++)
+            {
+                CombatFeedbackEvent feedback = _combatEvents[i];
+                if (feedback.Kind == CombatFeedbackKind.Death)
+                {
+                    BeginDeathHold(feedback.TargetId);
+                }
+            }
+            _combatEffects?.Present(_combatEvents);
+
+            float blend = 1f - Mathf.Exp(-Mathf.Max(0f, _interpolationSpeed) * Time.deltaTime);
             for (int i = 0; i < _visibleScratch.Count; i++)
             {
                 EntityId id = _visibleScratch[i];
@@ -299,10 +360,10 @@ namespace Nova.Gameplay.Match
                 ApplyTransform(slot, in unit, spawned ? 1f : blend);
             }
 
-            // 2) Everything that was not reported visible this frame died,
-            //    was despawned or slipped back under the fog: the view goes
-            //    back into the pool, it is never leaked and never left behind
-            //    as a pickable proxy.
+            // 2) Everything not visible now is either already detached into a
+            //    confirmed death hold, or is an ambiguous despawn/fog loss
+            //    that returns immediately. Neither path leaves a pickable
+            //    proxy behind.
             for (int i = _activeIndices.Count - 1; i >= 0; i--)
             {
                 int slot = _activeIndices[i];
@@ -314,6 +375,22 @@ namespace Nova.Gameplay.Match
                 _activeIndices[i] = _activeIndices[last];
                 _activeIndices.RemoveAt(last);
             }
+        }
+
+        private Vector3 CombatSamplePosition(int slot, in UnitState unit)
+        {
+            if (_viewInstances[slot] != null && _boundIds[slot] == unit.Id)
+            {
+                return _viewInstances[slot].transform.position;
+            }
+
+            // New rows have no view yet. This copied fallback is used for the
+            // 2D UnitReady cue and as a safe baseline only; shots cannot occur
+            // until a subsequent observation has a bound view.
+            return new Vector3(
+                unit.Transform.PositionX.ToFloat(),
+                SimDefinitions.IsBuildingRole(unit.Role) ? 0.5f : 0.4f,
+                unit.Transform.PositionY.ToFloat());
         }
 
         private byte ResolveViewerTeam(FogOfWarSystem fog)
@@ -367,8 +444,10 @@ namespace Nova.Gameplay.Match
             // LateUpdate loop never grows a backing array mid-match.
             if (_visibleScratch.Capacity < capacity) _visibleScratch.Capacity = capacity;
             if (_activeIndices.Capacity < capacity) _activeIndices.Capacity = capacity;
+            if (_combatSamples.Capacity < capacity) _combatSamples.Capacity = capacity;
 
             if (_propertyBlock == null) _propertyBlock = new MaterialPropertyBlock();
+            _combatDiffer.Reset(capacity);
         }
 
         private void AcquireView(int slot, in UnitState unit)
@@ -556,12 +635,153 @@ namespace Nova.Gameplay.Match
             }
 
             _viewObjectToSlot.Remove(instance);
+            int shapeKey = _viewShapeKeys[slot];
+            GameObject sourcePrefab = _viewSourcePrefabs[slot];
+            ReturnInstanceToPool(instance, shapeKey, sourcePrefab);
+
+            _viewInstances[slot] = null;
+            _viewRenderers[slot] = null;
+            _boundIds[slot] = EntityId.Invalid;
+            _viewSourcePrefabs[slot] = null;
+            _viewOwners[slot] = -1;
+            _viewHealthSteps[slot] = -1;
+        }
+
+        /// <summary>
+        /// Detaches a confirmed corpse from the slot table immediately while
+        /// retaining the exact primitive/prefab pool identity until its short
+        /// death presentation completes. The slot is therefore free for a new
+        /// EntityId version without ever reusing the corpse object.
+        /// </summary>
+        private bool BeginDeathHold(EntityId id)
+        {
+            if (_viewInstances == null || !id.IsValid) return false;
+            int slot = id.Index;
+            if (slot < 0 || slot >= _viewInstances.Length) return false;
+            if (_boundIds[slot] != id || _viewInstances[slot] == null) return false;
+
+            GameObject instance = _viewInstances[slot];
+            _viewObjectToSlot.Remove(instance);
+
+            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(includeInactive: true);
+            Collider[] colliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
+            var originalMaterials = new Material[renderers.Length][];
+            var originalColors = new Color[renderers.Length];
+            var colliderStates = new bool[colliders.Length];
+
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                colliderStates[i] = colliders[i] != null && colliders[i].enabled;
+                if (colliders[i] != null) colliders[i].enabled = false;
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null) continue;
+
+                originalMaterials[i] = renderer.sharedMaterials;
+                var transparent = new Material[originalMaterials[i].Length];
+                for (int m = 0; m < transparent.Length; m++)
+                {
+                    transparent[m] = TransparentVariant(originalMaterials[i][m]);
+                }
+                renderer.sharedMaterials = transparent;
+
+                _propertyBlock.Clear();
+                renderer.GetPropertyBlock(_propertyBlock);
+                Color color = _propertyBlock.GetColor("_BaseColor");
+                if (color == default) color = _propertyBlock.GetColor("_Color");
+                if (color == default) color = Color.white;
+                originalColors[i] = color;
+            }
+
+            _deathHolds.Add(new DeathViewHold(
+                instance,
+                _viewShapeKeys[slot],
+                _viewSourcePrefabs[slot],
+                instance.transform.position,
+                renderers,
+                originalMaterials,
+                originalColors,
+                colliders,
+                colliderStates,
+                SimDefinitions.IsBuildingRole(_viewRoles[slot])));
+
+            // Detach only. The active-slot sweep owns _tracked/_activeIndices
+            // and removes this slot later in the same LateUpdate.
+            _viewInstances[slot] = null;
+            _viewRenderers[slot] = null;
+            _boundIds[slot] = EntityId.Invalid;
+            _viewSourcePrefabs[slot] = null;
+            _viewOwners[slot] = -1;
+            _viewHealthSteps[slot] = -1;
+            return true;
+        }
+
+        private void AdvanceDeathHolds(float deltaTime)
+        {
+            if (_deathHolds.Count == 0) return;
+            float dt = Mathf.Max(0f, deltaTime);
+            for (int i = _deathHolds.Count - 1; i >= 0; i--)
+            {
+                DeathViewHold hold = _deathHolds[i];
+                hold.Elapsed += dt;
+                float t = Mathf.Clamp01(hold.Elapsed / DeathViewHold.DurationSeconds);
+                float eased = t * t * (3f - 2f * t);
+                float sink = hold.IsBuilding ? 0.65f : 0.45f;
+                hold.Instance.transform.position = hold.StartPosition + Vector3.down * (sink * eased);
+
+                for (int r = 0; r < hold.Renderers.Length; r++)
+                {
+                    Renderer renderer = hold.Renderers[r];
+                    if (renderer == null) continue;
+                    Color color = hold.OriginalColors[r];
+                    color.a *= 1f - eased;
+                    _propertyBlock.Clear();
+                    FactionTint.ApplyToPropertyBlock(_propertyBlock, color);
+                    renderer.SetPropertyBlock(_propertyBlock);
+                }
+
+                if (t >= 1f) CompleteDeathHoldAt(i);
+            }
+        }
+
+        private void CompleteDeathHoldAt(int index)
+        {
+            DeathViewHold hold = _deathHolds[index];
+            _deathHolds.RemoveAt(index);
+
+            for (int r = 0; r < hold.Renderers.Length; r++)
+            {
+                Renderer renderer = hold.Renderers[r];
+                if (renderer == null) continue;
+                renderer.sharedMaterials = hold.OriginalMaterials[r] ?? Array.Empty<Material>();
+                renderer.SetPropertyBlock(null);
+            }
+            for (int c = 0; c < hold.Colliders.Length; c++)
+            {
+                if (hold.Colliders[c] != null) hold.Colliders[c].enabled = hold.ColliderStates[c];
+            }
+            hold.Instance.transform.position = hold.StartPosition;
+            ReturnInstanceToPool(hold.Instance, hold.ShapeKey, hold.SourcePrefab);
+        }
+
+        private void CompleteAllDeathHolds()
+        {
+            for (int i = _deathHolds.Count - 1; i >= 0; i--)
+            {
+                CompleteDeathHoldAt(i);
+            }
+        }
+
+        private void ReturnInstanceToPool(GameObject instance, int shapeKey, GameObject sourcePrefab)
+        {
+            if (instance == null) return;
             instance.SetActive(false);
 
-            int shapeKey = _viewShapeKeys[slot];
             if (shapeKey == PrefabShapeKey)
             {
-                GameObject sourcePrefab = _viewSourcePrefabs[slot];
                 if (sourcePrefab != null)
                 {
                     if (!_prefabPools.TryGetValue(sourcePrefab, out Stack<GameObject> prefabPool))
@@ -577,24 +797,72 @@ namespace Nova.Gameplay.Match
                     // destroy rather than pool under a lost key.
                     Destroy(instance);
                 }
-            }
-            else
-            {
-                Stack<GameObject> pool = _shapePools[shapeKey];
-                if (pool == null)
-                {
-                    pool = new Stack<GameObject>();
-                    _shapePools[shapeKey] = pool;
-                }
-                pool.Push(instance);
+                return;
             }
 
-            _viewInstances[slot] = null;
-            _viewRenderers[slot] = null;
-            _boundIds[slot] = EntityId.Invalid;
-            _viewSourcePrefabs[slot] = null;
-            _viewOwners[slot] = -1;
-            _viewHealthSteps[slot] = -1;
+            Stack<GameObject> pool = _shapePools[shapeKey];
+            if (pool == null)
+            {
+                pool = new Stack<GameObject>();
+                _shapePools[shapeKey] = pool;
+            }
+            pool.Push(instance);
+        }
+
+        private Material TransparentVariant(Material source)
+        {
+            if (source == null) return null;
+            if (_transparentMaterialCache.TryGetValue(source, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+
+            var material = new Material(source)
+            {
+                name = source.name + "_DeathFade",
+                hideFlags = HideFlags.HideAndDontSave,
+                renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent,
+            };
+            if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+            if (material.HasProperty("_ZWrite")) material.SetFloat("_ZWrite", 0f);
+            if (material.HasProperty("_SrcBlend"))
+            {
+                material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            }
+            if (material.HasProperty("_DstBlend"))
+            {
+                material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            }
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.DisableKeyword("_ALPHATEST_ON");
+            _transparentMaterialCache[source] = material;
+            return material;
+        }
+
+        private WeaponProfile ResolveWeaponProfile(in UnitState unit)
+        {
+            EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
+            if (economy == null || unit.PlayerId >= EconomySystem.MaxPlayers)
+            {
+                return WeaponProfiles.Fallback;
+            }
+            return WeaponProfiles.Get(economy.GetSlotFaction(unit.PlayerId), unit.Role);
+        }
+
+        private void EnsureCombatEffects()
+        {
+            if (_combatEffects != null) return;
+            _combatEffects = GetComponent<CombatEffectController>();
+            if (_combatEffects == null) _combatEffects = gameObject.AddComponent<CombatEffectController>();
+        }
+
+        private void ResetCombatFeedback()
+        {
+            _combatDiffer.Reset(_viewInstances != null ? _viewInstances.Length : 0);
+            _combatSamples.Clear();
+            _combatEvents.Clear();
+            CompleteAllDeathHolds();
+            _combatEffects?.ResetEffects();
         }
 
         private void ApplyTransform(int slot, in UnitState unit, float blend)
@@ -848,6 +1116,7 @@ namespace Nova.Gameplay.Match
         public void ResetViews()
         {
             ReleaseAllViews();
+            ResetCombatFeedback();
             if (_viewInstances == null) return;
             for (int i = 0; i < _viewInstances.Length; i++)
             {
@@ -863,6 +1132,7 @@ namespace Nova.Gameplay.Match
 
         private void ReleaseAllViews()
         {
+            CompleteAllDeathHolds();
             if (_viewInstances != null)
             {
                 for (int i = 0; i < _activeIndices.Count; i++)
@@ -879,6 +1149,7 @@ namespace Nova.Gameplay.Match
         private void OnDestroy()
         {
             ReleaseAllViews();
+            _combatEffects?.ResetEffects();
 
             for (int i = 0; i < _shapePools.Length; i++)
             {
@@ -902,10 +1173,57 @@ namespace Nova.Gameplay.Match
             }
             _prefabPools.Clear();
 
+            foreach (Material material in _transparentMaterialCache.Values)
+            {
+                if (material != null) Destroy(material);
+            }
+            _transparentMaterialCache.Clear();
+
             if (_primitiveMaterial != null)
             {
                 Destroy(_primitiveMaterial);
                 _primitiveMaterial = null;
+            }
+        }
+
+        private sealed class DeathViewHold
+        {
+            public const float DurationSeconds = 0.8f;
+
+            public GameObject Instance { get; }
+            public int ShapeKey { get; }
+            public GameObject SourcePrefab { get; }
+            public Vector3 StartPosition { get; }
+            public Renderer[] Renderers { get; }
+            public Material[][] OriginalMaterials { get; }
+            public Color[] OriginalColors { get; }
+            public Collider[] Colliders { get; }
+            public bool[] ColliderStates { get; }
+            public bool IsBuilding { get; }
+            public float Elapsed;
+
+            public DeathViewHold(
+                GameObject instance,
+                int shapeKey,
+                GameObject sourcePrefab,
+                Vector3 startPosition,
+                Renderer[] renderers,
+                Material[][] originalMaterials,
+                Color[] originalColors,
+                Collider[] colliders,
+                bool[] colliderStates,
+                bool isBuilding)
+            {
+                Instance = instance;
+                ShapeKey = shapeKey;
+                SourcePrefab = sourcePrefab;
+                StartPosition = startPosition;
+                Renderers = renderers;
+                OriginalMaterials = originalMaterials;
+                OriginalColors = originalColors;
+                Colliders = colliders;
+                ColliderStates = colliderStates;
+                IsBuilding = isBuilding;
             }
         }
     }

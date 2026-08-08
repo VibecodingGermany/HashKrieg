@@ -3,11 +3,10 @@ using UnityEngine;
 namespace Nova.Presentation.UI
 {
     /// <summary>
-    /// The menu track. One <see cref="AudioSource"/>, no AudioMixer: the
-    /// settings map straight onto <c>AudioSource.volume</c>, which is the
-    /// whole audio surface the project has (there is exactly one sound in the
-    /// game, and mixer buses would be infrastructure for a bus that carries
-    /// nothing).
+    /// The menu track. Its legacy <see cref="AudioSource"/> is routed to the
+    /// D-090 Music mixer group by the generated scene while this component
+    /// retains the already-proven loop and live-volume lifecycle. Moving both
+    /// music controllers behind IAudioService remains a documented follow-up.
     /// <para>
     /// LIVE VOLUME is the point of this component: it subscribes to
     /// <see cref="GameSettingsStore.Applied"/> and the settings panel

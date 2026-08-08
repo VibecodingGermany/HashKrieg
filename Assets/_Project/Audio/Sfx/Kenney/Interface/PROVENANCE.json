@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "audio-batch-v1",
+  "assetId": "kenney.sfx.interface-sounds",
+  "originType": "cc0-import",
+  "sourceName": "Kenney Interface Sounds 1.0",
+  "sourceUrl": "https://kenney.nl/assets/interface-sounds",
+  "licenseId": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrievedAt": "2026-08-07",
+  "sourceFileHash": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+  "attributionRequired": false,
+  "attributionText": "",
+  "redistributionAllowed": true,
+  "modifications": "Unveränderte OGG-Quelldateien; nur eine kuratierte Teilmenge wurde übernommen.",
+  "derivedFrom": "",
+  "evidenceStatus": "complete-under-D-090-tier-1-exception",
+  "verifiedBy": "",
+  "verifiedAt": "",
+  "verificationException": {
+    "decisionId": "D-090",
+    "reason": "Governance Tier 1: keine zweite menschliche Prüferin bzw. kein zweiter menschlicher Prüfer verfügbar. ZIP-, Lizenz- und Einzelhashes wurden technisch verifiziert."
+  },
+  "files": [
+    { "sourcePath": "Audio/click_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_001.ogg", "sourceSha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9", "targetSha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9" },
+    { "sourcePath": "Audio/click_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_002.ogg", "sourceSha256": "adcd1f4adc35f1b41bc1b5bbefeff7aa44f2f3f0d96d3199b544140c7c1e761c", "targetSha256": "adcd1f4adc35f1b41bc1b5bbefeff7aa44f2f3f0d96d3199b544140c7c1e761c" },
+    { "sourcePath": "Audio/click_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/click_003.ogg", "sourceSha256": "2fa929138bc3a0f432696588f66eac94b8f6d463905ec8808c6461ce4b054292", "targetSha256": "2fa929138bc3a0f432696588f66eac94b8f6d463905ec8808c6461ce4b054292" },
+    { "sourcePath": "Audio/select_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_001.ogg", "sourceSha256": "aec0c31ea934a35936ae0d2ab8fac8123c93aa5647f935853a58dbaf90278b7a", "targetSha256": "aec0c31ea934a35936ae0d2ab8fac8123c93aa5647f935853a58dbaf90278b7a" },
+    { "sourcePath": "Audio/select_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_002.ogg", "sourceSha256": "4cc6ac5341b9b2c86fef80c347de028e9ab9f2e037586ac7d9fa59a403a1c012", "targetSha256": "4cc6ac5341b9b2c86fef80c347de028e9ab9f2e037586ac7d9fa59a403a1c012" },
+    { "sourcePath": "Audio/select_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/select_003.ogg", "sourceSha256": "9a612fd2f513d52a296906b41071c990f75defe56be3bee60d2d4e2423b51b8b", "targetSha256": "9a612fd2f513d52a296906b41071c990f75defe56be3bee60d2d4e2423b51b8b" },
+    { "sourcePath": "Audio/confirmation_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_001.ogg", "sourceSha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a", "targetSha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a" },
+    { "sourcePath": "Audio/confirmation_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_002.ogg", "sourceSha256": "33b17a9a9a2397c62b285c52c33a907fdffb476909c99e42dde603f6a7a8b12c", "targetSha256": "33b17a9a9a2397c62b285c52c33a907fdffb476909c99e42dde603f6a7a8b12c" },
+    { "sourcePath": "Audio/confirmation_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_003.ogg", "sourceSha256": "3091bf0be0497f825769ee0733ca7bdc3bcd59bd6c6e8f2ba8f93d580ff38022", "targetSha256": "3091bf0be0497f825769ee0733ca7bdc3bcd59bd6c6e8f2ba8f93d580ff38022" },
+    { "sourcePath": "Audio/confirmation_004.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/confirmation_004.ogg", "sourceSha256": "568967a3d9f8a8f6af54ea01729c4882284308f2a27d78c07ffd7ee0d6951661", "targetSha256": "568967a3d9f8a8f6af54ea01729c4882284308f2a27d78c07ffd7ee0d6951661" },
+    { "sourcePath": "Audio/error_001.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_001.ogg", "sourceSha256": "46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433", "targetSha256": "46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433" },
+    { "sourcePath": "Audio/error_002.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_002.ogg", "sourceSha256": "76810ec365f41078fd0507101da5bb7b8730fe011dde43908329fdabd8575e79", "targetSha256": "76810ec365f41078fd0507101da5bb7b8730fe011dde43908329fdabd8575e79" },
+    { "sourcePath": "Audio/error_003.ogg", "targetPath": "Assets/_Project/Audio/Sfx/Kenney/Interface/error_003.ogg", "sourceSha256": "885b28175c7b511118bcffab95675b48bbac9005cf6514656ebdad979276b3ab", "targetSha256": "885b28175c7b511118bcffab95675b48bbac9005cf6514656ebdad979276b3ab" }
+  ]
+}

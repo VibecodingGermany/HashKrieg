@@ -99,6 +99,13 @@ namespace Nova.Simulation.CommandsV1
         /// </summary>
         public CommandIngressResult TrySubmitIntent(in CommandIntent intent, out CommandRejectReason reason)
         {
+            if (_transport is ICommandSubmissionReadiness readiness
+                && !readiness.IsReadyForCommandSubmission)
+            {
+                reason = CommandRejectReason.TransportNotReady;
+                return CommandIngressResult.Rejected;
+            }
+
             if (CommandKindInfo.IsSessionAction(intent.Kind))
             {
                 return TryQueueSessionAction(intent, out reason);

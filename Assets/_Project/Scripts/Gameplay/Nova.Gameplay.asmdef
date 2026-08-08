@@ -5,7 +5,8 @@
         "Nova.Core",
         "Nova.Simulation",
         "Nova.AI",
-        "Nova.Data"
+        "Nova.Data",
+        "Nova.Networking"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

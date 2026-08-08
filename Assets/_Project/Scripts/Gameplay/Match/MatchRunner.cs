@@ -10,6 +10,7 @@ using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
+using Nova.Networking;
 
 namespace Nova.Gameplay.Match
 {
@@ -76,6 +77,9 @@ namespace Nova.Gameplay.Match
         private float _timeAccumulator;
         private LocalLoopbackTransport _transport;
         private AiPeerCommandTransport _aiTransport;
+        private RelayMatchClient _relayClient;
+        private MatchConfig _config;
+        private bool _kernelStarted;
 
         public SimulationKernel Kernel { get; private set; }
         public EntityManager Entities { get; private set; }
@@ -106,6 +110,25 @@ namespace Nova.Gameplay.Match
 
         /// <summary>Session authority binding the local player slot (MS-1: slot 0 of {0, 1}).</summary>
         public MatchSession Session { get; private set; }
+
+        /// <summary>Validated, ownership-safe configuration of the current match.</summary>
+        public MatchConfig Config => _config?.ValidateAndClone();
+
+        /// <summary>The bound relay client, or null for the canonical local match.</summary>
+        public RelayMatchClient RelayClient => _relayClient;
+
+        /// <summary>True when this runner was initialized with a relay transport.</summary>
+        public bool IsRelayMatch => _relayClient != null;
+
+        /// <summary>Local input is always allowed; relay input starts only after the authoritative Start frame.</summary>
+        public bool RelayCommandsAllowed =>
+            _relayClient == null || _relayClient.Phase == RelayClientPhase.Running;
+
+        /// <summary>Terminal relay reason for presentation, empty while no terminal reason exists.</summary>
+        public string RelayEndReason =>
+            _relayClient != null && _relayClient.Phase == RelayClientPhase.Ended
+                ? _relayClient.EndReason
+                : string.Empty;
 
         /// <summary>The only command entry point for UI and AI (intent in, sealed batch out).</summary>
         public CommandIngress Ingress { get; private set; }
@@ -148,10 +171,34 @@ namespace Nova.Gameplay.Match
         public void InitializeMatch(ulong seed, ushort width = 128, ushort height = 128, int maxUnits = 2048,
             long startingCredits = EconomySystem.CanonicalMatchStartingCreditsAE, bool enableSkirmishAi = true)
         {
-            _seed = seed;
-            _mapWidth = width;
-            _mapHeight = height;
-            _maxUnits = maxUnits;
+            MatchConfig config = MatchConfig.LocalVsAi(seed, width, height, maxUnits, startingCredits);
+            if (!enableSkirmishAi) config.AiSlots = Array.Empty<byte>();
+            InitializeMatch(config);
+        }
+
+        /// <summary>
+        /// Builds the complete host from a validated A6 configuration. The
+        /// source is cloned before any state is created, so later caller
+        /// mutation cannot change slot authority, factions, AI ownership or
+        /// input delay of a running match.
+        /// </summary>
+        public void InitializeMatch(MatchConfig config)
+        {
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            _config = config.ValidateAndClone();
+
+            _seed = _config.Seed;
+            _mapWidth = _config.MapWidth;
+            _mapHeight = _config.MapHeight;
+            _maxUnits = _config.EntityCapacity;
+
+            _transport = null;
+            _aiTransport = null;
+            _relayClient = _config.Transport;
+            _kernelStarted = false;
+            AiSession = null;
+            AiIngress = null;
+            SkirmishAi = null;
 
             var random = new SimRandom(_seed);
             var logger = new UnityNovaLogger();
@@ -160,19 +207,27 @@ namespace Nova.Gameplay.Match
             Entities = new EntityManager(_maxUnits);
             Pathfinding = new PathfindingSystem(_mapWidth, _mapHeight);
             Movement = new MovementSystem(Entities, Pathfinding);
-            Economy = new EconomySystem(Entities, startingCredits);
+            Economy = new EconomySystem(Entities, _config.StartingCredits);
             Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy, Pathfinding.CostField);
             Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, teamCount: 2, _mapWidth, _mapHeight);
             Combat = new CombatSystem(Entities, FogOfWar, Economy);
             Victory = new Simulation.Victory.VictorySystem(Entities, Construction);
 
-            Session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
+            Session = new MatchSession(_config.LocalSlot, _config.ActiveSlots, _config.InputDelayTicks);
             Ingress = new CommandIngress(Session);
-            _transport = new LocalLoopbackTransport(Ingress);
-
-            if (enableSkirmishAi)
+            if (_relayClient != null)
             {
+                _relayClient.BindIngress(Ingress);
+            }
+            else
+            {
+                _transport = new LocalLoopbackTransport(Ingress);
+            }
+
+            if (_config.AiSlots.Length == 1)
+            {
+                byte aiSlot = _config.AiSlots[0];
                 // The MS-1 skirmish opponent is a session PEER (AIArchitecture.md
                 // section 1): it owns a slot-1 session and ingress of its own,
                 // so its commands are sealed by the same session authority as a
@@ -180,12 +235,12 @@ namespace Nova.Gameplay.Match
                 // tick itself. The peer transport forwards its records into the
                 // host ingress's validating intake, byte-for-byte the path a
                 // network peer's records will take.
-                AiSession = new MatchSession(localSlot: 1, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
+                AiSession = new MatchSession(aiSlot, _config.ActiveSlots, _config.InputDelayTicks);
                 AiIngress = new CommandIngress(AiSession);
                 _aiTransport = new AiPeerCommandTransport(AiIngress, Ingress);
                 SkirmishAi = new SkirmishAiSystem(
-                    aiPlayerId: 1,
-                    new AiFactionProfile("Legion",
+                    aiPlayerId: aiSlot,
+                    new AiFactionProfile(_config.FactionPerSlot[aiSlot].ToString(),
                         targetPowerMargin: 0,     // power plant only when the margin would go negative
                         targetArmySize: 12,
                         attackSquadThreshold: 6,
@@ -221,27 +276,64 @@ namespace Nova.Gameplay.Match
             Kernel.BindCommands(new UnitCommandStateView(Entities, Pathfinding, Economy, Construction, Production), Ingress);
         }
 
-        public void StartMatch()
+        /// <summary>
+        /// Starts a freshly initialized kernel. A relay-backed kernel may be
+        /// started exactly once: restarting it would reset the simulation
+        /// tick while the remote peer keeps advancing.
+        /// </summary>
+        public bool StartMatch()
         {
+            if (_relayClient != null && _kernelStarted)
+            {
+                Debug.LogError("[MatchRunner] Relay match start/resume refused: a started network kernel cannot be reset.");
+                return false;
+            }
             if (Kernel == null)
             {
-                InitializeMatch(_seed, _mapWidth, _mapHeight, _maxUnits);
+                InitializeMatch(MatchConfig.LocalVsAi(
+                    _seed, _mapWidth, _mapHeight, _maxUnits,
+                    EconomySystem.CanonicalMatchStartingCreditsAE));
             }
 
             _timeAccumulator = 0f;
             Kernel.Start();
+            _kernelStarted = true;
+            return true;
         }
 
-        public void PauseMatch()
+        /// <summary>Pauses a local match. Relay matches cannot pause independently of their peer.</summary>
+        public bool PauseMatch()
         {
+            if (_relayClient != null)
+            {
+                Debug.LogError("[MatchRunner] Local pause refused for a relay match.");
+                return false;
+            }
             if (IsRunning)
             {
                 Kernel.Stop();
             }
+            return true;
+        }
+
+        /// <summary>Ordered terminal stop used only by the network lifecycle owner.</summary>
+        internal void StopNetworkMatch()
+        {
+            _timeAccumulator = 0f;
+            if (IsRunning) Kernel.Stop();
         }
 
         private void Update()
         {
+            // Network progress must never depend on simulation progress: the
+            // relay is pumped during handshake, pause and lockstep stalls.
+            _relayClient?.Poll();
+
+            if (_relayClient != null && _relayClient.Phase == RelayClientPhase.Ended)
+            {
+                StopNetworkMatch();
+                return;
+            }
             if (!IsRunning) return;
 
             _timeAccumulator += Time.deltaTime;
@@ -249,7 +341,14 @@ namespace Nova.Gameplay.Match
             // Step fixed 10-Hz simulation ticks
             while (_timeAccumulator >= TickDeltaTime)
             {
-                StepFixedTick();
+                if (!TryStepFixedTick())
+                {
+                    // Do not bank wall-clock time during a stall. Releasing
+                    // the barrier resumes at 10 Hz instead of fast-forwarding
+                    // through a catch-up burst.
+                    _timeAccumulator = 0f;
+                    break;
+                }
                 _timeAccumulator -= TickDeltaTime;
             }
         }
@@ -269,8 +368,14 @@ namespace Nova.Gameplay.Match
         /// queue.
         /// </para>
         /// </summary>
-        private void StepFixedTick()
+        private bool TryStepFixedTick()
         {
+            if (_relayClient != null)
+            {
+                if (!_relayClient.TryStepTick(Kernel)) return false;
+                return true;
+            }
+
             uint nextTick = Kernel.CurrentTick.Value + 1;
             CommandBatch batch = Ingress.SealTickBatch(nextTick);
             if (batch.Count > 0)
@@ -280,6 +385,7 @@ namespace Nova.Gameplay.Match
             AiSession?.AdvanceTick();
             Kernel.StepTick();
             Session.AdvanceTick();
+            return true;
         }
 
         private void OnDestroy()
@@ -288,6 +394,7 @@ namespace Nova.Gameplay.Match
             {
                 Kernel.Stop();
             }
+            _relayClient?.Disconnect();
         }
     }
 }

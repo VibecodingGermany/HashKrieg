@@ -1,6 +1,6 @@
 # Lizenz-Register
 
-**Version:** 1.5.0 | **Status:** sprint-freigegeben (laufend fortzuschreiben) | **Verantwortungsbereich:** Producer / Technical Director / Project Owner | **Sprint:** 5
+**Version:** 1.6.0 | **Status:** sprint-freigegeben (laufend fortzuschreiben) | **Verantwortungsbereich:** Producer / Technical Director / Project Owner | **Sprint:** 12
 
 ## Zweck
 
@@ -53,6 +53,9 @@ _Import-Protokoll – laufend zu befüllen._ Jede freigegebene CC0-/KI-Quelle er
 | Datum | Paket/Quelle | Lizenztyp | Seats | Kosten | Attribution nötig? | Repo-Freigabe |
 |---|---|---|---|---|---|---|
 | 2026-07-24 | Quaternius Sci-Fi & Kenney Kits | CC0 | unbegrenzt | 0 € | nein | Ja (öffentliches Repo) |
+| 2026-08-07 | Kenney – Sci-Fi Sounds 1.0 (`Assets/_Project/Audio/Sfx/Kenney/SciFi`) | CC0 1.0 | unbegrenzt | 0 € | nein | Ja (öffentliches Repo) |
+| 2026-08-07 | Kenney – Impact Sounds 1.0 (`Assets/_Project/Audio/Sfx/Kenney/Impact`) | CC0 1.0 | unbegrenzt | 0 € | nein | Ja (öffentliches Repo) |
+| 2026-08-07 | Kenney – Interface Sounds 1.0 (`Assets/_Project/Audio/Sfx/Kenney/Interface`) | CC0 1.0 | unbegrenzt | 0 € | nein | Ja (öffentliches Repo) |
 | 2026-08-06 | Suno (Bezahltarif) – Menümusik `Assets/_Project/Audio/Music/MUS_MainMenu_Hashkrieg.ogg` | kommerziell, Output-Eigentum beim Nutzer[^3] | unbegrenzt | Abotarif des Inhabers (benannte Ausnahme zu Regel 5) | nein | Ja (öffentliches Repo) |
 | 2026-08-07 | Suno (Bezahltarif) – Ingame-Musik `Assets/_Project/Audio/Music/MUS_Ingame_Hashkrieg_01..03.ogg` (Themen 1_orc / 2 (2) / 3 (1), nach OGG-Vorbis konvertiert) | kommerziell, Output-Eigentum beim Nutzer[^3] | unbegrenzt | Abotarif des Inhabers (Ausnahme-Erweiterung Regel 5, D-086) | nein | Ja (öffentliches Repo) |
 | 2026-08-06 | OpenAI Image API (gpt-image-1) – Key Art `Assets/_Project/UI/UI_KeyArt_MainMenu.jpg` | kommerziell, Output-Eigentum beim Nutzer | unbegrenzt | 0 € | nein | Ja (öffentliches Repo) |
@@ -63,7 +66,13 @@ _Import-Protokoll – laufend zu befüllen._ Jede freigegebene CC0-/KI-Quelle er
 - **`CREDITS.md`** wird mit dem ersten CC-BY-Import angelegt (keine Platzhalter-Dokumente, [../meta/DocumentationStandard.md](../meta/DocumentationStandard.md)).
 - **Der Import vom 2026-08-06 löst `CREDITS.md` nicht aus — geprüft, entschieden, nicht offen gelassen.** Regel 2 bindet die Attributionspflicht ausdrücklich an CC-BY. Keine der drei neuen Quellen ist CC-BY: Suno und OpenAI Image API verlangen keine Namensnennung, und OFL-1.1 verlangt sie ebenfalls nicht — es verlangt die Mitlieferung des Lizenztextes, was etwas anderes ist. Der Rajdhani-Copyright-Header nennt zudem **keinen** „Reserved Font Name", die Umbenennungsklausel greift also nicht. `CREDITS.md` bleibt damit unangelegt, bis wirklich ein CC-BY-Asset importiert wird. Wer diese Prüfung später wiederholt: der Auslöser ist die Lizenz, nicht die Zahl der Quellen.
 - **OFL-1.1-Beilagepflicht.** `Assets/_Project/UI/Fonts/OFL.txt` muss bei jeder Weitergabe der Schriftdateien mitgehen — Repo, Build und Paket gleichermaßen. Wer die Fonts verschiebt oder umbenennt, verschiebt die Lizenzdatei mit; ohne sie ist die Weitergabe nicht gedeckt.
-- **Provenienznachweis für die drei Neuzugänge fehlt noch.** [Provenance.md](Provenance.md) verlangt vor der Repo-Aufnahme je Asset einen `PROVENANCE.json`-Sidecar plus Eintrag in `provenance-ledger.json` — ausdrücklich auch für Audio und Fonts. Key Art, Menümusik und die beiden TTFs liegen im Arbeitsbaum, ohne dass diese Datensätze existieren. Die Ledger-Zeilen oben decken die **Lizenzlage**, nicht den Herkunftsnachweis je Datei; die KI-Pflichtfelder (`promptText`, `providerTermsUrl`, `providerTermsRetrievedAt`, wörtliches `outputOwnership`-Zitat) kann nur der Inhaber liefern.
+- **Audio-Provenienz D-090:** Die drei Kenney-Pack-Sidecars und ihre
+  `files[]`-Hashes liegen vor. Das Musik-Sidecar erfasst Menü- und drei
+  Ingame-Tracks, bleibt aber bei allen vier Datensätzen `incomplete`, weil
+  echte Ursprungs- oder Konvertierungsbelege fehlen. Diese Lücken werden nicht
+  durch Vermutungen geschlossen. Für Key Art und die beiden TTFs fehlen die
+  in [Provenance.md](Provenance.md) verlangten Asset-Datensätze weiterhin; die
+  KI-Pflichtfelder kann nur der Inhaber mit Originalbelegen liefern.
 
 ## Nächste Schritte
 
@@ -80,3 +89,4 @@ _Import-Protokoll – laufend zu befüllen._ Jede freigegebene CC0-/KI-Quelle er
 | 1.2.0 | 2026-07-25 | Hunyuan3D-Zeile in §1 korrigiert und in Meshes/Modellgewichte/Vorgängerversionen aufgeteilt (Beleg: SourceCatalog_MS1.md); Anbieter-Whitelist/-Blacklist für Repo-Assets und harte 0-€-Regel für MS-1 als Regeln 5–6 in §2 ergänzt; KI-Tools- und Sketchfab-Zeilen in §1 präzisiert (Meshy/Tripo3D Free-Tier gesperrt für Repo, Sketchfab nur nach Einzelprüfung) | Producer |
 | 1.4.0 | 2026-08-06 | Menü-Assetimport freigegeben (D-083): §1 um Suno (Bezahltarif, mit Fußnote [^3] zur fehlenden eigenen AGB-Prüfung) und SIL Open Font License 1.1 erweitert; §2 Regel 5 um die zweckgebundene Suno-Ausnahme und Regel 6 um beide Quellen ergänzt; §3 Ledger um Menümusik, Key Art und Rajdhani mit konkreten Dateipfaden befüllt; unter „Offene Punkte" entschieden, dass dieser Import **keine** `CREDITS.md` auslöst (keine CC-BY-Quelle), dazu OFL-Beilagepflicht und fehlende `PROVENANCE.json`-Datensätze vermerkt | Project Owner / Producer |
 | 1.5.0 | 2026-08-07 | Ingame-Musik freigegeben (D-086): Regel-5-Ausnahme um die drei Ingame-Themen erweitert (dieselbe Quelle/Tarif/Rechtslage); §3-Ledger um `MUS_Ingame_Hashkrieg_01..03.ogg` ergänzt (OGG-Vorbis-Konvertierung aus den Suno-MP3s; Prompt-/Provenienzfelder stehen wie bei der Menümusik beim Inhaber aus) | Project Owner / Agent (Protokoll) |
+| 1.6.0 | 2026-08-08 | Drei Kenney-Audiopacks als konkrete CC0-Importe mit 0 €, ohne Attribution und mit öffentlicher Repo-Freigabe erfasst; Musik-Sidecar als vorhanden, aber ehrlich unvollständig präzisiert | Producer / Agent (Umsetzung) |
