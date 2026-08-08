@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Hardened Runtime ist fuer die Notarisierung Pflicht, und Unitys Mono
+	  verletzt drei seiner Annahmen. Ohne diese drei Ausnahmen startet die
+	  signierte App gar nicht erst — sie stirbt beim ersten JIT-Compile.
+
+	  Bewusst NICHT gesetzt: App Sandbox. Die braucht nur der Mac App Store;
+	  fuer Direktvertrieb ueber Developer ID waere sie zusaetzliche Fessel
+	  ohne Gegenwert (und der Relay-Client braucht ausgehende Netzwerkrechte).
+	-->
+
+	<!-- Mono kompiliert IL zur Laufzeit. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+
+	<!-- Mono schreibt in Speicher, den es danach ausfuehrt. -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+
+	<!-- Unity laedt Plugins aus PlugIns/, die nicht Teil des Hauptsiegels sind. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
