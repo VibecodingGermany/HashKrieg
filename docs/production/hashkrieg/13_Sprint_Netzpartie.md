@@ -74,15 +74,33 @@ Maintainer-Label, damit ein bewusster Baseline-Reset weiterhin möglich ist.
 Dieses Paket ist die Voraussetzung dafür, dass Sprint 13B ohne ständiges
 Nachfassen laufen kann.
 
+### 13.7 · Der Linux-Build
+
+`tools/packaging/` kann heute nur macOS. Damit kann am Netznachweis nur
+teilnehmen, wer einen Mac hat — der Einheitenstrang wäre von genau der Runde
+ausgeschlossen, deren Verhalten er baut. Ein Zwei-Spieler-Nachweis mit nur einer
+Plattform ist zudem ein schwächerer Nachweis.
+
+Nötig ist ein `build-linux.sh` nach dem Muster von `build-mac.sh`, das denselben
+`NovaBuildCommit` einbrennt und ihn ohne Unity auslesbar macht (`cat
+ProjectNova_Data/NovaBuildCommit.txt`). Das Packaging-README bekommt beide Wege.
+
+Vorbedingung: Das Unity-Linux-Build-Modul muss installiert sein. Fehlt es, ist
+das der erste Schritt und wird notiert.
+
+Dieses Paket kommt **vor** 13.4, sonst ist Stufe 3 nur zwischen zwei Macs
+belegbar.
+
 ## Schreibhoheit
 
 | Pfad | |
 |---|---|
 | `Scripts/Gameplay/UI/`, `Scripts/Gameplay/Input/` | 13.1 |
-| `Scripts/Gameplay/Match/` | 13.1 |
+| `Scripts/Gameplay/Match/` | 13.1, und die Systemregistrierung auf Zuruf aus 13B (siehe [Parallelbetrieb](13-15_Parallelbetrieb.md), „Neue Systeme") |
 | `Scripts/Networking/` | nur falls ein Abnahmefund es erzwingt |
 | `tools/Nova.RelayServer/`, `docs/tech/RelayServer.md` | 13.2 |
 | `.github/workflows/` | 13.6 |
+| `tools/packaging/` | 13.7 |
 | `docs/production/GrayboxLog.md` | 13.3–13.5 |
 
 **Keine Datei unter `Scripts/Simulation/` oder `Scripts/AI*`.** Wenn ein
@@ -116,6 +134,8 @@ Sprint 13B übergeben — nicht hier gefixt.
 3. Der Ablauf steht im GrayboxLog — mit Commit, Ticks, Endzustand beider Seiten.
 4. Ein Dritter kann aus dem Runbook heraus einen Relay aufsetzen, ohne zu fragen.
 5. Der Baseline-Wächter läuft auf jedem PR.
+6. Es gibt einen Linux-Build, und mindestens eine Abnahmestufe wurde
+   plattformübergreifend gespielt.
 
 Punkt 2 ist nicht durch Punkt 1 ersetzbar. Genau das ist der Sinn von Tier 1.
 

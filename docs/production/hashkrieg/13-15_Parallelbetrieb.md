@@ -36,23 +36,69 @@ würde die Trennung sofort aufheben. Er wird als Sprint 16 geführt.
 
 ## Schreibhoheit
 
+Die Tabelle ist **vollständig**: jeder Pfad unter `Assets/_Project/Scripts/` hat
+einen Eigentümer. Ein unzugeordneter Pfad ist ein Fehler in diesem Dokument, kein
+Freiraum.
+
 | Pfad | Eigentümer | Anmerkung |
 |---|---|---|
-| `Scripts/AI/`, `Scripts/AI.Data/` | **Einheitenstrang** | `AiPeerCommandTransport.cs` darf die Transport-Verträge nicht ändern (siehe unten) |
+| `Scripts/AI/`, `Scripts/AI.Data/` | **Einheitenstrang** | `AiPeerCommandTransport.cs` darf die Transport-Verträge nicht ändern (siehe unten). `AI.Data/` enthält heute nur das asmdef — die Datenschicht baut der Einheitenstrang auf |
 | `Scripts/Simulation/Movement/` | **Einheitenstrang** | |
 | `Scripts/Simulation/Combat/` | **Einheitenstrang** | inkl. `WeaponProfiles`, `DamageMatrix`, `ArmorClass` |
 | `Scripts/Simulation/Factions/` | **Einheitenstrang** | Legion-Waffenidentität |
+| `Scripts/Simulation/Pathfinding/` | **Einheitenstrang (13–15)** | `MovementSystem` hängt im Konstruktor daran; ohne Flow-Field-Zugriff ist B3 nicht lösbar. **`CostField` ist Vertragsfläche** — siehe unten |
 | `Scripts/Networking/` | **Netzstrang** | |
-| `Scripts/Gameplay/Match/` | **Netzstrang** | `MatchConfig`, `MatchBootstrap`, `MatchRunner` |
+| `Scripts/Gameplay/Match/` | **Netzstrang** | `MatchConfig`, `MatchBootstrap`, `MatchRunner` — inkl. der Systemregistrierung |
 | `Scripts/Gameplay/UI/`, `Scripts/Gameplay/Input/` | **Netzstrang** | Verbindungs- und Lobbyoberfläche, Fraktionsauswahl |
-| `tools/Nova.RelayServer/` | **Netzstrang** | |
-| `Scripts/Simulation/Construction/`, `Economy/` | **Netzstrang (ab Sprint 16)** | in 13–15 fasst sie niemand an |
+| `Scripts/Gameplay/Audio/`, `Gameplay/CombatFeedback/` | **Netzstrang** | Präsentationsnah; wandert an den Art-Strang, sobald der besetzt ist |
+| `Scripts/Presentation/` | **Netzstrang** | dito |
+| `Scripts/Core/` | **Netzstrang** | Logging und Infrastruktur; Änderungen nur additiv, beide Stränge hängen daran |
+| `Scripts/Data/` | **Netzstrang** | Registries und Karten, überwiegend Unity-Assets — mergen schlecht, ein Schreiber |
+| `Scripts/Simulation/Vision/` | **Netzstrang** | `FogOfWarSystem`. **Vertragsfläche:** `CombatSystem` konsumiert `GetTeamView` |
+| `Scripts/Simulation/Commanders/`, `Victory/` | **Netzstrang** | |
+| `Scripts/Simulation/Construction/`, `Economy/`, `Production/` | **Netzstrang (ab Sprint 16)** | in 13–15 fasst sie niemand an |
+| `tools/Nova.RelayServer/`, `tools/packaging/` | **Netzstrang** | |
 | `Scripts/Simulation/Definitions/` | **geteilt — Absprache nötig** | Vertragsfläche: `WeaponDefinition`/`UnitDefinition` braucht der Einheitenstrang, `BuildingDefinition`/`SimDefinitions` der Wirtschaftsstrang |
+| `Scripts/Simulation/SimulationKernel.cs` | **niemand ohne D-ID** | Tick-Reihenfolge, siehe „Neue Systeme" |
+| `Scripts/Simulation/Systems/` | **niemand ohne D-ID** | `ISimSystem` ist der Systemvertrag selbst |
+| `Scripts/Simulation/CommandsV1/` | **niemand ohne D-ID** | Command- und Payload-Schema |
 | `Scripts/Simulation/Replays/`, `Snapshots/`, `State/` | **niemand ohne D-ID** | Speicherformat und Fingerprint — Änderung ist eine Inhaberentscheidung |
 | `CHANGELOG.md` | **serialisiert** | ein Eintrag pro PR, Konflikte löst der Mergende |
+| `docs/production/hashkrieg/` | **Maintainer** | Planungsstand; Befunde kommen per Mail oder Issue, nicht per PR |
 
 Berührt ein PR fremdes Terrain, wird er nicht gemergt, sondern zurückgegeben.
 Das gilt in beide Richtungen.
+
+### Vertragsflächen in fremdem Besitz
+
+Zwei Ordner gehören einem Strang, werden aber vom anderen konsumiert. Dort gilt
+zusätzlich: **Verhalten ändern ja, Vertrag ändern nur nach Absprache.**
+
+| Fläche | Eigentümer | Konsument | Was ohne Absprache nicht geht |
+|---|---|---|---|
+| `Pathfinding.CostField` | Einheitenstrang | `ConstructionSystem` (Platzierungsprüfung, Sprint 16) | Signatur oder Begehbarkeits-Semantik von `IsWalkable` ändern. Flow-Field-Erzeugung und Pathfinding-Interna sind frei |
+| `FogOfWarSystem.GetTeamView` | Netzstrang | `CombatSystem` (Zielerlaubnis) | Rückgabeform oder Sichtbarkeitsregel ändern, ohne den Einheitenstrang zu informieren |
+
+## Neue Systeme — wer die Tick-Reihenfolge setzt
+
+Die Tick-Reihenfolge ist die Registrierungsreihenfolge in
+`Gameplay/Match/MatchRunner.cs`. Diese Datei gehört dem Netzstrang. Die Regel
+„neue Systeme werden eingeordnet, nicht angehängt" wäre für den Einheitenstrang
+sonst nicht erfüllbar — er käme an die Registrierung gar nicht heran.
+
+Auflösung, in dieser Reihenfolge:
+
+1. **Bevorzugt:** Neues Verhalten geht in ein bereits registriertes System des
+   eigenen Strangs. `SkirmishAiSystem` ist zwischen `Combat` und `Victory`
+   registriert und deckt den Reaktionsraum von B4 ab. Dann wird `MatchRunner`
+   nicht angefasst.
+2. **Wenn ein eigenes System wirklich nötig ist:** Der PR des Einheitenstrangs
+   bringt das System mit, **ohne** die Registrierung. Er nennt im Text die
+   gewünschte Position und die Begründung. Ein Maintainer setzt die
+   Registrierungszeile in einem eigenen, minimalen PR nach.
+
+Damit bleibt die Tick-Reihenfolge eine Inhaberentscheidung, ohne den
+Einheitenstrang zu blockieren. Das Einordnen ist der Punkt, nicht der Besitz.
 
 ## Was der Einheitenstrang nicht anfassen darf
 
@@ -101,13 +147,28 @@ altern damit bei jedem simulationsverändernden Merge.
 |---|---|
 | **Merge-Fenster** | Simulationsändernde PRs werden gesammelt und in Fenstern gemergt, nicht einzeln durchgereicht |
 | **Kein Fenster während eines Netznachweises** | Läuft gerade A8 Stufe 2–4 oder eine Abnahmerunde, ist das Fenster zu |
-| **Nach jedem Fenster** | `tools/packaging/build-mac.sh`, neues DMG an alle Testenden, alter Build ist ungültig |
+| **Nach jedem Fenster** | Build für **jede** Plattform, an der jemand testet, neuer Build an alle Testenden, alter Build ist ungültig |
 | **Der Netzstrang testet gegen einen festen Stand** | Abnahmeläufe nennen den Commit, gegen den sie liefen — sonst ist das Ergebnis nicht zuordenbar |
+
+### Plattformen
+
+`tools/packaging/` enthält heute nur den macOS-Weg. Solange das so ist, kann am
+Netznachweis (A8 Stufen 2–4) nur teilnehmen, wer einen Mac hat — der
+Einheitenstrang wäre damit von genau der Runde ausgeschlossen, deren Verhalten er
+baut.
+
+**Der Linux-Build ist deshalb eine Bringschuld des Netzstrangs** und liegt als
+Paket 13.7 in [Sprint 13](13_Sprint_Netzpartie.md). Die .NET-Toolchain für die
+SimRunner-Tests richtet sich jeder Strang selbst ein; das ist keine Bringschuld.
 
 Wer den Commit seines Builds prüfen will:
 
 ```bash
+# macOS
 defaults read /Applications/ProjectNova.app/Contents/Info.plist NovaBuildCommit
+
+# Linux (nach 13.7)
+cat ProjectNova_Data/NovaBuildCommit.txt
 ```
 
 ## Der externe Beitragende — Zugangsmodell
@@ -153,4 +214,5 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-08 | Erstfassung: Schreibhoheit, Baseline-Regel, Merge-Fenster und Zugangsmodell für den Parallelbetrieb 13–15 | Producer / Agent (Umsetzung) |

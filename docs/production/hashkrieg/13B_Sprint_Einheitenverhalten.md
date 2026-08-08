@@ -19,19 +19,33 @@ Dieser Strang besitzt exklusiv:
 | Pfad | Inhalt |
 |---|---|
 | `Assets/_Project/Scripts/AI/` | `SkirmishAiSystem`, `AiFactionProfile`, `AiPeerCommandTransport` |
-| `Assets/_Project/Scripts/AI.Data/` | KI-Datenschicht |
+| `Assets/_Project/Scripts/AI.Data/` | KI-Datenschicht — heute nur das asmdef, der Inhalt entsteht hier |
 | `Assets/_Project/Scripts/Simulation/Movement/` | `MovementSystem` |
 | `Assets/_Project/Scripts/Simulation/Combat/` | `CombatSystem`, `WeaponProfiles`, `DamageMatrix`, `ArmorClass`, `DamageType` |
 | `Assets/_Project/Scripts/Simulation/Factions/` | `EvolvedFactionSystem`, `BiomassGrid` |
+| `Assets/_Project/Scripts/Simulation/Pathfinding/` | `PathfindingSystem`, `CostField`, `FlowField` — für die Dauer von 13–15 |
 | eigene neue Testdateien unter `tools/Nova.SimRunner.Tests/` | |
 
 Geteilt und nur nach Absprache: `Simulation/Definitions/` — `WeaponDefinition`
 und `UnitDefinition` werden hier gebraucht, `BuildingDefinition` und
 `SimDefinitions` gehören dem Wirtschaftsstrang.
 
+**Zwei Vertragsflächen** (ausführlich in
+[13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md)):
+
+- `CostField` gehört zwar diesem Strang, wird aber ab Sprint 16 von
+  `ConstructionSystem` für die Platzierungsprüfung konsumiert. Flow-Field-Erzeugung
+  und Pathfinding-Interna sind frei; Signatur und Begehbarkeits-Semantik von
+  `IsWalkable` nur nach Absprache.
+- `FogOfWarSystem.GetTeamView` gehört dem Netzstrang, wird aber von
+  `CombatSystem` für die Zielerlaubnis gebraucht. Wird benutzt, nicht geändert.
+
 **Ausdrücklich nicht in diesem Strang:** `Simulation/Construction/`,
-`Simulation/Economy/`, `Scripts/Networking/`, `Scripts/Gameplay/`,
-`Simulation/Replays/`, `Simulation/Snapshots/`, `Simulation/State/`.
+`Simulation/Economy/`, `Simulation/Production/`, `Simulation/Vision/`,
+`Simulation/Commanders/`, `Simulation/Victory/`, `Scripts/Networking/`,
+`Scripts/Gameplay/`, `Scripts/Core/`, `Scripts/Data/`, `Scripts/Presentation/`,
+`Simulation/Replays/`, `Simulation/Snapshots/`, `Simulation/State/`,
+`Simulation/CommandsV1/`, `Simulation/Systems/`, `SimulationKernel.cs`.
 
 ## Pakete
 
@@ -57,11 +71,22 @@ Truppenführung (D-088) ordnet Gruppen bereits. Offen bleibt das Verhalten am
 Ziel und unterwegs: Einheiten, die sich gegenseitig blockieren, Umwege statt
 Warten, sinnvolles Abstandhalten von Fernkämpfern.
 
+Das geht nicht ohne Eingriff ins Flow-Field. `Simulation/Pathfinding/` gehört
+diesem Strang deshalb mit — unter der `CostField`-Auflage oben.
+
 ### B4 · Eine KI, die nicht nur baut
 
 Die Skirmish-KI baut und schickt Truppen los. Was fehlt, ist Reaktion:
 Angriffserkennung, Rückzug, Zielpriorisierung, Verteidigung des eigenen
 Aetherium-Feldes.
+
+**Wo das Verhalten hingehört.** Die Tick-Reihenfolge ist die
+Registrierungsreihenfolge in `Gameplay/Match/MatchRunner.cs`, und diese Datei
+gehört dem Netzstrang. Deshalb: Reaktionsverhalten bevorzugt in
+`SkirmishAiSystem` — das ist zwischen `Combat` und `Victory` registriert und
+deckt den Reaktionsraum ab. Braucht es doch ein eigenes System, kommt es **ohne**
+Registrierung im PR, mit gewünschter Position und Begründung im Text; ein
+Maintainer setzt die Registrierungszeile in einem eigenen Mini-PR nach.
 
 ### B5 · Tests, die das Verhalten festhalten
 
@@ -127,3 +152,10 @@ Pro PR eine Zeile unter `[Unreleased]`. Kein Sammel-Eintrag am Ende.
 
 `minor` pro Paket — Verhaltensänderungen ohne Vertragsbruch. Eine Änderung am
 Zustandslayout wäre `major` und braucht vorher eine D-ID.
+
+## Änderungsverlauf
+
+| Version | Datum | Änderung | Autor |
+|---|---|---|---|
+| 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: `Simulation/Pathfinding/` in die Schreibhoheit aufgenommen (B3 braucht das Flow-Field), Vertragsflächen `CostField` und `GetTeamView` benannt, Abgrenzungsliste vervollständigt, B4 um die Regel zur Systemregistrierung ergänzt | Producer / Agent (Umsetzung) |
+| 1.0.0 | 2026-08-08 | Erstfassung | Producer / Agent (Umsetzung) |
