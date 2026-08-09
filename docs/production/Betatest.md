@@ -267,13 +267,68 @@ Plattform, Rohtext und `status`.
 | | |
 |---|---|
 | **Warum eine Tabelle** | Sonst liegen später fünfzehn lange Freitexte in fünfzehn Nachrichten, und niemand weiß mehr, was daraus geworden ist. Der `status` beantwortet genau das |
-| **Zugriff von der Seite** | ausschließlich `insert`, über den öffentlichen `publishable key`. Es gibt bewusst **keine** `select`-, `update`- oder `delete`-Policy — von außen geprüft: Lesen liefert `[]`, Löschen ändert nichts |
+| **Zugriff von der Seite** | **gar keiner.** Die Tabelle hat seit dem Herkunfts-Ausbau *keine* Policy mehr — der einzige Weg hinein führt über die Edge Function `bericht-einreichen`. Von außen geprüft: ein direkter `insert` mit dem öffentlichen Schlüssel wird mit `42501` abgewiesen, Lesen liefert `[]` |
 | **Zugriff von uns** | über die `service_role`, die RLS umgeht — in dieser Sitzung über den Supabase-MCP |
 | **Missbrauchsschutz** | Längengrenzen als `check`-Constraints und ein eindeutiger Index auf `(tester, md5(bericht))`, damit ein Doppelklick keinen zweiten Bericht erzeugt |
 | **Kein Bild** | Die Tabelle nimmt reinen Text. Screenshots kommen weiterhin direkt und werden über die Textstelle zugeordnet |
 
 `status` läuft: `neu` → `gesichtet` → `zerlegt`, dazu `verworfen` für alles,
 was keinen Handlungsbedarf erzeugt.
+
+### Wer war das — Zuordnung eines Berichts
+
+Der Link ist unlisted, aber nicht geschützt. Wer ihn hat, kann einreichen. Damit
+ein Bericht trotzdem einer Person zuzuordnen ist, stempelt die Edge Function
+jede Zeile:
+
+| Feld | Woher | Wie belastbar |
+|---|---|---|
+| `tester` | Pflichtfeld im Formular | Selbstauskunft — ohne Namen nimmt die Funktion nichts an (`name_fehlt`) |
+| `tester_token` | `?t=` aus dem persönlichen Einladungslink | **Am belastbarsten**, siehe unten |
+| `ip` | `x-forwarded-for` an der Edge Function | Gut für „war das dieselbe Quelle", schlecht für „war das diese Person": geteilte Anschlüsse, wechselnde Adressen, Mobilfunk-NAT, VPN |
+| `browser_kennung` | Zufalls-UUID im `localStorage` des Testenden | Erkennt denselben Browser wieder. Wer den Speicher leert, bekommt eine neue |
+| `user_agent`, `sprache`, `zeitzone`, `bildschirm` | Browser und Kopfzeilen | Einzeln schwach, in Kombination ein brauchbarer Fingerabdruck |
+
+**Der persönliche Link ist der eigentliche Hebel.** Wir verschicken den Link
+ohnehin einzeln — dann bekommt jeder seinen eigenen:
+
+```text
+https://project-nova-pitch.vercel.app/beta?t=arn
+https://project-nova-pitch.vercel.app/beta?t=michael
+```
+
+Die Kennung landet in `tester_token`. Das ordnet einen Bericht **durch die
+Konstruktion** zu, statt hinterher aus einer IP zu schließen — und es ist die
+einzige Zuordnung hier, die nicht rät. Wer die Links vergibt, führt eine Liste
+außerhalb des Repos, welche Kennung zu wem gehört.
+
+### Was nicht geht, egal wie man fragt
+
+**MAC-Adresse, Seriennummer, Rechner-ID.** Ein Browser gibt diese Daten nicht
+heraus — es gibt keine Web-API dafür, auch nicht mit Zustimmung des Nutzers.
+Die Tabelle hat deshalb bewusst keine Spalte dafür: eine dauerhaft leere Spalte
+würde eine Zuordnung vortäuschen, die es nicht gibt.
+
+Was technisch ginge und hier **nicht** eingebaut ist: Canvas- und
+Audio-Fingerprinting, also das Wiedererkennen eines Geräts über
+Rendering-Eigenheiten. Das ist Tracking-Technik, verlangt eine Einwilligung
+statt eines Hinweises — und wäre neben dem persönlichen Link ohnehin
+überflüssig. Wenn es je gebraucht wird, ist es eine eigene Entscheidung.
+
+### Aufbewahrung
+
+Eine IP-Adresse ist ein personenbezogenes Datum. Auf der Seite steht deshalb
+direkt am Formular, was gespeichert wird und warum — Missbrauchsnachverfolgung,
+mehr nicht. **Mit dem Ende des Betatests werden die Herkunftsfelder gelöscht:**
+
+```sql
+update public.testberichte
+   set ip = null, user_agent = null, browser_kennung = null,
+       sprache = null, zeitzone = null, bildschirm = null;
+```
+
+Die Berichte selbst bleiben — sie sind die Arbeitsgrundlage, die Herkunft war
+nur die Versicherung.
 
 ### Aus Berichten Issues machen
 
@@ -322,9 +377,11 @@ uns.
   Downloads weiter — und kann Berichte einreichen. Für zwei bekannte Personen
   ist das entschieden und in Ordnung; für einen größeren Kreis wäre es eine
   neue Entscheidung. Lesen kann von außen nach wie vor niemand.
-- Das Einreichen hat keine Ratenbegrenzung. Längengrenzen und der
-  Doppel-Index fangen Versehen ab, nicht Absicht. Fällt das je auf, ist der
-  Hebel eine Edge Function mit Prüfung statt der direkten Tabelle.
+- Das Einreichen hat bewusst keine Ratenbegrenzung — Testende sollen so oft
+  abgeben dürfen, wie sie wollen. Die Zuordnung übernimmt der persönliche
+  Link, nicht eine Schranke.
+- Die Liste, welche Token-Kennung zu wem gehört, existiert noch nicht. Ohne
+  sie ist `tester_token` nur eine Zeichenkette.
 - Der Blob-Store hat noch keine Aufräumroutine. Solange es einen Stand gibt,
   ist das kein Problem — ab dem dritten wird es eins.
 
@@ -353,21 +410,31 @@ create table public.testberichte (
 
 create unique index testberichte_kein_doppel on public.testberichte (tester, md5(bericht));
 
-alter table public.testberichte enable row level security;
+-- Herkunft, gestempelt von der Edge Function. Keine Spalte fuer MAC oder
+-- Hardware-Kennung: der Browser gibt das nicht heraus.
+alter table public.testberichte
+  add column ip inet, add column user_agent text, add column browser_kennung text,
+  add column tester_token text, add column sprache text, add column zeitzone text,
+  add column bildschirm text;
 
--- Einreichen ja, alles andere nein. Keine select/update/delete-Policy.
-create policy "bericht einreichen" on public.testberichte
-  for insert to anon, authenticated
-  with check (status = 'neu' and issues_erstellt_am is null and notiz is null);
+alter table public.testberichte enable row level security;
+-- Keine Policy. Der einzige Weg hinein ist die Edge Function
+-- `bericht-einreichen`, die mit der service_role schreibt und dabei die
+-- Herkunft stempelt. Ein direkter insert waere ein Bericht ohne Zuordnung.
 ```
 
-Die Längen- und `build`/`plattform`-Constraints sind im Original ausführlicher;
-maßgeblich ist die Migration.
+Die Längen-Constraints sind im Original ausführlicher; maßgeblich sind die
+Migrationen `testberichte_anlegen`, `testberichte_herkunft` und
+`testberichte_nur_ueber_funktion`.
+
+Die Edge Function heißt `bericht-einreichen`, läuft mit `verify_jwt = false`
+(die Seite hat keine Anmeldung) und prüft Pflichtfelder und Längen selbst.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.4.0 | 2026-08-09 | Einreichen läuft über die Edge Function `bericht-einreichen` statt direkt in die Tabelle; sie stempelt IP, User-Agent, Browserkennung, Sprache, Zeitzone, Bildschirm und den Token aus dem persönlichen Link. Direkter Schreibweg geschlossen. Festgehalten, dass MAC- und Hardware-Kennungen im Browser nicht existieren, und dass der persönliche Link die belastbarere Zuordnung ist als die IP; Löschabfrage für die Herkunftsfelder ergänzt | Producer / Agent (Umsetzung) |
 | 1.3.0 | 2026-08-09 | Rückmeldung von „schick uns den Text" auf ein Formular auf der Beta-Seite umgestellt; Berichte landen in `public.testberichte` (Supabase `hashkrieg-lobby`) mit einreichen-nur-RLS; Ablauf vom Bericht zum Issue und der `status`-Lebenszyklus festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-09 | Verteilung auf eine Beta-Seite umgestellt (`/beta` im Investorenpapier-Projekt) statt Einzelversand; Downloads liegen im Vercel-Blob-Store, Begründung gegen VPS und Supabase festgehalten; Ablauf für den nächsten Build und die Aufräumpflicht ergänzt | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-09 | Rückmeldeweg auf das ChatGPT-Verfahren umgestellt (Prompt zuerst, Sprachnachrichten beim Spielen, `FERTIG` löst den Bericht aus), Screenshot-Tastenkürzel für beide Systeme ergänzt, Befund-Ablage auf die Abschnitte des Berichts abgebildet; Verteilung auf das kombinierte Testpaket umgestellt | Producer / Agent (Umsetzung) |
