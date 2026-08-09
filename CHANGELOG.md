@@ -29,7 +29,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   44 % der Angriffsstärke los, die dieselbe Regel der Allianz gibt, und das
   steht in der Verlustspalte (51 gegen 23). Die r5-Regel wandert in Punkten
   mit: der Schwellwert wird weiterhin gegen das gekappt, was die Produktion
-  noch liefern kann, damit ein Überlebender ausserhalb des Rings die nächste
+  noch liefern kann, damit ein Überlebender außerhalb des Rings die nächste
   Welle nicht blockiert. **Mit der ausgelieferten Armeeobergrenze 12 ändert das
   noch nichts** — die Punktklausel kann nur entscheiden, solange ein Kopf der
   Obergrenze frei ist, also bei elf Schützen mit 1.100 Punkten gegen eine
@@ -37,7 +37,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   `SkirmishAiTests` steht dadurch unverändert bei Tick 2.548 und
   `0x14472B2B943ED2BB`; im KI-gegen-KI-Lauf des Labors ist die Partie
   ebenfalls byteidentisch (Tick 5.773, `0x2B34B4E194257940`).
-  Das ist der Zweck dieses Schritts: Wellengrösse und
+  Das ist der Zweck dieses Schritts: Wellengröße und
   Produktionsobergrenze hängen nicht mehr an derselben Zahl, bevor an dieser
   Zahl gedreht wird. Im Labor einseitig gemessen: die Obergrenze **allein**
   anzuheben macht die Legion schlechter (Verluste 51 → 64, Austausch 45 → 34),
