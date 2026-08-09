@@ -41,8 +41,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Produktionsobergrenze hängen nicht mehr an derselben Zahl, bevor an dieser
   Zahl gedreht wird. Im Labor einseitig gemessen: die Obergrenze **allein**
   anzuheben macht die Legion schlechter (Verluste 51 → 64, Austausch 45 → 34),
-  mit dem Tor gewinnt derselbe Sitz (Austausch 45 → 90 bei Obergrenze 36).
-  Im laufenden Spiel ungesehen.
+  mit dem Tor und Obergrenze 30 gewinnt derselbe Sitz und entscheidet schneller
+  als heute (Tick 5.005 gegen 5.773, 23 statt 51 eigene Verluste, Austausch 139
+  gegen 45). Das ist ausdrücklich keine Änderung dieses Eintrags — die
+  Obergrenze liegt als Literal in `MatchRunner` — und vor ihr gehört eine
+  Abbruchregel: die Aussetzzeit am Sammelpunkt steigt dabei von 3.502 auf
+  12.326 Einheit-Ticks je 1.000.
+  **Im laufenden Spiel gespielt:** kein sichtbarer Unterschied zum bisherigen
+  Verhalten, wie erwartet — bei der ausgelieferten Armeeobergrenze entscheidet
+  das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
+  sie belegt keine Verbesserung.
 
 ### Behoben
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
