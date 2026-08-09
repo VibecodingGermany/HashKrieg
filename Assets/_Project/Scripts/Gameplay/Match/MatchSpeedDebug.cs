@@ -25,8 +25,17 @@ namespace Nova.Gameplay.Match
     /// IGNORED IN A RELAY MATCH, and not as a courtesy. Two peers stepping at
     /// different wall-clock rates would sit in the lockstep barrier waiting
     /// for each other; the fast one gains nothing and the slow one is stalled
-    /// by a debug key. <c>MatchRunner</c> reads <see cref="Multiplier"/> only
-    /// for the local match.
+    /// by a debug key. The refusal lives in <see cref="Multiplier"/> itself
+    /// rather than at the one call site in <c>MatchRunner</c>: with the guard
+    /// outside, the key handler and the status line kept cycling and kept
+    /// claiming "4x SPEED" in a relay match that ran in real time — a label
+    /// that lies is worse than no label, and any future second tick source
+    /// would have silently lost the protection.
+    /// </para>
+    /// <para>
+    /// BEFORE THE FIRST PUBLIC BUILD: goes out together with
+    /// <see cref="FogRevealDebug"/> — see the removal note there. The build
+    /// gate below makes this inert in a release build, not absent.
     /// </para>
     /// <para>
     /// A static like <see cref="FogRevealDebug"/> next door, for the same
@@ -43,15 +52,50 @@ namespace Nova.Gameplay.Match
         /// </summary>
         public static readonly int[] Steps = { 1, 2, 4, 10 };
 
+        /// <summary>
+        /// True while a relay match is running. Set once per match by
+        /// <c>MatchRunner.InitializeMatch</c> — the switch is process-wide,
+        /// a match is not.
+        /// </summary>
+        public static bool RelayMatch { get; private set; }
+
         private static int _index;
 
         /// <summary>Wall-clock ticks per canonical tick. 1 is the shipped speed.</summary>
-        public static int Multiplier => Steps[_index];
+        public static int Multiplier
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            get => RelayMatch ? 1 : Steps[_index];
+#else
+            get => 1;
+#endif
+        }
 
         /// <summary>True while the match is not running at the shipped speed — the screen has to say so.</summary>
         public static bool IsFastForwarding => Multiplier != 1;
 
-        /// <summary>Next speed in the ring, wrapping back to 1x.</summary>
-        public static void Cycle() => _index = (_index + 1) % Steps.Length;
+        /// <summary>
+        /// Next speed in the ring, wrapping back to 1x. Refused in a relay
+        /// match, so the panel cannot show a speed the clock never ran at.
+        /// </summary>
+        public static void Cycle()
+        {
+            if (RelayMatch)
+            {
+                _index = 0;
+                return;
+            }
+            _index = (_index + 1) % Steps.Length;
+        }
+
+        /// <summary>
+        /// Back to 1x and records the match kind. Called at match start so a
+        /// speed set in a skirmish cannot ride along into a relay match.
+        /// </summary>
+        public static void ResetForMatch(bool relayMatch)
+        {
+            _index = 0;
+            RelayMatch = relayMatch;
+        }
     }
 }

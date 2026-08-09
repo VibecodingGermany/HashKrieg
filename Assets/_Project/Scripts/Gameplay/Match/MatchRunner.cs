@@ -200,6 +200,15 @@ namespace Nova.Gameplay.Match
             AiIngress = null;
             SkirmishAi = null;
 
+            // The two lab switches are process-wide statics and a match is not.
+            // Without this, a reveal set while watching the AI in a skirmish
+            // would still be on after returning to the menu and joining a
+            // lobby — a maphack nobody consciously switched on. Both refuse to
+            // engage in a relay match; see FogRevealDebug for why the reveal in
+            // particular is not merely unsporting but reaches the state hash.
+            FogRevealDebug.ResetForMatch(_relayClient != null);
+            MatchSpeedDebug.ResetForMatch(_relayClient != null);
+
             var random = new SimRandom(_seed);
             var logger = new UnityNovaLogger();
             Kernel = new SimulationKernel(random, logger);

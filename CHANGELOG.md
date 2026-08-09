@@ -17,6 +17,28 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Behoben
+- **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
+  im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
+  Einheitenstrang als reine Diagnose und waren dort auch genau das. Sie hingen
+  aber am F3-Panel, und `DebugHud` hat kein Build-Gate — im ganzen Projekt gab es
+  keins. Damit wäre F4 in einer Relay-Partie ein Maphack gewesen: die vollständige
+  gegnerische Armee auf Minimap, Einheitenansicht und Healthbars. Die
+  Unbedenklichkeitszusage des Werkzeugs („ändert nichts an der Simulation") gilt
+  zudem nur fürs Zusehen — `RtsDeviceInput.TryPickUnit` filtert nicht nach Nebel
+  und die Befehlsvalidierung prüft keine Sichtbarkeit, ein aufgedeckter Gegner
+  lässt sich also direkt als regulärer Angriffsbefehl anklicken, der über den
+  Relay geht und in den Zustands-Hash eingeht. Beide Schalter sind jetzt hinter
+  `UNITY_EDITOR || DEVELOPMENT_BUILD` compiliert, verweigern sich zusätzlich in
+  jeder Relay-Partie, und `MatchRunner` setzt sie bei jedem Matchstart zurück —
+  vorher waren es prozessweite Statics, ein in der Skirmish gesetzter Reveal
+  überlebte den Wechsel in die Lobby. Der Relay-Riegel sitzt bewusst in den
+  Schaltern selbst statt an der einen Aufrufstelle: vorher zeigte die Statuszeile
+  in einer Relay-Partie „4x SPEED" an, während die Uhr in Echtzeit lief.
+  **Das Gate macht die Schalter wirkungslos, nicht abwesend** — vor dem ersten
+  öffentlichen Build fliegen sie raus, die Entfernungsnotiz steht in
+  `FogRevealDebug`.
+
 ### Hinzugefügt
 - **Drei Werkzeuge zum Zusehen im F3-Panel (Einheitenstrang, optional):** Ein
   Gegner, den man nur durch den eigenen Sichtradius beobachten kann, lässt sich

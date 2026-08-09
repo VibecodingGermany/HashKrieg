@@ -31,13 +31,72 @@ namespace Nova.Gameplay.Match
     /// generator. The reveal survives closing the panel (looking at an
     /// uncluttered map is the point) but not a restart of the player.
     /// </para>
+    /// <para>
+    /// TWO LOCKS, and both are load-bearing. <b>Release builds:</b> the whole
+    /// switch compiles out — <see cref="RevealAll"/> is a constant false, so a
+    /// shipped client cannot reveal anything no matter what it presses.
+    /// <b>Relay matches:</b> the reveal is refused even in a development build.
+    /// It is worth being precise about why, because the class remarks above are
+    /// only true for someone watching with their hands off the mouse:
+    /// <c>RtsDeviceInput.TryPickUnit</c> has no fog filter and the command
+    /// validation checks no visibility, so a revealed map converts directly
+    /// into a legal AttackTarget order on a hidden unit — which goes over the
+    /// relay and into the state hash. Against a human opponent this is a
+    /// maphack, not a diagnostic.
+    /// </para>
+    /// <para>
+    /// BEFORE THE FIRST PUBLIC BUILD: delete this class, <see cref="MatchSpeedDebug"/>,
+    /// their F4/F5 keys and panel buttons in <c>DebugHud</c>, and the four
+    /// presentation branches that read <see cref="RevealAll"/>. The build gate
+    /// below makes them inert, not absent, and inert debug code in a shipped
+    /// binary is a standing invitation. The gate buys time; it is not the fix.
+    /// </para>
     /// </summary>
     public static class FogRevealDebug
     {
-        /// <summary>True while the presentation draws every entity and clear ground.</summary>
-        public static bool RevealAll { get; private set; }
+        /// <summary>
+        /// True while a relay match is running. Set once per match by
+        /// <c>MatchRunner.InitializeMatch</c> — the switch is process-wide,
+        /// a match is not.
+        /// </summary>
+        public static bool RelayMatch { get; private set; }
 
-        public static void Toggle() => RevealAll = !RevealAll;
+        private static bool _revealAll;
+
+        /// <summary>True while the presentation draws every entity and clear ground.</summary>
+        public static bool RevealAll
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            get => _revealAll && !RelayMatch;
+#else
+            get => false;
+#endif
+        }
+
+        /// <summary>
+        /// Flips the reveal. Refused in a relay match, and compiled to a
+        /// no-op in a release build.
+        /// </summary>
+        public static void Toggle()
+        {
+            if (RelayMatch)
+            {
+                _revealAll = false;
+                return;
+            }
+            _revealAll = !_revealAll;
+        }
+
+        /// <summary>
+        /// Clears the reveal and records the match kind. Called at match start
+        /// so the flag cannot ride along from a previous skirmish into a relay
+        /// match the player never pressed the key in.
+        /// </summary>
+        public static void ResetForMatch(bool relayMatch)
+        {
+            _revealAll = false;
+            RelayMatch = relayMatch;
+        }
 
         /// <summary>
         /// Every active entity in ascending entity-index order, as a drop-in
