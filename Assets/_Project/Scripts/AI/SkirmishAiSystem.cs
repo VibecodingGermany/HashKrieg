@@ -476,16 +476,21 @@ namespace Nova.AI
                 // decision and only while the retreat rule is on. A local
                 // list, not a field: the system stays a pure function of the
                 // committed state, and nothing survives the decision.
-                List<long> threatCells = _profile.Profile.RetreatHealthPercent > 0
-                    ? CollectVisibleThreatCells()
-                    : null;
+                List<long> threatCells = null;
+                List<uint> threatRaws = null;
+                if (_profile.Profile.RetreatHealthPercent > 0)
+                {
+                    threatCells = new List<long>();
+                    threatRaws = new List<uint>();
+                    CollectVisibleThreats(threatCells, threatRaws);
+                }
 
                 var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
                     UnitState unit = combatUnits[i];
                     assignments.Add(ResolveUnitAssignment(
-                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells));
+                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells, threatRaws));
                 }
                 SubmitAssignments(assignments, combatUnits);
             }
@@ -626,12 +631,36 @@ namespace Nova.AI
             if (waveSize <= 1) return posture;
 
             int gathered = 0;
+            int committed = 0;
             for (int i = 0; i < combatUnits.Count; i++)
             {
                 UnitState unit = combatUnits[i];
-                if (!IsCommittedToTheWave(in unit, hqCellX, hqCellY)) gathered++;
+                if (IsCommittedToTheWave(in unit, hqCellX, hqCellY)) committed++;
+                else gathered++;
             }
-            posture.WaveReady = gathered >= waveSize;
+
+            // The wave waits for what production can still deliver, not for a
+            // fixed twelve.
+            //
+            // Every survivor of an earlier wave standing outside the ring is a
+            // unit the next wave will never get: the army cap counts it, so the
+            // barracks refills to TargetArmySize MINUS the survivors, and the
+            // count inside the ring can never reach a wave size equal to the
+            // cap again. One survivor that walks into an empty enemy start area
+            // and does not die is enough — measured consequence: eleven units
+            // stand at the staging cell until the time limit while a single
+            // unit holds the front alone.
+            //
+            // EffectiveWaveSize already refuses a wave production can never
+            // deliver; this is the same rule one step further, applied to what
+            // production can deliver RIGHT NOW instead of in principle. The
+            // floor of 1 keeps the wave launchable when more units are out than
+            // the cap allows for at home — the rest are already fighting.
+            int reachable = _profile.TargetArmySize - committed;
+            if (reachable < 1) reachable = 1;
+            int threshold = waveSize < reachable ? waveSize : reachable;
+
+            posture.WaveReady = gathered >= threshold;
             return posture;
         }
 
@@ -702,9 +731,12 @@ namespace Nova.AI
         /// save/restore because it is part of the world, not beside it.
         /// </para>
         /// <para>
-        /// A retreating unit gets no explicit attack target either (the
-        /// waiting branch handles it), which is what lets the D-087
-        /// auto-acquisition keep shooting at whatever chases it.
+        /// A retreating unit is pointed at its nearest visible armed enemy —
+        /// see <see cref="NearestThreatRaw"/>. This paragraph used to claim the
+        /// opposite (no explicit target, so D-087 keeps shooting at whatever
+        /// chases it) and the claim was wrong: submitting no attack intent
+        /// leaves the march target standing, and a standing valid target is
+        /// exactly what makes the auto-acquisition skip the unit.
         /// </para>
         /// </summary>
         private bool IsRetreating(in UnitState unit, in ArmyPosture posture, List<long> threatCells)
@@ -736,9 +768,8 @@ namespace Nova.AI
         /// (journal V002 — "react to a real threat, not to anything that
         /// moves").
         /// </summary>
-        private List<long> CollectVisibleThreatCells()
+        private void CollectVisibleThreats(List<long> cells, List<uint> raws)
         {
-            var cells = new List<long>();
             var visible = new List<EntityId>();
             _fogOfWar.GetVisibleEntities(_aiPlayerId, visible);
 
@@ -751,8 +782,62 @@ namespace Nova.AI
                 long x = GridCellOf(u.Transform.PositionX);
                 long y = GridCellOf(u.Transform.PositionY);
                 cells.Add((y << 32) | x);
+                raws.Add(UnitCommandStateView.ToRawEntityId(u.Id));
             }
-            return cells;
+        }
+
+        /// <summary>
+        /// The nearest armed enemy this unit can see, as a raw entity id, or 0
+        /// when the retreat rule is off or nothing armed is visible.
+        /// <para>
+        /// WHY A RETREATING UNIT NEEDS AN EXPLICIT TARGET AT ALL. The retreat
+        /// branch used to hand out <c>AttackTargetRaw = 0</c> and the class
+        /// remarks called that "no explicit target, so the D-087
+        /// auto-acquisition keeps shooting at whatever chases it". It does not:
+        /// zero means "submit no attack intent", and submitting nothing leaves
+        /// the march order the unit already carries. Nothing else clears it —
+        /// <c>UnitState.Stop()</c> does not touch <c>AttackTarget</c>,
+        /// <c>ApplyMove</c> only calls <c>SetTarget</c>, and <c>CombatSystem</c>
+        /// releases a target only when it dies. The auto-acquisition then skips
+        /// the unit entirely (<c>CombatSystem</c>: <c>if (attacker.AttackTarget.IsValid) continue;</c>),
+        /// so the wounded unit walked home carrying a target it had left behind,
+        /// firing at nothing the whole way and defending nothing once home.
+        /// </para>
+        /// <para>
+        /// The command schema has no way to CLEAR a target — a raw 0 on the
+        /// wire is rejected as <c>InvalidEntityId</c>, by design. So the fix is
+        /// to overwrite the stale target with the one the unit should actually
+        /// be shooting at: its pursuer. That is what the remarks promised all
+        /// along, now issued rather than assumed.
+        /// </para>
+        /// <para>
+        /// Chebyshev distance, ties broken on the LOWER raw id — never on the
+        /// scan position, so two peers pick the same pursuer.
+        /// </para>
+        /// </summary>
+        private uint NearestThreatRaw(in UnitState unit, List<long> threatCells, List<uint> threatRaws)
+        {
+            if (threatCells == null || threatRaws == null) return 0u;
+
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+
+            uint bestRaw = 0u;
+            int bestDistance = int.MaxValue;
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int threatX = (int)(uint)threatCells[i];
+                int threatY = (int)(threatCells[i] >> 32);
+                int distance = Math.Max(Math.Abs(cellX - threatX), Math.Abs(cellY - threatY));
+                uint raw = threatRaws[i];
+
+                if (distance > bestDistance) continue;
+                if (distance == bestDistance && (bestRaw == 0u || raw >= bestRaw)) continue;
+
+                bestDistance = distance;
+                bestRaw = raw;
+            }
+            return bestRaw;
         }
 
         /// <summary>
@@ -822,7 +907,7 @@ namespace Nova.AI
         /// </summary>
         private UnitAssignment ResolveUnitAssignment(
             uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
-            List<long> threatCells)
+            List<long> threatCells, List<uint> threatRaws)
         {
             // A wounded unit walks home, whatever the wave is doing. This test
             // comes FIRST on purpose: retreat has to outrank "you are out with
@@ -833,6 +918,17 @@ namespace Nova.AI
                 && (posture.StagingCellX < 0                      // no staging cell resolved
                 || posture.WaveReady                              // the wave launches this decision
                 || IsCommittedToTheWave(in unit, hqCellX, hqCellY)); // already out with an earlier wave
+
+            // The one order a retreating unit still needs: its pursuer.
+            // Zero does not clear the march target it is carrying — see
+            // NearestThreatRaw for why leaving it stale silenced the unit for
+            // the whole way home. A WAITING reinforcement keeps getting zero:
+            // it holds no stale order to overwrite (it never marched), and
+            // finding F001 is explicit that aiming while standing still is
+            // worse than letting D-087 acquire.
+            uint retreatTargetRaw = retreats
+                ? NearestThreatRaw(in unit, threatCells, threatRaws)
+                : 0u;
 
             if (marches)
             {
@@ -868,7 +964,7 @@ namespace Nova.AI
                 return new UnitAssignment
                 {
                     EntityRaw = entityRaw,
-                    AttackTargetRaw = 0,
+                    AttackTargetRaw = retreatTargetRaw,
                     MoveCellX = -1,
                     MoveCellY = -1,
                 };
@@ -884,10 +980,16 @@ namespace Nova.AI
             // would have shot at whatever came into range. Aiming is right
             // while a unit walks toward what it aims at (journal V003), and a
             // waiting unit does not.
+            //
+            // A RETREATING unit is the exception, and for the same reason
+            // rather than against it: it is not a fresh reinforcement, it is
+            // already carrying a march target it can no longer reach. Silence
+            // does not release that order, so silence is what kept it from
+            // firing. It gets its pursuer instead (retreatTargetRaw).
             return new UnitAssignment
             {
                 EntityRaw = entityRaw,
-                AttackTargetRaw = 0,
+                AttackTargetRaw = retreatTargetRaw,
                 MoveCellX = posture.StagingCellX,
                 MoveCellY = posture.StagingCellY,
             };
