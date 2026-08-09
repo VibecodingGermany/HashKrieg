@@ -62,7 +62,7 @@ namespace Nova.Simulation.Tests
                 var economy = new EconomySystem(entities, startingCredits);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
+                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
                 var combat = new CombatSystem(entities, fogOfWar, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
