@@ -403,8 +403,22 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+            ref readonly UnitState spawned = ref f.Entities.GetUnitRef(unit);
+
+            // 16.2 (#46): the unit is born at the barracks footprint and is
+            // ORDERED to the rally cell — it no longer materialises there.
+            // This fixture registers no MovementSystem, so it stays at the
+            // spawn cell; the standing order is what proves the rally
+            // survived the rejected update.
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(30),
+                "the surviving rally (30,30) is what the finished unit is sent to");
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(30));
+
+            int spawnX = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionX));
+            int spawnY = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionY));
+            Assert.That(System.Math.Max(System.Math.Abs(spawnX - 11), System.Math.Abs(spawnY - 11)),
+                Is.LessThanOrEqualTo(3),
+                "born at the footprint ring of the (11,11) barracks, not at the rally");
         }
 
         [Test]

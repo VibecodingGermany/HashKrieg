@@ -181,7 +181,12 @@ namespace Nova.SimRunner.Tests
 
             // 100 build ticks at full power (HQ 30 provided, barracks 15
             // required), plus the ticks already spent — 110 is ample.
-            for (int i = 0; i < 110; i++)
+            // Stop AT the spawn tick: the no-teleport assert below reads the
+            // birth position, and with a MovementSystem in the host the
+            // infantryman reaches the rally cell within a few more ticks —
+            // which is exactly the intended behaviour and would make a
+            // fixed-length loop assert the opposite of what it means.
+            for (int i = 0; i < 110 && host.CountRole(0, UnitRole.BasicInfantry) == 0; i++)
             {
                 host.Step();
             }
@@ -208,10 +213,10 @@ namespace Nova.SimRunner.Tests
                     infantry = u.Id;
                     int gx = System.Math.Max(0, SimFixed.WorldToGrid(u.Transform.PositionX));
                     int gy = System.Math.Max(0, SimFixed.WorldToGrid(u.Transform.PositionY));
-                    Assert.That(gx == 13 && gy == 11, Is.False,
-                        "no longer teleports to the default rally cell (13,11)");
                     Assert.That(System.Math.Max(System.Math.Abs(gx - 11), System.Math.Abs(gy - 11)), Is.LessThanOrEqualTo(3),
                         "spawns at the footprint ring of the (11,11) barracks and walks");
+                    Assert.That(gx == 13 && gy == 11, Is.False,
+                        "at the spawn tick he is not yet at the rally cell — he walks there");
                     Assert.That(u.GoalGridPos.X, Is.EqualTo(13));
                     Assert.That(u.GoalGridPos.Y, Is.EqualTo(11));
                     Assert.That(u.IsMoving, Is.True, "ordered at the default rally cell (13,11)");
