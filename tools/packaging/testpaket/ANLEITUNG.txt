@@ -25,10 +25,18 @@ DAS WICHTIGSTE IN FÜNF ZEILEN
    Halbe Sätze, Flüche, Gemurmel: alles gut.
 4. Wenn du fertig bist, schreib FERTIG in den Chat.
 5. ChatGPT baut daraus einen sortierten Bericht. Den kopierst du komplett
-   und schickst ihn uns zurück.
+   und fügst ihn auf unserer Seite ein:
+
+       https://project-nova-pitch.vercel.app/beta
+       ganz unten, "Bericht abgeben"
+
+   Namen dazu, absenden. Du musst uns nichts schicken.
 
 Das ist der ganze Trick: Du musst nichts aufschreiben und nichts sortieren.
 Du musst nur laut denken, während du spielst.
+
+Auf derselben Seite stehen übrigens auch die Downloads und diese Anleitung —
+falls du sie mal auf dem Handy brauchst.
 
 Wenn dir Reden unangenehm ist: tippen geht genauso. Der Prompt funktioniert
 mit getippten Nachrichten identisch.
