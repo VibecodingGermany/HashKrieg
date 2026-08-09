@@ -24,6 +24,8 @@ Dieser Strang besitzt exklusiv:
 | `Assets/_Project/Scripts/Simulation/Combat/` | `CombatSystem`, `WeaponProfiles`, `DamageMatrix`, `ArmorClass`, `DamageType` |
 | `Assets/_Project/Scripts/Simulation/Factions/` | `EvolvedFactionSystem`, `BiomassGrid` |
 | `Assets/_Project/Scripts/Simulation/Pathfinding/` | `PathfindingSystem`, `CostField`, `FlowField` — für die Dauer von 13–15 |
+| `tools/Nova.AiLab/`, `tools/Nova.AiLab.Tests/` | Messwerkzeug für KI-Läufe — kein Spielcode, wird nicht ausgeliefert |
+| `Assets/_Project/Scripts/Presentation/UI/DebugHud.cs` | Ausnahme aus `Presentation/`: KI-Verhalten muss im laufenden Spiel sichtbar sein |
 | eigene neue Testdateien unter `tools/Nova.SimRunner.Tests/` | |
 
 Geteilt und nur nach Absprache: `Simulation/Definitions/` — `WeaponDefinition`
@@ -43,7 +45,8 @@ und `UnitDefinition` werden hier gebraucht, `BuildingDefinition` und
 **Ausdrücklich nicht in diesem Strang:** `Simulation/Construction/`,
 `Simulation/Economy/`, `Simulation/Production/`, `Simulation/Vision/`,
 `Simulation/Commanders/`, `Simulation/Victory/`, `Scripts/Networking/`,
-`Scripts/Gameplay/`, `Scripts/Core/`, `Scripts/Data/`, `Scripts/Presentation/`,
+`Scripts/Gameplay/`, `Scripts/Core/`, `Scripts/Data/`, `Scripts/Presentation/`
+(einzige Ausnahme: `UI/DebugHud.cs`, siehe oben),
 `Simulation/Replays/`, `Simulation/Snapshots/`, `Simulation/State/`,
 `Simulation/CommandsV1/`, `Simulation/Systems/`, `SimulationKernel.cs`.
 
@@ -157,5 +160,6 @@ Zustandslayout wäre `major` und braucht vorher eine D-ID.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-09 | `tools/Nova.AiLab/` samt Tests und `Presentation/UI/DebugHud.cs` in die Schreibhoheit aufgenommen — beide werden in der Praxis gebraucht und fehlten in der Tabelle | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: `Simulation/Pathfinding/` in die Schreibhoheit aufgenommen (B3 braucht das Flow-Field), Vertragsflächen `CostField` und `GetTeamView` benannt, Abgrenzungsliste vervollständigt, B4 um die Regel zur Systemregistrierung ergänzt | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-08 | Erstfassung | Producer / Agent (Umsetzung) |
