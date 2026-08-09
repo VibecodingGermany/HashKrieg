@@ -87,7 +87,11 @@ namespace Nova.Presentation.UI
                 return;
             }
 
-            SetQuadActive(true);
+            // Lab reveal (FogRevealDebug): the sheet is hidden, not repainted
+            // clear — the texture keeps tracking the committed view underneath,
+            // so switching back shows the real fog at the next 5 Hz commit
+            // instead of a stale all-clear frame.
+            SetQuadActive(!FogRevealDebug.RevealAll);
             EnsureResources(fog);
             if (!ReferenceEquals(fog, _boundFog))
             {

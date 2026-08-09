@@ -17,6 +17,28 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Drei Werkzeuge zum Zusehen im F3-Panel (Einheitenstrang, optional):** Ein
+  Gegner, den man nur durch den eigenen Sichtradius beobachten kann, lässt sich
+  nicht beurteilen — Anmarschweg, Sammeln und der Moment, in dem eine
+  angeschlagene Einheit abdreht, passieren dort, wo niemand hinsieht. Und eine
+  Partie entscheidet um Tick 9.000, also fünfzehn Minuten Zusehen.
+  **F4** deckt die ganze Karte auf, **F5** schaltet 1x → 2x → 4x → 10x, und eine
+  Zeile nennt die **Kennung der Simulation** (Hash der Definitionstabelle plus
+  die fünf Schemaversionen) — die Werte, an denen ungleiche Testbuilds
+  auseinandergehen, ablesbar vom Screenshot statt erfragt.
+  **Keines der drei rechnet etwas anders.** Der Fog-Reveal lässt
+  `FogOfWarSystem` dieselben Team-Sichten berechnen und festschreiben, und die
+  KI liest weiter ihre eigene über `GetVisibleEntities`; nur vier
+  Präsentationsverbraucher zeichnen aus dem Entity-Store statt aus der Sicht.
+  Der Zeitraffer skaliert ausschliesslich die Wall-Clock-Zeit, die `MatchRunner`
+  seinem Fixed-Tick-Akkumulator gibt: die Simulation läuft weiterhin mit 10 Hz,
+  Tick für Tick, in derselben Reihenfolge — eine bei 10x zugesehene Partie endet
+  auf demselben Tick mit demselben Zustands-Hash. In einer Relay-Partie ist der
+  Zeitraffer wirkungslos. Beide Zustände stehen sichtbar in der Statuszeile
+  (`FOG REVEALED`, `4x SPEED`), weil ein Urteil über eine aufgedeckte oder
+  gespulte Partie ohne dieses Etikett nichts wert ist.
+
 ### Geändert
 - **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
   Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis

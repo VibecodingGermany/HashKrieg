@@ -277,9 +277,19 @@ namespace Nova.Gameplay.Match
             // 1) The committed team view is the ONLY source of renderable
             //    entities (own units included, foreign units only in Visible
             //    cells). Nothing here touches EntityManager.RawUnits.
+            //    Lab exception: FogRevealDebug swaps the feed for the raw
+            //    store so the opponent AI can be watched playing. The fog
+            //    system itself is untouched either way (see its remarks).
             _visibleScratch.Clear();
             _combatSamples.Clear();
-            fog.GetVisibleEntities(viewerTeam, _visibleScratch);
+            if (FogRevealDebug.RevealAll)
+            {
+                FogRevealDebug.CollectAllActive(entities, _visibleScratch);
+            }
+            else
+            {
+                fog.GetVisibleEntities(viewerTeam, _visibleScratch);
+            }
 
             // Build the complete fog-safe snapshot before touching a view.
             // A dead slot can be recycled by the simulation in the same tick;

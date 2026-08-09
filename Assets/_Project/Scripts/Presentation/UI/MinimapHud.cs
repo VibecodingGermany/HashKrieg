@@ -86,6 +86,10 @@ namespace Nova.Presentation.UI
         private uint _renderedTick;
         private bool _hasRendered;
         private FogOfWarSystem _boundFog;
+        // Which mode the background texture was painted in. The reveal is a
+        // keypress, not a simulation event, so it cannot wait for the next
+        // 5 Hz commit to become visible.
+        private bool _renderedReveal;
 
         private void Awake()
         {
@@ -192,6 +196,13 @@ namespace Nova.Presentation.UI
                 _hasRendered = false;
             }
 
+            bool reveal = FogRevealDebug.RevealAll;
+            if (reveal != _renderedReveal)
+            {
+                _renderedReveal = reveal;
+                _hasRendered = false;
+            }
+
             if (_hasRendered && (!fog.HasCommittedView || fog.LastRecomputeTick == _renderedTick)) return;
 
             TeamView view = fog.GetTeamView(team);
@@ -215,6 +226,11 @@ namespace Nova.Presentation.UI
                 int row = y * view.Width;
                 for (int x = 0; x < view.Width; x++)
                 {
+                    if (reveal)
+                    {
+                        _pixels[row + x] = visible;
+                        continue;
+                    }
                     switch (view.GetCellState(x, y))
                     {
                         case VisionState.Visible: _pixels[row + x] = visible; break;
@@ -244,7 +260,16 @@ namespace Nova.Presentation.UI
             if (entities == null) return;
 
             _visibleScratch.Clear();
-            fog.GetVisibleEntities(team, _visibleScratch);
+            if (FogRevealDebug.RevealAll)
+            {
+                // Lab reveal: the enemy army on the minimap is the readout
+                // that shows where the AI actually goes.
+                FogRevealDebug.CollectAllActive(entities, _visibleScratch);
+            }
+            else
+            {
+                fog.GetVisibleEntities(team, _visibleScratch);
+            }
 
             Color previousColor = GUI.color;
             for (int i = 0; i < _visibleScratch.Count; i++)

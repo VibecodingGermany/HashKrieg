@@ -62,7 +62,16 @@ namespace Nova.Presentation.UI
 
             byte viewerTeam = (byte)(_runner.Session != null ? _runner.Session.LocalSlot : 0);
             _visibleScratch.Clear();
-            fog.GetVisibleEntities(viewerTeam, _visibleScratch);
+            if (FogRevealDebug.RevealAll)
+            {
+                // Lab reveal: bars over the revealed enemy too — a retreat is
+                // only readable next to the health that triggered it.
+                FogRevealDebug.CollectAllActive(entities, _visibleScratch);
+            }
+            else
+            {
+                fog.GetVisibleEntities(viewerTeam, _visibleScratch);
+            }
             if (_visibleScratch.Count == 0) return;
 
             float scale = Mathf.Max(1f, _uiScale);
