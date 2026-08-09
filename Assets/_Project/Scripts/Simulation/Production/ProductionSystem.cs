@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
