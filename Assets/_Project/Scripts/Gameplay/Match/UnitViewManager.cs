@@ -6,6 +6,7 @@ using Nova.Data;
 using Nova.Gameplay.CombatFeedback;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Combat;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.State;
@@ -344,11 +345,13 @@ namespace Nova.Gameplay.Match
                 if (slot < 0 || slot >= _viewInstances.Length) continue;
 
                 // A rebind is required for a recycled slot (new version) and
-                // when the role changed in place — a construction site carries
-                // UnitRole.Unit until ConstructionSystem promotes it to the
-                // finished building role, and the shape must follow.
+                // when the EFFECTIVE view role changed in place: a site
+                // carries its definition role since 16.3 (#44), so the
+                // site-register flip at completion (not a role change) is
+                // what promotes the view from the site pad to the finished
+                // building look.
                 bool spawned = false;
-                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != unit.Role)
+                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != EffectiveViewRole(in unit))
                 {
                     ReleaseView(slot);
                     AcquireView(slot, in unit);
@@ -460,6 +463,27 @@ namespace Nova.Gameplay.Match
             _combatDiffer.Reset(capacity);
         }
 
+        /// <summary>
+        /// The role every shape decision is made with (16.3, #44): an
+        /// unfinished site carries its definition role in the simulation now,
+        /// but it must KEEP the site look — the low generic pad, no art
+        /// prefab — until completion. Sites therefore map back to
+        /// <see cref="UnitRole.Unit"/> here; one read drives the rebind
+        /// trigger, the prefab lookup and the primitive table alike, so the
+        /// completion flip (site register, not role) rebinds the view to the
+        /// finished building. <see cref="_viewRoles"/> stores this effective
+        /// role, which is also what the building-rotation lock reads.
+        /// </summary>
+        private UnitRole EffectiveViewRole(in UnitState unit)
+        {
+            ConstructionSystem construction = _matchRunner != null ? _matchRunner.Construction : null;
+            if (construction != null && SimDefinitions.IsBuildingRole(unit.Role) && construction.IsActiveSite(unit.Id))
+            {
+                return UnitRole.Unit;
+            }
+            return unit.Role;
+        }
+
         private void AcquireView(int slot, in UnitState unit)
         {
             GameObject instance;
@@ -487,7 +511,7 @@ namespace Nova.Gameplay.Match
             }
             else
             {
-                GetRoleShape(unit.Role, out PrimitiveType primitive, out Vector3 scale);
+                GetRoleShape(EffectiveViewRole(in unit), out PrimitiveType primitive, out Vector3 scale);
                 shapeKey = (int)primitive;
                 groundOffset = GroundOffset(primitive, scale);
 
@@ -523,7 +547,7 @@ namespace Nova.Gameplay.Match
             _viewInstances[slot] = instance;
             _viewRenderers[slot] = instance.GetComponentInChildren<Renderer>(true);
             _boundIds[slot] = unit.Id;
-            _viewRoles[slot] = unit.Role;
+            _viewRoles[slot] = EffectiveViewRole(in unit);
             _viewShapeKeys[slot] = shapeKey;
             _viewSourcePrefabs[slot] = sourcePrefab;
             _viewGroundOffsets[slot] = groundOffset;
@@ -544,8 +568,10 @@ namespace Nova.Gameplay.Match
         /// the entity's own faction definition id (the same lookup combat and
         /// economy resolve through — a Legion LightTank gets the Legion prefab,
         /// never the Alliance one), then the single legacy <see cref="_unitPrefab"/>
-        /// override. UnitRole.Unit (the construction site) maps to the invalid
-        /// definition id 0 and therefore always falls through to the primitive.
+        /// override. The effective view role decides (16.3, #44): a site maps
+        /// back to <see cref="UnitRole.Unit"/>, which resolves to the invalid
+        /// definition id 0 and therefore always falls through to the primitive —
+        /// a site never gets the finished building's art.
         /// </summary>
         private GameObject ResolveViewPrefab(in UnitState unit)
         {
@@ -555,7 +581,7 @@ namespace Nova.Gameplay.Match
                 if (economy != null && unit.PlayerId < EconomySystem.MaxPlayers)
                 {
                     FactionId faction = economy.GetSlotFaction(unit.PlayerId);
-                    int definitionId = SimDefinitions.ToDefinitionId(faction, unit.Role);
+                    int definitionId = SimDefinitions.ToDefinitionId(faction, EffectiveViewRole(in unit));
                     if (definitionId != 0)
                     {
                         GameObject prefab = _assetMappings.GetUnitPrefab(definitionId);
@@ -1004,8 +1030,9 @@ namespace Nova.Gameplay.Match
         {
             switch (role)
             {
-                // Generic entity and, until ConstructionSystem promotes it, the
-                // unfinished construction site: a low ground pad.
+                // Generic entity — and the unfinished construction site,
+                // which EffectiveViewRole maps back here until completion
+                // (16.3): a low ground pad.
                 case UnitRole.Unit:
                     primitive = PrimitiveType.Cube;
                     scale = new Vector3(1.0f, 0.30f, 1.0f);

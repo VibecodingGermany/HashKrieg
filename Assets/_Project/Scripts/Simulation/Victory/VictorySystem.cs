@@ -397,9 +397,12 @@ namespace Nova.Simulation.Victory
                 ref readonly UnitState u = ref units[i];
                 if (!u.IsActive || u.PlayerId >= MaxSlots) continue;
 
-                // Only COMPLETED buildings carry UnitRole.HQ (construction
-                // sites carry UnitRole.Unit), so a bare role check counts HQs.
-                if (u.Role == UnitRole.HQ)
+                // Only COMPLETED buildings count as HQs: a site carries its
+                // definition role since 16.3 (#44), so the bare role check
+                // alone would promote a half-built HQ to a headquarters —
+                // the site's own register is excluded here exactly like the
+                // generic role excluded it before.
+                if (u.Role == UnitRole.HQ && !_construction.IsActiveSite(u.Id))
                 {
                     _scratchHq[u.PlayerId]++;
                 }
@@ -418,9 +421,10 @@ namespace Nova.Simulation.Victory
         /// <summary>
         /// D-056 building classification: one of the nine MS-1 building roles,
         /// or an active construction site ("einschließlich Baustellen"). A
-        /// site is a live entity carrying <see cref="UnitRole.Unit"/> (see the
-        /// ConstructionSystem remarks), so the role alone cannot tell it from
-        /// a mobile unit and the site table is consulted for exactly that role.
+        /// site carries its definition role since 16.3 (#44), so the building
+        /// role check catches it directly; the site-table consultation below
+        /// remains as the defensive answer for the generic role, which no
+        /// canonical path assigns to a site any more.
         /// <para>
         /// Known limitation, inherited from the command wire format: entity
         /// indices above 1023 have no packed raw id

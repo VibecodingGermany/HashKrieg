@@ -18,6 +18,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
+  Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
+  Waffentabelle (15 Schaden, D-087-Zielerfassung) trifft sie nicht mehr, und
+  unbewaffnete Gebäuderollen tragen `AttackDamage = 0`. Keine Zeile in
+  `Combat/` nötig. Die drei Leser der alten Generikrolle sind an der Quelle
+  mitgezogen: die Strombilanz überspringt Baustellen über das Baustellenregister
+  (`IsActiveSite`, vom `ConstructionSystem`-Konstruktor in die Economy gebunden
+  — eine Baustelle liefert und zieht nichts), `UnitViewManager` behält die
+  Baustellenoptik bis zur Fertigstellung (kein Gebäude-Prefab für Sites), und
+  `VictorySystem` zählt eine halbfertige HQ-Baustelle nicht als Hauptquartier
+  (D-077-Eliminierung bleibt exakt). **Restbefund:** eine Baustelle der
+  Verteidigungsplattform bleibt bewaffnet (20 Schaden aus der Gebäudedefinition)
+  — ein Site-Filter im Auto-Targeting liegt in `Simulation/Combat/` und gehört
+  dem Einheitenstrang; Ansage per Issue erfolgt
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
