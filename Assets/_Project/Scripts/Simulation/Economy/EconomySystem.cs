@@ -227,6 +227,38 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
+        /// Nearest field with reserve left to a grid cell, false when every
+        /// registered field is exhausted (or none is registered). Ascending
+        /// registration-index scan, deterministic: Chebyshev distance decides
+        /// and a tie resolves to the LOWER index — never to a discovery
+        /// order. Exhausted fields are skipped: an exhausted target would
+        /// resolve a fresh harvest order on its first tick and teach the
+        /// grant that issues it (16.1, #43) nothing.
+        /// </summary>
+        public bool TryFindNearestField(int gridX, int gridY, out ushort fieldId)
+        {
+            fieldId = 0;
+            int bestDistance = int.MaxValue;
+            for (int i = 0; i < _fieldCount; i++)
+            {
+                ref readonly AetheriumField field = ref _fields[i];
+                if (field.IsExhausted)
+                {
+                    continue;
+                }
+                int distance = Math.Max(
+                    Math.Abs(gridX - field.GridPos.X),
+                    Math.Abs(gridY - field.GridPos.Y));
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    fieldId = field.FieldId;
+                }
+            }
+            return fieldId != 0;
+        }
+
+        /// <summary>
         /// The faction one slot plays (economy block v2). Part of the hashed
         /// state, so every consumer of faction-differentiated content —
         /// power figures, build costs, weapon profiles — reads it here rather

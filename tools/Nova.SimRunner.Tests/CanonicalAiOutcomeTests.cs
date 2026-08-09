@@ -43,11 +43,17 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class CanonicalAiOutcomeTests
     {
-        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 15 (r5).</summary>
+        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 15 (r5) — unchanged by 16.1.</summary>
         private const uint PinnedDecidedTick = 2548u;
 
-        /// <summary>End-state hash of the canonical AI match, last moved by: Sprint 15 (r5).</summary>
-        private const string PinnedEndState = "0x14472B2B943ED2BB";
+        /// <summary>
+        /// End-state hash of the canonical AI match, last moved by: Sprint 16 package
+        /// 16.1 (#43) — the founding Harvester is born with a standing harvest
+        /// order, so the AI match ends with a different economy. The AI itself is
+        /// unchanged: AiBehaviorId stayed r5.779A1B5B.
+        /// Previous value: 0x14472B2B943ED2BB (Sprint 15, r5).
+        /// </summary>
+        private const string PinnedEndState = "0x8C0B54F31F2986B7";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()
