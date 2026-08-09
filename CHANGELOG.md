@@ -18,6 +18,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **#53: Das Lager begrenzt das Konto (D-024/D-096)** — das Aetherium-Konto hat
+  jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
+  gespeichert (kein Zustandsfeld, kein Formatbruch): ein fertiges HQ gibt die
+  Basis 2.000 AE, jedes fertige Lager +2.000, Baustellen zählen nicht. Jede
+  Einzahlung (Ernte, Rückerstattungen bei Streichung, Abbruch, Verkauf) läuft
+  über `EconomySystem.DepositCapped` und deckelt hart — Überschuss verfällt.
+  Ein Bestand über der Grenze zerfällt einmal pro Sekunde um 25 % des
+  Überschusses (getaktet über den Sim-Tick, zustandslos, restore-sicher): das
+  ist der „25 % Verlust bei Zerstörung" ohne Ereignis getragen — ein
+  zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
+  Verlust. Ausformung der Zerstörungsregel durch Inhaberentscheidung
+  (Zerfall statt Slot-gebundenem Einmalverlust)
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem

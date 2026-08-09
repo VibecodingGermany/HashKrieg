@@ -74,7 +74,12 @@ namespace Nova.Simulation.Economy
             PowerRequired = 0;
         }
 
-        /// <summary>Adds a non-negative amount of credits (harvest deposits of this slice).</summary>
+        /// <summary>
+        /// Adds a non-negative amount of credits (raw write). Callers route
+        /// through <see cref="EconomySystem.DepositCapped"/> instead (16.4,
+        /// #53, D-024): income and refunds obey the derived storage ceiling —
+        /// only the ceiling rule itself and tests touch this directly.
+        /// </summary>
         public void AddCredits(long amount)
         {
             if (amount > 0)

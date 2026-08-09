@@ -47,7 +47,22 @@ namespace Nova.Simulation.Economy
     /// closing the distance is Movement's concern. A harvester with a
     /// standing <see cref="UnitState.IsReturningCargo"/> order deposits its
     /// full cargo at an own refinery in reach (same Chebyshev rule): credits
-    /// rise by exactly the cargo amount and the return leg resolves.
+    /// rise by the cargo amount THAT FITS under the storage ceiling (16.4 —
+    /// overflow is forfeit) and the return leg resolves.
+    /// </para>
+    /// <para>
+    /// Storage ceiling (16.4, #53, D-024/D-096): the AE account has a derived
+    /// upper bound — a completed HQ provides the 2.000 AE base (per HQ),
+    /// every completed Storage adds 2.000, scanned from the living building
+    /// stock on every read and NEVER stored (a stored cap would be a state
+    /// field and a format break). All income and refunds route through
+    /// <see cref="DepositCapped"/> and clamp at the ceiling ("Überschuss
+    /// verfällt"); an EXISTING balance above it decays by 25% of the excess
+    /// once per second (tick % <see cref="ExcessDecayIntervalTicks"/>, integer
+    /// floor, minimum 1 AE). The decay IS the D-024 "25% loss on
+    /// destruction", carried without an event: a destroyed or sold storage
+    /// drops the ceiling and the decay is the loss. Keyed to the tick number
+    /// — stateless and restore-safe.
     /// </para>
     /// <para>
     /// Auto-cycle (harvest -&gt; return -&gt; harvest, Q-040 resolution): the
@@ -128,6 +143,24 @@ namespace Nova.Simulation.Economy
         public const long CanonicalMatchStartingCreditsAE = 3000L;
 
         /// <summary>
+        /// 16.4 (#53, D-024/D-096): AE capacity base per completed HQ.
+        /// Deliberately below the canonical start balance (3.000 AE, D-077):
+        /// the start stock stays (existing balances only decay), but fresh
+        /// income forfeits until the player builds storage — the D-024 silo
+        /// pressure from the first minute.
+        /// </summary>
+        public const long HqBaseCapacityAE = 2000L;
+
+        /// <summary>16.4 (#53, D-024): AE capacity bonus per completed Storage.</summary>
+        public const long StorageCapacityBonusAE = 2000L;
+
+        /// <summary>16.4 (#53, D-024): excess balance decay in percent of the excess per decay tick (integer floor, minimum 1 AE).</summary>
+        public const int ExcessDecayPercent = 25;
+
+        /// <summary>16.4 (#53): excess decay cadence — once per second on the canonical 10 Hz clock, keyed to the tick number (stateless, restore-safe).</summary>
+        public const int ExcessDecayIntervalTicks = 10;
+
+        /// <summary>
         /// Faction-resolved harvester cargo capacities, indexed by raw
         /// <see cref="FactionId"/> and resolved once from
         /// <see cref="Definitions.SimDefinitions"/>: the tick path never
@@ -146,6 +179,15 @@ namespace Nova.Simulation.Economy
         private readonly AetheriumField[] _fields;
         private int _fieldCount;
         private SimulationKernel _kernel;
+
+        /// <summary>
+        /// Construction-site lookup bound by the ConstructionSystem
+        /// constructor (16.3, #44): a site entity carries its definition role
+        /// now, so the power recompute needs the site's own register to tell
+        /// "unfinished" from "completed". Null in a rig without construction
+        /// — every building-role entity then counts, the pre-16.3 behaviour.
+        /// </summary>
+        private Func<EntityId, bool> _isSiteLookup;
 
         public string Name => "EconomySystem";
 
@@ -176,6 +218,70 @@ namespace Nova.Simulation.Economy
             _kernel = kernel;
             kernel?.Logger.LogInfo(
                 $"[{Name}] Initialized canonical economy ({MaxPlayers} slots, harvest rate {HarvestRateAE} AE/tick).");
+        }
+
+        /// <summary>
+        /// Binds the construction site's own register as the "is this entity
+        /// an unfinished site" lookup (16.3, #44). Called ONCE by the
+        /// ConstructionSystem constructor — hosts never wire this themselves.
+        /// The lookup is read-only against the site table and moves no state
+        /// into the economy, so the snapshot layout is untouched.
+        /// </summary>
+        public void BindSiteLookup(Func<EntityId, bool> isSiteLookup)
+        {
+            _isSiteLookup = isSiteLookup;
+        }
+
+        /// <summary>
+        /// 16.4 (#53, D-024/D-096): the slot's AE ceiling, DERIVED from the
+        /// living building stock on every read — never stored (a stored cap
+        /// would be a state-field and format break). A completed HQ provides
+        /// the 2.000 AE base (per HQ), every completed Storage adds 2.000.
+        /// Sites are excluded via the bound lookup: a half-built silo holds
+        /// nothing. Without the lookup (construction-free rigs) every
+        /// building-role entity counts. Integer scan in ascending entity
+        /// order — deterministic, restore-safe.
+        /// </summary>
+        public long CapacityFor(byte playerId)
+        {
+            long capacity = 0;
+            UnitState[] units = _entityManager.RawUnits;
+            int count = _entityManager.Capacity;
+            for (int i = 0; i < count; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != playerId) continue;
+                if (unit.Role == UnitRole.HQ)
+                {
+                    if (_isSiteLookup != null && _isSiteLookup(unit.Id)) continue;
+                    capacity += HqBaseCapacityAE;
+                }
+                else if (unit.Role == UnitRole.Storage)
+                {
+                    if (_isSiteLookup != null && _isSiteLookup(unit.Id)) continue;
+                    capacity += StorageCapacityBonusAE;
+                }
+            }
+            return capacity;
+        }
+
+        /// <summary>
+        /// 16.4 (#53, D-024): the capped deposit — the ONLY way income and
+        /// refunds should land. What does not fit under <see cref="CapacityFor"/>
+        /// is forfeit ("Überschuss verfällt"); an existing balance above the
+        /// ceiling is NOT touched here (it decays per second, see ExecuteTick).
+        /// Returns the amount actually deposited (0 when the account is at or
+        /// above the ceiling).
+        /// </summary>
+        public long DepositCapped(byte playerId, long amount)
+        {
+            if (amount <= 0 || playerId >= MaxPlayers) return 0;
+            ref PlayerEconomyState eco = ref _players[playerId];
+            long room = CapacityFor(playerId) - eco.AetheriumCredits;
+            if (room <= 0) return 0;
+            long deposited = Math.Min(amount, room);
+            eco.AddCredits(deposited);
+            return deposited;
         }
 
         /// <summary>Mutable access to one slot's economy state (slot must be in [0, MaxPlayers)).</summary>
@@ -284,12 +390,35 @@ namespace Nova.Simulation.Economy
         /// Phases 2 and 3 of the canonical tick (SimulationCore.md section
         /// 2): power recompute, then the harvest cycle — both in strict
         /// ascending entity-index order, before movement runs (registration
-        /// order; see class remarks).
+        /// order; see class remarks). Once per second the excess-balance
+        /// decay runs (16.4, #53, D-024): a balance above the derived
+        /// ceiling loses 25% of the excess per decay tick (integer floor,
+        /// minimum 1 AE, so it always converges). This IS the "25% loss on
+        /// destruction", carried without an event: a destroyed (or sold)
+        /// storage drops the ceiling and the decay is the loss. Keyed to the
+        /// tick number — stateless and restore-safe, no remembered event.
         /// </summary>
         public void ExecuteTick(Tick tick)
         {
             RecomputePower();
             ExecuteHarvest();
+            if (tick.Value % ExcessDecayIntervalTicks == 0)
+            {
+                DecayExcessBalances();
+            }
+        }
+
+        /// <summary>The per-second excess decay (16.4): every slot above its derived ceiling loses a quarter of the excess.</summary>
+        private void DecayExcessBalances()
+        {
+            for (byte p = 0; p < MaxPlayers; p++)
+            {
+                ref PlayerEconomyState eco = ref _players[p];
+                long excess = eco.AetheriumCredits - CapacityFor(p);
+                if (excess <= 0) continue;
+                long loss = Math.Max(1L, excess * ExcessDecayPercent / 100L);
+                eco.AetheriumCredits -= loss;
+            }
         }
 
         public void Shutdown()
@@ -441,7 +570,7 @@ namespace Nova.Simulation.Economy
 
             if (!HasOwnRefineryInReach(in unit)) return; // held, not dropped
 
-            _players[unit.PlayerId].AddCredits(unit.CargoAE);
+            DepositCapped(unit.PlayerId, unit.CargoAE); // 16.4: capped at the derived ceiling — overflow is forfeit
             unit.CargoAE = 0;
             unit.IsReturningCargo = false;
         }

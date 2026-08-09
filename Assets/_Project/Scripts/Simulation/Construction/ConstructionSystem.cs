@@ -213,6 +213,10 @@ namespace Nova.Simulation.Construction
             _t2Unlocked = new bool[EconomySystem.MaxPlayers];
             _occupied = new byte[GridSize * GridSize];
             _costField = costField;
+            // 16.3 (#44): a site carries its definition role, so the power
+            // recompute can no longer skip sites by role — it skips them via
+            // this register instead. Bound here so no host can forget it.
+            _economy.BindSiteLookup(IsActiveSite);
         }
 
         public void Initialize(SimulationKernel kernel)
@@ -285,6 +289,18 @@ namespace Nova.Simulation.Construction
         public bool IsCompletedPlacement(uint rawEntityId)
         {
             return IndexOfBuilding(rawEntityId) >= 0;
+        }
+
+        /// <summary>
+        /// True while the entity is an unfinished site (16.3, #44: sites now
+        /// carry their definition role, so role alone no longer tells a site
+        /// apart). Bound into the economy's power recompute via
+        /// <see cref="EconomySystem.BindSiteLookup"/>; also the read the
+        /// presentation layer needs to keep the site look until completion.
+        /// </summary>
+        public bool IsActiveSite(EntityId id)
+        {
+            return IndexOfSite(UnitCommandStateView.ToRawEntityId(id)) >= 0;
         }
 
         /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
@@ -493,7 +509,8 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * CancelRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * CancelRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(site.OriginX, site.OriginY);
@@ -517,7 +534,8 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * SellRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * SellRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(placement.OriginX, placement.OriginY);

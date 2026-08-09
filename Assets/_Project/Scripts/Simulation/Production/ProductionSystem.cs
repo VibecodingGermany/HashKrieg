@@ -336,8 +336,8 @@ namespace Nova.Simulation.Production
             EntityId id = UnitCommandStateView.ToEntityId(buildingRaw);
             if (_entityManager.TryGetUnit(id, out UnitState building))
             {
-                _economy.GetPlayerEconomy(building.PlayerId)
-                    .AddCredits((long)def.CostAE * row.Entries[queueIndex].RemainingCount);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(building.PlayerId, (long)def.CostAE * row.Entries[queueIndex].RemainingCount);
             }
             RemoveEntry(row, queueIndex);
             return true;
