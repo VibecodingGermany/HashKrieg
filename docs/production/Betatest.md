@@ -195,12 +195,35 @@ im Umlauf jede Fehlermeldung wertlos macht.
 
 | | |
 |---|---|
-| **Was** | `Builds/dist/Hashkrieg-Test-<commit>.zip` — beide Plattformen, Anleitung und Prompt liegen darin. Eine Datei, keine Plattformfrage an den Empfänger |
+| **Kanal** | **Eine Adresse: `https://project-nova-pitch.vercel.app/beta`.** Statt jedem einzeln zu schreiben, bekommt jeder Testende diesen Link. Die Seite trägt Projektbeschreibung, Downloads, Installation, bewusste Lücken und den Rückmeldeweg |
+| **Sichtbarkeit** | `noindex, nofollow`, nicht vom Investorenpapier verlinkt. Wer die Adresse hat, kommt rein — bewusst so, es sind ein bis zwei bekannte Personen |
+| **Downloads** | drei Pakete unter `<kennung>/` im Vercel-Blob-Store `hashkrieg-beta`: macOS-DMG, Windows-ZIP und das kombinierte Paket. Sie liegen **nicht** im Vercel-Deploy — statische Dateien sind dort bei 100 MB gedeckelt |
 | **Gebaut mit** | `build-mac.sh` → `build-windows.sh` → `build-testpaket.sh`, siehe [tools/packaging/README.md](../../tools/packaging/README.md) |
-| **Kanal** | Drive-Ordner |
-| **Empfängerkreis** | namentlich bekannt, ein bis zwei Personen. Kein offener Link |
 | **Kein CLA nötig** | Testende tragen keinen Code bei. Schickt jemand später Code, greift der normale Weg aus [CONTRIBUTING.md](../../CONTRIBUTING.md) |
 | **Kein Repo-Zugang** | Ein Tester braucht weder Fork noch Collaborator-Eintrag. Das Zugangsmodell aus [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) bleibt unberührt |
+
+**Warum Blob und nicht der VPS:** Auf dem VPS läuft der Relay. Ein 327-MB-Download
+mitten in einer Netzpartie ist genau die Wechselwirkung, die wir nicht wollen.
+Dasselbe Argument spricht gegen das Supabase-Projekt `hashkrieg-lobby`.
+
+### Nach einem neuen Build
+
+Die Seite hat **eine** Stelle, an der Downloads stehen — den `RELEASE`-Block am
+Ende von `beta/index.html` im Projekt `project-nova-pitch`. Dort die Kennung
+setzen, dann hochladen und ausrollen:
+
+```bash
+vercel env pull .env.local
+vercel blob put <datei> --pathname "<kennung>/<datei>" --force true
+npx vercel@latest deploy --prod --yes
+```
+
+Bleibt eine URL im `RELEASE`-Block leer, zeigt die Seite dort „Link folgt"
+statt eines toten Knopfes.
+
+**Alte Stände löschen** — `vercel blob del "<alte-kennung>/<datei>"`. Ein
+kompletter Satz sind rund 660 MB; ohne Aufräumen wächst der Store mit jedem
+Build um denselben Betrag.
 
 ## Vor dem Verschicken — vier Prüfungen
 
@@ -261,10 +284,16 @@ uns.
 - Das Rückmeldeverfahren ist ungetestet. Ob eine zehnminütige Sprachnachricht
   in ChatGPT sauber durchläuft und der Prompt hält, was er verspricht, weiß
   erst der erste Durchgang.
+- Die Seite kennt keine Zugangskontrolle. Wer die Adresse weitergibt, gibt die
+  Downloads weiter. Für zwei bekannte Personen ist das entschieden und in
+  Ordnung; für einen größeren Kreis wäre es eine neue Entscheidung.
+- Der Blob-Store hat noch keine Aufräumroutine. Solange es einen Stand gibt,
+  ist das kein Problem — ab dem dritten wird es eins.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-09 | Verteilung auf eine Beta-Seite umgestellt (`/beta` im Investorenpapier-Projekt) statt Einzelversand; Downloads liegen im Vercel-Blob-Store, Begründung gegen VPS und Supabase festgehalten; Ablauf für den nächsten Build und die Aufräumpflicht ergänzt | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-09 | Rückmeldeweg auf das ChatGPT-Verfahren umgestellt (Prompt zuerst, Sprachnachrichten beim Spielen, `FERTIG` löst den Bericht aus), Screenshot-Tastenkürzel für beide Systeme ergänzt, Befund-Ablage auf die Abschnitte des Berichts abgebildet; Verteilung auf das kombinierte Testpaket umgestellt | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-09 | Erstfassung: Anleitung für Testende, Verteil- und Rückmeldeweg, Kadenzregel mit Testenden im Umlauf | Producer / Agent (Umsetzung) |
