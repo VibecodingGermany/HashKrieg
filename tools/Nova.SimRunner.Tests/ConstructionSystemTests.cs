@@ -490,7 +490,7 @@ namespace Nova.SimRunner.Tests
 
             f.Step(150);
             Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0), "not while the site is still running");
-            long creditsBefore = f.Economy.GetPlayerEconomy(0).Credits;
+            long creditsBefore = f.Economy.GetPlayerEconomy(0).AetheriumCredits;
 
             f.Step(100); // past the 200-tick build time
 
@@ -498,7 +498,7 @@ namespace Nova.SimRunner.Tests
                 "a finished Refinery hands out its first Harvester");
             Assert.That(CountUnits(f, 1, UnitRole.Harvester), Is.EqualTo(0),
                 "the grant belongs to the building's owner alone");
-            Assert.That(f.Economy.GetPlayerEconomy(0).Credits, Is.EqualTo(creditsBefore),
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(creditsBefore),
                 "the grant is free: nothing is charged at completion");
         }
 
