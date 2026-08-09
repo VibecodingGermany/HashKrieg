@@ -17,6 +17,33 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
+  (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als
+  `Schaden × Leben / Feuerintervall` — ganzzahlig, eine Division, eine
+  festgeschriebene Abschneidung, unbewaffnet ergibt 0 ohne Sonderfall. Das neue
+  Profilfeld `waveStrengthPoints` (ausgeliefert 1200, **0 schaltet die Regel
+  aus**) ersetzt damit das Abzählen am Sammelpunkt. Der Anlass ist eine
+  Asymmetrie, die eine Kopfzahl nicht sehen kann: zwölf Allianz-Schützen wiegen
+  1.200 Punkte, zwölf Legions-Rekruten 528 — die Legion marschiert also mit
+  44 % der Angriffsstärke los, die dieselbe Regel der Allianz gibt, und das
+  steht in der Verlustspalte (51 gegen 23). Die r5-Regel wandert in Punkten
+  mit: der Schwellwert wird weiterhin gegen das gekappt, was die Produktion
+  noch liefern kann, damit ein Überlebender ausserhalb des Rings die nächste
+  Welle nicht blockiert. **Mit der ausgelieferten Armeeobergrenze 12 ändert das
+  noch nichts** — die Punktklausel kann nur entscheiden, solange ein Kopf der
+  Obergrenze frei ist, also bei elf Schützen mit 1.100 Punkten gegen eine
+  Schwelle von 1.200. Der gepinnte Endzustand der kanonischen Partie in
+  `SkirmishAiTests` steht dadurch unverändert bei Tick 2.548 und
+  `0x14472B2B943ED2BB`; im KI-gegen-KI-Lauf des Labors ist die Partie
+  ebenfalls byteidentisch (Tick 5.773, `0x2B34B4E194257940`).
+  Das ist der Zweck dieses Schritts: Wellengrösse und
+  Produktionsobergrenze hängen nicht mehr an derselben Zahl, bevor an dieser
+  Zahl gedreht wird. Im Labor einseitig gemessen: die Obergrenze **allein**
+  anzuheben macht die Legion schlechter (Verluste 51 → 64, Austausch 45 → 34),
+  mit dem Tor gewinnt derselbe Sitz (Austausch 45 → 90 bei Obergrenze 36).
+  Im laufenden Spiel ungesehen.
+
 ### Behoben
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
