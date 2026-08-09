@@ -2,6 +2,9 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Simulation;
+using Nova.Simulation.Construction;
+using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
@@ -32,12 +35,16 @@ namespace Nova.SimRunner.Tests
         {
             public SimulationKernel Kernel { get; }
             public EntityManager Entities { get; }
+            public EconomySystem Economy { get; }
+            public ConstructionSystem Construction { get; }
             public FogOfWarSystem Fog { get; }
 
-            private TestHost(SimulationKernel kernel, EntityManager entities, FogOfWarSystem fog)
+            private TestHost(SimulationKernel kernel, EntityManager entities, EconomySystem economy, ConstructionSystem construction, FogOfWarSystem fog)
             {
                 Kernel = kernel;
                 Entities = entities;
+                Economy = economy;
+                Construction = construction;
                 Fog = fog;
             }
 
@@ -46,14 +53,19 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
-                var fog = new FogOfWarSystem(entities, teamCount: 2, width, height);
+                // 16.5/16.6: the FoW radar read requires the placement register
+                // and the power balance — an unregistered economy/construction
+                // pair answers both queries without ever ticking.
+                var economy = new EconomySystem(entities);
+                var construction = new ConstructionSystem(entities, economy);
+                var fog = new FogOfWarSystem(entities, construction, economy, teamCount: 2, width, height);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(pathfinding);
                 kernel.RegisterSystem(movement);
                 kernel.RegisterSystem(fog);
                 kernel.Start();
-                return new TestHost(kernel, entities, fog);
+                return new TestHost(kernel, entities, economy, construction, fog);
             }
 
             public void Step() => Kernel.StepTick();
@@ -235,9 +247,15 @@ namespace Nova.SimRunner.Tests
         public void RadarSignature_PingsWithoutTargetingRight()
         {
             var host = TestHost.Create(Seed);
-            SpawnAt(host, 0, 10, 10, sightRadius: 5); // radar coverage 10 (provisional x2)
-            SpawnAt(host, 1, 19, 10, sightRadius: 5); // inside radar (9 <= 10), outside sight (9 > 5)
-            SpawnAt(host, 1, 40, 10, sightRadius: 5); // outside radar
+            SpawnAt(host, 0, 10, 10, sightRadius: 5); // sight observer, NOT a radar source
+            // 16.5 (#54): only a COMPLETED Radar building radiates — centre
+            // (10,15), coverage = its sight radius 10 x 2 = 20. NOTE: the
+            // building also contributes plain SIGHT (radius 10), so a ping
+            // target must hide from both radii.
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True,
+                "Alliance Radar (def 10) as a completed placement");
+            SpawnAt(host, 1, 24, 10, sightRadius: 5); // inside radar coverage (dx 14 <= 20), outside both sights (14 > 10, 14 > 5)
+            SpawnAt(host, 1, 40, 10, sightRadius: 5); // outside radar (dx 30 > 20)
             SpawnAt(host, 1, 13, 10, sightRadius: 5); // inside sight: a target, not a ping
 
             host.Step(2);
@@ -245,15 +263,54 @@ namespace Nova.SimRunner.Tests
             var pings = new List<RadarSignature>();
             host.Fog.GetRadarSignatures(0, pings);
             Assert.That(pings.Count, Is.EqualTo(1), "exactly the radar-covered hidden enemy pings");
-            Assert.That(pings[0].GridX, Is.EqualTo(19));
+            Assert.That(pings[0].GridX, Is.EqualTo(24));
             Assert.That(pings[0].GridY, Is.EqualTo(10));
 
             // Contract: the ping grants no targeting permission — the cell is
             // not Visible, so Combat must not address the pinged object. The
             // signature struct carries no EntityId by design.
             TeamView view = host.Fog.GetTeamView(0);
-            Assert.That(view.IsVisible(19, 10), Is.False, "a pinged cell stays non-targetable");
+            Assert.That(view.IsVisible(24, 10), Is.False, "a pinged cell stays non-targetable");
             Assert.That(view.IsVisible(13, 10), Is.True, "the in-sight enemy is a target instead");
+        }
+
+        [Test]
+        public void RadarSignature_WithoutCompletedRadar_NoCoverage()
+        {
+            var host = TestHost.Create(Seed);
+            SpawnAt(host, 0, 10, 10, sightRadius: 5); // a plain unit radiates nothing since 16.5
+            SpawnAt(host, 1, 16, 10, sightRadius: 5); // hidden (6 > 5) — the old every-unit x2 rule WOULD have pinged this
+
+            host.Step(2);
+
+            var pings = new List<RadarSignature>();
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(0), "no finished Radar building, no coverage at all");
+        }
+
+        [Test]
+        public void RadarSignatures_StopAtPowerDeficit_AndResumeWhenBalanceRecovers()
+        {
+            // 16.6 (C4, D-030): at a power deficit the radar is the FIRST
+            // system to fall — no coverage, no pings. The deficit here is set
+            // directly on the balance (the rig's economy never recomputes).
+            var host = TestHost.Create(Seed);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True);
+            SpawnAt(host, 1, 24, 10, sightRadius: 5); // radar-covered, hidden
+            host.Step(2);
+
+            var pings = new List<RadarSignature>();
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(1), "coverage with a finished Radar and a balanced grid");
+
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 1; // deficit: 1 required > 0 provided
+            pings.Clear();
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(0), "LOW POWER takes the radar offline");
+
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 0;
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(1), "the radar comes back with the balance");
         }
 
         [Test]
@@ -269,9 +326,17 @@ namespace Nova.SimRunner.Tests
             var hostB = TestHost.Create(Seed);
             SpawnAt(hostA, 0, 10, 10, sightRadius: 5);
             SpawnAt(hostB, 0, 10, 10, sightRadius: 5);
+            // 16.5: both hosts get an identical completed Radar, so the ping
+            // comparison exercises the radar path rather than two empty lists.
+            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True);
+            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True);
             EntityId hiddenA = SpawnAt(hostA, 1, 50, 50, sightRadius: 5);
             EntityId hiddenB = SpawnAt(hostB, 1, 55, 52, sightRadius: 5); // hidden variation
             Assert.That(hiddenA, Is.EqualTo(hiddenB), "same spawn sequence must yield the same id");
+            // Identical radar-covered enemy in BOTH hosts (inside coverage
+            // 20, outside both sight radii 10 and 5): one ping each.
+            SpawnAt(hostA, 1, 24, 10, sightRadius: 5);
+            SpawnAt(hostB, 1, 24, 10, sightRadius: 5);
 
             for (int i = 0; i < 10; i++)
             {

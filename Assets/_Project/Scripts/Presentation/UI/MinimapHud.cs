@@ -6,6 +6,7 @@ using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 using EntityId = Nova.Core.EntityId;
@@ -18,9 +19,16 @@ namespace Nova.Presentation.UI
     /// the Glutrinne desert ground, the viewer team's fog state as the same
     /// terrain silhouette in three brightness bands (visible full, explored
     /// dimmed, unexplored near-dark but readable — never black), every entity
-    /// the team may legally see as a faction-coloured dot, and the camera's
-    /// ground footprint as a white rectangle. A left click inside the map
-    /// jumps the camera there.
+    /// the team may legally see as a faction-coloured dot, radar pings as
+    /// signal-orange dots, and the camera's ground footprint as a white
+    /// rectangle. A left click inside the map jumps the camera there.
+    /// <para>
+    /// RADAR GATE (16.5, #54, C3): the whole panel — draw AND hit area — only
+    /// exists while the local slot owns a COMPLETED Radar building
+    /// (<see cref="LocalRadarOnline"/>). The map the tester always had was
+    /// never free; the radar button says so in plain text. One read drives
+    /// both, so the dead rect cannot swallow clicks while nothing is drawn.
+    /// </para>
     /// <para>
     /// NO LEAKS BY CONSTRUCTION: the background is the SAME committed team
     /// view the <see cref="FogOfWarOverlayView"/> renders and the dots come
@@ -79,8 +87,11 @@ namespace Nova.Presentation.UI
         [Header("Dots")]
         [SerializeField] private float _unitDotSize = 3f;
         [SerializeField] private float _buildingDotSize = 4.5f;
+        [Tooltip("Radar pings (16.5): foreign units inside Radar coverage but outside committed sight — a signal, not a target.")]
+        [SerializeField] private Color _radarPingColor = new Color(1f, 0.55f, 0.1f, 1f);
 
         private readonly List<EntityId> _visibleScratch = new List<EntityId>(256);
+        private readonly List<RadarSignature> _radarScratch = new List<RadarSignature>(64);
         private Texture2D _background;
         private Color32[] _pixels;
         private uint _renderedTick;
@@ -109,6 +120,10 @@ namespace Nova.Presentation.UI
         /// </summary>
         public bool IsPointerOverMinimap(Vector2 mousePosition)
         {
+            // 16.5 (#54): no Radar, no map — and no hit area either, so the
+            // dead rect cannot swallow world clicks while nothing is drawn.
+            if (!LocalRadarOnline()) return false;
+
             float scale = Mathf.Max(1f, _uiScale);
             Vector2 gui = HudLayout.RawMouseToGui(mousePosition, scale);
             Rect map = ComputeMapRect();
@@ -131,6 +146,11 @@ namespace Nova.Presentation.UI
         {
             FogOfWarSystem fog = _runner != null ? _runner.FogOfWar : null;
             if (fog == null) return; // no committed sight, no minimap (the world view renders nothing either)
+            // 16.5 (#54, C3): the map itself is a Radar function now — no
+            // completed Radar, no minimap at all. The radar building button
+            // says so in plain text (BuildMenuHud), and a lost Radar takes
+            // the map away again.
+            if (!LocalRadarOnline()) return;
 
             byte team = ResolveViewerTeam(fog);
             RefreshBackground(fog, team);
@@ -148,10 +168,28 @@ namespace Nova.Presentation.UI
 
             GUI.DrawTexture(map, _background);
             DrawEntityDots(map, fog, team);
+            DrawRadarPings(map, fog, team);
             DrawCameraViewport(map, fog);
             HandleClick(map, fog);
 
             GUI.matrix = previousMatrix;
+        }
+
+        /// <summary>
+        /// 16.5 (#54, C3): the minimap unlocks with the local slot's first
+        /// COMPLETED Radar building and goes dark when it is lost. 16.6 (C4,
+        /// D-030): at a power deficit the radar is the FIRST system to fall —
+        /// the map goes dark too, exactly like the sim-side pings stop. One
+        /// read, shared by the draw and the hit test, so they can never
+        /// disagree.
+        /// </summary>
+        private bool LocalRadarOnline()
+        {
+            if (_runner == null || _runner.Construction == null || _runner.Session == null) return false;
+            if (!_runner.Construction.HasFinishedBuilding(_runner.Session.LocalSlot, UnitRole.Radar)) return false;
+            EconomySystem economy = _runner.Economy;
+            if (economy == null) return false;
+            return !economy.GetPlayerEconomy(_runner.Session.LocalSlot).IsLowPower;
         }
 
         /// <summary>The local viewer team — the same convention as FogOfWarOverlayView/UnitViewManager.</summary>
@@ -283,6 +321,39 @@ namespace Nova.Presentation.UI
 
                 float size = SimDefinitions.IsBuildingRole(unit.Role) ? _buildingDotSize : _unitDotSize;
                 GUI.color = ColorForOwner(unit.PlayerId);
+                GUI.DrawTexture(
+                    new Rect(map.x + uiX - size * 0.5f, map.y + uiY - size * 0.5f, size, size),
+                    HudChrome.Pixel);
+            }
+            GUI.color = previousColor;
+        }
+
+        /// <summary>
+        /// Radar pings (16.5, #54): foreign units inside the finished Radar's
+        /// coverage but OUTSIDE committed sight — a signal, not a target.
+        /// Drawn as the signal-orange dot, one per cell, on top of the entity
+        /// dots so a ping is never hidden by explored terrain. First live
+        /// consumer of <see cref="FogOfWarSystem.GetRadarSignatures"/>.
+        /// </summary>
+        private void DrawRadarPings(Rect map, FogOfWarSystem fog, byte team)
+        {
+            if (FogRevealDebug.RevealAll) return; // the lab reveal already shows everything
+
+            _radarScratch.Clear();
+            fog.GetRadarSignatures(team, _radarScratch);
+            if (_radarScratch.Count == 0) return;
+
+            Color previousColor = GUI.color;
+            GUI.color = _radarPingColor;
+            float size = _unitDotSize + 1f;
+            for (int i = 0; i < _radarScratch.Count; i++)
+            {
+                RadarSignature ping = _radarScratch[i];
+                // The signature is a GRID cell: draw its centre (the +0.5),
+                // same boundary as the entity dots.
+                (float uiX, float uiY) = MinimapRenderer.WorldToMinimapGuiCoordinates(
+                    ping.GridX + 0.5f, ping.GridY + 0.5f,
+                    fog.Width, fog.Height, map.width, map.height);
                 GUI.DrawTexture(
                     new Rect(map.x + uiX - size * 0.5f, map.y + uiY - size * 0.5f, size, size),
                     HudChrome.Pixel);

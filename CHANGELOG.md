@@ -18,6 +18,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **Low Power ist eine Waffe (C4/D-030, Sprint 16.6)** — bei Energiedefizit
+  fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
+  (Economy als Pflicht-Abhängigkeit), und die Minimap geht mit aus (dieselbe
+  Bilanz, dieselbe Abfrage). Produktion und Bau behalten den exakten
+  Tempo-Malus (0.5 in Q16.16), und die Reparatur halbiert jetzt exakt
+  (10 → 5 HP/Tick, Economy.md-Reparaturregel). Erst damit ist der Angriff
+  aufs Kraftwerk ein taktischer Zug. **Nicht dabei:** die Verteidigungs-
+  abschaltung — ob ein Turm feuert, entscheidet `CombatSystem` (Einheiten-
+  strang), das einen Strombegriff nicht kennt; Befund geht an 13B
+- **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
+  Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
+  solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im
+  Klartext („Radar: schaltet die Minimap frei — ohne Radar keine Karte"). Die
+  Radar-Abdeckung kommt vom Gebäude statt von jeder Einheit: nur ein fertiges
+  Radargebäude strahlt (Sichtweite × 2), `FogOfWarSystem` bekommt das
+  Bau-Register dafür als Pflicht-Abhängigkeit, und `GetRadarSignatures` wird
+  erstmals von der Präsentation konsumiert (signal-orange Pings: ein Zeichen,
+  kein Ziel). `GetTeamView` unverändert — Vertragsfläche des Einheitenstrangs.
+  Kein Baseline-Eingriff: die Pings sind eine abgeleitete Ansicht, kein
+  autorisierter Zustand
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem

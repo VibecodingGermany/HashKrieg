@@ -38,23 +38,29 @@ namespace Nova.SimRunner.Tests
             public FogOfWarSystem Fog { get; }
             public CombatSystem Combat { get; }
 
-            private TestHost(SimulationKernel kernel, EntityManager entities, FogOfWarSystem fog, CombatSystem combat)
+            private TestHost(SimulationKernel kernel, EntityManager entities,
+                Nova.Simulation.Construction.ConstructionSystem construction, FogOfWarSystem fog, CombatSystem combat)
             {
                 Kernel = kernel;
                 Entities = entities;
+                Construction = construction;
                 Fog = fog;
                 Combat = combat;
             }
+
+            public Nova.Simulation.Construction.ConstructionSystem Construction { get; }
 
             public static TestHost Create(ulong seed, int capacity = 64, ushort width = 64, ushort height = 64)
             {
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
-                var fog = new FogOfWarSystem(entities, teamCount: 2, width, height);
                 // Faction source for the combat weapon table: an unregistered
-                // economy state (all slots default to Alliance).
+                // economy state (all slots default to Alliance). 16.5: the
+                // FoW radar read also requires the placement register.
                 var factions = new EconomySystem(entities);
+                var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, factions);
+                var fog = new FogOfWarSystem(entities, construction, factions, teamCount: 2, width, height);
                 var combat = new CombatSystem(entities, fog, factions);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
@@ -63,7 +69,7 @@ namespace Nova.SimRunner.Tests
                 kernel.RegisterSystem(fog);
                 kernel.RegisterSystem(combat);
                 kernel.Start();
-                return new TestHost(kernel, entities, fog, combat);
+                return new TestHost(kernel, entities, construction, fog, combat);
             }
 
             public void Step() => Kernel.StepTick();
@@ -246,17 +252,21 @@ namespace Nova.SimRunner.Tests
         public void RadarPingOnly_GrantsNoTargetingPermission()
         {
             var host = TestHost.Create(Seed);
-            // Sight 5 (radar 10 provisional x2): the enemy 7 cells out is
-            // radar-covered and inside weapon range 8 + 0.5, but NOT Visible.
-            EntityId attacker = SpawnAt(host, 0, 10, 10, sightRadius: 5);
-            EntityId target = SpawnAt(host, 1, 17, 10, maxHealth: 100);
+            // 16.5: only a COMPLETED Radar building radiates — centre (10,15),
+            // coverage sight 10 x 2 = 20. The building also contributes plain
+            // SIGHT (radius 10), so the target hides from both radii: 16 > 10
+            // and 16 > 5 away, inside the 20 coverage, inside weapon range.
+            EntityId attacker = SpawnAt(host, 0, 20, 10, sightRadius: 5);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True,
+                "Alliance Radar (def 10) as a completed placement");
+            EntityId target = SpawnAt(host, 1, 26, 10, maxHealth: 100);
             host.Entities.GetUnitRef(attacker).AttackTarget = target;
 
             host.Step(2); // first commit
             var pings = new System.Collections.Generic.List<RadarSignature>();
             host.Fog.GetRadarSignatures(0, pings);
             Assert.That(pings.Count, Is.EqualTo(1), "the hidden in-range enemy pings on radar");
-            Assert.That(host.Fog.GetTeamView(0).IsVisible(17, 10), Is.False);
+            Assert.That(host.Fog.GetTeamView(0).IsVisible(26, 10), Is.False);
 
             host.Step(18); // many shot opportunities pass
             Assert.That(HealthOf(host, target), Is.EqualTo(100),
@@ -563,7 +573,9 @@ namespace Nova.SimRunner.Tests
                 var pathfinding = new PathfindingSystem(64, 64);
                 var movement = new MovementSystem(entities, pathfinding);
                 var economy = new EconomySystem(entities);
-                var fog = new FogOfWarSystem(entities, teamCount: 2, 64, 64);
+                // 16.5: the FoW radar read requires the placement register.
+                var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
+                var fog = new FogOfWarSystem(entities, construction, factions, teamCount: 2, 64, 64);
                 var combat = new CombatSystem(entities, fog, economy);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));

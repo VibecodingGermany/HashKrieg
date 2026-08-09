@@ -588,6 +588,27 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void Repair_LowPower_ExactlyHalvesTheRate()
+        {
+            // 16.6 (C4, Economy.md repair rule): under LOW POWER the repair
+            // rate halves exactly — 5 HP per tick, no rounding.
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 40, 40).IsValid, Is.True,
+                "a completed Refinery (20 required, nothing provided) forces low power");
+            EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
+            f.Entities.GetUnitRef(barracks).CurrentHealth = 100;
+
+            EntityId builder = f.SpawnBuilder(0, 19, 20);
+            f.Step(1); // commit the balance: refinery + barracks draw 35, nothing provided
+            Assert.That(f.Economy.GetPlayerEconomy(0).IsLowPower, Is.True);
+
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(builder), UnitCommandStateView.ToRawEntityId(barracks));
+            f.Step(10);
+            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(150),
+                "5 HP per tick under low power — exactly half the provisional rate");
+        }
+
+        [Test]
         public void Repair_Validation_RejectsNonBuilder_AndUndamagedTarget()
         {
             var f = new Fixture();
