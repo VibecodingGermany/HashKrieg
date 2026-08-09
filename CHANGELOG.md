@@ -18,6 +18,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Hinzugefügt
+- **Verbindungsdialog und Linux-Build (Sprint 13, Pakete 13.1 und 13.7):** Das
+  Hauptmenü hat einen Bereich „Netzpartie" mit Serveradresse, Port, maskiertem
+  Match-Code, Rollenwahl Host/Gast und einem Statusband, das die Zustände des
+  `RelayMatchClient` ehrlich benennt statt stumm zu bleiben. Der TCP-Connect ist
+  von blockierend auf poll-getrieben umgestellt, damit ein nicht erreichbarer
+  Server Unitys Hauptthread nicht mehr einfriert; Host und Port werden vor dem
+  Verbindungsversuch geprüft. Der Relay unterscheidet jetzt zwischen dem
+  10-Sekunden-Fenster für den Handshake-Beweis und einem eigenen
+  120-Sekunden-Fenster fürs Warten auf den Gegenspieler, weil beides vorher
+  denselben Timeout teilte. Dazu `BuildScript.BuildLinux64` und
+  `tools/packaging/build-linux.sh`, damit am Netznachweis nicht nur teilnehmen
+  kann, wer einen Mac hat.
 - **Freigabe für externe Beiträge (D-091, Sprint 13.0):** Der unveränderte
   Text der `PolyForm-Noncommercial-1.0.0`-Lizenz, ein Scope-/Asset-`NOTICE` und
   eine nicht-exklusive Contributor License Agreement schaffen den

@@ -158,6 +158,81 @@ namespace Nova.Gameplay.Tests
         }
 
         [Test]
+        public void MenuJoinValidation_IsFailClosed_AndNeverEchoesTheMatchCode()
+        {
+            var go = new GameObject("NetworkJoinValidation");
+            try
+            {
+                go.AddComponent<MatchRunner>();
+                MatchBootstrap bootstrap = go.AddComponent<MatchBootstrap>();
+                bootstrap.AutoStart = false;
+
+                LogAssert.Expect(LogType.Error,
+                    "[MatchBootstrap] Network join failed: Die Serveradresse darf nicht leer sein.");
+                Assert.That(bootstrap.TryStartNetworkJoin(
+                    "", 47777, "0123456789ABCDEF", NetworkJoinRole.Host), Is.False);
+                Assert.That(bootstrap.JoinStatus.Failure, Is.EqualTo(NetworkJoinFailure.InvalidHost));
+                Assert.That(bootstrap.JoinStatus.Message, Does.Not.Contain("0123456789ABCDEF"));
+
+                LogAssert.Expect(LogType.Error,
+                    "[MatchBootstrap] Network join failed: Der Port muss eine Zahl von 1 bis 65535 sein.");
+                Assert.That(bootstrap.TryStartNetworkJoin(
+                    "127.0.0.1", " 47777", "0123456789ABCDEF", NetworkJoinRole.Host), Is.False);
+                Assert.That(bootstrap.JoinStatus.Failure, Is.EqualTo(NetworkJoinFailure.InvalidPort));
+
+                LogAssert.Expect(LogType.Error,
+                    "[MatchBootstrap] Network join failed: Der Match-Code muss aus genau 16 Hexzeichen bestehen und darf nicht null sein.");
+                Assert.That(bootstrap.TryStartNetworkJoin(
+                    "127.0.0.1", 47777, "0x0123456789ABCDEF", NetworkJoinRole.Host), Is.False);
+                Assert.That(bootstrap.JoinStatus.Failure, Is.EqualTo(NetworkJoinFailure.InvalidMatchCode));
+                Assert.That(bootstrap.JoinStatus.Message, Does.Not.Contain("0123456789ABCDEF"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void MenuJoin_CancelDuringConnect_DropsTheClientAndReturnsToIdle()
+        {
+            var go = new GameObject("NetworkJoinCancel");
+            try
+            {
+                go.AddComponent<MatchRunner>();
+                MatchBootstrap bootstrap = go.AddComponent<MatchBootstrap>();
+                bootstrap.AutoStart = false;
+
+                Assert.That(bootstrap.TryStartNetworkJoin(
+                    "127.0.0.1", 47777, "0123456789ABCDEF", NetworkJoinRole.Host), Is.True);
+                Assert.That(bootstrap.JoinStatus.Phase, Is.EqualTo(NetworkJoinPhase.Connecting));
+                Assert.That(bootstrap.JoinStatus.CanCancel, Is.True);
+                RelayMatchClient firstClient = bootstrap.NetworkClient;
+                Assert.That(firstClient, Is.Not.Null);
+
+                Assert.That(bootstrap.CancelNetworkJoin(), Is.True);
+                Assert.That(bootstrap.JoinStatus.Phase, Is.EqualTo(NetworkJoinPhase.Idle));
+                Assert.That(bootstrap.NetworkClient, Is.Null);
+                Assert.That(bootstrap.IsMatchReady, Is.False);
+
+                Assert.That(bootstrap.TryStartNetworkJoin(
+                    "127.0.0.1", 47777, "0123456789ABCDEF", NetworkJoinRole.Host), Is.True);
+                RelayMatchClient retryClient = bootstrap.NetworkClient;
+                Assert.That(retryClient, Is.Not.Null);
+                Assert.That(retryClient, Is.Not.SameAs(firstClient),
+                    "every retry must own a fresh single-session relay client");
+
+                Assert.That(bootstrap.CancelNetworkJoin(), Is.True);
+                Assert.That(bootstrap.JoinStatus.Phase, Is.EqualTo(NetworkJoinPhase.Idle));
+                Assert.That(bootstrap.NetworkClient, Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void RelayRunner_RefusesLocalPauseAndASecondKernelStart()
         {
             var go = new GameObject("RelayPauseGuard");

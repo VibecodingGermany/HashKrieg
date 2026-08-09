@@ -1,6 +1,7 @@
 using System;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.State;
 
 // Namespace is deliberately Nova.Gameplay (flat), not Nova.Gameplay.Input,
@@ -96,6 +97,45 @@ namespace Nova.Gameplay
 
         /// <summary>The session-bound local player slot commands are sealed for.</summary>
         public byte LocalSlot => _ingress.Session.LocalSlot;
+
+        /// <summary>
+        /// Resolves one serialized canonical Alliance definition id to the
+        /// same role for the local faction. This is presentation/input
+        /// mapping only; the stable simulation definition table is unchanged.
+        /// </summary>
+        public static bool TryResolveCanonicalDefinitionId(
+            ushort canonicalAllianceDefinitionId, FactionId localFaction,
+            out ushort localDefinitionId)
+        {
+            localDefinitionId = 0;
+            if (localFaction != FactionId.Alliance && localFaction != FactionId.Legion)
+            {
+                return false;
+            }
+
+            UnitRole role;
+            if (SimDefinitions.TryGetBuilding(
+                    canonicalAllianceDefinitionId,
+                    out SimBuildingDefinition building)
+                && building.Faction == FactionId.Alliance)
+            {
+                role = building.Role;
+            }
+            else if (SimDefinitions.TryGetUnit(
+                         canonicalAllianceDefinitionId,
+                         out SimUnitDefinition unit)
+                     && unit.Faction == FactionId.Alliance)
+            {
+                role = unit.Role;
+            }
+            else
+            {
+                return false;
+            }
+
+            localDefinitionId = SimDefinitions.ToDefinitionId(localFaction, role);
+            return localDefinitionId != 0;
+        }
 
         // ----------------------------------------------------------------
         // Entity-list commands (chunked at MaxEntityIdsPerCommand)

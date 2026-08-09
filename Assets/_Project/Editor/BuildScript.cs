@@ -11,6 +11,7 @@ namespace Nova.Editor
     /// Usage:
     ///   Unity -batchmode -projectPath <repo> -executeMethod Nova.Editor.BuildScript.BuildWindows64 -quit
     ///   Unity -batchmode -projectPath <repo> -executeMethod Nova.Editor.BuildScript.BuildMacOSArm64 -quit
+    ///   Unity -batchmode -projectPath <repo> -executeMethod Nova.Editor.BuildScript.BuildLinux64 -quit
     /// The scene list always comes from EditorBuildSettings; the build fails
     /// closed when no enabled scene is configured.
     /// </summary>
@@ -31,6 +32,13 @@ namespace Nova.Editor
             Build(
                 BuildTarget.StandaloneOSX,
                 "Builds/MacOSArm64/ProjectNova.app");
+        }
+
+        public static void BuildLinux64()
+        {
+            Build(
+                BuildTarget.StandaloneLinux64,
+                "Builds/Linux64/ProjectNova.x86_64");
         }
 
         private static void Build(BuildTarget target, string locationPathName)

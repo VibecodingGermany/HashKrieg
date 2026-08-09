@@ -115,6 +115,7 @@ namespace Nova.PlayMode.Tests
                 "the menu overlay must be visible the moment the scene is up");
 
             Assert.NotNull(FindButton(root, "Neues Spiel"), "the menu needs a way into a match");
+            Assert.NotNull(FindButton(root, "Netzpartie"), "the menu needs a two-player join path");
             Assert.NotNull(FindButton(root, "Einstellungen"), "the menu needs a way into the settings");
             Assert.NotNull(FindButton(root, "Beenden"),
                 "the menu needs a way out of the game. No test ever presses it: in the Editor it " +
@@ -226,6 +227,55 @@ namespace Nova.PlayMode.Tests
             Assert.IsFalse(music.isPlaying,
                 "the menu track fades out and stops when the match starts (MenuMusicPlayer, 1.25 s) " +
                 "— it must not keep playing over the match");
+        }
+
+        [UnityTest]
+        public IEnumerator NetworkPanel_ValidatesMasksAndCancelsWithoutStartingGameplay()
+        {
+            yield return LoadBootstrapScene();
+
+            var bootstrap = Object.FindAnyObjectByType<MatchBootstrap>();
+            var runner = Object.FindAnyObjectByType<MatchRunner>();
+            VisualElement root = MenuRoot();
+
+            Submit(FindButton(root, "Netzpartie"));
+            yield return null;
+
+            Assert.AreEqual(DisplayStyle.None, root.Q("menu-main").style.display.value);
+            Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-network").style.display.value);
+            TextField host = FindTextField(root, "Serveradresse");
+            TextField port = FindTextField(root, "Port");
+            TextField code = FindTextField(root, "Match-Code");
+            Assert.IsTrue(code.isPasswordField, "the match code must be masked while typed");
+            Assert.AreEqual(16, code.maxLength);
+            Assert.NotNull(FindDropdown(root, "Rolle"));
+
+            const string secret = "0123456789ABCDEF";
+            host.value = string.Empty;
+            port.value = "47777";
+            code.value = secret;
+            LogAssert.Expect(LogType.Error,
+                "[MatchBootstrap] Network join failed: Die Serveradresse darf nicht leer sein.");
+            Submit(FindButton(root, "Verbinden"));
+            yield return null;
+
+            Label status = root.Q<Label>("network-status");
+            Assert.NotNull(status);
+            StringAssert.Contains("Serveradresse", status.text);
+            StringAssert.DoesNotContain(secret, status.text);
+            Assert.AreEqual(string.Empty, code.value,
+                "the UI must drop the code immediately after the join click");
+            Assert.AreEqual(NetworkJoinFailure.InvalidHost, bootstrap.JoinStatus.Failure);
+            Assert.IsFalse(bootstrap.IsMatchReady);
+            Assert.IsFalse(runner.IsRunning);
+            Assert.IsFalse(CameraRig().enabled);
+            Assert.IsTrue(MenuAudioSource().isPlaying);
+
+            Submit(FindButton(root, "Abbrechen"));
+            yield return null;
+            Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-main").style.display.value);
+            Assert.AreEqual(DisplayStyle.None, root.Q("menu-network").style.display.value);
+            Assert.AreEqual(NetworkJoinPhase.Idle, bootstrap.JoinStatus.Phase);
         }
 
         // ------------------------------------------------------------------
@@ -396,6 +446,16 @@ namespace Nova.PlayMode.Tests
                 if (dropdown.label == label) return dropdown;
             }
             Assert.Fail($"the settings panel has no dropdown labelled '{label}'");
+            return null;
+        }
+
+        private static TextField FindTextField(VisualElement root, string label)
+        {
+            foreach (TextField field in root.Query<TextField>().ToList())
+            {
+                if (field.label == label) return field;
+            }
+            Assert.Fail($"the network panel has no text field labelled '{label}'");
             return null;
         }
 

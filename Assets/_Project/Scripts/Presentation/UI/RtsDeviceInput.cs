@@ -99,7 +99,7 @@ namespace Nova.Presentation.UI
         [Tooltip("Click-select radius in world units (= cells).")]
         [SerializeField] private float _pickRadiusWorld = 1.5f;
 
-        [Header("Definition ids (verified against SimDefinitions; local slot 0 plays Alliance)")]
+        [Header("Canonical Alliance definition ids (resolved to the local slot faction at runtime)")]
         [Tooltip("B: Power — Alliance defId 5, 450 AE, prerequisite-free.")]
         [SerializeField] private ushort _buildingDefId = 5;
         [Tooltip("Shift+B: Barracks — Alliance defId 7, 500 AE, prerequisite-free.")]
@@ -942,13 +942,14 @@ namespace Nova.Presentation.UI
         /// <summary>The building hotkeys enter (or re-target) placement mode; shared by the normal and the placement input flow.</summary>
         private void HandleBuildingHotkeys(bool shift)
         {
-            if (Input.GetKeyDown(KeyCode.B)) EnterPlacementMode(shift ? _altBuildingDefId : _buildingDefId);
-            if (Input.GetKeyDown(KeyCode.C)) EnterPlacementMode(_storageDefId);
-            if (Input.GetKeyDown(KeyCode.V)) EnterPlacementMode(_vehicleFactoryDefId);
-            if (Input.GetKeyDown(KeyCode.T)) EnterPlacementMode(_researchLabDefId);
-            if (Input.GetKeyDown(KeyCode.G)) EnterPlacementMode(_radarDefId);
-            if (Input.GetKeyDown(KeyCode.F)) EnterPlacementMode(_defensePlatformDefId);
-            if (Input.GetKeyDown(KeyCode.Y)) EnterPlacementMode(_refineryDefId);
+            if (Input.GetKeyDown(KeyCode.B)) EnterPlacementMode(ResolveHotkeyDefinition(
+                shift ? _altBuildingDefId : _buildingDefId));
+            if (Input.GetKeyDown(KeyCode.C)) EnterPlacementMode(ResolveHotkeyDefinition(_storageDefId));
+            if (Input.GetKeyDown(KeyCode.V)) EnterPlacementMode(ResolveHotkeyDefinition(_vehicleFactoryDefId));
+            if (Input.GetKeyDown(KeyCode.T)) EnterPlacementMode(ResolveHotkeyDefinition(_researchLabDefId));
+            if (Input.GetKeyDown(KeyCode.G)) EnterPlacementMode(ResolveHotkeyDefinition(_radarDefId));
+            if (Input.GetKeyDown(KeyCode.F)) EnterPlacementMode(ResolveHotkeyDefinition(_defensePlatformDefId));
+            if (Input.GetKeyDown(KeyCode.Y)) EnterPlacementMode(ResolveHotkeyDefinition(_refineryDefId));
         }
 
         /// <summary>
@@ -980,6 +981,7 @@ namespace Nova.Presentation.UI
 
         private void TryQueueUnit(ushort defId)
         {
+            defId = ResolveHotkeyDefinition(defId);
             if (TryResolveProducer(defId, out EntityId producer))
             {
                 Report($"QueueUnit {defId}", _dispatcher.QueueUnit(producer, defId, 1));
@@ -988,6 +990,21 @@ namespace Nova.Presentation.UI
             {
                 _lastCommandStatus = $"QueueUnit {defId}: no own producer building for that definition";
             }
+        }
+
+        private ushort ResolveHotkeyDefinition(ushort canonicalAllianceDefinitionId)
+        {
+            if (_runner?.Economy == null || _dispatcher == null)
+            {
+                return canonicalAllianceDefinitionId;
+            }
+
+            FactionId localFaction = _runner.Economy.GetSlotFaction(_dispatcher.LocalSlot);
+            return RtsIntentDispatcher.TryResolveCanonicalDefinitionId(
+                    canonicalAllianceDefinitionId, localFaction,
+                    out ushort localDefinitionId)
+                ? localDefinitionId
+                : canonicalAllianceDefinitionId;
         }
 
         /// <summary>

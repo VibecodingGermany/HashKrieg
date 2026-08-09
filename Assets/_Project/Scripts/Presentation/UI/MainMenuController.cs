@@ -112,12 +112,22 @@ namespace Nova.Presentation.UI
         private VisualElement _screen;
         private VisualElement _mainPanel;
         private VisualElement _settingsPanel;
+        private VisualElement _networkPanel;
+        private TextField _networkHost;
+        private TextField _networkPort;
+        private TextField _networkCode;
+        private DropdownField _networkRole;
+        private Button _networkConnect;
+        private Button _networkCancel;
+        private Label _networkStatus;
+        private UnitViewManager _views;
 
         /// <summary>Deduplicated width x height modes, biggest first; index-parallel to the resolution dropdown.</summary>
         private readonly List<Vector2Int> _resolutions = new List<Vector2Int>(16);
 
         private bool _settingsDirty;
         private float _dirtySince;
+        private bool _networkTransitionCommitted;
 
         /// <summary>
         /// True while the menu overlay owns the screen (initial state, and
@@ -132,6 +142,7 @@ namespace Nova.Presentation.UI
             if (_document == null) _document = GetComponent<UIDocument>();
             if (_music == null) _music = GetComponent<MenuMusicPlayer>();
             if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
+            if (_views == null) _views = FindAnyObjectByType<UnitViewManager>();
         }
 
         private void Start()
@@ -209,6 +220,8 @@ namespace Nova.Presentation.UI
             {
                 FlushSettings();
             }
+
+            UpdateNetworkJoin();
         }
 
         // --- tree ---------------------------------------------------------
@@ -272,6 +285,12 @@ namespace Nova.Presentation.UI
             _settingsPanel.style.maxWidth = _settingsWidth;
             content.Add(_settingsPanel);
             BuildSettings(_settingsPanel);
+
+            _networkPanel = MakePanel("menu-network");
+            _networkPanel.style.display = DisplayStyle.None;
+            _networkPanel.style.width = _settingsWidth;
+            content.Add(_networkPanel);
+            BuildNetworkJoin(_networkPanel);
         }
 
         private void BuildTitle(VisualElement parent)
@@ -295,6 +314,7 @@ namespace Nova.Presentation.UI
         private void BuildMainButtons(VisualElement parent)
         {
             parent.Add(MakeButton("Neues Spiel", StartMatch));
+            parent.Add(MakeButton("Netzpartie", () => ShowNetworkPanel(true)));
 
             Button load = MakeButton("Laden", null);
             load.SetEnabled(false);
@@ -317,6 +337,81 @@ namespace Nova.Presentation.UI
 
             parent.Add(MakeButton("Einstellungen", () => ShowSettings(true)));
             parent.Add(MakeButton("Beenden", Quit));
+        }
+
+        private void BuildNetworkJoin(VisualElement parent)
+        {
+            var header = new Label("Netzpartie");
+            ApplyFont(header, _titleFont);
+            header.style.fontSize = 34;
+            header.style.letterSpacing = 4f;
+            header.style.color = _titleColor;
+            header.style.marginBottom = 14f;
+            parent.Add(header);
+
+            _networkHost = new TextField("Serveradresse")
+            {
+                name = "network-host",
+                value = "127.0.0.1",
+            };
+            StyleField(_networkHost);
+            parent.Add(_networkHost);
+
+            _networkPort = new TextField("Port")
+            {
+                name = "network-port",
+                value = "47777",
+                maxLength = 5,
+            };
+            StyleField(_networkPort);
+            parent.Add(_networkPort);
+
+            _networkCode = new TextField("Match-Code")
+            {
+                name = "network-code",
+                isPasswordField = true,
+                maxLength = 16,
+            };
+            StyleField(_networkCode);
+            parent.Add(_networkCode);
+            parent.Add(MakeHint("Genau 16 Hexzeichen. Der Code wird weder angezeigt noch gespeichert."));
+
+            _networkRole = new DropdownField(
+                "Rolle", new List<string> { "Host", "Gast" }, 0)
+            {
+                name = "network-role",
+            };
+            StyleField(_networkRole);
+            parent.Add(_networkRole);
+            parent.Add(MakeHint("Der Host verbindet zuerst; der Gast danach."));
+
+            _networkStatus = new Label("Bereit für eine Verbindung.")
+            {
+                name = "network-status",
+            };
+            ApplyFont(_networkStatus, _bodyFont);
+            _networkStatus.style.fontSize = _fieldFontSize;
+            _networkStatus.style.color = _bodyColor;
+            _networkStatus.style.whiteSpace = WhiteSpace.Normal;
+            _networkStatus.style.minHeight = 48f;
+            _networkStatus.style.marginTop = 8f;
+            _networkStatus.style.marginBottom = 12f;
+            _networkStatus.style.paddingLeft = 10f;
+            _networkStatus.style.paddingRight = 10f;
+            _networkStatus.style.paddingTop = 8f;
+            _networkStatus.style.paddingBottom = 8f;
+            _networkStatus.style.backgroundColor = _buttonFill;
+            SetBorder(_networkStatus, 1f, _panelEdge, 3f);
+            parent.Add(_networkStatus);
+
+            _networkConnect = MakeButton("Verbinden", StartNetworkJoin);
+            _networkConnect.name = "network-connect";
+            parent.Add(_networkConnect);
+
+            _networkCancel = MakeButton("Abbrechen", CancelNetworkJoin);
+            _networkCancel.name = "network-cancel";
+            _networkCancel.style.marginBottom = 0f;
+            parent.Add(_networkCancel);
         }
 
         private void BuildSettings(VisualElement parent)
@@ -489,7 +584,87 @@ namespace Nova.Presentation.UI
         {
             _mainPanel.style.display = show ? DisplayStyle.None : DisplayStyle.Flex;
             _settingsPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_networkPanel != null) _networkPanel.style.display = DisplayStyle.None;
             if (!show) FlushSettings(); // leaving the panel persists whatever a slider left dirty
+        }
+
+        private void ShowNetworkPanel(bool show)
+        {
+            _mainPanel.style.display = show ? DisplayStyle.None : DisplayStyle.Flex;
+            _settingsPanel.style.display = DisplayStyle.None;
+            _networkPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (show && _bootstrap != null)
+            {
+                NetworkJoinStatus status = _bootstrap.JoinStatus;
+                _networkStatus.text = status.Phase == NetworkJoinPhase.Idle
+                    ? "Bereit für eine Verbindung."
+                    : status.Message;
+            }
+        }
+
+        private void StartNetworkJoin()
+        {
+            if (_bootstrap == null)
+            {
+                _networkStatus.text = "Match-Start ist in dieser Szene nicht verdrahtet.";
+                return;
+            }
+
+            NetworkJoinRole role = _networkRole.index == 0
+                ? NetworkJoinRole.Host
+                : NetworkJoinRole.Guest;
+            _networkTransitionCommitted = false;
+            _bootstrap.TryStartNetworkJoin(
+                _networkHost.value,
+                _networkPort.value,
+                _networkCode.value,
+                role);
+            // The match code is never kept in UI state beyond the click.
+            _networkCode.SetValueWithoutNotify(string.Empty);
+            UpdateNetworkJoin();
+        }
+
+        private void CancelNetworkJoin()
+        {
+            _bootstrap?.CancelNetworkJoin();
+            _bootstrap?.ResetNetworkJoin();
+            _views?.ResetViews();
+            _networkCode?.SetValueWithoutNotify(string.Empty);
+            _networkTransitionCommitted = false;
+            ShowNetworkPanel(false);
+        }
+
+        private void UpdateNetworkJoin()
+        {
+            if (_bootstrap == null || _networkStatus == null) return;
+
+            NetworkJoinStatus status = _bootstrap.JoinStatus;
+            if (status.Phase != NetworkJoinPhase.Idle)
+            {
+                _networkStatus.text = status.Message;
+            }
+
+            bool active = status.IsActive;
+            _networkHost?.SetEnabled(!active);
+            _networkPort?.SetEnabled(!active);
+            _networkCode?.SetEnabled(!active);
+            _networkRole?.SetEnabled(!active);
+            _networkConnect?.SetEnabled(!active);
+            _networkCancel?.SetEnabled(true);
+
+            if (!_networkTransitionCommitted
+                && status.Phase == NetworkJoinPhase.Ready
+                && _bootstrap.IsMatchReady
+                && _bootstrap.Runner != null
+                && _bootstrap.Runner.IsRunning)
+            {
+                _networkTransitionCommitted = true;
+                IsMenuVisible = false;
+                SetGameplayLayerActive(true);
+                if (_music != null) _music.FadeOutAndStop();
+                if (_screen != null) _screen.style.display = DisplayStyle.None;
+                enabled = false;
+            }
         }
 
         private void StartMatch()
@@ -556,6 +731,7 @@ namespace Nova.Presentation.UI
                 _screen.style.display = DisplayStyle.Flex;
             }
             IsMenuVisible = true;
+            _networkTransitionCommitted = false;
             enabled = true;
         }
 
