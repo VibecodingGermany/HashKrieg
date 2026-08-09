@@ -44,6 +44,13 @@ namespace Nova.AI.Data
         /// threat, missing health, distance) instead of the order of the
         /// visibility list. The enemy HQ stays a short-circuit.</item>
         /// </list>
+        /// <para>
+        /// NOT bumped for the posture/assignment refactor of the army step:
+        /// it reproduces the canonical match tick for tick, which is what
+        /// "leaves the end-state hash alone" means. Aiming below the squad
+        /// threshold WOULD have bumped it and was measured back out again —
+        /// behaviour journal V003.
+        /// </para>
         /// </summary>
         public const int Revision = 2;
 
