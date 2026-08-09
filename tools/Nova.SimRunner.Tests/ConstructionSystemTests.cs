@@ -679,6 +679,8 @@ namespace Nova.SimRunner.Tests
         public void Repair_BuilderRestoresHp_InReachOnly_AndResolvesAtFull()
         {
             var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+                "a completed power plant keeps the normal repair rate active");
             EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint raw = UnitCommandStateView.ToRawEntityId(barracks);
             f.Entities.GetUnitRef(barracks).CurrentHealth = 100;
