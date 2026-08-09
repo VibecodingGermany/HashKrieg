@@ -43,6 +43,8 @@ Freiraum.
 | Pfad | Eigentümer | Anmerkung |
 |---|---|---|
 | `Scripts/AI/`, `Scripts/AI.Data/` | **Einheitenstrang** | `AiPeerCommandTransport.cs` darf die Transport-Verträge nicht ändern (siehe unten). `AI.Data/` enthält heute nur das asmdef — die Datenschicht baut der Einheitenstrang auf |
+| `tools/Nova.AiLab/`, `tools/Nova.AiLab.Tests/` | **Einheitenstrang** | Messwerkzeug für KI-Läufe. Kein Spielcode, wird nicht ausgeliefert; erzeugte Läufe und Reports gehören nicht ins Repository, sondern in die PR-Beschreibung |
+| `Scripts/Presentation/UI/DebugHud.cs` | **Einheitenstrang** | ausdrückliche Ausnahme aus `Presentation/`: ohne eine Anzeige im laufenden Spiel ist KI-Verhalten nicht beobachtbar, und beobachtet werden muss es (Nachweisregel) |
 | `Scripts/Simulation/Movement/` | **Einheitenstrang** | |
 | `Scripts/Simulation/Combat/` | **Einheitenstrang** | inkl. `WeaponProfiles`, `DamageMatrix`, `ArmorClass` |
 | `Scripts/Simulation/Factions/` | **Einheitenstrang** | Legion-Waffenidentität |
@@ -51,7 +53,7 @@ Freiraum.
 | `Scripts/Gameplay/Match/` | **Netzstrang** | `MatchConfig`, `MatchBootstrap`, `MatchRunner` — inkl. der Systemregistrierung |
 | `Scripts/Gameplay/UI/`, `Scripts/Gameplay/Input/` | **Netzstrang** | Verbindungs- und Lobbyoberfläche, Fraktionsauswahl |
 | `Scripts/Gameplay/Audio/`, `Gameplay/CombatFeedback/` | **Netzstrang** | Präsentationsnah; wandert an den Art-Strang, sobald der besetzt ist |
-| `Scripts/Presentation/` | **Netzstrang** | dito |
+| `Scripts/Presentation/` | **Netzstrang** | dito; einzige Ausnahme ist `UI/DebugHud.cs`, siehe oben |
 | `Scripts/Core/` | **Netzstrang** | Logging und Infrastruktur; Änderungen nur additiv, beide Stränge hängen daran |
 | `Scripts/Data/` | **Netzstrang** | Registries und Karten, überwiegend Unity-Assets — mergen schlecht, ein Schreiber |
 | `Scripts/Simulation/Vision/` | **Netzstrang** | `FogOfWarSystem`. **Vertragsfläche:** `CombatSystem` konsumiert `GetTeamView` |
@@ -213,6 +215,7 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-09 | Zwei Pfade nachgetragen, die der Einheitenstrang in der Praxis braucht und die die Tabelle nicht kannte: `tools/Nova.AiLab/` samt Tests (Messwerkzeug, kein Spielcode) und `Presentation/UI/DebugHud.cs` als ausdrückliche Ausnahme aus `Presentation/`. Beide Lücken lagen im Dokument, nicht im Verhalten des Beitragenden | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-08 | D-091: konkrete Merge-Accounts, Maintainer-Peer-Review, CLA-/Review-Prüfung und vorbereiteter Tier-2-Rollout ergänzt | Producer / Agent (Umsetzung) |
 | 1.2.1 | 2026-08-08 | Metadata-only Checks auf vertrauenswürdigen Zielbranch-Kontext gehärtet und D-ID-Pflicht auf echte Entscheidungen vereinheitlicht | Producer / Agent (Umsetzung) |
