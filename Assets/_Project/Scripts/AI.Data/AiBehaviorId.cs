@@ -43,6 +43,11 @@ namespace Nova.AI.Data
         /// <item><b>2</b> — target choice by integer score (counter table,
         /// threat, missing health, distance) instead of the order of the
         /// visibility list. The enemy HQ stays a short-circuit.</item>
+        /// <item><b>3</b> — waves. The army marches at full strength and
+        /// reinforcements wait at a staging cell between the own base and the
+        /// enemy start area instead of walking to the front one at a time.
+        /// Units already out are never called back. Off setting:
+        /// <c>waveSize</c> 1.</item>
         /// </list>
         /// <para>
         /// NOT bumped for the posture/assignment refactor of the army step:
@@ -52,7 +57,7 @@ namespace Nova.AI.Data
         /// behaviour journal V003.
         /// </para>
         /// </summary>
-        public const int Revision = 2;
+        public const int Revision = 3;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
@@ -97,6 +102,9 @@ namespace Nova.AI.Data
             writer.WriteInt32(profile.TargetThreatWeight);
             writer.WriteInt32(profile.TargetFinishWeight);
             writer.WriteInt32(profile.TargetDistanceWeight);
+            writer.WriteInt32(profile.WaveSize);
+            writer.WriteInt32(profile.StagingDistanceCells);
+            writer.WriteInt32(profile.StagingToleranceCells);
             return writer.Digest();
         }
     }

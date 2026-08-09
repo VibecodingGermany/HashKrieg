@@ -474,7 +474,8 @@ namespace Nova.AI
                 var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
-                    assignments.Add(ResolveUnitAssignment(combatRaws[i], in posture));
+                    UnitState unit = combatUnits[i];
+                    assignments.Add(ResolveUnitAssignment(combatRaws[i], in unit, in posture, hqCellX, hqCellY));
                 }
                 SubmitAssignments(assignments, combatUnits);
             }
@@ -521,6 +522,31 @@ namespace Nova.AI
 
             /// <summary>See <see cref="MoveCellX"/>.</summary>
             public int MoveCellY;
+
+            /// <summary>
+            /// Where reinforcements gather before they march; -1 when waves are
+            /// off (<see cref="AiProfile.WaveSize"/> 1) or the army does not act.
+            /// <para>
+            /// Derived from the own HQ and the ENEMY START AREA, never from the
+            /// current target cell. That is deliberate: the target moves every
+            /// cadence, so a staging point derived from it would move too, and
+            /// every unit waiting there would be re-ordered on every decision.
+            /// That is precisely the churn that sank <c>DefendBase</c> (journal
+            /// V002, +23 % intents), and the intents-per-1000-ticks column is
+            /// the first number to look at here.
+            /// </para>
+            /// </summary>
+            public int StagingCellX;
+
+            /// <summary>See <see cref="StagingCellX"/>.</summary>
+            public int StagingCellY;
+
+            /// <summary>
+            /// True when enough units are gathered AT the staging cell for the
+            /// wave to march — or when waves are off, in which case every unit
+            /// is its own wave and this is always true.
+            /// </summary>
+            public bool WaveReady;
         }
 
         /// <summary>
@@ -555,6 +581,9 @@ namespace Nova.AI
                 Engages = combatCount >= _profile.AttackSquadThreshold && _aiPlayerId < _fogOfWar.TeamCount,
                 MoveCellX = -1,
                 MoveCellY = -1,
+                StagingCellX = -1,
+                StagingCellY = -1,
+                WaveReady = true,
             };
             if (!posture.Engages) return posture;
 
@@ -568,7 +597,124 @@ namespace Nova.AI
             {
                 GetEnemyStartAreaCell(hqCellX, hqCellY, out posture.MoveCellX, out posture.MoveCellY);
             }
+
+            // ---- waves, and the off setting that keeps this reproducible ----
+            //
+            // waveSize 1 leaves BEFORE anything below runs, so the shipped
+            // behaviour is not "the same result through new code" but the same
+            // code path it always took. That is what makes the comparison run
+            // one-sided (finding M001): identical binary, one profile value
+            // apart.
+            int waveSize = EffectiveWaveSize();
+            if (waveSize <= 1) return posture;
+
+            GetStagingCell(hqCellX, hqCellY, out posture.StagingCellX, out posture.StagingCellY);
+
+            int gathered = 0;
+            for (int i = 0; i < combatUnits.Count; i++)
+            {
+                UnitState unit = combatUnits[i];
+                if (!IsCommittedToTheWave(in unit, hqCellX, hqCellY)) gathered++;
+            }
+            posture.WaveReady = gathered >= waveSize;
             return posture;
+        }
+
+        /// <summary>
+        /// The wave size actually used, clamped to the army cap.
+        /// <para>
+        /// Without the clamp a profile with <c>waveSize</c> above
+        /// <see cref="AiFactionProfile.TargetArmySize"/> would wait for a wave
+        /// production can never deliver, and the army would stand at the
+        /// staging cell until the time limit. The clamp is not a tuning
+        /// decision, it is the guard against a profile that cannot work.
+        /// </para>
+        /// </summary>
+        private int EffectiveWaveSize()
+        {
+            int waveSize = _profile.Profile.WaveSize;
+            return waveSize > _profile.TargetArmySize ? _profile.TargetArmySize : waveSize;
+        }
+
+        /// <summary>
+        /// The staging cell: <see cref="AiProfile.StagingDistanceCells"/> cells
+        /// from the own HQ along the straight line toward the enemy start area,
+        /// clamped into the grid. Static map knowledge on both ends, so this
+        /// cell is the SAME for the whole match — a unit ordered there is not
+        /// re-ordered on the next cadence.
+        /// <para>
+        /// Integer division truncates, which is deterministic and identical on
+        /// both machines; that is the only property that matters here.
+        /// </para>
+        /// </summary>
+        private void GetStagingCell(int hqCellX, int hqCellY, out int cellX, out int cellY)
+        {
+            GetEnemyStartAreaCell(hqCellX, hqCellY, out int enemyX, out int enemyY);
+
+            int distance = _profile.Profile.StagingDistanceCells;
+            int dx = enemyX - hqCellX;
+            int dy = enemyY - hqCellY;
+            int span = Math.Max(Math.Abs(dx), Math.Abs(dy));
+            if (span <= distance)
+            {
+                // The enemy start area is nearer than the staging distance:
+                // there is nothing between base and target to gather at.
+                cellX = enemyX;
+                cellY = enemyY;
+                return;
+            }
+
+            cellX = ClampToGrid(hqCellX + (dx * distance / span));
+            cellY = ClampToGrid(hqCellY + (dy * distance / span));
+        }
+
+        /// <summary>
+        /// True when this unit already stands at the staging cell — within
+        /// <see cref="AiProfile.StagingToleranceCells"/> of it, because the
+        /// formation distribution spreads an arriving group over several
+        /// cells. Used ONLY to keep quiet about a unit that is where it
+        /// belongs, never to decide whether the wave is full.
+        /// </summary>
+        private bool IsAtTheStagingCell(in UnitState unit, in ArmyPosture posture)
+        {
+            int dx = Math.Abs(GridCellOf(unit.Transform.PositionX) - posture.StagingCellX);
+            int dy = Math.Abs(GridCellOf(unit.Transform.PositionY) - posture.StagingCellY);
+            return Math.Max(dx, dy) <= _profile.Profile.StagingToleranceCells;
+        }
+
+        /// <summary>
+        /// True when this unit has left the staging ring around the own HQ —
+        /// it belongs to a wave that already marched and is not called back.
+        /// Everything INSIDE the ring is the wave that has not left yet, and
+        /// that count is what the wave size is compared against.
+        /// <para>
+        /// Measured against the OWN HQ, not against the target: the HQ does not
+        /// move, so a unit does not flip between "out" and "waiting" because
+        /// the enemy walked a few cells. Turning back a wave that is already
+        /// out is the V002 failure mode, and this predicate is the place it
+        /// would come back in.
+        /// </para>
+        /// <para>
+        /// MEASURED, NOT ASSUMED: the first version of this rule counted only
+        /// units standing within <see cref="AiProfile.StagingToleranceCells"/>
+        /// OF THE STAGING CELL. That never worked, and the recorded run showed
+        /// why in one screen — the formation distribution spreads a group of
+        /// twelve over more than four cells, so the count stayed under the wave
+        /// size forever and the army oscillated between the base and the
+        /// staging point for 11.000 ticks while a single enemy unit ground
+        /// down its HQ. The ring is the whole area inside
+        /// <c>StagingDistanceCells + StagingToleranceCells</c>, so where
+        /// exactly a unit stands while it waits does not matter.
+        /// </para>
+        /// </summary>
+        private bool IsCommittedToTheWave(in UnitState unit, int hqCellX, int hqCellY)
+        {
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+            int dx = Math.Abs(cellX - hqCellX);
+            int dy = Math.Abs(cellY - hqCellY);
+            int ring = _profile.Profile.StagingDistanceCells + _profile.Profile.StagingToleranceCells;
+            return Math.Max(dx, dy) > ring;
         }
 
         /// <summary>
@@ -587,14 +733,66 @@ namespace Nova.AI
         /// toward what it aims at.
         /// </para>
         /// </summary>
-        private UnitAssignment ResolveUnitAssignment(uint entityRaw, in ArmyPosture posture)
+        private UnitAssignment ResolveUnitAssignment(
+            uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY)
         {
+            bool marches = posture.StagingCellX < 0          // waves off
+                || posture.WaveReady                          // the wave launches this decision
+                || IsCommittedToTheWave(in unit, hqCellX, hqCellY); // already out with an earlier wave
+
+            if (marches)
+            {
+                return new UnitAssignment
+                {
+                    EntityRaw = entityRaw,
+                    AttackTargetRaw = posture.TargetRaw,
+                    MoveCellX = posture.MoveCellX,
+                    MoveCellY = posture.MoveCellY,
+                };
+            }
+
+            // Reinforcement that has ARRIVED: no order at all.
+            //
+            // This is not an optimisation, it is the difference between a wave
+            // and a stutter. Arrival clears TargetGridPos through Stop(), so
+            // the re-issue suppression in SubmitAssignments stops matching and
+            // the same move order goes out again every single cadence. Measured
+            // before this branch existed: 40 actions per minute against 23 for
+            // the shipped AI, for units that were standing still. Intent churn
+            // without a change of behaviour is exactly what sank DefendBase
+            // (journal V002), and the fix is to say nothing when there is
+            // nothing to say.
+            // "Arrived" means standing there, not merely being there. A unit
+            // that is inside the tolerance but still WALKING is walking
+            // somewhere else — saying nothing to it lets it carry on out of
+            // the ring, which is the opposite of what the rule wants.
+            if (!unit.IsMoving && IsAtTheStagingCell(in unit, in posture))
+            {
+                return new UnitAssignment
+                {
+                    EntityRaw = entityRaw,
+                    AttackTargetRaw = 0,
+                    MoveCellX = -1,
+                    MoveCellY = -1,
+                };
+            }
+
+            // Reinforcement still on its way: walk to the staging cell.
+            //
+            // NO EXPLICIT ATTACK TARGET while waiting, and that is a
+            // consequence of finding F001, not an oversight. An AttackTarget
+            // is released only by the target's death — Stop() leaves it
+            // standing — so a unit that is NOT closing the distance holds a
+            // stale order and stops firing, while the D-087 auto-acquisition
+            // would have shot at whatever came into range. Aiming is right
+            // while a unit walks toward what it aims at (journal V003), and a
+            // waiting unit does not.
             return new UnitAssignment
             {
                 EntityRaw = entityRaw,
-                AttackTargetRaw = posture.TargetRaw,
-                MoveCellX = posture.MoveCellX,
-                MoveCellY = posture.MoveCellY,
+                AttackTargetRaw = 0,
+                MoveCellX = posture.StagingCellX,
+                MoveCellY = posture.StagingCellY,
             };
         }
 
@@ -1046,6 +1244,12 @@ namespace Nova.AI
         private static int GridCellOf(SimFixed position)
         {
             return Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, SimFixed.WorldToGrid(position)));
+        }
+
+        /// <summary>A computed cell, held inside the construction grid.</summary>
+        private static int ClampToGrid(int cell)
+        {
+            return Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, cell));
         }
 
         /// <summary>Chebyshev distance of a cell to a building footprint rectangle (0 = inside).</summary>

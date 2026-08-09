@@ -74,7 +74,10 @@ namespace Nova.AI
                 targetDamageWeight: shipped.TargetDamageWeight,
                 targetThreatWeight: shipped.TargetThreatWeight,
                 targetFinishWeight: shipped.TargetFinishWeight,
-                targetDistanceWeight: shipped.TargetDistanceWeight);
+                targetDistanceWeight: shipped.TargetDistanceWeight,
+                waveSize: shipped.WaveSize,
+                stagingDistanceCells: shipped.StagingDistanceCells,
+                stagingToleranceCells: shipped.StagingToleranceCells);
         }
 
         /// <summary>Binds a faction name to a fully specified profile — the tuning path.</summary>

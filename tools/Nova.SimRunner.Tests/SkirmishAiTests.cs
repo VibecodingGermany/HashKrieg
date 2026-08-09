@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Nova.AI;
+using Nova.AI.Data;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
@@ -114,7 +115,40 @@ namespace Nova.SimRunner.Tests
             }
         }
 
-        private static AiHost BuildAiHost(ulong seed)
+        /// <summary>
+        /// The shipped profile with waves switched off (<c>waveSize</c> 1).
+        /// <para>
+        /// A test that wants to observe TARGET CHOICE has to switch the wave
+        /// gate off, or it observes the gate: since behaviour revision 3 a
+        /// unit waiting inside the staging ring gets no explicit AttackTarget
+        /// at all. That the off setting exists is not a convenience here — it
+        /// is the same property that lets the lab measure the rule one-sided
+        /// (behaviour journal M001), used a second time.
+        /// </para>
+        /// </summary>
+        private static AiProfile WavesOff()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            return new AiProfile(
+                profileId: "test-waves-off",
+                decisionTickInterval: shipped.DecisionTickInterval,
+                placementSearchRadius: shipped.PlacementSearchRadius,
+                powerReserve: 0,
+                targetHarvesters: 2,
+                harvesterQueueBatch: shipped.HarvesterQueueBatch,
+                targetArmySize: 12,
+                attackSquadThreshold: 6,
+                infantryQueueBatch: shipped.InfantryQueueBatch,
+                targetDamageWeight: shipped.TargetDamageWeight,
+                targetThreatWeight: shipped.TargetThreatWeight,
+                targetFinishWeight: shipped.TargetFinishWeight,
+                targetDistanceWeight: shipped.TargetDistanceWeight,
+                waveSize: 1,
+                stagingDistanceCells: shipped.StagingDistanceCells,
+                stagingToleranceCells: shipped.StagingToleranceCells);
+        }
+
+        private static AiHost BuildAiHost(ulong seed, AiProfile? profile = null)
         {
             // Mirror of MatchRunner.InitializeMatch(seed, ..., enableSkirmishAi: true).
             var kernel = new SimulationKernel(new SimRandom(seed));
@@ -138,8 +172,10 @@ namespace Nova.SimRunner.Tests
             _ = new AiPeerCommandTransport(aiIngress, ingress);
             var ai = new SkirmishAiSystem(
                 AiSlot,
-                new AiFactionProfile("Legion",
-                    targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2),
+                profile.HasValue
+                    ? new AiFactionProfile("Legion", profile.Value)
+                    : new AiFactionProfile("Legion",
+                        targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2),
                 aiIngress, entities, economy, construction, production, fogOfWar, victory);
 
             kernel.RegisterSystem(economy);
@@ -212,9 +248,9 @@ namespace Nova.SimRunner.Tests
             }
         }
 
-        private static AiHost BuildMatch(ulong seed)
+        private static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
         {
-            AiHost host = BuildAiHost(seed);
+            AiHost host = BuildAiHost(seed, profile);
             ApplyOpeningPosition(host);
             return host;
         }
@@ -375,7 +411,53 @@ namespace Nova.SimRunner.Tests
         }
 
         // ----------------------------------------------------------------
-        // (e) Target choice is a score, not the order of the visible list
+        // (e) The behaviour identifier — the guard against a silent change
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Pins <see cref="AiBehaviorId"/> TOGETHER with what the AI actually
+        /// does. Either half alone is useless: the identifier's profile hash
+        /// catches changed numbers but never a changed rule, and the end state
+        /// catches a changed rule but does not know the identifier exists.
+        /// <para>
+        /// WHEN THIS GOES RED — and only then read on, because the failure
+        /// message is the procedure:
+        /// </para>
+        /// <list type="number">
+        /// <item>Was the behaviour change intended? If not, fix the code. The
+        /// test just told you the AI plays differently than you thought.</item>
+        /// <item>If it was: bump <c>AiBehaviorId.Revision</c>, add its line to
+        /// the history in that file, write the journal entry in
+        /// <c>tools/Nova.AiLab/reports/behavior-log.md</c> — measured values,
+        /// better AND worse — and only then update the numbers below.</item>
+        /// </list>
+        /// <para>
+        /// This is NOT one of the four determinism baselines and must not be
+        /// treated as one: those live in their own files and separate a
+        /// behaviour PR from a baseline PR. This pin belongs to the behaviour
+        /// change and is updated in the same commit as the revision bump.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void AiBehaviorId_TracksWhatTheAiActuallyDoes()
+        {
+            AiHost host = BuildMatch(Seed);
+            uint decided = host.RunUntilDecided(EndToEndBudgetTicks);
+            ulong endState = host.Kernel.CalculateStateHash();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(AiBehaviorId.Value, Is.EqualTo("r3.1D8DA20F"),
+                    "the AI identifier changed — bump the revision and write the journal entry");
+                Assert.That(decided, Is.EqualTo(2709u),
+                    "the AI decides the canonical match on a different tick than the pinned one");
+                Assert.That($"0x{endState:X16}", Is.EqualTo("0xDDE44F64DC295EB6"),
+                    "same identifier, different end state: behaviour moved without the revision moving");
+            });
+        }
+
+        // ----------------------------------------------------------------
+        // (f) Target choice is a score, not the order of the visible list
         // ----------------------------------------------------------------
 
         /// <summary>
@@ -407,10 +489,14 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void SkirmishAi_ShootsTheDangerousTarget_NotTheFirstOneInTheVisibleList()
         {
-            AiHost host = BuildMatch(Seed);
+            AiHost host = BuildMatch(Seed, WavesOff());
 
-            // Wait for the attack squad; the AI only issues AttackTarget from
-            // its threshold upwards.
+            // Waves are OFF for this one — see WavesOff(). What is under test
+            // is the SCORE, and the wave gate of revision 3 would hide it: a
+            // unit waiting inside the staging ring carries no explicit
+            // AttackTarget on purpose. Measuring the gate here instead of the
+            // score would be the quiet kind of wrong test, the one that stays
+            // green for the wrong reason.
             const int SquadThreshold = 6;
             int budget = EndToEndBudgetTicks;
             while (budget-- > 0 && CountUnits(host, AiSlot, UnitRole.BasicInfantry) < SquadThreshold)
@@ -441,17 +527,110 @@ namespace Nova.SimRunner.Tests
                 "the army must shoot what actually threatens it, not what it happened to see first");
         }
 
+        // ----------------------------------------------------------------
+        // (g) Waves: reinforcements wait, the army marches at full strength
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// The wave rule of behaviour revision 3, stated as the two halves a
+        /// player would describe: <b>nobody leaves alone</b>, and <b>at full
+        /// strength everybody leaves</b>.
+        /// <para>
+        /// The first half is what makes the test worth having. With waves off
+        /// the army marches at the squad threshold of six, so units DO leave
+        /// the staging ring long before twelve exist — the assertion would
+        /// fail on the previous behaviour, which is the only way a test of a
+        /// new rule proves anything.
+        /// </para>
+        /// <para>
+        /// Both halves are read off the committed state (positions), never off
+        /// the intents: what matters is where the units end up, not what was
+        /// submitted. An intent that is rejected or overwritten would still
+        /// look right in a submission count.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_KeepsReinforcementsHomeUntilTheWaveIsFull()
+        {
+            AiHost host = BuildMatch(Seed);
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            int ring = shipped.StagingDistanceCells + shipped.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True,
+                "without the AI's HQ there is no staging ring to measure against");
+
+            int ticksWithAnArmyBelowTheWave = 0;
+            for (int i = 0; i < EndToEndBudgetTicks && CountCombatUnits(host, AiSlot) < shipped.WaveSize; i++)
+            {
+                host.Step();
+                if (CountCombatUnits(host, AiSlot) == 0) continue;
+                ticksWithAnArmyBelowTheWave++;
+                Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.LessThanOrEqualTo(ring),
+                    $"a unit left the staging ring at tick {host.Kernel.CurrentTick.Value} while the wave was " +
+                    $"still short of {shipped.WaveSize} — that is the trickle the rule exists to stop");
+            }
+
+            Assert.That(ticksWithAnArmyBelowTheWave, Is.GreaterThan(0),
+                "the AI never held an incomplete army, so the waiting half was never observed");
+            Assert.That(CountCombatUnits(host, AiSlot), Is.GreaterThanOrEqualTo(shipped.WaveSize),
+                "the AI never assembled a full wave inside the budget");
+
+            bool marched = false;
+            for (int i = 0; i < EndToEndBudgetTicks && !marched; i++)
+            {
+                host.Step();
+                marched = FarthestCombatDistance(host, AiSlot, hqX, hqY) > ring;
+            }
+            Assert.That(marched, Is.True,
+                "the wave was full and the army still did not leave — waiting without marching is a deadlock");
+        }
+
+        /// <summary>Chebyshev distance of the combat unit standing farthest from <paramref name="cellX"/>/<paramref name="cellY"/>; -1 without any.</summary>
+        private static int FarthestCombatDistance(AiHost host, byte slot, int cellX, int cellY)
+        {
+            int farthest = -1;
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                int dx = System.Math.Abs(SimFixed.WorldToGrid(u.Transform.PositionX) - cellX);
+                int dy = System.Math.Abs(SimFixed.WorldToGrid(u.Transform.PositionY) - cellY);
+                int distance = dx > dy ? dx : dy;
+                if (distance > farthest) farthest = distance;
+            }
+            return farthest;
+        }
+
+        /// <summary>The slot's HQ cell (ascending scan, first match).</summary>
+        private static bool TryHqCell(AiHost host, byte slot, out int cellX, out int cellY)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot || u.Role != UnitRole.HQ) continue;
+                cellX = SimFixed.WorldToGrid(u.Transform.PositionX);
+                cellY = SimFixed.WorldToGrid(u.Transform.PositionY);
+                return true;
+            }
+            cellX = 0;
+            cellY = 0;
+            return false;
+        }
+
         /// <summary>
         /// Steps to just past a decision tick at which the AI actually holds
         /// its attack squad.
         /// <para>
         /// Waiting a fixed number of ticks is not enough, and the reason is a
-        /// finding in its own right: BELOW the squad threshold the AI issues no
-        /// AttackTarget at all, so what its units carry is D-087
-        /// auto-acquisition — the NEAREST visible hostile, harmless or not.
-        /// Measured in this scenario: with five units, four shoot the harvester
-        /// while a battle tank stands one cell away. The score only governs
-        /// from the threshold upwards.
+        /// finding in its own right: while the army is BELOW its marching gate
+        /// the AI issues no AttackTarget at all, so what its units carry is
+        /// D-087 auto-acquisition — the NEAREST visible hostile, harmless or
+        /// not. Measured in this scenario: with five units, four shoot the
+        /// harvester while a battle tank stands one cell away. Since revision 3
+        /// that gate is the wave size, not the squad threshold.
         /// </para>
         /// </summary>
         private static void RunToDecisionWithSquad(AiHost host, int squadThreshold)

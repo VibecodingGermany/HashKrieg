@@ -41,6 +41,18 @@ namespace Nova.SimRunner.Tests
             Assert.That(shipped.PlacementSearchRadius, Is.EqualTo(8));
             Assert.That(shipped.InfantryQueueBatch, Is.EqualTo(2));
             Assert.That(shipped.HarvesterQueueBatch, Is.EqualTo(2));
+
+            // The wave values, which are NOT a copy of an older constant:
+            // waves did not exist before behaviour revision 3. The size sits
+            // AT the army cap on purpose — that is the rule ("attack at full
+            // strength, never reinforce piecemeal") expressed as one number,
+            // and the pairing is asserted here so a later change to the cap
+            // cannot quietly turn the wave rule into something else.
+            Assert.That(shipped.WaveSize, Is.EqualTo(12));
+            Assert.That(shipped.WaveSize, Is.EqualTo(shipped.TargetArmySize),
+                "the shipped wave is the whole army; 1 would be the off setting");
+            Assert.That(shipped.StagingDistanceCells, Is.EqualTo(12));
+            Assert.That(shipped.StagingToleranceCells, Is.EqualTo(4));
         }
 
         [Test]
@@ -120,7 +132,8 @@ namespace Nova.SimRunner.Tests
                 powerReserve: 20, targetHarvesters: 4, harvesterQueueBatch: 3,
                 targetArmySize: 20, attackSquadThreshold: 10, infantryQueueBatch: 4,
                 targetDamageWeight: 12, targetThreatWeight: 8,
-                targetFinishWeight: 2, targetDistanceWeight: 5);
+                targetFinishWeight: 2, targetDistanceWeight: 5,
+                waveSize: 5, stagingDistanceCells: 20, stagingToleranceCells: 3);
 
             var bound = new AiFactionProfile("Legion", tuned);
 
@@ -130,6 +143,8 @@ namespace Nova.SimRunner.Tests
                 "the cadence is tunable now — it used to be a const nobody could reach");
             Assert.That(bound.Profile.TargetDamageWeight, Is.EqualTo(12),
                 "the target weights are tunable data too, not constants in the behaviour");
+            Assert.That(bound.Profile.WaveSize, Is.EqualTo(5),
+                "the wave size is data as well — turning the rule off is a profile value, not a build");
         }
 
         // ----------------------------------------------------------------

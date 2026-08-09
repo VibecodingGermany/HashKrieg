@@ -48,7 +48,23 @@ namespace Nova.AI.Data
             targetDamageWeight: 10,
             targetThreatWeight: 6,
             targetFinishWeight: 3,
-            targetDistanceWeight: 4);
+            targetDistanceWeight: 4,
+            // Waves. 12 IS the army cap above, and that is the rule in one
+            // number: attack at full strength, never reinforce piecemeal. A
+            // reinforcement waits at the staging cell until the wave is full
+            // again — which, with the cap at 12, means until the previous wave
+            // is gone. Units already out are never called back.
+            //
+            // Measured one-sided against waveSize 1 over five sizes (4, 6, 8,
+            // 10, 12) and both faction seatings; every column improves
+            // monotonically with the size, which is why the value sits at the
+            // cap and not somewhere in the middle. waveSize 1 turns the rule
+            // off and reproduces the previous behaviour exactly — the lab
+            // keeps that as the candidate `wave-off`, because a behaviour
+            // without an off setting cannot be measured one-sided (M001).
+            waveSize: 12,
+            stagingDistanceCells: 12,
+            stagingToleranceCells: 4);
 
         /// <summary>
         /// The old <c>AiFactionProfile</c> constructor defaults (power margin
@@ -72,6 +88,11 @@ namespace Nova.AI.Data
             targetDamageWeight: 10,
             targetThreatWeight: 6,
             targetFinishWeight: 3,
-            targetDistanceWeight: 4);
+            targetDistanceWeight: 4,
+            // Same reasoning as above: there is no "legacy" wave value to
+            // preserve, waves did not exist.
+            waveSize: 1,
+            stagingDistanceCells: 12,
+            stagingToleranceCells: 4);
     }
 }
