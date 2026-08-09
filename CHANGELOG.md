@@ -18,6 +18,37 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Geändert
+- **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
+  Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
+  zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8
+  Zellen) ein **bewaffneter** Feind sichtbar ist, läuft jetzt zum Sammelpunkt
+  zurück, auch wenn sie längst draussen ist; zu Hause ist sie eine normale
+  wartende Einheit und zieht mit der nächsten Welle wieder los. Ein unbewaffneter
+  Harvester am Zaun löst nichts aus — Überreaktion auf Belangloses ist der
+  Fehlermodus, an dem ein früherer Verteidigungszweig gescheitert ist.
+  **Bewusst ohne Lebens-Hysterese:** Eintritt bei 25 % und Austritt bei 60 %
+  setzt voraus, dass eine Einheit heilt. In MS-1 heilt keine — `ValidateRepair`
+  verlangt als Ziel eine fertiggestellte Platzierung, also ein Gebäude. Ein
+  Austrittswert wäre nie erreicht worden, Verwundete hätten sich zu Hause
+  gestapelt, die Armeeobergrenze belegt und die Welle nie wieder voll werden
+  lassen. Gedämpft wird über Gefahr und Entfernung statt über Leben.
+  **Einseitig gemessen** gegen dasselbe Binary mit `retreatHealthPercent: 0`:
+  Austauschverhältnis 131 statt 89. Die Regel **kostet dabei Tempo, nicht
+  Einheiten** — ohne sie entscheidet die Partie 2.000 Ticks früher und mit
+  geringfügig *weniger* eigenen Verlusten (56 statt 62). Das ist ein Handel, kein
+  reiner Gewinn, und er gehört genauso in den Eintrag wie der Gewinn. Die
+  Schwelle ist über fünf Stufen von 25 bis 90 gemessen und nicht gewählt; 75
+  liegt im Austausch höher (166), erkauft das aber mit 0 % Siegen und einer
+  Partie über 17.770 Ticks — eine Kennzahl allein hätte hier die schlechtere KI
+  gewählt.
+  **Was das kostet, offen gesagt:** Ein Spieler kann mit einer einzelnen billigen
+  Einheit eine ganze Welle nach Hause schicken. Im Labor tritt das nicht auf,
+  weil keine Seite absichtlich ködert; gegen einen Menschen ist es die
+  naheliegende Gegenstrategie und ungemessen. Wie bei den Wellen gilt: Der feste
+  Schwellwert ist eine Zwischenstufe — ob ein Rückzug richtig ist, hängt von der
+  Lage ab, und die soll die KI später selbst beurteilen.
+  565/565 SimRunner-Tests, Baseline-Dateien unberührt. **Im laufenden Spiel nicht
+  geprüft.**
 - **Die KI greift in Wellen an, statt einzeln nachzutröpfeln (Einheitenstrang,
   KI-Verhalten `r3`):** Bisher lief jede fertige Einheit sofort allein quer über
   die Karte — kein Angriff, sondern ein Förderband; man konnte sich mit drei
