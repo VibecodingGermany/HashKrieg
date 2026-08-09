@@ -133,7 +133,8 @@ namespace Nova.SimRunner.Tests
                 targetArmySize: 20, attackSquadThreshold: 10, infantryQueueBatch: 4,
                 targetDamageWeight: 12, targetThreatWeight: 8,
                 targetFinishWeight: 2, targetDistanceWeight: 5,
-                waveSize: 5, stagingDistanceCells: 20, stagingToleranceCells: 3);
+                waveSize: 5, stagingDistanceCells: 20, stagingToleranceCells: 3,
+                retreatHealthPercent: 30, retreatDangerCells: 6);
 
             var bound = new AiFactionProfile("Legion", tuned);
 

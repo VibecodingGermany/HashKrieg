@@ -74,7 +74,21 @@ namespace Nova.AI.Data
             // without an off setting cannot be measured one-sided (M001).
             waveSize: 12,
             stagingDistanceCells: 12,
-            stagingToleranceCells: 4);
+            stagingToleranceCells: 4,
+            // Retreat. A unit under 60 % health with an armed enemy within
+            // eight cells walks back to the staging cell instead of dying
+            // where it stands; once home it is an ordinary waiting unit and
+            // leaves with the next wave. There is no exit percentage and
+            // there cannot be one — MS-1 units never heal, see AiProfile.
+            //
+            // 60 is not a middle value, it is the top of a measured curve.
+            // One-sided against retreat off, exchange ratio as Alliance:
+            // 25 -> 138, 40 -> 184, 60 -> 252, 75 -> 290, 90 -> 209. 75 buys
+            // its higher ratio with a match that runs twice as long and twice
+            // the own losses; 90 turns the curve down on both seatings. 0
+            // switches the rule off, which is how it was measured (M001).
+            retreatHealthPercent: 60,
+            retreatDangerCells: 8);
 
         /// <summary>
         /// The old <c>AiFactionProfile</c> constructor defaults (power margin
@@ -103,6 +117,8 @@ namespace Nova.AI.Data
             // preserve, waves did not exist.
             waveSize: 1,
             stagingDistanceCells: 12,
-            stagingToleranceCells: 4);
+            stagingToleranceCells: 4,
+            retreatHealthPercent: 0,
+            retreatDangerCells: 8);
     }
 }

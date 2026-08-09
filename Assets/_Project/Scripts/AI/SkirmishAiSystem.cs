@@ -472,11 +472,20 @@ namespace Nova.AI
             ArmyPosture posture = ResolveArmyPosture(combatCount, combatUnits, hqCellX, hqCellY);
             if (posture.Engages)
             {
+                // Cells of the visible ARMED enemies, collected once per
+                // decision and only while the retreat rule is on. A local
+                // list, not a field: the system stays a pure function of the
+                // committed state, and nothing survives the decision.
+                List<long> threatCells = _profile.Profile.RetreatHealthPercent > 0
+                    ? CollectVisibleThreatCells()
+                    : null;
+
                 var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
                     UnitState unit = combatUnits[i];
-                    assignments.Add(ResolveUnitAssignment(combatRaws[i], in unit, in posture, hqCellX, hqCellY));
+                    assignments.Add(ResolveUnitAssignment(
+                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells));
                 }
                 SubmitAssignments(assignments, combatUnits);
             }
@@ -599,17 +608,22 @@ namespace Nova.AI
                 GetEnemyStartAreaCell(hqCellX, hqCellY, out posture.MoveCellX, out posture.MoveCellY);
             }
 
+            // The staging cell is resolved whenever the army acts, because
+            // BOTH rules need it: it is where a wave gathers and where a
+            // wounded unit walks back to. Resolving it is pure arithmetic over
+            // static map knowledge — with every rule switched off it changes
+            // nothing, which is what keeps the off path byte-identical.
+            GetStagingCell(hqCellX, hqCellY, out posture.StagingCellX, out posture.StagingCellY);
+
             // ---- waves, and the off setting that keeps this reproducible ----
             //
-            // waveSize 1 leaves BEFORE anything below runs, so the shipped
-            // behaviour is not "the same result through new code" but the same
-            // code path it always took. That is what makes the comparison run
-            // one-sided (finding M001): identical binary, one profile value
-            // apart.
+            // waveSize 1 leaves WaveReady at true, so every unit marches and
+            // the shipped-before behaviour is not "the same result through new
+            // code" but the same decision it always took. That is what makes
+            // the comparison run one-sided (finding M001): identical binary,
+            // one profile value apart.
             int waveSize = EffectiveWaveSize();
             if (waveSize <= 1) return posture;
-
-            GetStagingCell(hqCellX, hqCellY, out posture.StagingCellX, out posture.StagingCellY);
 
             int gathered = 0;
             for (int i = 0; i < combatUnits.Count; i++)
@@ -667,6 +681,78 @@ namespace Nova.AI
 
             cellX = ClampToGrid(hqCellX + (dx * distance / span));
             cellY = ClampToGrid(hqCellY + (dy * distance / span));
+        }
+
+        /// <summary>
+        /// True when this unit is pulling out: wounded below
+        /// <see cref="AiProfile.RetreatHealthPercent"/> AND either an armed
+        /// enemy is within <see cref="AiProfile.RetreatDangerCells"/> or it is
+        /// already walking home.
+        /// <para>
+        /// THE SECOND HALF IS THE DAMPING, and it replaces the health
+        /// hysteresis the plan sketch asked for. That sketch wanted a unit to
+        /// re-enter the fight above an exit percentage — which presumes
+        /// healing, and MS-1 units never heal (<c>Repair</c> validates its
+        /// target as a completed BUILDING). With an unreachable exit the
+        /// wounded would pile up at home, keep occupying the army cap, and the
+        /// wave would never fill again. So the rule is: run home, and once you
+        /// are home you are an ordinary waiting unit again and leave with the
+        /// next wave, wounded or not. "Already walking home" is read off the
+        /// standing order — the AI's only memory, and one that survives
+        /// save/restore because it is part of the world, not beside it.
+        /// </para>
+        /// <para>
+        /// A retreating unit gets no explicit attack target either (the
+        /// waiting branch handles it), which is what lets the D-087
+        /// auto-acquisition keep shooting at whatever chases it.
+        /// </para>
+        /// </summary>
+        private bool IsRetreating(in UnitState unit, in ArmyPosture posture, List<long> threatCells)
+        {
+            int threshold = _profile.Profile.RetreatHealthPercent;
+            if (threshold <= 0 || threatCells == null || posture.StagingCellX < 0) return false;
+            if (unit.MaxHealth <= 0) return false;
+            if ((long)unit.CurrentHealth * 100 / unit.MaxHealth >= threshold) return false;
+
+            if (AlreadyHeadingTo(in unit, posture.StagingCellX, posture.StagingCellY)) return true;
+
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+            int danger = _profile.Profile.RetreatDangerCells;
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int threatX = (int)(uint)threatCells[i];
+                int threatY = (int)(threatCells[i] >> 32);
+                if (Math.Abs(cellX - threatX) <= danger && Math.Abs(cellY - threatY) <= danger) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The cells of every ARMED enemy in the team's committed view, packed
+        /// as <c>(y &lt;&lt; 32) | x</c>. Unarmed entities are left out: a
+        /// harvester at the fence is not a reason to run, and treating it as
+        /// one is exactly the over-reaction that sank <c>DefendBase</c>
+        /// (journal V002 — "react to a real threat, not to anything that
+        /// moves").
+        /// </summary>
+        private List<long> CollectVisibleThreatCells()
+        {
+            var cells = new List<long>();
+            var visible = new List<EntityId>();
+            _fogOfWar.GetVisibleEntities(_aiPlayerId, visible);
+
+            for (int i = 0; i < visible.Count; i++)
+            {
+                if (!_entityManager.TryGetUnit(visible[i], out UnitState u)) continue;
+                if (u.PlayerId == _aiPlayerId) continue;
+                if (WeaponProfiles.Get(_economy.GetSlotFaction(u.PlayerId), u.Role).AttackDamage <= 0) continue;
+
+                long x = GridCellOf(u.Transform.PositionX);
+                long y = GridCellOf(u.Transform.PositionY);
+                cells.Add((y << 32) | x);
+            }
+            return cells;
         }
 
         /// <summary>
@@ -735,11 +821,18 @@ namespace Nova.AI
         /// </para>
         /// </summary>
         private UnitAssignment ResolveUnitAssignment(
-            uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY)
+            uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
+            List<long> threatCells)
         {
-            bool marches = posture.StagingCellX < 0          // waves off
-                || posture.WaveReady                          // the wave launches this decision
-                || IsCommittedToTheWave(in unit, hqCellX, hqCellY); // already out with an earlier wave
+            // A wounded unit walks home, whatever the wave is doing. This test
+            // comes FIRST on purpose: retreat has to outrank "you are out with
+            // the wave, keep going", or it can never pull anybody back.
+            bool retreats = IsRetreating(in unit, in posture, threatCells);
+
+            bool marches = !retreats
+                && (posture.StagingCellX < 0                      // no staging cell resolved
+                || posture.WaveReady                              // the wave launches this decision
+                || IsCommittedToTheWave(in unit, hqCellX, hqCellY)); // already out with an earlier wave
 
             if (marches)
             {
@@ -766,7 +859,10 @@ namespace Nova.AI
             // "Arrived" means standing there, not merely being there. A unit
             // that is inside the tolerance but still WALKING is walking
             // somewhere else — saying nothing to it lets it carry on out of
-            // the ring, which is the opposite of what the rule wants.
+            // the ring, which is the opposite of what both rules want. A test
+            // found this: a wounded unit twelve cells from its HQ kept its
+            // march order and walked on toward the enemy, because it happened
+            // to pass within four cells of the staging cell.
             if (!unit.IsMoving && IsAtTheStagingCell(in unit, in posture))
             {
                 return new UnitAssignment

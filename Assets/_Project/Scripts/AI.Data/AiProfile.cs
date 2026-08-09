@@ -111,6 +111,36 @@ namespace Nova.AI.Data
         /// </summary>
         public int StagingToleranceCells { get; }
 
+        // ---- retreat ----
+
+        /// <summary>
+        /// Health percentage below which a unit disengages and walks back to
+        /// the staging cell. <b>0 means off.</b>
+        /// <para>
+        /// THERE IS NO EXIT THRESHOLD, and that is not an omission. The plan
+        /// sketch asked for hysteresis between an entry and an exit percentage
+        /// (25 in, 60 out), which presumes a unit can heal. In MS-1 it cannot:
+        /// <c>Repair</c> validates its target as a completed BUILDING, and no
+        /// other system raises a unit's health. An exit percentage would
+        /// therefore never be reached, and a retreated unit would sit at home
+        /// for the rest of the match while still counting against the army cap
+        /// — the wave would never fill again and the AI would stop attacking
+        /// altogether. The damping happens over DANGER and DISTANCE instead,
+        /// see <see cref="RetreatDangerCells"/>.
+        /// </para>
+        /// </summary>
+        public int RetreatHealthPercent { get; }
+
+        /// <summary>
+        /// How near a visible ARMED enemy has to be for a wounded unit to
+        /// count as in danger. A unit retreats while it is wounded AND
+        /// (an armed enemy is this close OR it is still walking home) — the
+        /// second half is what stops it from turning around mid-field the
+        /// moment it outruns the shooter. Once it is home it becomes an
+        /// ordinary waiting unit and rejoins the next wave, wounded or not.
+        /// </summary>
+        public int RetreatDangerCells { get; }
+
         // ---- target scoring ----
         //
         // Four weights over ONE integer score, no scalar quality function:
@@ -151,7 +181,9 @@ namespace Nova.AI.Data
             int targetDistanceWeight,
             int waveSize,
             int stagingDistanceCells,
-            int stagingToleranceCells)
+            int stagingToleranceCells,
+            int retreatHealthPercent,
+            int retreatDangerCells)
         {
             ProfileId = profileId ?? string.Empty;
             DecisionTickInterval = decisionTickInterval;
@@ -169,6 +201,8 @@ namespace Nova.AI.Data
             WaveSize = waveSize;
             StagingDistanceCells = stagingDistanceCells;
             StagingToleranceCells = stagingToleranceCells;
+            RetreatHealthPercent = retreatHealthPercent;
+            RetreatDangerCells = retreatDangerCells;
         }
 
         /// <summary>
@@ -198,7 +232,9 @@ namespace Nova.AI.Data
             && TargetDistanceWeight == other.TargetDistanceWeight
             && WaveSize == other.WaveSize
             && StagingDistanceCells == other.StagingDistanceCells
-            && StagingToleranceCells == other.StagingToleranceCells;
+            && StagingToleranceCells == other.StagingToleranceCells
+            && RetreatHealthPercent == other.RetreatHealthPercent
+            && RetreatDangerCells == other.RetreatDangerCells;
 
         public override bool Equals(object obj) => obj is AiProfile other && Equals(other);
 
@@ -222,6 +258,8 @@ namespace Nova.AI.Data
                 hash = (hash * 397) ^ WaveSize;
                 hash = (hash * 397) ^ StagingDistanceCells;
                 hash = (hash * 397) ^ StagingToleranceCells;
+                hash = (hash * 397) ^ RetreatHealthPercent;
+                hash = (hash * 397) ^ RetreatDangerCells;
                 return hash;
             }
         }
