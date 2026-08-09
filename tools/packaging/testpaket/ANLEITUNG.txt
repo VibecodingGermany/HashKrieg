@@ -1,0 +1,208 @@
+HASHKRIEG — TESTRUNDE
+=====================================================================
+
+Danke, dass du dir das anschaust.
+
+Was du vor dir hast, ist ein Testbuild — kein fertiges Spiel. Eine ganze
+Runde läuft von vorne bis hinten durch, aber die Oberfläche ist roh und ein
+paar Dinge fehlen mit Absicht. Welche, steht weiter unten unter "WAS BEWUSST
+NOCH FEHLT". Bitte lies das vorher — sonst meldest du uns Sachen, die wir
+schon wissen, und deine Zeit ist verschenkt.
+
+Eine Runde dauert 15 bis 30 Minuten. Nimm dir für den ersten Durchgang eine
+Stunde. Der Reiz liegt nicht im Gewinnen, sondern in dem, was dir dabei
+auffällt.
+
+
+DAS WICHTIGSTE IN FÜNF ZEILEN
+---------------------------------------------------------------------
+
+1. Handy neben die Tastatur legen. ChatGPT öffnen, NEUEN Chat starten.
+2. Den kompletten Text aus "PROMPT FUER CHATGPT.txt" dort hineinkopieren
+   und abschicken. ChatGPT antwortet kurz und wartet dann.
+3. Spiel starten. Alles, was dir auffällt, ins Handy sprechen — als
+   Sprachnachricht in genau diesen Chat. Ruhig zehn Minuten am Stück.
+   Halbe Sätze, Flüche, Gemurmel: alles gut.
+4. Wenn du fertig bist, schreib FERTIG in den Chat.
+5. ChatGPT baut daraus einen sortierten Bericht. Den kopierst du komplett
+   und schickst ihn uns zurück.
+
+Das ist der ganze Trick: Du musst nichts aufschreiben und nichts sortieren.
+Du musst nur laut denken, während du spielst.
+
+Wenn dir Reden unangenehm ist: tippen geht genauso. Der Prompt funktioniert
+mit getippten Nachrichten identisch.
+
+
+INSTALLIEREN
+---------------------------------------------------------------------
+
+--- macOS ---
+
+  1. Ordner "macOS" öffnen, die .dmg-Datei doppelklicken.
+  2. ProjectNova.app in den Ordner "Applications" ziehen.
+  3. Starten.
+
+  Es kommt KEINE Warnung — der Build ist von Apple geprüft. Wenn doch eine
+  kommt, sag uns das bitte, das wäre ein Fehler.
+
+--- Windows ---
+
+  1. Ordner "Windows" komplett auf die Festplatte kopieren.
+     Nicht aus dem ZIP heraus starten, das Spiel findet dann seine Daten
+     nicht.
+  2. ProjectNova.exe doppelklicken.
+  3. Windows meldet: "Der Computer wurde durch Windows geschützt".
+
+     Das ist erwartet. Der Build ist nicht signiert — ein Windows-Zertifikat
+     kostet dreistellig im Jahr, das lohnt für zwei Testende nicht.
+
+     -> auf "Weitere Informationen" klicken
+     -> dann auf "Trotzdem ausführen"
+
+  Wenn dein Virenscanner die Datei wegräumt: auch das ist erwartbar. Sag uns
+  bitte, welcher Scanner es war.
+
+
+WELCHEN BUILD HAST DU?
+---------------------------------------------------------------------
+
+Der steht im Namen dieses Ordners (die Zeichenfolge am Ende) und noch einmal
+in der Datei BUILD.txt daneben. Nenne ihn bitte am Anfang deiner ersten
+Sprachnachricht. Ohne ihn wissen wir später nicht, welchen Stand du gesehen
+hast — und dann ist deine Beobachtung leider wertlos.
+
+
+DEINE ERSTE RUNDE
+---------------------------------------------------------------------
+
+Alles Nötige ist anklickbar. Bauleiste unten, Kommandokarte rechts, Minimap
+links unten. Tastenkürzel gibt es zusätzlich, du brauchst sie nicht.
+
+  1. "Neues Spiel" im Hauptmenü. Du bist die Allianz, der Computer die
+     Legion.
+  2. Raffinerie bauen. In der Bauleiste anklicken, dann mit der Maus
+     platzieren — grün heißt geht, rot heißt geht nicht. Linksklick setzt,
+     Rechtsklick bricht ab.
+  3. Harvester produzieren. Die kommen aus der RAFFINERIE, nicht aus dem
+     Hauptquartier. Danach fahren sie von allein zum Rohstofffeld und
+     zurück. Da musst du nichts machen.
+  4. Kraftwerk und Kaserne, sobald der Strom knapp wird.
+  5. Truppen bauen, zusammenstellen, per Rechtsklick zur Gegnerbasis
+     schicken.
+  6. Das feindliche Hauptquartier zerstören. Dann kommt der
+     Ergebnisbildschirm.
+
+  P pausiert das Spiel.
+  F3 blendet ein Debug-Panel ein — nur interessant, wenn du neugierig bist.
+
+Wichtig: Wenn du dich verläufst oder nicht weiterkommst, ist das KEIN
+Versagen deinerseits. Das ist genau die Information, die wir brauchen. Sprich
+es aus und mach weiter.
+
+
+WAS BEWUSST NOCH FEHLT
+---------------------------------------------------------------------
+
+Das hier ist uns bekannt. Du musst es nicht melden — außer es hat dich
+konkret gestört, dann sag es ruhig trotzdem.
+
+  * Kein Attack-Move. Truppen schießen zwar von selbst, halten unterwegs
+    aber nicht an, um zu kämpfen. Sie laufen ins Ziel und feuern nebenbei.
+
+  * Kein Speichern und Laden. Der Menüeintrag "Laden" ist da und ausgegraut.
+
+  * Lager und Radar kosten Geld und tun nichts. Zwei von neun Gebäuden
+    warten noch auf ihre Funktion.
+
+  * Kein Wirtschaftsdruck. Strommangel bremst noch nicht, der Rohstoff geht
+    nicht aus. Die Runde ist dadurch entspannter, als sie mal sein soll.
+
+  * Mehrspieler ist noch nicht getestet. Der Verbindungsdialog existiert,
+    aber eine Partie zu zweit hat noch nie jemand gespielt. Das machen wir
+    gemeinsam mit Termin — bitte nicht allein ausprobieren.
+
+
+SCREENSHOTS UND VIDEOS
+---------------------------------------------------------------------
+
+Bilder helfen enorm, vor allem bei allem, was mit "das sah komisch aus"
+anfängt. Bitte einfach mitschicken.
+
+--- Windows ---
+  Ganzer Bildschirm:  Windows-Taste + Druck
+                      landet in  Bilder\Screenshots
+  Nur ein Ausschnitt: Windows-Taste + Umschalt + S
+  Video aufnehmen:    Windows-Taste + Alt + R  (startet und stoppt)
+                      landet in  Videos\Captures
+
+--- macOS ---
+  Ganzer Bildschirm:  Cmd + Shift + 3        landet auf dem Schreibtisch
+  Nur ein Ausschnitt: Cmd + Shift + 4
+  Video aufnehmen:    Cmd + Shift + 5
+
+EIN TRICK, der uns sehr viel Arbeit spart: Sag im selben Moment laut, worum
+es geht. Also "Screenshot — hier hängt die Bauleiste". Dann können wir Bild
+und Aussage später zusammenbringen. Sonst haben wir vierzig Bilder und
+wissen bei der Hälfte nicht mehr, warum.
+
+
+WENN DAS SPIEL ABSTÜRZT
+---------------------------------------------------------------------
+
+Kein Drama, aber bitte die Logdatei mitschicken:
+
+  Windows:  %USERPROFILE%\AppData\LocalLow\Project Nova\Project Nova\Player.log
+            (Windows-Taste + R, den Pfad reinkopieren, Enter)
+
+  macOS:    ~/Library/Logs/Project Nova/Project Nova/Player.log
+            (im Finder: Gehe zu > Gehe zum Ordner, Pfad reinkopieren)
+
+
+WORAUF ES UNS WIRKLICH ANKOMMT
+---------------------------------------------------------------------
+
+Nicht "das Spiel ist gut". Sondern:
+
+  1. Die ersten fünf Minuten. Wo hast du gestockt? Was hast du gesucht und
+     nicht gefunden? Was hast du angeklickt, das nichts getan hat?
+
+  2. Wo du rausgefallen bist. Der Punkt, an dem du weggelegt oder ins Menü
+     zurückgegangen bist — und warum.
+
+  3. Was sich falsch angefühlt hat. Zu langsam, zu schnell, zu unfair, zu
+     zäh. Ein Gefühl reicht völlig. Du musst es nicht begründen.
+
+  4. Was du erwartet hast, das nicht passiert ist. Das ist die wertvollste
+     Kategorie überhaupt.
+
+  5. Ob es flüssig lief. Ruckler, Standbilder, laute Lüfter — und ab wann.
+
+  6. Ton. Zu laut, zu leise, nervig, fehlt.
+
+  7. Lesbarkeit. Erkennst du, was dir gehört? Wo der Gegner ist? Wann ein
+     Gebäude fertig wird?
+
+EINE BITTE: Sag, was du GESEHEN hast, nicht was wir ändern sollen.
+
+  "Ich hab dreimal auf die Kaserne geklickt und nichts passierte"  <- Gold.
+  "Ihr solltet das UI überarbeiten"                                <- damit
+                                                                      können
+                                                                      wir
+                                                                      nichts
+                                                                      anfangen.
+
+Deine Ideen und Wünsche wollen wir trotzdem hören — der Prompt sortiert sie
+in einen eigenen Abschnitt, damit wir beides auseinanderhalten können.
+
+
+ZUM SCHLUSS
+---------------------------------------------------------------------
+
+Der Build ist dir zum Testen überlassen, nicht zur Weitergabe. Bitte lade ihn
+nirgends hoch. Nicht aus Geheimniskrämerei — sondern weil ein Build ohne
+unseren Stempel im Umlauf jede Fehlermeldung wertlos macht.
+
+Und: Es gibt keine falsche Rückmeldung. Wenn du zwanzig Minuten lang nur
+gemurmelt hast, dass du die Minimap nicht findest, ist das ein besserer
+Testbericht als drei Seiten höfliche Zusammenfassung.
