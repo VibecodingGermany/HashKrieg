@@ -1,5 +1,6 @@
 using System;
 using Nova.Core;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Production;
 using Nova.Simulation.State;
@@ -10,7 +11,8 @@ namespace Nova.Gameplay
     /// The buttons one command card can show. Presence is role-driven
     /// (<see cref="CommandCardPresenter"/>); whether a present button is
     /// clickable is a separate, state-driven evaluation
-    /// (<see cref="ProductionBlocker"/>, <see cref="BuildingRepairBlocker"/>)
+    /// (<see cref="ProductionBlocker"/>, <see cref="BuildingPlacementBlocker"/>,
+    /// <see cref="BuildingRepairBlocker"/>)
     /// — a greyed button must always carry its reason.
     /// </summary>
     [Flags]
@@ -42,6 +44,22 @@ namespace Nova.Gameplay
         TierLocked = 1,
         QueueFull = 2,
         InsufficientCredits = 3,
+    }
+
+    /// <summary>
+    /// Why a building cannot be placed, in the executor's state-dependent
+    /// validation order after target geometry: prerequisite, affordability,
+    /// free power and finally the global construction-site capacity. The UI
+    /// derives this reason because schema v1 deliberately shares one result
+    /// code between several of these cases.
+    /// </summary>
+    public enum BuildingPlacementBlocker
+    {
+        None = 0,
+        MissingPrerequisite = 1,
+        InsufficientCredits = 2,
+        InsufficientPower = 3,
+        SiteCapacityReached = 4,
     }
 
     /// <summary>
@@ -200,6 +218,54 @@ namespace Nova.Gameplay
             if (queueEntryCount >= ProductionSystem.MaxQueueEntries) return ProductionBlocker.QueueFull;
             if (credits < definition.CostAE) return ProductionBlocker.InsufficientCredits;
             return ProductionBlocker.None;
+        }
+
+        /// <summary>
+        /// First building-placement blocker in the executor's own order.
+        /// Geometry is intentionally absent: the build bar has no target cell
+        /// until placement mode starts. An energy blocker is informational in
+        /// that bar and must not disable entering placement mode.
+        /// </summary>
+        public static BuildingPlacementBlocker EvaluateBuildingPlacementBlocker(
+            in SimBuildingDefinition definition, bool prerequisiteMet, long credits,
+            int powerProvided, int powerRequired, int activeSiteCount)
+        {
+            if (!prerequisiteMet) return BuildingPlacementBlocker.MissingPrerequisite;
+            if (credits < definition.CostAE) return BuildingPlacementBlocker.InsufficientCredits;
+            if (definition.PowerRequired > 0
+                && powerProvided - powerRequired < definition.PowerRequired)
+            {
+                return BuildingPlacementBlocker.InsufficientPower;
+            }
+            if (activeSiteCount >= ConstructionSystem.MaxSites)
+            {
+                return BuildingPlacementBlocker.SiteCapacityReached;
+            }
+            return BuildingPlacementBlocker.None;
+        }
+
+        /// <summary>
+        /// Compact live grid balance for the build bar. Low power must name
+        /// its gameplay consequence where the player makes build decisions.
+        /// </summary>
+        public static string FormatPowerBalance(int powerProvided, int powerRequired)
+        {
+            string balance = $"Strom {powerProvided}/{powerRequired}";
+            return powerRequired > powerProvided
+                ? balance + " · LOW POWER: Produktion ½"
+                : balance;
+        }
+
+        /// <summary>Power generation or draw shown on a selected building's command card and on build-button hover.</summary>
+        public static string FormatBuildingPower(in SimBuildingDefinition definition)
+        {
+            if (definition.PowerProvided > 0 && definition.PowerRequired > 0)
+            {
+                return $"Erzeugt +{definition.PowerProvided} · benötigt {definition.PowerRequired} Strom";
+            }
+            if (definition.PowerProvided > 0) return $"Erzeugt +{definition.PowerProvided} Strom";
+            if (definition.PowerRequired > 0) return $"Benötigt {definition.PowerRequired} Strom";
+            return "Kein Strombedarf";
         }
 
         /// <summary>

@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using Nova.Core;
 using Nova.Gameplay;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Production;
 using Nova.Simulation.State;
@@ -237,6 +238,75 @@ namespace Nova.Gameplay.Tests
                 ProductionBlocker.None,
                 CommandCardPresenter.EvaluateProductionBlocker(in t2, credits: t2.CostAE, t2Unlocked: true, queueEntryCount: 0),
                 "unlocked, funded and queue space: the executor would apply");
+        }
+
+        [Test]
+        public void EvaluateBuildingPlacementBlocker_FollowsExecutorOrder()
+        {
+            Assert.IsTrue(SimDefinitions.TryGetBuilding(
+                FactionId.Alliance, UnitRole.VehicleFactory, out SimBuildingDefinition factory));
+
+            Assert.AreEqual(
+                BuildingPlacementBlocker.MissingPrerequisite,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in factory, prerequisiteMet: false, credits: 0,
+                    powerProvided: 0, powerRequired: 0, activeSiteCount: ConstructionSystem.MaxSites),
+                "the prerequisite wins when every blocker applies");
+            Assert.AreEqual(
+                BuildingPlacementBlocker.InsufficientCredits,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in factory, prerequisiteMet: true, credits: factory.CostAE - 1,
+                    powerProvided: 0, powerRequired: 0, activeSiteCount: ConstructionSystem.MaxSites),
+                "affordability wins over power and capacity");
+            Assert.AreEqual(
+                BuildingPlacementBlocker.InsufficientPower,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in factory, prerequisiteMet: true, credits: factory.CostAE,
+                    powerProvided: factory.PowerRequired - 1, powerRequired: 0,
+                    activeSiteCount: ConstructionSystem.MaxSites),
+                "power wins over site capacity");
+            Assert.AreEqual(
+                BuildingPlacementBlocker.SiteCapacityReached,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in factory, prerequisiteMet: true, credits: factory.CostAE,
+                    powerProvided: factory.PowerRequired, powerRequired: 0,
+                    activeSiteCount: ConstructionSystem.MaxSites),
+                "free power equal to the draw is sufficient, exposing the later capacity blocker");
+            Assert.AreEqual(
+                BuildingPlacementBlocker.None,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in factory, prerequisiteMet: true, credits: factory.CostAE,
+                    powerProvided: factory.PowerRequired, powerRequired: 0,
+                    activeSiteCount: ConstructionSystem.MaxSites - 1));
+        }
+
+        [Test]
+        public void EvaluateBuildingPlacementBlocker_ZeroDrawNeverEnergyBlocks()
+        {
+            Assert.IsTrue(SimDefinitions.TryGetBuilding(
+                FactionId.Alliance, UnitRole.Power, out SimBuildingDefinition powerPlant));
+
+            Assert.AreEqual(
+                BuildingPlacementBlocker.None,
+                CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in powerPlant, prerequisiteMet: true, credits: powerPlant.CostAE,
+                    powerProvided: 0, powerRequired: 100, activeSiteCount: 0));
+        }
+
+        [Test]
+        public void PowerFormatters_NameBalanceConsequenceAndBuildingDraw()
+        {
+            Assert.AreEqual("Strom 30/20", CommandCardPresenter.FormatPowerBalance(30, 20));
+            Assert.AreEqual(
+                "Strom 20/40 · LOW POWER: Produktion ½",
+                CommandCardPresenter.FormatPowerBalance(20, 40));
+
+            Assert.IsTrue(SimDefinitions.TryGetBuilding(
+                FactionId.Alliance, UnitRole.Power, out SimBuildingDefinition powerPlant));
+            Assert.IsTrue(SimDefinitions.TryGetBuilding(
+                FactionId.Alliance, UnitRole.Refinery, out SimBuildingDefinition refinery));
+            Assert.AreEqual("Erzeugt +100 Strom", CommandCardPresenter.FormatBuildingPower(in powerPlant));
+            Assert.AreEqual("Benötigt 20 Strom", CommandCardPresenter.FormatBuildingPower(in refinery));
         }
 
         [Test]

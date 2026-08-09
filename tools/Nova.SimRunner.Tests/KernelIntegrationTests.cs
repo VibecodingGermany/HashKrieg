@@ -154,6 +154,35 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void SealedStopCommand_ClearsMovementAndAttackTarget_WithoutCombatSystem()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId unit = host.Entities.SpawnUnit(
+                0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
+            EntityId target = host.Entities.SpawnUnit(
+                1, new Transform2D(SimFixed.FromFloat(20.5f), SimFixed.FromFloat(20.5f)), SimFixed.FromInt(5));
+
+            ref UnitState state = ref host.Entities.GetUnitRef(unit);
+            state.SetTarget(new GridPos2D(30, 30));
+            state.AttackTarget = target;
+
+            var stop = new StopPayload(new[] { UnitCommandStateView.ToRawEntityId(unit) });
+            Assert.That(
+                host.Ingress.TrySubmitIntent(CommandIntent.Create(stop), out _),
+                Is.EqualTo(CommandIngressResult.Accepted));
+
+            host.StepTick();
+
+            Assert.That(host.Kernel.LastTickResults.Count, Is.EqualTo(1));
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
+            ref readonly UnitState stopped = ref host.Entities.GetUnitRef(unit);
+            Assert.That(stopped.IsMoving, Is.False);
+            Assert.That(stopped.TargetGridPos.IsValid, Is.False);
+            Assert.That(stopped.GoalGridPos.IsValid, Is.False);
+            Assert.That(stopped.AttackTarget, Is.EqualTo(EntityId.Invalid));
+        }
+
+        [Test]
         public void StateHash_ReflectsStateMutation_AndStaysStableOnRepeat()
         {
             // F-005 regression: canonical NOVA_STATE_V1/XXH64 hash over the

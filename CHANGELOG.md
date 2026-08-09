@@ -53,6 +53,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Behoben
+- **#45/#47/#48: Entscheidungspunkt und „Stoppen“ melden jetzt die Wahrheit (D-097):** Die Baubar zeigt dauerhaft die Strombilanz samt Low-Power-Folge, nennt beim Überfahren Bedarf beziehungsweise Erzeugung und leitet den ersten Blocker in Simulationsreihenfolge aus Voraussetzung, AE, freier Energie und Baustellenlimit her; Energie sperrt den Eintritt in den Platzierungsmodus bewusst nicht. Die Befehlskarte zeigt den Stromwert des gewählten Gebäudes, und ein angewandter Stop-Befehl räumt zusätzlich `AttackTarget` ab. Ein echtes Halte-Feuer bleibt ausserhalb dieses Pakets, weil D-087 im nächsten Combat-Tick wieder ein Ziel erfassen darf
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
   solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im
