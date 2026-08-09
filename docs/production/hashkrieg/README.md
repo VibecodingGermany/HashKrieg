@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.7.1 | **Status:** fortgeschriebene Planungsmappe – Sprint 13 zur Hälfte gemergt (13.1, 13.7 seit `e15f5e6`), die offenen Pakete 13.2–13.5 warten auf Zugangsdaten und zwei Menschen an zwei Rechnern; **Sprint 16 ist nach dem ersten Betatest vorgezogen** und läuft seit D-092 parallel zum Einheitenstrang; Sprint 18 neu angelegt | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 16
+**Version:** 0.7.1 | **Status:** fortgeschriebene Planungsmappe – Sprint 13 zur Hälfte gemergt (13.1, 13.7 seit `e15f5e6`), die offenen Pakete 13.2–13.5 warten auf Zugangsdaten und zwei Menschen an zwei Rechnern; **Sprint 16 ist nach dem ersten Betatest vorgezogen** und läuft seit D-095 parallel zum Einheitenstrang; Sprint 18 neu angelegt | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 16
 
 ## Zweck
 
@@ -44,7 +44,7 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | Sprint 12; Strang A A1–A7 umgesetzt und A8 Stufe 1 über 10.023 TCP-Ticks nachgewiesen, manuelle Loopback-/LAN-/VPS-Stufen offen (D-089) |
 | [12B_Sprint_Sichtbares_Gefecht.md](12B_Sprint_Sichtbares_Gefecht.md) | Sprint 12 Strang B; fog-sicheres VFX- und Tier-0-Audio technisch umgesetzt, manuelle 60-Einheiten-Sicht-/Gegenhörabnahme offen (D-090) |
 | [13-0_Sprint_Freigabe.md](13-0_Sprint_Freigabe.md) | Sprint 13.0; Lizenz, Tier-2-Wechsel, Maintainer-/Fork-Modell und CI-Wächter vor dem ersten externen PR |
-| [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Parallelbetrieb 13–18 — Regelwerk für die parallele Arbeit** — Schreibhoheit, Determinismus-Baselines, Merge-Fenster, Zugangsmodell für externe Beitragende; seit **D-092** trennt die **Dateihoheit** die Stränge, nicht mehr der Verhaltensraum |
+| [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Parallelbetrieb 13–18 — Regelwerk für die parallele Arbeit** — Schreibhoheit, Determinismus-Baselines, Merge-Fenster, Zugangsmodell für externe Beitragende; seit **D-095** trennt die **Dateihoheit** die Stränge, nicht mehr der Verhaltensraum |
 | [13_Sprint_Netzpartie.md](13_Sprint_Netzpartie.md) | Sprint 13 (Maintainer); Verbindungsdialog, Relay auf dem VPS, A8 Stufen 2–4 als gespielte Abnahme |
 | [13B_Sprint_Einheitenverhalten.md](13B_Sprint_Einheitenverhalten.md) | Sprint 13B (externer Beitragender, PR-only); Einheitenverhalten, KI und Legion-Waffenidentität — fortlaufend parallel zu 13–15 |
 | [14_Sprint_Lobby.md](14_Sprint_Lobby.md) | Sprint 14 (Maintainer); Match per Code über Supabase, Fraktionswahl, Build-Abgleich vor dem Verbinden |
@@ -193,9 +193,8 @@ Masterplans grundlegend — sonst nichts.
    - **Block 3 — [Sprint 14](14_Sprint_Lobby.md):** Match per Code über
      Supabase, Fraktionswahl, Build-Abgleich.
    - **Block 4 — [Sprint 17](17_Sprint_Zugangsprotokoll.md) Paket A:** liegt bis
-     auf eine Ausnahme im Supabase-Projekt. Es steht **hinter** der Lobby, weil
-     es die Lobby-Functions aus Block 3 voraussetzt, die heute null Zeilen im
-     Repository haben. Die eine Ausnahme unter `Assets/` ist Paket 17.0: das
+     Es läuft als **Block 3 des Großauftrags**, weil es die Lobby-Functions
+     aus Sprint 14 voraussetzt — die seit `b4e75e5` auf `main` liegen.
      `.partial`-Leck in `Assets/_Project/Scripts/Networking/RelayServerCore.cs`.
      `ResetMatch` verwirft den Aufzeichnungsstrom und merkt sich den Pfad,
      löscht die Datei aber nie. Paket B wartet weiterhin auf Sprint 15.
@@ -217,5 +216,5 @@ Masterplans grundlegend — sonst nichts.
 | 0.4.0 | 2026-08-08 | Sprint 13.0 und D-091 als Voraussetzung für externe Beiträge unter Tier 2 ergänzt | Producer / Agent (Umsetzung) |
 | 0.5.0 | 2026-08-09 | Sprint 17 (Zugangsprotokoll, Sperrliste, Erstmeldung) aufgenommen; Paket A als vorziehbar vermerkt | Producer / Agent (Umsetzung) |
 | 0.6.0 | 2026-08-09 | Ersten Betatest-Bericht **anonymisiert** aufgenommen und in die Sprintfolge eingeordnet (Issues #43–#58); Testberichte-Ordner angelegt, Ablauf in [../Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) festgelegt | Orchestrator |
-| 0.7.0 | 2026-08-09 | Nach der Inhaberentscheidung zum ersten Betatest: **Sprint 16 vorgezogen**, [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) und [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md) in die Mappe aufgenommen, Regelwerk als Parallelbetrieb 13–18 mit Trennung über Dateihoheit (**D-092**) fortgeschrieben, Großauftrag mit den Blöcken 0 bis 4 eingehängt. „Nächste Schritte" neu geschrieben: Sprint 13 halb gemergt (`e15f5e6`), 13.2–13.5 nicht durch einen Agenten erledigbar, `SimDefinitions`-Pakete vor dem VPS-Rollout. Punkt 2 der Fünf-Sätze-Zusammenfassung nach **D-077** berichtigt — die Skirmish-KI ist registriert und spielt | Orchestrator |
-| 0.7.1 | 2026-08-09 | Index gegen den Großauftrag und die Sprintdateien nachgezogen: Sprint 17 Paket A ist nicht „sofort vorziehbar", sondern läuft als **Block 4 hinter der Lobby** (Voraussetzung: die Lobby-Functions aus Sprint 14, heute null Zeilen im Repository — [17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md) 1.1.0 hat den Satz bereits als Aktenfehler zurückgenommen), und es berührt mit dem `.partial`-Fix in `RelayServerCore.cs` genau **eine** Datei unter `Assets/`. Sprint 16 trägt **acht** Betatest-Befunde (#43, #44, #45, #46, #47, #48, #53, #54), nicht sechs. Alle Markdown-Links dieser Datei gegen das Dateisystem geprüft — kein toter Link | Orchestrator |
+| 0.7.0 | 2026-08-09 | Nach der Inhaberentscheidung zum ersten Betatest: **Sprint 16 vorgezogen**, [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) und [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md) in die Mappe aufgenommen, Regelwerk als Parallelbetrieb 13–18 mit Trennung über Dateihoheit (**D-095**) fortgeschrieben, Großauftrag mit den Blöcken 0 bis 4 eingehängt. „Nächste Schritte" neu geschrieben: Sprint 13 halb gemergt (`e15f5e6`), 13.2–13.5 nicht durch einen Agenten erledigbar, `SimDefinitions`-Pakete vor dem VPS-Rollout. Punkt 2 der Fünf-Sätze-Zusammenfassung nach **D-077** berichtigt — die Skirmish-KI ist registriert und spielt | Orchestrator |
+| 0.7.1 | 2026-08-09 | Index gegen den Großauftrag und die Sprintdateien nachgezogen: Sprint 17 Paket A ist nicht „sofort vorziehbar", sondern läuft als **Block 3 hinter der Lobby**, die seit `b4e75e5` auf `main` gebaut ist, und es berührt mit dem `.partial`-Fix in `RelayServerCore.cs` genau **eine** Datei unter `Assets/`. Sprint 16 trägt **acht** Betatest-Befunde (#43, #44, #45, #46, #47, #48, #53, #54), nicht sechs. Alle Markdown-Links dieser Datei gegen das Dateisystem geprüft — kein toter Link | Orchestrator |

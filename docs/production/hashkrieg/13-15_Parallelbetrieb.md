@@ -21,12 +21,12 @@ Client aus unterschiedlichen Commits stammt.
 Dieses Dokument löst den Widerspruch, statt ihn auszusitzen.
 
 > **Zum Dateinamen:** Er bleibt `13-15_Parallelbetrieb.md`, obwohl das Dokument
-> seit D-092 die Sprints 13–18 abdeckt. Ein Umbenennen bräche **24 eingehende
+> seit D-095 die Sprints 13–18 abdeckt. Ein Umbenennen bräche **24 eingehende
 > Links in zwölf Dateien**. Der Titel ist massgeblich, nicht der Dateiname.
 
 ## Die Grundentscheidung: die Trennung läuft über Dateien, nicht über Verhalten
 
-> **Geändert mit [D-092](../DecisionLog.md) (2026-08-09).** Bis dahin galt die
+> **Geändert mit [D-095](../DecisionLog.md) (2026-08-09).** Bis dahin galt die
 > schärfere Fassung: Sprints 13–15 fassen **gar keine** Datei unter
 > `Scripts/Simulation/` an, und der gesamte Simulations-Verhaltensraum gehört
 > für ihre Dauer dem Einheitenstrang allein. Diese Fassung ist überholt, weil
@@ -67,7 +67,7 @@ Freiraum.
 | `Scripts/Simulation/Combat/` | **Einheitenstrang** | inkl. `WeaponProfiles`, `DamageMatrix`, `ArmorClass` |
 | `Scripts/Simulation/Factions/` | **Einheitenstrang** | Legion-Waffenidentität |
 | `Scripts/Simulation/Pathfinding/` | **Einheitenstrang (13–18)** | `MovementSystem` hängt im Konstruktor daran; ohne Flow-Field-Zugriff ist B3 nicht lösbar. **`CostField` ist Vertragsfläche** — siehe unten |
-| `Scripts/Networking/` | **Netzstrang** | |
+| `Scripts/Networking/` | **Netzstrang** | inkl. `Lobby/` (Client, Code, Verträge — seit D-092) und `LobbyToken` (D-093) |
 | `Scripts/Gameplay/Match/` | **Netzstrang** | `MatchConfig`, `MatchBootstrap`, `MatchRunner` — inkl. der Systemregistrierung |
 | `Scripts/Gameplay/UI/`, `Scripts/Gameplay/Input/` | **Netzstrang** | Verbindungs- und Lobbyoberfläche, Fraktionsauswahl |
 | `Scripts/Gameplay/Audio/`, `Gameplay/CombatFeedback/` | **Netzstrang** | Präsentationsnah; wandert an den Art-Strang, sobald der besetzt ist |
@@ -76,16 +76,15 @@ Freiraum.
 | `Scripts/Data/` | **Netzstrang** | Registries und Karten, überwiegend Unity-Assets — mergen schlecht, ein Schreiber |
 | `Scripts/Simulation/Vision/` | **Netzstrang** | `FogOfWarSystem`. **Vertragsfläche:** `CombatSystem` konsumiert `GetTeamView` |
 | `Scripts/Simulation/Commanders/`, `Victory/` | **Netzstrang** | |
-| `Scripts/Simulation/Construction/`, `Economy/`, `Production/` | **Netzstrang — ab Sprint 16 aktiv** | seit D-092 in Arbeit, nicht mehr gesperrt. **Vertragsfläche:** die Platzierungsprüfung (`ValidatePlacement`) liest `Pathfinding.CostField` |
+| `Scripts/Simulation/Construction/`, `Economy/`, `Production/` | **Netzstrang — ab Sprint 16 aktiv** | seit D-095 in Arbeit, nicht mehr gesperrt. **Vertragsfläche:** die Platzierungsprüfung (`ValidatePlacement`) liest `Pathfinding.CostField` |
 | `tools/Nova.RelayServer/`, `tools/packaging/` | **Netzstrang** | |
-| `tools/lobby/` (neu, D-098) | **Netzstrang** | SQL, Policies und Edge Functions der Lobby als Quelltext; ausgerollt wird im Supabase-Projekt ausserhalb des Repos |
 | `Scripts/Simulation/Definitions/` | **geteilt — Absprache nötig** | Vertragsfläche: `WeaponDefinition`/`UnitDefinition` braucht der Einheitenstrang, `BuildingDefinition`/`SimDefinitions` der Wirtschaftsstrang |
 | `Scripts/Simulation/SimulationKernel.cs` | **niemand ohne D-ID** | Tick-Reihenfolge, siehe „Neue Systeme" |
 | `Scripts/Simulation/Systems/` | **niemand ohne D-ID** | `ISimSystem` ist der Systemvertrag selbst |
 | `Scripts/Simulation/CommandsV1/` | **niemand ohne D-ID** | Command- und Payload-Schema |
 | `Scripts/Simulation/Replays/`, `Snapshots/` | **niemand ohne D-ID** | Speicherformat und Fingerprint — Änderung ist eine Inhaberentscheidung |
 | `Scripts/Simulation/State/` — **Layout und Serialisierung** | **niemand ohne D-ID** | Feldbestand, Feldreihenfolge, `StateVersion`, Blockformat. Das ist der Teil, der Snapshots und Replays unlesbar macht |
-| `Scripts/Simulation/State/` — **Befehlsanwendung** (`UnitCommandStateView`) | **Netzstrang** | mit D-092 aus dem Frost gelöst: *was* ein bestehender `CommandKind` in den Zustand schreibt, ist Verhalten, nicht Format. **Kein neuer `CommandKind`** — das Register bleibt eingefroren |
+| `Scripts/Simulation/State/` — **Befehlsanwendung** (`UnitCommandStateView`) | **Netzstrang** | mit D-095 aus dem Frost gelöst: *was* ein bestehender `CommandKind` in den Zustand schreibt, ist Verhalten, nicht Format. **Kein neuer `CommandKind`** — das Register bleibt eingefroren |
 | `CHANGELOG.md` | **serialisiert** | ein Eintrag pro PR, Konflikte löst der Mergende |
 | `docs/production/hashkrieg/` | **Maintainer** | Planungsstand; Befunde kommen per Mail oder Issue, nicht per PR |
 
@@ -104,7 +103,7 @@ Sie verläuft nicht zwischen Befehlsarten, sondern zwischen **Zielsetzung** und
 
 Präzedenz ist [D-088](../DecisionLog.md): die Formationsverteilung in `ApplyMove`
 hat das Maintainer-Team gebaut, während `MovementSystem` beim Einheitenstrang lag.
-D-092 schreibt diese bereits gelebte Linie nur auf.
+D-095 schreibt diese bereits gelebte Linie nur auf.
 
 ### Vertragsflächen in fremdem Besitz
 
@@ -188,7 +187,7 @@ altern damit bei jedem simulationsverändernden Merge.
 | **Kein Fenster während eines Netznachweises** | Läuft gerade A8 Stufe 2–4 oder eine Abnahmerunde, ist das Fenster zu |
 | **Nach jedem Fenster** | Build für **jede** Plattform, an der jemand testet, neuer Build an alle Testenden, alter Build ist ungültig |
 | **Der Netzstrang testet gegen einen festen Stand** | Abnahmeläufe nennen den Commit, gegen den sie liefen — sonst ist das Ergebnis nicht zuordenbar |
-| **Ein Fenster hat einen Strang** | seit D-092 bewegen beide Stränge Baselines. In einem Fenster mergen wir die PRs **eines** Strangs, prüfen die Baselines, und öffnen dann das nächste. Zwei Stränge in einem Fenster machen einen roten Test nicht zuordenbar |
+| **Ein Fenster hat einen Strang** | seit D-095 bewegen beide Stränge Baselines. In einem Fenster mergen wir die PRs **eines** Strangs, prüfen die Baselines, und öffnen dann das nächste. Zwei Stränge in einem Fenster machen einen roten Test nicht zuordenbar |
 
 ### Der Definitions-Hash — die teuerste Zahl im Projekt
 
@@ -291,7 +290,7 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
-| 1.3.0 | 2026-08-09 | **D-092:** Trennung von „Verhaltensraum" auf „Dateihoheit" umgestellt — Sprint 16 läuft parallel zu 13B statt dahinter. `Simulation/State/` in Layout (weiter eingefroren) und Befehlsanwendung (Eigentümer des jeweiligen Befehls) getrennt. Zwei Vertragsflächen ergänzt (`WeaponProfiles`-Slot `UnitRole.Unit`, `UnitState.AttackTarget`). Merge-Fenster auf einen Strang je Fenster verschärft. Abschnitte „Definitions-Hash" und „kanonische Startaufstellung an vier Stellen" ergänzt. Plattform-Abschnitt berichtigt: der Linux-Build existiert seit `e15f5e6`, die offene Bringschuld ist stattdessen ein `NovaBuildCommit`-Leser im Spiel | Orchestrator |
+| 1.3.0 | 2026-08-09 | **D-095:** Trennung von „Verhaltensraum" auf „Dateihoheit" umgestellt — Sprint 16 läuft parallel zu 13B statt dahinter. `Simulation/State/` in Layout (weiter eingefroren) und Befehlsanwendung (Eigentümer des jeweiligen Befehls) getrennt. Zwei Vertragsflächen ergänzt (`WeaponProfiles`-Slot `UnitRole.Unit`, `UnitState.AttackTarget`). Merge-Fenster auf einen Strang je Fenster verschärft. Abschnitte „Definitions-Hash" und „kanonische Startaufstellung an vier Stellen" ergänzt. Plattform-Abschnitt berichtigt: der Linux-Build existiert seit `e15f5e6`, die offene Bringschuld ist stattdessen ein `NovaBuildCommit`-Leser im Spiel | Orchestrator |
 | 1.2.2 | 2026-08-09 | Zwei Pfade nachgetragen, die der Einheitenstrang in der Praxis braucht und die die Tabelle nicht kannte: `tools/Nova.AiLab/` samt Tests (Messwerkzeug, kein Spielcode) und `Presentation/UI/DebugHud.cs` als ausdrückliche Ausnahme aus `Presentation/`. Beide Lücken lagen im Dokument, nicht im Verhalten des Beitragenden | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-08 | D-091: konkrete Merge-Accounts, Maintainer-Peer-Review, CLA-/Review-Prüfung und vorbereiteter Tier-2-Rollout ergänzt | Producer / Agent (Umsetzung) |

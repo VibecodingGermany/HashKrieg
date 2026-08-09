@@ -61,11 +61,16 @@ berührt keine Datei unter `Assets/`. Es kollidiert deshalb mit **keiner**
 Schreibhoheit und läuft parallel zu Sprint 15 und 13B.
 
 **Voraussetzungsfrei ist es trotzdem nicht.** Paket A erweitert die Edge
-Functions aus Sprint 14 — es setzt sie voraus, statt sie mitzubringen. Sprint 14
-steht heute auf `geplant` und hat **null Zeilen im Repository**: kein
-Supabase-Client, keine Edge Function, kein Schema. Baubar wird Paket A in dem
-Moment, in dem die Functions stehen. Genau deshalb ist es im Großauftrag vom
-2026-08-09 Block 4 direkt hinter der Lobby und nicht davor.
+Functions aus Sprint 14 — es setzt sie voraus, statt sie mitzubringen. Diese
+Voraussetzung ist **erfüllt**: die Lobby liegt seit `b4e75e5` auf `main`, samt
+Vertrag, Schema und Function-Quelltexten in
+[../../tech/LobbySupabase.md](../../tech/LobbySupabase.md) (D-092 bis D-094).
+Paket A ist damit Block 3 des Großauftrags vom 2026-08-09.
+
+> **Aktenstand:** [14_Sprint_Lobby.md](14_Sprint_Lobby.md) trägt weiterhin den
+> Status `geplant`, obwohl der Code gemergt ist. Die Sprintdatei wurde beim
+> Merge nicht nachgezogen — wer sie als Ist-Stand liest, hält eine gebaute
+> Sache für offen.
 
 Das Entscheidende daran: Diese Functions **sehen die IP ohnehin**. Sobald sie
 laufen, liefert Paket A Protokoll und IP-Sperre, ohne dass ein einziger Spieler
@@ -364,9 +369,9 @@ aufgegriffen wird.
 
 | ID | Inhalt | Wer |
 |---|---|---|
-| D-095 | Tier-3-Auslöser präzisiert: Veröffentlichung/Geld/Publikum statt jeder personenbezogenen Verarbeitung; Betriebs- und Missbrauchsdaten mit Löschfristen bleiben Tier 2. Hashing ist dafür in der geschlossenen Beta nach D-096 keine Bedingung — die Grenze ist die Frist, nicht der Hash. Q-041 entscheidet vor der Öffnung neu | Inhaber |
-| D-096 | Identitätsmodell: Für die geschlossene Beta wird die Herkunfts-IP **im Klartext** gespeichert, dazu das gekürzte Netzpräfix; begrenzt wird sie durch die 30-Tage-Löschfrist statt durch einen Hash. Installations-GUID und Geräte-Anker bleiben serverseitig gepeppert gehasht (Paket B). MAC-Adresse ausdrücklich verworfen; IP-Sperren nur befristet. Die Umstellung auf Hashing ist vor Öffnung der Beta neu zu entscheiden und steht als Q-041 im Fragenkatalog | Inhaber (Richtung) / Agent (Ausformung) |
-| D-097 | Erstmeldung beim ersten Start ohne Zustimmungsdialog, gestützt auf berechtigtes Interesse; Auskunft und Widerspruch werden gebaut. Verhältnis zu Q-019 („Opt-in Telemetrie") ist mitzuentscheiden — D-097 ersetzt Q-019 für die Erstmeldung | Inhaber |
+| D-098 | Tier-3-Auslöser präzisiert: Veröffentlichung/Geld/Publikum statt jeder personenbezogenen Verarbeitung; Betriebs- und Missbrauchsdaten mit Löschfristen bleiben Tier 2. Hashing ist dafür in der geschlossenen Beta nach D-099 keine Bedingung — die Grenze ist die Frist, nicht der Hash. Q-041 entscheidet vor der Öffnung neu | Inhaber |
+| D-099 | Identitätsmodell: Für die geschlossene Beta wird die Herkunfts-IP **im Klartext** gespeichert, dazu das gekürzte Netzpräfix; begrenzt wird sie durch die 30-Tage-Löschfrist statt durch einen Hash. Installations-GUID und Geräte-Anker bleiben serverseitig gepeppert gehasht (Paket B). MAC-Adresse ausdrücklich verworfen; IP-Sperren nur befristet. Die Umstellung auf Hashing ist vor Öffnung der Beta neu zu entscheiden und steht als Q-041 im Fragenkatalog | Inhaber (Richtung) / Agent (Ausformung) |
+| D-100 | Erstmeldung beim ersten Start ohne Zustimmungsdialog, gestützt auf berechtigtes Interesse; Auskunft und Widerspruch werden gebaut. Verhältnis zu Q-019 („Opt-in Telemetrie") ist mitzuentscheiden — D-100 ersetzt Q-019 für die Erstmeldung | Inhaber |
 
 ## Changelog-Notiz
 
@@ -392,6 +397,6 @@ hält.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
-| 1.2.0 | 2026-08-09 | Vier Widersprüche aus der Prüfung des Großauftrags behoben. 17.3 zählt für die geschlossene Beta pro Netzpräfix und pro Adresse; das Fenster pro Installation kommt mit Paket B, bis dahin bleibt die Sperrart `install` unbefüllt. Paket 17.0 (`.partial`-Leck in `RelayServerCore.ResetMatch`, vorgezogen aus 15.5) als Ausnahme zum „nichts am Spiel" benannt und mit zwei Zeilen in die Schreibhoheit aufgenommen. Die Umgebungsvariable `NOVA_RELAY_TOKEN_SECRET` an beiden Stellen durch `NOVA_MATCH_TOKEN` ersetzt — `RelayEnvironment.cs` kennt den alten Namen nicht, und das Match-Token ist ein geteiltes Zugangstoken, kein Hash-Pepper. D-095 auf den Absatz darüber nachgezogen: Löschfristen tragen die Tier-2-Einstufung, Hashing ist für die geschlossene Beta keine Bedingung | Orchestrator |
-| 1.1.0 | 2026-08-09 | Paket A vorgezogen und für die geschlossene Beta vereinfacht: Die Herkunfts-IP wird im Klartext gespeichert, begrenzt durch die 30-Tage-Löschfrist statt durch `HMAC(pepper, ip)`; drei Wege bewertet, die Umstellung auf Hashing steht als Frage im Fragenkatalog. Paket B und 17.8 als zurückgestellt markiert, nicht gelöscht. Die Relay-Zeile um die Protokollierung erweitert. D-096 auf die Klartext-Adresse nachgezogen. Zwei Aktenfehler berichtigt: `docs/tech/LobbySupabase.md` existiert nicht und wird in Sprint 14 angelegt; Paket A ist nicht „sofort baubar", sondern setzt die Lobby-Functions aus Sprint 14 voraus, die heute null Zeilen im Repository haben | Orchestrator |
+| 1.2.0 | 2026-08-09 | Vier Widersprüche aus der Prüfung des Großauftrags behoben. 17.3 zählt für die geschlossene Beta pro Netzpräfix und pro Adresse; das Fenster pro Installation kommt mit Paket B, bis dahin bleibt die Sperrart `install` unbefüllt. Paket 17.0 (`.partial`-Leck in `RelayServerCore.ResetMatch`, vorgezogen aus 15.5) als Ausnahme zum „nichts am Spiel" benannt und mit zwei Zeilen in die Schreibhoheit aufgenommen. Die Umgebungsvariable an beiden Stellen auf `NOVA_MATCH_TOKEN` gestellt. **Nachtrag:** `NOVA_RELAY_TOKEN_SECRET` existiert seit D-093 sehr wohl (Secret für die HMAC-Match-Tokens der Lobby); die ursprüngliche Korrektur beruhte auf einem veralteten Stand. Für den Vergleich in 17.1 bleibt `NOVA_MATCH_TOKEN` trotzdem das treffendere Beispiel, weil es die root-eigene Env-Datei beschreibt. D-098 auf den Absatz darüber nachgezogen: Löschfristen tragen die Tier-2-Einstufung, Hashing ist für die geschlossene Beta keine Bedingung | Orchestrator |
+| 1.1.0 | 2026-08-09 | Paket A vorgezogen und für die geschlossene Beta vereinfacht: Die Herkunfts-IP wird im Klartext gespeichert, begrenzt durch die 30-Tage-Löschfrist statt durch `HMAC(pepper, ip)`; drei Wege bewertet, die Umstellung auf Hashing steht als Frage im Fragenkatalog. Paket B und 17.8 als zurückgestellt markiert, nicht gelöscht. Die Relay-Zeile um die Protokollierung erweitert. D-099 auf die Klartext-Adresse nachgezogen. Zwei Aktenfehler berichtigt: `docs/tech/LobbySupabase.md` existiert nicht und wird in Sprint 14 angelegt; Paket A ist nicht „sofort baubar", sondern setzt die Lobby-Functions aus Sprint 14 voraus, die heute null Zeilen im Repository haben | Orchestrator |
 | 1.0.0 | 2026-08-09 | Erstfassung: Zugriffsprotokoll, Sperrliste, Rate-Limit, Bedienweg und Fristen als Paket A; Installationskennung und Erstmeldung als Paket B | Orchestrator |

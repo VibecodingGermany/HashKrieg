@@ -3,10 +3,13 @@
 using System;
 using System.Text;
 using UnityEngine;
+using Nova.AI.Data;
 using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Combat;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 using Nova.Simulation.Victory;
 using EntityId = Nova.Core.EntityId;
@@ -65,6 +68,21 @@ namespace Nova.Presentation.UI
         private readonly StringBuilder _builder = new StringBuilder(256);
 
         /// <summary>
+        /// The simulation's identity, computed ONCE. Both halves are constant
+        /// for the lifetime of the process — the definition table is static
+        /// data and the schema versions are consts — and
+        /// <see cref="SimDefinitions.ComputeDefinitionsHash64"/> walks both
+        /// tables, which is not a per-frame cost worth paying for a label.
+        /// </summary>
+        private static readonly string SimulationId =
+            $"sim {SimDefinitions.ComputeDefinitionsHash64():X16}  schema " +
+            $"s{MatchFingerprint.StateSchemaVersionV1}/" +
+            $"c{MatchFingerprint.CommandSchemaVersionV1}/" +
+            $"p{MatchFingerprint.PayloadSchemaVersionV1}/" +
+            $"n{MatchFingerprint.SnapshotSchemaVersionV1}/" +
+            $"x{MatchFingerprint.SidecarSchemaVersionV1}";
+
+        /// <summary>
         /// Per-role combat profile text, sized to the weapon table itself so
         /// the two cannot drift. The profiles are immutable static content, so
         /// each role is formatted at most once per component instance.
@@ -74,6 +92,7 @@ namespace Nova.Presentation.UI
         private GUIStyle _labelStyle;
         private GUIStyle _outcomeStyle;
         private GUIStyle _statusStyle;
+        private GUIStyle _buttonStyle;
 
         // F3 panel scroll position: the panel's height is bounded by its
         // HudLayout zone, so surplus content scrolls instead of running out.
@@ -98,6 +117,26 @@ namespace Nova.Presentation.UI
             if (Input.GetKeyDown(KeyCode.F3))
             {
                 _visible = !_visible;
+            }
+
+            // F4 reveals the whole map for judging the opponent AI. It is
+            // bound only while the panel is open — the reveal is a diagnostic
+            // control and belongs to the diagnostic view, not to the running
+            // match's key map. It does keep working after the panel is closed
+            // again, which is the point: an uncluttered view of the enemy.
+            if (_visible && Input.GetKeyDown(KeyCode.F4))
+            {
+                FogRevealDebug.Toggle();
+            }
+
+            // F5 steps through the fast-forward speeds. Same binding rule as
+            // F4: only while the panel is open, because it is a diagnostic
+            // control and not part of the running match's key map. It keeps
+            // working after the panel is closed, which is the point — one
+            // watches an uncluttered map at 4x, not a panel.
+            if (_visible && Input.GetKeyDown(KeyCode.F5))
+            {
+                MatchSpeedDebug.Cycle();
             }
         }
 
@@ -163,6 +202,8 @@ namespace Nova.Presentation.UI
                 if (_input != null) GUILayout.Label($"Last command: {_input.LastCommandStatus}", _labelStyle);
                 string legend = _input != null ? _input.ControlLegend : null;
                 GUILayout.Label(string.IsNullOrEmpty(legend) ? "Controls: no RtsDeviceInput in the scene." : legend, _labelStyle);
+                DrawFogRevealControl();
+                DrawMatchSpeedControl();
             }
 
             GUILayout.EndScrollView();
@@ -220,9 +261,83 @@ namespace Nova.Presentation.UI
                 }
 
                 _builder.Append("   |   F3: debug panel");
+
+                // A revealed map must say so on screen. Otherwise a
+                // screenshot claims a sight the player never had, and the
+                // observation it is supposed to support is worth nothing.
+                if (FogRevealDebug.RevealAll) _builder.Append("   |   FOG REVEALED (lab)");
+
+                // A fast-forwarded match must say so as loudly as a revealed
+                // one. Everything on screen still happens at 10 Hz — but what
+                // a viewer JUDGES as "the AI reacted quickly" is wall-clock,
+                // and at 10x that judgement is worthless without the label.
+                if (MatchSpeedDebug.IsFastForwarding)
+                {
+                    _builder.Append("   |   ").Append(MatchSpeedDebug.Multiplier).Append("x SPEED (lab)");
+                }
             }
 
             GUI.Label(HudLayout.StatusStrip(scale, _fontSize + 6f, 8f), _builder.ToString(), _statusStyle);
+        }
+
+        /// <summary>
+        /// The lab reveal switch (F4, or this button). Presentation only: the
+        /// fog system keeps computing and committing the same team views and
+        /// the AI keeps reading its own, so a revealed match plays exactly
+        /// like a fogged one — see <see cref="FogRevealDebug"/>. It sits in
+        /// the F3 panel because that is where the diagnostics live, and it is
+        /// labelled with what it costs: what one sees here, a player would
+        /// not have seen.
+        /// </summary>
+        private void DrawFogRevealControl()
+        {
+            if (_buttonStyle == null)
+            {
+                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = _fontSize, richText = false };
+            }
+
+            string caption = FogRevealDebug.RevealAll
+                ? "Fog of War: REVEALED — F4 restores it"
+                : "Fog of War: on — F4 reveals the map (lab, presentation only)";
+            if (GUILayout.Button(caption, _buttonStyle))
+            {
+                FogRevealDebug.Toggle();
+            }
+        }
+
+        /// <summary>
+        /// The lab fast-forward (F5, or this button). It scales wall-clock
+        /// time only: the kernel steps the same 10-Hz ticks in the same order,
+        /// so a match watched at 10x ends on the same tick with the same state
+        /// hash — see <see cref="MatchSpeedDebug"/>. It sits beside the fog
+        /// reveal because both answer the same question, "what is the opponent
+        /// actually doing", and both are labelled with what they cost.
+        /// <para>
+        /// In a relay match the button says so instead of lying: two peers at
+        /// different wall-clock rates only wait for each other in the lockstep
+        /// barrier.
+        /// </para>
+        /// </summary>
+        private void DrawMatchSpeedControl()
+        {
+            if (_buttonStyle == null)
+            {
+                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = _fontSize, richText = false };
+            }
+
+            if (_runner != null && _runner.IsRelayMatch)
+            {
+                GUILayout.Label("Speed: 1x — a relay match always runs at 10 Hz", _labelStyle);
+                return;
+            }
+
+            string caption = MatchSpeedDebug.IsFastForwarding
+                ? $"Speed: {MatchSpeedDebug.Multiplier}x — F5 for the next step (lab, wall clock only)"
+                : "Speed: 1x — F5 fast-forwards 2x / 4x / 10x (lab, wall clock only)";
+            if (GUILayout.Button(caption, _buttonStyle))
+            {
+                MatchSpeedDebug.Cycle();
+            }
         }
 
         private void DrawMatchLine()
@@ -230,6 +345,23 @@ namespace Nova.Presentation.UI
             uint tick = _runner.Kernel != null ? _runner.Kernel.CurrentTick.Value : 0u;
             string state = _runner.IsRunning ? "running" : _runner.Kernel == null ? "not initialized" : "stopped";
             GUILayout.Label($"Nova graybox HUD — tick {tick} ({state}, 10 Hz lockstep)", _labelStyle);
+
+            // Which AI is this? The identifier changes whenever the skirmish AI
+            // behaves differently — profile numbers automatically, behaviour
+            // code through a hand-bumped revision that a test pins against the
+            // canonical match's end state. It exists so a screenshot, a lab
+            // report and an entry in the behaviour journal can be tied to each
+            // other without asking anybody what was built that day.
+            GUILayout.Label($"AI behaviour {AiBehaviorId.Value}", _labelStyle);
+
+            // WHICH SIMULATION is this? The definition table's hash plus the
+            // five schema versions — the same values the match fingerprint
+            // seals, and the reason a simulation-changing merge invalidates
+            // every distributed test build: unequal builds are separated by
+            // exactly these numbers, not by a version string somebody
+            // remembered to bump. Two testers comparing screenshots can tell
+            // in one glance whether they are playing the same game.
+            GUILayout.Label(SimulationId, _labelStyle);
         }
 
         /// <summary>

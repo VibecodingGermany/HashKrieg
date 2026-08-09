@@ -5,7 +5,8 @@
         "Nova.Core",
         "Nova.Simulation",
         "Nova.Data",
-        "Nova.Gameplay"
+        "Nova.Gameplay",
+        "Nova.AI.Data"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

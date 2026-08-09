@@ -200,6 +200,15 @@ namespace Nova.Gameplay.Match
             AiIngress = null;
             SkirmishAi = null;
 
+            // The two lab switches are process-wide statics and a match is not.
+            // Without this, a reveal set while watching the AI in a skirmish
+            // would still be on after returning to the menu and joining a
+            // lobby — a maphack nobody consciously switched on. Both refuse to
+            // engage in a relay match; see FogRevealDebug for why the reveal in
+            // particular is not merely unsporting but reaches the state hash.
+            FogRevealDebug.ResetForMatch(_relayClient != null);
+            MatchSpeedDebug.ResetForMatch(_relayClient != null);
+
             var random = new SimRandom(_seed);
             var logger = new UnityNovaLogger();
             Kernel = new SimulationKernel(random, logger);
@@ -336,7 +345,14 @@ namespace Nova.Gameplay.Match
             }
             if (!IsRunning) return;
 
-            _timeAccumulator += Time.deltaTime;
+            // Diagnostic fast-forward (MatchSpeedDebug), off at 1x.
+            // The multiplier scales WALL-CLOCK time, not the simulation: the
+            // kernel still steps whole 10-Hz ticks, in order, one at a time —
+            // a match watched at 4x ends on the same tick with the same state
+            // hash. A relay match is excluded, because two peers at different
+            // rates just wait for each other in the lockstep barrier.
+            int speed = _relayClient == null ? MatchSpeedDebug.Multiplier : 1;
+            _timeAccumulator += Time.deltaTime * speed;
 
             // Step fixed 10-Hz simulation ticks
             while (_timeAccumulator >= TickDeltaTime)

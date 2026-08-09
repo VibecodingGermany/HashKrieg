@@ -17,7 +17,211 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Behoben
+- **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
+  im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
+  Einheitenstrang als reine Diagnose und waren dort auch genau das. Sie hingen
+  aber am F3-Panel, und `DebugHud` hat kein Build-Gate — im ganzen Projekt gab es
+  keins. Damit wäre F4 in einer Relay-Partie ein Maphack gewesen: die vollständige
+  gegnerische Armee auf Minimap, Einheitenansicht und Healthbars. Die
+  Unbedenklichkeitszusage des Werkzeugs („ändert nichts an der Simulation") gilt
+  zudem nur fürs Zusehen — `RtsDeviceInput.TryPickUnit` filtert nicht nach Nebel
+  und die Befehlsvalidierung prüft keine Sichtbarkeit, ein aufgedeckter Gegner
+  lässt sich also direkt als regulärer Angriffsbefehl anklicken, der über den
+  Relay geht und in den Zustands-Hash eingeht. Beide Schalter sind jetzt hinter
+  `UNITY_EDITOR || DEVELOPMENT_BUILD` compiliert, verweigern sich zusätzlich in
+  jeder Relay-Partie, und `MatchRunner` setzt sie bei jedem Matchstart zurück —
+  vorher waren es prozessweite Statics, ein in der Skirmish gesetzter Reveal
+  überlebte den Wechsel in die Lobby. Der Relay-Riegel sitzt bewusst in den
+  Schaltern selbst statt an der einen Aufrufstelle: vorher zeigte die Statuszeile
+  in einer Relay-Partie „4x SPEED" an, während die Uhr in Echtzeit lief.
+  **Das Gate macht die Schalter wirkungslos, nicht abwesend** — vor dem ersten
+  öffentlichen Build fliegen sie raus, die Entfernungsnotiz steht in
+  `FogRevealDebug`.
+
+### Behoben
+- **Zwei Defekte im KI-Verhalten aus dem Review von `r3`/`r4` (Verhaltensrevision
+  `r5`):** Erstens blieb die Angriffswelle dauerhaft stehen, sobald eine Einheit
+  einer früheren Welle ausserhalb des Sammelrings überlebte. Die Wellenschwelle
+  war fest auf die Armeeobergrenze gesetzt, die Obergrenze zählt aber auch die
+  Überlebenden mit — die Kaserne füllte also auf „Obergrenze minus Überlebende"
+  auf, und die Zahl im Ring konnte die Schwelle nie wieder erreichen. Eine
+  einzelne Einheit, die in eine leere Feindstartzone läuft und dort nicht stirbt,
+  genügte: elf Einheiten warteten bis zum Zeitlimit am Sammelpunkt, während eine
+  allein an der Front stand. Die Welle wartet jetzt auf das, was die Produktion
+  noch liefern kann. Zweitens trug eine sich zurückziehende Einheit ihr altes
+  Marschziel weiter mit. Der Rückzug reichte kein Angriffskommando ein, und genau
+  das löscht ein stehendes Ziel nicht — `UnitState.Stop()` fasst `AttackTarget`
+  nicht an, `ApplyMove` setzt nur das Wegziel, und `CombatSystem` gibt ein Ziel
+  erst bei dessen Tod frei. Die D-087-Automatik überspringt jede Einheit mit
+  gültigem Ziel, also feuerte die verwundete Einheit auf dem ganzen Rückweg auf
+  nichts und verteidigte zu Hause nichts. Sie wird jetzt auf ihren Verfolger
+  gerichtet — das, was die Dokumentation die ganze Zeit versprochen hatte.
+  **Offen bleibt die Ursache:** das Kommandoschema kennt kein „Ziel löschen", eine
+  rohe 0 wird als `InvalidEntityId` abgewiesen. Ein sauberes Freigeben braucht
+  eine Schemaentscheidung und damit eine D-ID. Messbarer Nebeneffekt: die
+  kanonische Testpartie entscheidet jetzt auf Tick 2548 statt 2709 — die KI
+  gewinnt 161 Ticks früher, weil nachrückende Einheiten nicht mehr zu Hause
+  festhängen. Der Bezeichner steht auf `r5`, der gepinnte Endzustand ist
+  mitgeführt.
+
+### Hinzugefügt
+- **Drei Werkzeuge zum Zusehen im F3-Panel (Einheitenstrang, optional):** Ein
+  Gegner, den man nur durch den eigenen Sichtradius beobachten kann, lässt sich
+  nicht beurteilen — Anmarschweg, Sammeln und der Moment, in dem eine
+  angeschlagene Einheit abdreht, passieren dort, wo niemand hinsieht. Und eine
+  Partie entscheidet um Tick 9.000, also fünfzehn Minuten Zusehen.
+  **F4** deckt die ganze Karte auf, **F5** schaltet 1x → 2x → 4x → 10x, und eine
+  Zeile nennt die **Kennung der Simulation** (Hash der Definitionstabelle plus
+  die fünf Schemaversionen) — die Werte, an denen ungleiche Testbuilds
+  auseinandergehen, ablesbar vom Screenshot statt erfragt.
+  **Keines der drei rechnet etwas anders.** Der Fog-Reveal lässt
+  `FogOfWarSystem` dieselben Team-Sichten berechnen und festschreiben, und die
+  KI liest weiter ihre eigene über `GetVisibleEntities`; nur vier
+  Präsentationsverbraucher zeichnen aus dem Entity-Store statt aus der Sicht.
+  Der Zeitraffer skaliert ausschliesslich die Wall-Clock-Zeit, die `MatchRunner`
+  seinem Fixed-Tick-Akkumulator gibt: die Simulation läuft weiterhin mit 10 Hz,
+  Tick für Tick, in derselben Reihenfolge — eine bei 10x zugesehene Partie endet
+  auf demselben Tick mit demselben Zustands-Hash. In einer Relay-Partie ist der
+  Zeitraffer wirkungslos. Beide Zustände stehen sichtbar in der Statuszeile
+  (`FOG REVEALED`, `4x SPEED`), weil ein Urteil über eine aufgedeckte oder
+  gespulte Partie ohne dieses Etikett nichts wert ist.
+
 ### Geändert
+- **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
+  Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
+  zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8
+  Zellen) ein **bewaffneter** Feind sichtbar ist, läuft jetzt zum Sammelpunkt
+  zurück, auch wenn sie längst draussen ist; zu Hause ist sie eine normale
+  wartende Einheit und zieht mit der nächsten Welle wieder los. Ein unbewaffneter
+  Harvester am Zaun löst nichts aus — Überreaktion auf Belangloses ist der
+  Fehlermodus, an dem ein früherer Verteidigungszweig gescheitert ist.
+  **Bewusst ohne Lebens-Hysterese:** Eintritt bei 25 % und Austritt bei 60 %
+  setzt voraus, dass eine Einheit heilt. In MS-1 heilt keine — `ValidateRepair`
+  verlangt als Ziel eine fertiggestellte Platzierung, also ein Gebäude. Ein
+  Austrittswert wäre nie erreicht worden, Verwundete hätten sich zu Hause
+  gestapelt, die Armeeobergrenze belegt und die Welle nie wieder voll werden
+  lassen. Gedämpft wird über Gefahr und Entfernung statt über Leben.
+  **Einseitig gemessen** gegen dasselbe Binary mit `retreatHealthPercent: 0`:
+  Austauschverhältnis 131 statt 89. Die Regel **kostet dabei Tempo, nicht
+  Einheiten** — ohne sie entscheidet die Partie 2.000 Ticks früher und mit
+  geringfügig *weniger* eigenen Verlusten (56 statt 62). Das ist ein Handel, kein
+  reiner Gewinn, und er gehört genauso in den Eintrag wie der Gewinn. Die
+  Schwelle ist über fünf Stufen von 25 bis 90 gemessen und nicht gewählt; 75
+  liegt im Austausch höher (166), erkauft das aber mit 0 % Siegen und einer
+  Partie über 17.770 Ticks — eine Kennzahl allein hätte hier die schlechtere KI
+  gewählt.
+  **Was das kostet, offen gesagt:** Ein Spieler kann mit einer einzelnen billigen
+  Einheit eine ganze Welle nach Hause schicken. Im Labor tritt das nicht auf,
+  weil keine Seite absichtlich ködert; gegen einen Menschen ist es die
+  naheliegende Gegenstrategie und ungemessen. Wie bei den Wellen gilt: Der feste
+  Schwellwert ist eine Zwischenstufe — ob ein Rückzug richtig ist, hängt von der
+  Lage ab, und die soll die KI später selbst beurteilen.
+  565/565 SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt und bestätigt,
+  in beiden Hälften:** „Angeschlagene drehen um und gehen in nächster Gruppe
+  wieder mit los auf Angriff." Die zweite Hälfte ist die, an der die Konstruktion
+  hing — ohne Heilung war die Sorge, dass Verwundete zu Hause versauern und die
+  Armeeobergrenze belegen. Sie tun es nicht. Das Ködern mit einer einzelnen
+  Einheit bleibt ungemessen und ungesehen.
+- **Die KI greift in Wellen an, statt einzeln nachzutröpfeln (Einheitenstrang,
+  KI-Verhalten `r3`):** Bisher lief jede fertige Einheit sofort allein quer über
+  die Karte — kein Angriff, sondern ein Förderband; man konnte sich mit drei
+  Einheiten an den Weg stellen und die halbe Partie lang einen nach dem anderen
+  abräumen. Nachschub sammelt sich jetzt an einem Sammelpunkt zwischen eigener
+  Basis und Feindgebiet, und die Armee marschiert erst bei voller Stärke. Wer
+  schon draussen ist, wird nie zurückgerufen: „draussen" heisst ausserhalb eines
+  Rings von 16 Zellen um das eigene HQ, gemessen am **HQ** und nicht am Ziel,
+  damit eine Einheit nicht zwischen draussen und wartend kippt, weil der Gegner
+  ein paar Zellen gelaufen ist. Der Sammelpunkt ist für die ganze Partie
+  derselbe — statisches Kartenwissen auf beiden Seiten, also kein
+  Befehlsrauschen. Eine wartende Einheit bekommt bewusst **kein** Angriffsziel
+  (ein `AttackTarget` wird nur vom Tod des Ziels frei, eine stehende Einheit
+  hielte also ein veraltetes und feuerte nicht mehr, während die
+  D-087-Automatik geschossen hätte); eine angekommene bekommt gar keinen Befehl,
+  sonst geht derselbe Marschbefehl jede Kadenz neu hinaus.
+  **Einseitig gemessen**, weil anders nicht messbar: Eine Coderegel steckt im
+  Binary und erreicht im Selbstspiel beide KIs zugleich, wo „später entschieden,
+  mehr Verluste" nicht von „zwei stärkeren Armeen" zu unterscheiden ist. Deshalb
+  trägt die Regel einen Profilwert mit **Aus-Stellung** — `waveSize: 1`
+  reproduziert das bisherige Verhalten bitgenau — und gemessen wurde dasselbe
+  Binary mit gegen ohne, in beiden Fraktionsrollen: Verluste 62 statt 143,
+  Austauschverhältnis 131 statt 84, Intervalle mit Verlusten 18 statt 59. Aus
+  dem Tröpfeln werden wenige Zusammenstösse.
+  `waveSize: 12` ist die Armeeobergrenze, und der Wert gehört dorthin oder auf
+  1, **nicht dazwischen**: Eine halbvolle Welle ist schlechter als gar keine
+  (`waveSize 6` liegt im Austausch bei 74 gegen 84 ohne Wellen) — sechs
+  Einheiten warten lange genug, um den Nachschub zu bremsen, und sind zu wenige,
+  um die Schlacht zu entscheiden.
+  **Das ist ausdrücklich kein Endzustand.** Heute ist „Welle oder Tröpfeln" eine
+  Einstellung, die für die ganze Partie gilt — und beide Verhaltensweisen haben
+  Lagen, in denen sie richtig sind: Nachschub einzeln nachschieben ist richtig,
+  wenn die eigene Armee im Gefecht steht und jede Einheit sofort zählt, oder
+  wenn der Gegner bereits vor der eigenen Basis steht. Sammeln ist richtig vor
+  dem ersten Vorstoss und nach einer verlorenen Welle. Ziel ist, dass die KI
+  **situationsabhängig entscheidet**, statt dass ein Profilwert es vorgibt; die
+  gemessene Kurve oben ist die Begründung dafür, dass es überhaupt eine
+  Entscheidung ist und keine Geschmacksfrage. Der Profilwert bleibt danach als
+  Aus-Stellung erhalten, weil ohne ihn keine einseitige Messung möglich wäre.
+  Voraus geht eine **verhaltensneutrale Formänderung**: Schritt (6) erteilt
+  keinen Armeebefehl mehr, sondern löst in Haltung, Zuweisung je Einheit und
+  gruppiertes Einreichen auf. Ohne sie ist „diese eine Einheit wartet" nicht
+  schwer zu formulieren, sondern nicht formulierbar. Nachweis ist keine
+  Testzusage, sondern eine Zahl: Entscheidungstick und Endzustand bleiben
+  identisch, der Bezeichner-Pin geht ohne Änderung durch. 564/564
+  SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt und bestätigt:** „Kam
+  in Welle." Kein Fall, in dem etwas kaputt aussah. Die Fortsetzung hat der
+  Spieler dabei selbst benannt — automatischer Wechsel zum Tröpfeln, wenn die
+  Armee bereits auf dem Angriffsweg ist, als Unterstützung; das kommt in einem
+  eigenen PR.
+- **Die KI zielt nach Wirkung statt nach Listenreihenfolge (Einheitenstrang,
+  KI-Verhalten `r2`):** Die Zielwahl lautete „HQ, sonst das ERSTE sichtbare
+  Gebäude, sonst die ERSTE sichtbare Einheit". Diese Reihenfolge ist die des
+  Sichtbarkeitsscans, also der Entitätsindex — die Armee lief an einem Panzer
+  vorbei, um ein Lagerhaus zu beschiessen, weil kinetischer Schaden auf Medium
+  mit 50 % und auf Building mit 30 % landet und die alte Regel das nicht sehen
+  konnte. Stattdessen ein ganzzahliger Score aus vier Profilgewichten: gelandeter
+  Schaden gegen die Rüstungsklasse, Bedrohung durch das Ziel, fehlendes Leben,
+  minus mittlere Entfernung. Gleichstand bricht auf der niedrigeren rohen
+  Entity-Id, nie auf der Listenposition. Das feindliche HQ bleibt ein
+  Kurzschluss und ist bewusst **kein** Gewicht: sein Verlust entscheidet die
+  Partie (D-077), und eine Siegbedingung ist keine Vorliebe.
+  **Gemessen**, Referenzpartie gegen sich selbst: Entscheidung bei Tick 8.715
+  statt 12.975 (−33 %), Verluste 70/97 statt 113/137 — beide Seiten verlieren
+  weniger, obwohl beide dasselbe neue Zielverhalten fahren. Nicht für jedes
+  Profil eine Verbesserung: `greedy-economy` und `fast-cadence` entscheiden
+  später und verlieren mehr.
+  Neu dazu: **`AiBehaviorId`** beantwortet „welche KI ist das" in einem String,
+  den man von einem Screenshot ablesen kann — eine von Hand gebumpte Revision
+  für Coderegeln, ein Hash über alle Profilzahlen für die Werte. Ein Test nagelt
+  ihn zusammen mit dem Endzustand der kanonischen Partie fest, sodass eine
+  Verhaltensänderung ohne Bump rot wird. Die F3-Anzeige zeigt ihn und daneben
+  die **Kennung der Simulation** (Hash der Definitionstabelle plus die fünf
+  Schemaversionen) — die Werte, an denen ungleiche Testbuilds auseinandergehen.
+  Ohne Anzeige im Spiel ist die Forderung nach einer gesehenen Runde schwer zu
+  erfüllen. 562/562 SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt — und
+  die Regel war dabei nicht erkennbar:** „Zielwahl nicht eindeutig erkennbar bis
+  dato". Wer in einer Schlacht mit zwölf Einheiten auf welches Ziel schiesst, ist
+  mit blossem Auge kaum auseinanderzuhalten. Sie ist gemessen und getestet, aber
+  nicht gesehen.
+- **KI-Profile als Datenschicht (`Nova.AI.Data`, Einheitenstrang):** Die
+  Stellschrauben der Skirmish-KI lagen an zwei Orten — als Konstruktor-Defaults
+  auf `AiFactionProfile` und als `const`-Felder in `SkirmishAiSystem`. Tunen
+  hiess damit Verhaltenscode editieren, und vier Werte (Kadenz, Suchradius,
+  beide Queue-Batches) waren von aussen gar nicht erreichbar. Sie liegen jetzt
+  vollständig in einem `AiProfile`. **Verhaltensneutral, und das ist der
+  Nachweis, nicht die Absicht:** Das ausgelieferte Profil `ms1-canonical` trägt
+  die bisherigen acht Zahlen wertgleich (Strommarge 0, Armee 12,
+  Angriffsschwelle 6, Harvester 2, Kadenz 20, Suchradius 8, Batches 2), die vier
+  Determinismus-Baselines bleiben grün, 561/561 SimRunner-Tests. Die Signatur
+  von `AiFactionProfile` und `SkirmishAiSystem` ist unverändert, damit
+  `MatchRunner` nicht angefasst werden muss. Zwei Vorarbeiten sind mit erledigt:
+  `AiFactionProfile` verglich bisher **nur den Fraktionsnamen**, sodass zwei
+  Profile mit gleichem Namen und verschiedenen Zahlen als gleich galten — was
+  erst beim Tunen auffällt, wo genau das der Regelfall ist; und `Nova.AI.Data`
+  steht auf `noEngineReferences: true`, ist also strukturell enginefrei statt
+  zufällig. Dazu zwei veraltete Behauptungen in der Klassendoku von
+  `SkirmishAiSystem`: GB-002 „kein Auto-Acquire" gilt seit D-087 nicht mehr, und
+  `SetRallyPoint` wird sehr wohl akzeptiert. Der Code galt, die Doku nicht.
 - **Der erste Betatest ist eingeordnet, und die Sprintfolge ist danach neu
   geschnitten.** Der Bericht zu Build `a434e2c` (Tester T-01) liegt anonymisiert
   in der Mappe, der Ablauf dafür ist in `Nutzerfeedback_Ablauf.md` festgehalten,
@@ -27,7 +231,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   und 18 (Befehl und Auswahl), dazu ein gebündelter Arbeitsauftrag über die
   Blöcke 0 bis 4. Das Regelwerk zum Parallelbetrieb stellt die Trennung
   zwischen Netz- und Einheitenstrang von „Verhaltensraum" auf **Dateihoheit**
-  um (D-092), womit Sprint 16 neben statt hinter dem Einheitenstrang läuft; der
+  um (D-095), womit Sprint 16 neben statt hinter dem Einheitenstrang läuft; der
   Frost auf `Simulation/State/` ist dabei in Layout (weiter eingefroren) und
   Befehlsanwendung (Netzstrang) getrennt worden. Eine Prüfung der neuen
   Dokumente gegen den Quelltext hat sechs Annahmen widerlegt, die sonst in die
@@ -52,6 +256,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   10000-Tick-Szenarios.
 
 ### Hinzugefügt
+- **Lobby über Supabase (Sprint 14, Pakete 14.1–14.5, D-092 bis D-094):** Ein
+  Spieler legt ein Match an und bekommt einen kurzen, vorlesbaren Code
+  (`XXX-XXX`, Alphabet ohne `0`/`O`/`1`/`I`/`L`); der zweite tritt damit bei —
+  inklusive Fraktionswahl (Allianz/Legion, schreibt in `FactionPerSlot`),
+  beidseitiger Bereitschaft und Build-Abgleich schon beim Beitritt („Ihr habt
+  unterschiedliche Versionen — hol dir Build `<commit>`"). Erst wenn beide
+  bereit sind, erhalten die Clients das Match-Token und verbinden sich zum
+  Relay. Das Token ist jetzt kurzlebig: Die Lobby mintet pro Match einen
+  64-bit-HMAC-Token (30 Minuten gültig, einmal verwendbar), den der Relay
+  lokal gegen ein geteiltes Secret prüft und aus dem er den Match-Seed
+  ableitet; der statische `NOVA_MATCH_TOKEN`-Direktweg aus Sprint 13 bleibt
+  unverändert nutzbar. Die Vermittlung ist ein Supabase-Projekt ausserhalb
+  des Repos (Edge Functions, Tabellen per RLS vollständig gesperrt); Vertrag,
+  Schema und Function-Referenzen stehen in `docs/tech/LobbySupabase.md`, die
+  Client-Konfiguration ist gitignort (`Resources/lobby-config.json` oder
+  `NOVA_LOBBY_URL`/`NOVA_LOBBY_ANON_KEY`). Der Build-Commit steht zur
+  Laufzeit bereit (`BuildInfo.Commit`, beim Player-Build gestempelt, sonst
+  `dev-editor`). Neue Dependency: `com.unity.nuget.newtonsoft-json`. Client,
+  Relay-Token und Glue sind mit 605/605 grünen Tests belegt; die
+  Supabase-Anlage, das Relay-Redeploy und die gespielte Zwei-Personen-Abnahme
+  stehen noch aus.
 - **Verbindungsdialog und Linux-Build (Sprint 13, Pakete 13.1 und 13.7):** Das
   Hauptmenü hat einen Bereich „Netzpartie" mit Serveradresse, Port, maskiertem
   Match-Code, Rollenwahl Host/Gast und einem Statusband, das die Zustände des

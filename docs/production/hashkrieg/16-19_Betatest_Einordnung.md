@@ -17,8 +17,8 @@
 > der Sprintdatei — an sie bindet der Großauftrag die Reihenfolge.
 >
 > **Die vier offenen Inhaberfragen sind geschlossen:** #53 und #54 mit
-> [D-093](../DecisionLog.md), #45 mit [D-094](../DecisionLog.md), #52 mit
-> [D-092](../DecisionLog.md) und Sprint 18.
+> [D-096](../DecisionLog.md), #45 mit [D-097](../DecisionLog.md), #52 mit
+> [D-095](../DecisionLog.md) und Sprint 18.
 >
 > **Vier Aussagen unten sind am Code widerlegt:**
 >

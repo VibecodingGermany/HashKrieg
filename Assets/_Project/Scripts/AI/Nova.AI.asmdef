@@ -3,7 +3,8 @@
     "rootNamespace": "Nova.AI",
     "references": [
         "Nova.Core",
-        "Nova.Simulation"
+        "Nova.Simulation",
+        "Nova.AI.Data"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -1,6 +1,6 @@
 # Großauftrag: Von der Attrappe zur Partie
 
-**Version:** 1.0.0 | **Status:** verbindlich | **Erteilt:** 2026-08-09 | **Auftraggeber:** Inhaber | **Ausführung:** Kimi (Maintainer-Seite) | **Umfang:** Blöcke 0–4, entspricht den Sprints 16, 18, 14 und 17 Paket A | **Leitsatz:** ein Block nach dem anderen, jeder für sich abnehmbar
+**Version:** 1.0.0 | **Status:** verbindlich | **Erteilt:** 2026-08-09 | **Auftraggeber:** Inhaber | **Ausführung:** Kimi (Maintainer-Seite) | **Umfang:** Blöcke 0–3, entspricht den Sprints 16, 18 und 17 Paket A | **Leitsatz:** ein Block nach dem anderen, jeder für sich abnehmbar
 
 ## Vorrangregel
 
@@ -64,7 +64,7 @@ Assets/_Project/Scripts/Simulation/State/  — nur Layout und Serialisierung:
 
 **`Simulation/State/UnitCommandStateView.cs` darfst du bearbeiten**, aber nur die
 Befehlsanwendung — *was* ein bestehender `CommandKind` mit dem Zustand tut. Das
-ist seit [D-092](../DecisionLog.md) ausdrücklich erlaubt. Kein neues Feld, keine
+ist seit [D-095](../DecisionLog.md) ausdrücklich erlaubt. Kein neues Feld, keine
 neue Reihenfolge, kein `StateVersion`-Bump.
 
 Und diese vier Dateien fasst **kein PR dieses Auftrags** an:
@@ -82,7 +82,7 @@ Nie zusammen mit einer Verhaltensänderung. Das Drehbuch
 `tools/Nova.SimRunner/Determinism10000Scenario.cs` ist davon **nicht** betroffen
 und darf im selben PR nachgezogen werden.
 
-## Die fünf Blöcke
+## Die vier Blöcke
 
 Arbeite sie **in dieser Reihenfolge** ab. Zwischen zwei Blöcken liegt ein Gate:
 erst wenn der vorige gemergt und gespielt gesehen ist, fängt der nächste an.
@@ -140,43 +140,23 @@ Fasst **keine** Simulationsdatei an außer der Zielverteilung in `ApplyMove`.
 18.3 (Formationsausrichtung) ist die erste Abwurfkandidatin — die Verteilung
 selbst existiert seit Sprint 11 bereits.
 
-### Block 3 · Sprint 14 — Die Lobby
-
-**Binde Sprintdatei:** [14_Sprint_Lobby.md](14_Sprint_Lobby.md)
-
-Sprint 14 hat heute **null Zeilen** im Repository. Es gibt keinen Supabase-Client,
-keine Edge Function, kein Schema, und `docs/tech/LobbySupabase.md` ist verlinkt,
-aber nie geschrieben worden.
-
-Vor 14.1 kommt ein Paket, das die Sprintdatei nicht kennt:
-
-#### 14.0 · Das Spiel kennt seinen eigenen Build
-
-`NovaBuildCommit` wird von **keiner einzigen C#-Datei** gelesen. Beide
-Packaging-Skripte brennen ihn ein — macOS als `Info.plist`-Schlüssel, Linux als
-`ProjectNova_Data/NovaBuildCommit.txt` — aber das Spiel kann ihn weder anzeigen
-noch melden. Ohne diesen Leser ist 14.4 (Build-Abgleich) nicht baubar.
-
-Ablageort für den Leser: `Assets/_Project/Scripts/Gameplay/` (Assembly
-`Nova.Gameplay`). **Nicht** `Scripts/Core/`: das ist engine-frei, wird in die
-SimRunner-Testlane hineinkompiliert und steht im Baseline-Wächter unter den
-Simulationsflächen — jede Änderung dort gälte als Verhaltensänderung.
-
-**Ablage der Serverseite — entschieden mit D-098**, weil 14.1 den Ort offengelassen
-hat: SQL, Policies und Edge Functions kommen als Quelltext ins Repository unter
-`tools/lobby/`, das Runbook nach `docs/tech/LobbySupabase.md`. Ausgerollt wird im
-Supabase-Projekt außerhalb des Repos. Unversionierter Servercode ist genau das,
-was in sechs Monaten niemand mehr nachvollzieht.
-
-**Was du nicht kannst:** ausrollen. Du bereitest so vor, dass ein Deploy alles
-mitbringt; der Inhaber führt es aus.
-
-### Block 4 · Sprint 17 Paket A — Wer da spielt
+### Block 3 · Sprint 17 Paket A — Wer da spielt
 
 **Binde Sprintdatei:** [17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md),
 Pakete 17.1 bis 17.5.
 
-Jeder Aufruf der Lobby-Functions schreibt eine Zeile: Zeitpunkt, Endpunkt,
+> **Sprint 14 ist gebaut und nicht Teil dieses Auftrags.** Die Lobby liegt seit
+> `b4e75e5` auf `main`: `Scripts/Networking/Lobby/` (Client, Code, Verträge),
+> `LobbyToken`, `LobbySession`, `MainMenuController.Lobby`, dazu der vollständige
+> Vertrag samt Schema und Function-Quelltexten in
+> [../../tech/LobbySupabase.md](../../tech/LobbySupabase.md). Create/Join,
+> Fraktionsfelder, Bereitschaft, `build_mismatch` und kurzlebige Match-Tokens
+> stehen (D-092 bis D-094). Auch der Build-Commit ist zur Laufzeit lesbar —
+> `Gameplay/Match/BuildInfo.cs`. Was dort noch fehlt, zeigt eine gespielte Runde,
+> nicht dieser Auftrag.
+
+Genau deshalb ist Paket A jetzt baubar: die Functions, die die IP sehen,
+existieren. Jeder Aufruf schreibt eine Zeile — Zeitpunkt, Endpunkt,
 Herkunfts-IP, Netzpräfix, Build-Commit, Match-Code, Ergebnis. Dazu Sperrliste
 (`install` / `ip` / `prefix`), Rate-Limit, Bedienweg als fertige SQL-Bausteine im
 Runbook, und ein `pg_cron`-Job für die Fristen.
@@ -196,8 +176,7 @@ Betreiberprobe aus** und trägt das Ergebnis nach. Der Nachweis für diesen Bloc
 ist deshalb weder die SimRunner-CI noch eine gespielte Runde, sondern der
 Betreibernachweis des Inhabers am ausgerollten Stand.
 
-Am Relay gibt es ausser der Token-Entgegennahme aus Paket 14.5 genau **eine**
-Änderung, und sie ist ein echter Fehler:
+Am Relay gibt es genau **eine** Änderung, und sie ist ein echter Fehler:
 
 #### 17.0 · Das `.partial`-Leck
 
@@ -348,4 +327,5 @@ es nötig wäre, und auf die Entscheidung warten.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-09 | Auf den tatsächlichen Stand von `main` gezogen. Der Erstfassung lag ein acht Commits alter Branch zugrunde: Sprint 14 ist längst gebaut (Lobby, Match-Tokens, Build-Commit-Leser), deshalb entfällt der bisherige Block 3 und Sprint 17 Paket A rückt auf. D-IDs neu vergeben — D-092 bis D-094 waren auf `main` schon mit anderem Inhalt belegt | Orchestrator |
 | 1.0.0 | 2026-08-09 | Erstfassung: Blöcke 0–4 gebündelt, am Code geprüft, Grenzen und stille Fallen benannt | Orchestrator |

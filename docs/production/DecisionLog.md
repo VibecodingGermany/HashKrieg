@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.31.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.32.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -2500,7 +2500,43 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
 
 ---
 
-### D-092 | verbindlich | Sprint 16 (Parallelbetrieb über Dateihoheit statt Verhaltensraum)
+### D-092 | verbindlich | Sprint 14 (Lobby-Vermittlung: Supabase Edge Functions, schlanker Client, Polling)
+
+**Kontext:** Sprint 14 ersetzt das Abtelefonieren von Serveradresse, Match-Code und Slot durch eine Lobby: Match per kurzem Code anlegen und beitreten, Fraktionswahl, Bereitschaft, Build-Abgleich. Offen waren: Wo läuft die Vermittlungslogik, wie spricht der Client sie an, und wo liegt der Client-Code im Repo?
+**Alternativen:** (a) Supabase Edge Functions (Deno) als einzige Serverlogik, dazu ein schlanker HTTPS-Client (HttpClient + Newtonsoft.Json) mit ~1,5-s-Polling, anon-Key im Client, Row-Level-Security deny-all auf den Tabellen; Client-Code engine-frei unter `Scripts/Networking/Lobby/`; (b) direkter PostgREST-/REST-Tabellenzugriff des Clients mit RLS-Policies; (c) Supabase Realtime (WebSocket-Subscriptions) statt Polling; (d) UnityWebRequest + JsonUtility in der Gameplay-/Präsentationsassembly; (e) externes supabase-csharp-SDK oder ein eigenes Vermittlungs-Backend.
+**Entscheidung:** (a).
+**Begründung:** Das Token-Minting (D-093) braucht ein serverseitiges Geheimnis — nur Functions können es halten; bei (b) läge das Secret im Client oder das Token ungeschützt in der Tabelle. RLS deny-all plus Service-Role-Key ausschliesslich in der Function-Umgebung minimiert die Angriffsfläche; der anon-Key ist per Sprint-Vorgabe kein Geheimnis, bleibt aber unkonfiguriert aus dem Repo (gitignorte `lobby-config.json` bzw. `NOVA_LOBBY_URL`/`NOVA_LOBBY_ANON_KEY`). Polling reicht für genau zwei Spieler; (c) brächte WebSocket-Client und Verbindungsmanagement ohne Mehrwert. Die engine-freie Platzierung macht den Client mit dem kanonischen `dotnet test` prüfbar (22 Tests gegen einen In-Prozess-Mock); (d) hätte ihn in die nur lokal laufenden Unity-EditMode-Tests verwiesen, und JsonUtility trägt die Vertrags-DTOs (verschachtelte Slot-Arrays, Null-Felder) nicht sauber. (e) ist eine schwere Abhängigkeit für fünf flache Endpunkte.
+**Konsequenzen:** Neue Dependency `com.unity.nuget.newtonsoft-json` (Unity) bzw. `Newtonsoft.Json` (net8-Tests); `<Compile Remove>` im Relay-csproj, damit der Client nicht ins Relay-Binary wandert; Vertrag, Schema und Function-Referenzquelltexte in [../tech/LobbySupabase.md](../tech/LobbySupabase.md); Lobby-UI in `Presentation/UI`, Glue in `Gameplay` (Schreibhoheit Netzstrang, Assembly-Trennung Presentation.UI ↔ Networking bleibt gewahrt); keine Accounts und keine personenbezogenen Daten — vor dem ersten personenbeziehbaren Feld ist eine neue D-ID fällig. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden — überstimmbar.**
+
+**Verworfen:** (b) PostgREST-Direktzugriff — kann das Minting-Secret nicht serverseitig halten; (c) Realtime — überdimensioniert für eine Zwei-Personen-Lobby; (d) UnityWebRequest in Gameplay — verliert die Headless-Testbarkeit des kanonischen Checks; (e) SDK/Eigenbackend — Abhängigkeit bzw. Betrieb ohne Verhältnis zum Umfang.
+
+---
+
+### D-093 | verbindlich | Sprint 14.5 (kurzlebige HMAC-Match-Tokens für den Relay)
+
+**Kontext:** Der Relay verlangt seit A6 ein Match-Token — bisher ein statischer `ulong` aus `NOVA_MATCH_TOKEN` für die gesamte Prozesslebensdauer, per Anruf abgestimmt. Die Lobby soll pro Match ein kurzlebiges Token vergeben und beiden Clients übergeben, ohne dass der Relay neue Kanäle oder nennenswerten Zustand bekommt und ohne den Direktweg aus Sprint 13 zu brechen.
+**Alternativen:** (a) strukturiertes 64-bit-Token [20 bit Expiry-Bucket à 5 min ‖ 12 bit Match-Id ‖ 32 bit HMAC-SHA256-Tag] gegen ein per Konfiguration geteiltes Secret; Relay validiert lokal, Match-Seed wird per HMAC aus dem Token abgeleitet, statisches Token bleibt für den Direktweg; (b) Token-Registry/-Datei am Relay, die die Lobby über einen neuen Provisionierungskanal (SSH/HTTP-Hook auf dem VPS) beschreibt; (c) Relay fragt bei jedem Hello aktiv per REST gegen Supabase (Pull-Validierung); (d) Protokolländerung: längeres signiertes Token mit `ProtocolVersion`-Bump.
+**Entscheidung:** (a) — Richtung vom Inhaber im Sprint-Gespräch bestätigt, Ausformung vom Agenten unter Delegation, überstimmbar.
+**Begründung:** (a) bricht das Protokoll nicht — Hello bleibt Version + `u64`, `ProtocolVersion` 1 unverändert — und braucht keinen Laufzeit-Kanal zwischen Lobby und Relay ((b)) und keine Kopplung des Relay an Supabase-Verfügbarkeit; (c) hätte zusätzlich den Service-Role-Key auf den Relay-Host gebracht und den Relay weniger „dumm" gemacht. (d) ist die sauberste Langform, sperrt aber alle vorhandenen Builds und widerspricht dem Sprint-Leitsatz, der Relay bleibe, was er ist. Der 32-bit-Tag reicht, weil der Relay Tokens nur im 5-Sekunden-Hello-Fenster prüft und ein Match pro Prozess bindet. Single-Use wird prozessintern über Match-Resets hinweg gehalten und per Expiry gepurgt; die Seed-Ableitung (`HMAC(secret, "NOVA-LOBBY-SEED-V1" ‖ token)`, ODER 1) macht die Lobby zur Seed-Quelle, ohne das Offer-Protokoll anzufassen — das Offer bleibt auf dem Draht autoritativ.
+**Konsequenzen:** `LobbyToken.cs` (engine-frei, nur BCL) mit exakt dokumentierter, von der Deno-Function zu spiegelnder Serialisierung; `RelayServerCore` akzeptiert neben dem statischen Token validierte Lobby-Tokens (gleiches Token für beide Peers, Verbrauch nach Reset, abgeleiteter Seed vor dem Offer); neue optionale Env `NOVA_RELAY_TOKEN_SECRET` (64 Hex, fail-closed validiert, `NOVA_MATCH_TOKEN` bleibt Pflicht für den Direktweg); Doku in [../tech/RelayServer.md](../tech/RelayServer.md) 1.1.0 und [../tech/LobbySupabase.md](../tech/LobbySupabase.md); Tests inklusive Zwei-Client-Handshake über echten TCP-Relay. Einschränkungen (dokumentiert): ein gebundenes Token bleibt bis zum Match-Reset gebunden; Bucket-Wrap ca. 2036; die Lobby muss Match-Id-Kollisionen durch Neu-Minten vermeiden.
+
+**Verworfen:** (b) Token-Datei — neuer Provisionierungskanal und VPS-Infra ausserhalb des Repos für ein Problem, das ein Shared Secret ohne Kanal löst; (c) Relay-Pull — Verfügbarkeitskopplung an Supabase und Service-Key auf dem Relay; (d) Protokolländerung — Versionsbruch ohne zwingenden Grund.
+
+---
+
+### D-094 | verbindlich | Sprint 14.4 (Build-Commit zur Laufzeit lesbar)
+
+**Kontext:** Die Lobby soll ungleiche Builds schon beim Beitritt im Klartext erklären („Ihr habt unterschiedliche Versionen — hol dir Build `<commit>`"), bevor der Relay sie spät und technisch abweist (A4). Der Build-Commit steht bisher nur in `Info.plist`/`NovaBuildCommit.txt` der Pakete und wird zur Laufzeit nirgends gelesen.
+**Alternativen:** (a) `IPreprocessBuildWithReport` in `Nova.Editor` schreibt `git rev-parse --short HEAD` (plus `-dirty`, analog `build-mac.sh`) vor jedem Player-Build in die gitignorte `Assets/_Project/Resources/NovaBuildCommit.txt`; Runtime-Reader `BuildInfo.Commit` mit Fallback `dev-editor`; (b) `Info.plist` bzw. plattformabhängige Paketdateien zur Laufzeit lesen; (c) eingecheckte generierte C#-Datei (`BuildInfo.g.cs`), die jeder Build neu erzeugt; (d) die Packaging-Skripte schreiben die Datei vor dem Unity-Aufruf.
+**Entscheidung:** (a).
+**Begründung:** (a) deckt alle Build-Wege (Skripte, Editor-Menü, künftige CI) plattformgleich ab, ohne die laufende Windows-Packaging-Arbeit in `tools/packaging/` zu berühren. (b) ist plattformspezifisch und fragil (Signatur-/Notarisierungsreihenfolge auf macOS, abweichende Ablagen auf Linux/Windows). (c) verschmutzt den Arbeitsbaum oder erzwingt Leer-Commits für einen Wert, der die Paketierung ohnehin kennt. (d) greift in fremde WIP ein und lässt Editor-Builds aussen vor. Der Fallback `dev-editor` hält Editor-gegen-Editor-Spiele ohne Konfiguration spielbar; zwei `dev-editor` gelten als gleicher Build und passieren den Lobby-Abgleich — als dokumentierter Entwicklungsweg, nicht als Schutz.
+**Konsequenzen:** `BuildInfo.Commit` in `Gameplay/Match`, `BuildCommitStamp` in `Assets/_Project/Editor/`, `.gitignore`-Einträge für die Stempel-Datei; die Lobby vergleicht den Commit beim Beitritt (409 `build_mismatch` mit beiden Commits im Klartext, Vertrag in [../tech/LobbySupabase.md](../tech/LobbySupabase.md)); der Relay-Fingerprint (A4) bleibt die letzte, technische Sperre unverändert dahinter. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden — überstimmbar.**
+
+**Verworfen:** (b) Plattformdatei-Lese — fragil und dreifach zu pflegen; (c) generierte eingecheckte Quelle — Tree-Dirt bzw. Leer-Commits; (d) Skript-Stempel — kollidiert mit laufender Arbeit an `tools/packaging/` und erfasst Editor-Builds nicht.
+
+---
+
+### D-095 | verbindlich | Sprint 16 (Parallelbetrieb über Dateihoheit statt Verhaltensraum)
 
 **Status:** Inhaberentscheidung vom 2026-08-09. Sie ist in
 [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) Fassung 1.3.0
@@ -2605,7 +2641,7 @@ Entscheidung selbst ist unverändert — deshalb keine neue D-ID.
 
 ---
 
-### D-093 | verbindlich | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
+### D-096 | verbindlich | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
 
 **Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
 Paketen liegt beim Agenten. Umgesetzt in
@@ -2686,7 +2722,7 @@ keinem CI-Testlauf enthalten.
 
 ---
 
-### D-094 | verbindlich | Sprint 16 (Stoppen löscht den Angriffsbefehl, Halte-Feuer bleibt beim Einheitenstrang)
+### D-097 | verbindlich | Sprint 16 (Stoppen löscht den Angriffsbefehl, Halte-Feuer bleibt beim Einheitenstrang)
 
 **Status:** Inhaberentscheidung vom 2026-08-09. Umgesetzt in
 [16_Sprint_Wirtschaft.md](hashkrieg/16_Sprint_Wirtschaft.md) 16.10.
@@ -2696,7 +2732,7 @@ Ernte und Reparatur ab — den Angriff nicht. `UnitState.AttackTarget` bleibt
 stehen, und die Einheit feuert weiter. Der erste Betatest (T-01) hat das als
 #45 gemeldet: der Knopf stoppte nichts, was der Tester stoppen wollte.
 `AttackTarget` gehört dem Einheitenstrang (`CombatSystem`); die Befehlsanwendung
-gehört seit D-092 dem Eigentümer des jeweiligen Befehls.
+gehört seit D-095 dem Eigentümer des jeweiligen Befehls.
 
 **Alternativen:**
 
@@ -2724,7 +2760,7 @@ gehört seit D-092 dem Eigentümer des jeweiligen Befehls.
 
 **Begründung:** Die Grenze verläuft zwischen „ein Feld räumen" und „eine Regel
 über das Wiederbelegen dieses Feldes aufstellen". Das Erste ist Befehlsanwendung
-und damit nach D-092 beim Eigentümer des Befehls; das Zweite ist Kampfverhalten
+und damit nach D-095 beim Eigentümer des Befehls; das Zweite ist Kampfverhalten
 und gehört zu D-087. Der halbe Schritt ist trotzdem der richtige: Ein Angriff,
 der nach dem Stopp-Befehl unverändert weiterläuft, ist ein anderer Fehler als
 eine Einheit, die nach dem Stopp erneut selbst ein Ziel erfasst. Der erste ist
@@ -2740,7 +2776,7 @@ gespielten Runde möglich.
 
 ---
 
-### D-095 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 17 (Tier-3-Auslöser präzisiert)
+### D-098 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 17 (Tier-3-Auslöser präzisiert)
 
 **Status:** **ENTWURF.** Ein Tier-Wechsel ist laut
 [GOVERNANCE.md](../../GOVERNANCE.md) ausdrücklich eine Inhaberentscheidung, und
@@ -2788,7 +2824,7 @@ Publikum gibt.
    bezahlter Build, Publisher-Vertrag. Nicht an jeder personenbezogenen
    Verarbeitung.
 2. **Betriebs- und Missbrauchsdaten mit Löschfristen bleiben Tier 2.** Für die
-   geschlossene Beta gilt das auch mit der Klartext-Adresse aus D-096: Der
+   geschlossene Beta gilt das auch mit der Klartext-Adresse aus D-099: Der
    Kreis ist geschlossen, die Frist läuft automatisch als `pg_cron`-Job, und
    die Umstellung auf Hashing steht als Q-041 im
    [Fragenkatalog](OpenQuestions.md).
@@ -2813,7 +2849,7 @@ an denen Tier 3 künftig hängt.
 
 ---
 
-### D-096 | verbindlich | Sprint 17 (Identitätsmodell und Klartext-IP für die geschlossene Beta)
+### D-099 | verbindlich | Sprint 17 (Identitätsmodell und Klartext-IP für die geschlossene Beta)
 
 **Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
 Paketen liegt beim Agenten. Umgesetzt in
@@ -2888,79 +2924,6 @@ Vertriebsweg und setzt sich später neben `install_hash`, ohne Tabellen,
 Sperrarten oder Bedienweg zu ändern. Q-041 bleibt bis zur Öffnung der Beta
 offen.
 
----
-
-### D-098 | in Kraft — vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden | Sprint 14 (Ablage der Lobby-Serverseite)
-
-**Status:** Vom Agenten unter Delegation entschieden, **nicht vom Inhaber
-selbst** — als solches gekennzeichnet und überstimmbar. Gegenstand ist Paket
-14.0 aus dem [Großauftrag vom 2026-08-09](hashkrieg/AUFTRAG_Grossblock.md),
-Block 3; die D-ID stammt aus dem für
-[Sprint 17](hashkrieg/17_Sprint_Zugangsprotokoll.md) reservierten Bereich.
-
-**Kontext:** Sprint 14 hat heute null Zeilen im Repository: kein
-Supabase-Client, keine Edge Function, kein Schema. Die Sprintdatei hat den
-Ablageort der Serverseite offengelassen. Damit stünde SQL, Policies und Edge
-Functions nichts entgegen, ausschließlich im Supabase-Projekt zu leben, wo sie
-niemand versioniert, niemand reviewt und niemand einem Client-Commit zuordnen
-kann.
-
-**Alternativen:**
-
-1. Die Serverseite bleibt nur im Supabase-Projekt und wird dort im Editor
-   gepflegt — verworfen: Unversionierter Servercode ist genau das, was in sechs
-   Monaten niemand mehr nachvollzieht. Kein Diff, kein Review, kein Rückweg auf
-   einen früheren Stand, und der Zusammenhang zum Build, der die Function
-   aufruft, ist nicht herstellbar.
-2. Ein eigenes Repository für die Serverseite — verworfen: Es trennt den
-   Function-Vertrag von dem Client, der ihn aufruft; jede Vertragsänderung
-   bräuchte zwei PRs in zwei Repositories, und die Schreibhoheitstabelle aus
-   [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) müsste über
-   Repo-Grenzen hinweg gelten. Dazu käme ein zweiter Satz Governance —
-   `CODEOWNERS`, CI, Lizenz, Beitragsregeln — für eine Handvoll Dateien.
-3. Nur das Runbook ins Repository, der Quelltext bleibt im Supabase-Projekt —
-   verworfen: Dann beschreibt das Runbook einen Stand, den niemand
-   gegenprüfen kann, und Beschreibung und Wirklichkeit laufen auseinander.
-   Genau das ist bei `docs/tech/LobbySupabase.md` schon einmal passiert: an
-   mehreren Stellen verlinkt, nie geschrieben.
-4. **Gewählt: SQL, Policies und Edge Functions als Quelltext im Repository
-   unter `tools/lobby/`, das Runbook nach `docs/tech/LobbySupabase.md`.**
-
-**Entscheidung:**
-
-1. `tools/lobby/` (neu) nimmt SQL, Policies und Edge Functions der Lobby als
-   Quelltext auf. Der Ordner liegt neben `tools/Nova.RelayServer/` und
-   `tools/packaging/` — Betriebswerkzeug, kein Spielcode. Er berührt keine
-   Assembly und keine Simulationsfläche und bewegt damit keine Baseline.
-2. Das Runbook entsteht als `docs/tech/LobbySupabase.md` in Sprint 14 und
-   schließt damit zugleich einen Aktenfehler: Die Datei ist heute verlinkt,
-   aber nicht vorhanden.
-3. **Ausgerollt wird weiterhin im Supabase-Projekt außerhalb des Repositories.**
-   Das Repository hält den Stand, nicht den Betrieb; den Deploy führt der
-   Inhaber aus.
-4. `tools/lobby/` gehört in der Schreibhoheitstabelle dem **Netzstrang**.
-
-**Begründung:** Servercode, der nur in einer Weboberfläche existiert, ist
-Wissen ohne Träger — er lässt sich nicht reviewen, nicht zurückrollen und nicht
-mit dem Client-Commit in Beziehung setzen, der ihn aufruft. Ein eigenes
-Repository löst dasselbe Problem, kauft es aber mit doppelter Governance und
-einer Schreibhoheit, die an der Repo-Grenze endet. Der Ordner im vorhandenen
-Repository kostet dagegen nichts: Er liegt außerhalb jeder Simulationsfläche,
-und `tools/` trägt mit Relay und Packaging bereits Betriebswerkzeug, das nicht
-im Spiel läuft.
-
-**Konsequenzen:**
-[13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) führt
-`tools/lobby/` bereits als Netzstrang-Zeile. Der Ordner existiert noch nicht;
-er entsteht mit Sprint 14. Geheimnisse bleiben draußen — Pepper und
-Relay-Token-Geheimnis liegen in der Function-Umgebung, die Regel „keine Secrets
-im Repository" gilt unverändert und wird durch diesen Ordner eher schärfer
-geprüft als vorher. Eine spätere Umkehr auf ein eigenes Repository ist ein
-Verschieben von Dateien plus einer Zeile in der Schreibhoheitstabelle, keine
-Strukturänderung — deshalb ist diese Entscheidung billig überstimmbar.
-
----
-
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3010,16 +2973,26 @@ Strukturänderung — deshalb ist diese Entscheidung billig überstimmbar.
   verlangt — bei den KI-Quellen sind `promptText`, `providerTermsUrl`,
   `providerTermsRetrievedAt` und ein wörtliches `outputOwnership`-Zitat
   Pflichtfelder, die nur der Inhaber liefern kann.
-- **D-097 steht in derselben Delegationslage** (Ablage der Lobby-Serverseite
+- **D-100 steht in derselben Delegationslage** (Ablage der Lobby-Serverseite
   unter `tools/lobby/`). Der Inhaber möge den Ablageort bestätigen oder einen
   anderen anweisen; eine Umkehr verschiebt Dateien und eine Zeile in der
-  Schreibhoheitstabelle. Bis dahin gilt D-097.
+  Schreibhoheitstabelle. Bis dahin gilt D-100.
 - **D-078 bis D-082 sind reserviert** für die Übertragung der
   Inhaberentscheidungen E-1 bis E-5 aus
   [hashkrieg/00_Entscheidungen.md](hashkrieg/00_Entscheidungen.md); die dortige
   „Offene Punkte"-Zeile nennt noch den zu kurzen Bereich D-078 bis D-081 und
   begründet die Reservierung mit einem inzwischen erfolgten Eintrag (D-077).
   Beides ist in jener Datei nachzuziehen, nicht hier.
+- **D-095 bis D-097 stehen in derselben Delegationslage** wie D-074/D-083
+  (Lobby-Vermittlung über Supabase Edge Functions, kurzlebige
+  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-096 hat der
+  Inhaber die Richtung (HMAC-Token) selbst vorgegeben, die Ausformung sowie
+  D-095/D-097 hat der Agent unter Delegation entschieden — gekennzeichnet und
+  überstimmbar. **Offen darin:** Das Supabase-Projekt ist noch nicht angelegt
+  und die Function-Referenzen in
+  [../tech/LobbySupabase.md](../tech/LobbySupabase.md) noch nicht gegen ein
+  lebendes Projekt gelaufen; der erste Deploy-Lauf gehört dem Inhaber
+  (Betriebspfad im selben Dokument).
 
 ## Nächste Schritte
 
@@ -3065,5 +3038,6 @@ Strukturänderung — deshalb ist diese Entscheidung billig überstimmbar.
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
 | 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |
-| 1.30.0 | 2026-08-09 | D-092, D-093 und D-094 aufgenommen: Parallelbetrieb trennt über Dateihoheit statt Verhaltensraum (Sprint 16 parallel zu 13B, `Simulation/State/` in eingefrorenes Layout und strangeigene Befehlsanwendung geteilt, ein Strang je Merge-Fenster); Lager erhält eine aus dem Gebäudebestand **abgeleitete** AE-Obergrenze statt eines Zustandsfeldes und das Radar schaltet die Minimap frei; „Stoppen" löscht zusätzlich `UnitState.AttackTarget`, das Halte-Feuer bleibt beim Einheitenstrang | Project Owner / Orchestrator |
-| 1.31.0 | 2026-08-09 | D-095 bis D-097 nachgetragen, nachdem sie anderswo bereits als geltend zitiert wurden: Tier-3-Auslöser auf Veröffentlichung, Geld und Publikum präzisiert statt auf jede personenbezogene Verarbeitung; Identitätsmodell der geschlossenen Beta mit Klartext-IP plus gekürztem Netzpräfix und 30-Tage-Löschfrist statt `HMAC(pepper, ip)`, MAC-Adresse verworfen, IP- und Präfixsperren zwingend befristet; Lobby-Serverseite als Quelltext unter `tools/lobby/` statt nur im Supabase-Projekt (vom Agenten unter Delegation entschieden, überstimmbar, in den Offenen Punkten vermerkt). D-092 Punkt 3 im Wortlaut auf das Regelwerk nachgezogen — die Befehlsanwendung trennt zwischen Zielsetzung und Ausführung, nicht zwischen Befehlsarten; dieselbe Entscheidung, keine neue D-ID. Kopfzeile von Sprint 13.0 auf 16 berichtigt | Project Owner / Agent (unter Delegation) |
+| 1.30.0 | 2026-08-09 | D-095 bis D-097 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-096-Richtung vom Inhaber vorgegeben, Ausformung sowie D-095/D-097 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-096 Richtung: Dennis Westermann |
+| 1.30.0 | 2026-08-09 | D-095, D-096 und D-097 aufgenommen: Parallelbetrieb trennt über Dateihoheit statt Verhaltensraum (Sprint 16 parallel zu 13B, `Simulation/State/` in eingefrorenes Layout und strangeigene Befehlsanwendung geteilt, ein Strang je Merge-Fenster); Lager erhält eine aus dem Gebäudebestand **abgeleitete** AE-Obergrenze statt eines Zustandsfeldes und das Radar schaltet die Minimap frei; „Stoppen" löscht zusätzlich `UnitState.AttackTarget`, das Halte-Feuer bleibt beim Einheitenstrang | Project Owner / Orchestrator |
+| 1.31.0 | 2026-08-09 | D-098 bis D-100 nachgetragen, nachdem sie anderswo bereits als geltend zitiert wurden: Tier-3-Auslöser auf Veröffentlichung, Geld und Publikum präzisiert statt auf jede personenbezogene Verarbeitung; Identitätsmodell der geschlossenen Beta mit Klartext-IP plus gekürztem Netzpräfix und 30-Tage-Löschfrist statt `HMAC(pepper, ip)`, MAC-Adresse verworfen, IP- und Präfixsperren zwingend befristet; Lobby-Serverseite als Quelltext unter `tools/lobby/` statt nur im Supabase-Projekt (vom Agenten unter Delegation entschieden, überstimmbar, in den Offenen Punkten vermerkt). D-095 Punkt 3 im Wortlaut auf das Regelwerk nachgezogen — die Befehlsanwendung trennt zwischen Zielsetzung und Ausführung, nicht zwischen Befehlsarten; dieselbe Entscheidung, keine neue D-ID. Kopfzeile von Sprint 13.0 auf 16 berichtigt | Project Owner / Agent (unter Delegation) |

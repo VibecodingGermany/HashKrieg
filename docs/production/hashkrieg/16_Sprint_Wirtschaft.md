@@ -11,7 +11,7 @@ Schreibbereich fallen.
 
 Er ändert erstmals seit Sprint 13 wieder Simulationsverhalten aus der Hand des
 Maintainer-Teams und läuft dabei **parallel** zum Einheitenstrang. Die Regel, die
-das trägt, ist [D-092](../DecisionLog.md).
+das trägt, ist [D-095](../DecisionLog.md).
 
 ## Herkunft dieser Datei
 
@@ -327,12 +327,12 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 
 | ID | Inhalt | Wer |
 |---|---|---|
-| D-093 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
-| D-094 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
+| D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
+| D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
 
-D-093 und D-094 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-095
-(Entwurf) und D-096 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
-D-097 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
+D-096 und D-097 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
+(Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
+D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
 [Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
 werden.
 

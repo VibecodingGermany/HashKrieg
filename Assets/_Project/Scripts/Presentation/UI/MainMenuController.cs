@@ -41,7 +41,7 @@ namespace Nova.Presentation.UI
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class MainMenuController : MonoBehaviour
+    public sealed partial class MainMenuController : MonoBehaviour
     {
         private const string LoadHintText = "kommt später — es gibt noch kein Speicherformat";
 
@@ -214,6 +214,11 @@ namespace Nova.Presentation.UI
             FlushSettings();
         }
 
+        private void OnDestroy()
+        {
+            _lobbySession?.Dispose();
+        }
+
         private void Update()
         {
             if (_settingsDirty && Time.unscaledTime - _dirtySince >= _saveIntervalSeconds)
@@ -222,6 +227,7 @@ namespace Nova.Presentation.UI
             }
 
             UpdateNetworkJoin();
+            UpdateLobby();
         }
 
         // --- tree ---------------------------------------------------------
@@ -291,6 +297,14 @@ namespace Nova.Presentation.UI
             _networkPanel.style.width = _settingsWidth;
             content.Add(_networkPanel);
             BuildNetworkJoin(_networkPanel);
+
+            // Sprint 14 (D-092): the lobby becomes the "Netzpartie" entry;
+            // the direct connection above stays reachable from its entry view.
+            _lobbyPanel = MakePanel("menu-lobby");
+            _lobbyPanel.style.display = DisplayStyle.None;
+            _lobbyPanel.style.width = _settingsWidth;
+            content.Add(_lobbyPanel);
+            BuildLobby(_lobbyPanel);
         }
 
         private void BuildTitle(VisualElement parent)
@@ -314,7 +328,7 @@ namespace Nova.Presentation.UI
         private void BuildMainButtons(VisualElement parent)
         {
             parent.Add(MakeButton("Neues Spiel", StartMatch));
-            parent.Add(MakeButton("Netzpartie", () => ShowNetworkPanel(true)));
+            parent.Add(MakeButton("Netzpartie", () => ShowLobbyPanel(true)));
 
             Button load = MakeButton("Laden", null);
             load.SetEnabled(false);
@@ -585,6 +599,7 @@ namespace Nova.Presentation.UI
             _mainPanel.style.display = show ? DisplayStyle.None : DisplayStyle.Flex;
             _settingsPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             if (_networkPanel != null) _networkPanel.style.display = DisplayStyle.None;
+            if (_lobbyPanel != null) _lobbyPanel.style.display = DisplayStyle.None;
             if (!show) FlushSettings(); // leaving the panel persists whatever a slider left dirty
         }
 
@@ -592,6 +607,7 @@ namespace Nova.Presentation.UI
         {
             _mainPanel.style.display = show ? DisplayStyle.None : DisplayStyle.Flex;
             _settingsPanel.style.display = DisplayStyle.None;
+            if (_lobbyPanel != null) _lobbyPanel.style.display = DisplayStyle.None;
             _networkPanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             if (show && _bootstrap != null)
             {
@@ -732,6 +748,8 @@ namespace Nova.Presentation.UI
             }
             IsMenuVisible = true;
             _networkTransitionCommitted = false;
+            _lobbyTransitionCommitted = false;
+            _lobbySession?.Reset();
             enabled = true;
         }
 

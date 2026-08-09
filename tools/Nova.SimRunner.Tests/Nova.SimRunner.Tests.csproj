@@ -17,6 +17,9 @@
     <!-- The MS-1 skirmish AI (engine-free assembly) under test: same
          shared-sources contract as Core/Simulation. -->
     <Compile Include="..\..\Assets\_Project\Scripts\AI\**\*.cs" Link="AI\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The AI's data layer (engine-free assembly Nova.AI.Data): the profile
+         values the skirmish AI reads. Same shared-sources contract. -->
+    <Compile Include="..\..\Assets\_Project\Scripts\AI.Data\**\*.cs" Link="AI.Data\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- The relay/lockstep network layer under test: engine-free assembly,
          same shared-sources contract (strands A1-A5 of sprint 12). -->
     <Compile Include="..\..\Assets\_Project\Scripts\Networking\**\*.cs" Link="Networking\%(RecursiveDir)%(Filename)%(Extension)" />
@@ -37,6 +40,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <!-- JSON for the linked sprint-14 lobby client sources (Networking/Lobby). -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NUnit" Version="4.2.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
     <!-- Line coverage for the linked Core/Simulation sources (they compile into
