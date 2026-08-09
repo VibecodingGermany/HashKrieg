@@ -40,7 +40,8 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class SkirmishAiTests
     {
-        private const ulong Seed = 0xA17E57DE57UL;
+        /// <summary>Seed of the canonical AI match. Internal since D-101: CanonicalAiOutcomeTests pins its outcome.</summary>
+        internal const ulong Seed = 0xA17E57DE57UL;
         private const byte HumanSlot = 0;
         private const byte AiSlot = 1;
         private const ushort MapWidth = 128;
@@ -53,13 +54,13 @@ namespace Nova.SimRunner.Tests
         /// at tick 2242, so 6.000 ticks is a ~2.7x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
-        private const int EndToEndBudgetTicks = 6000;
+        internal const int EndToEndBudgetTicks = 6000;
 
         // ----------------------------------------------------------------
         // The AI host (mirror of MatchRunner's skirmish wiring)
         // ----------------------------------------------------------------
 
-        private sealed class AiHost
+        internal sealed class AiHost
         {
             public SimulationKernel Kernel;
             public EntityManager Entities;
@@ -147,7 +148,10 @@ namespace Nova.SimRunner.Tests
                 stagingDistanceCells: shipped.StagingDistanceCells,
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: shipped.RetreatHealthPercent,
-                retreatDangerCells: shipped.RetreatDangerCells);
+                retreatDangerCells: shipped.RetreatDangerCells,
+                // Waves off means waves off: the strength gate is the same
+                // rule and switches off with them.
+                waveStrengthPoints: 0);
         }
 
         private static AiHost BuildAiHost(ulong seed, AiProfile? profile = null)
@@ -161,7 +165,7 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
+            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
             var combat = new CombatSystem(entities, fogOfWar, economy);
             var victory = new VictorySystem(entities, construction);
 
@@ -250,7 +254,7 @@ namespace Nova.SimRunner.Tests
             }
         }
 
-        private static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
+        internal static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
         {
             AiHost host = BuildAiHost(seed, profile);
             ApplyOpeningPosition(host);
@@ -417,22 +421,29 @@ namespace Nova.SimRunner.Tests
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// Pins <see cref="AiBehaviorId"/> TOGETHER with what the AI actually
-        /// does. Either half alone is useless: the identifier's profile hash
-        /// catches changed numbers but never a changed rule, and the end state
-        /// catches a changed rule but does not know the identifier exists.
+        /// Pins <see cref="AiBehaviorId"/> — the identifier that says WHICH AI
+        /// this is. It carries the profile hash and the revision, so it catches
+        /// changed numbers, and the revision catches a changed rule that the
+        /// author declared.
         /// <para>
-        /// WHEN THIS GOES RED — and only then read on, because the failure
-        /// message is the procedure:
-        /// </para>
-        /// <list type="number">
-        /// <item>Was the behaviour change intended? If not, fix the code. The
-        /// test just told you the AI plays differently than you thought.</item>
-        /// <item>If it was: bump <c>AiBehaviorId.Revision</c>, add its line to
-        /// the history in that file, write the journal entry in
+        /// WHEN THIS GOES RED: the AI's profile numbers or its revision moved.
+        /// Bump <c>AiBehaviorId.Revision</c>, add its line to the history in
+        /// that file, write the journal entry in
         /// <c>tools/Nova.AiLab/reports/behavior-log.md</c> — measured values,
-        /// better AND worse — and only then update the numbers below.</item>
-        /// </list>
+        /// better AND worse — and only then update the string below.
+        /// </para>
+        /// <para>
+        /// THE OTHER HALF LIVES ELSEWHERE (D-101, 2026-08-09). This pin used to
+        /// also assert the decided tick and the end-state hash of the canonical
+        /// AI match. Those two numbers move on ANY simulation change, not only
+        /// on an AI change — every package of Sprint 16 tripped them — and the
+        /// procedure above then pointed the wrong strand at the wrong journal.
+        /// They now live in <c>CanonicalAiOutcomeTests</c>, which the maintainer
+        /// strand owns. The diagnosis stays intact because that test reads this
+        /// identifier: outcome moved AND identifier moved means the AI changed;
+        /// outcome moved and identifier unchanged means the simulation under it
+        /// changed.
+        /// </para>
         /// <para>
         /// This is NOT one of the four determinism baselines and must not be
         /// treated as one: those live in their own files and separate a
@@ -441,21 +452,24 @@ namespace Nova.SimRunner.Tests
         /// </para>
         /// </summary>
         [Test]
-        public void AiBehaviorId_TracksWhatTheAiActuallyDoes()
+        public void AiBehaviorId_TracksWhichAiThisIs()
         {
-            AiHost host = BuildMatch(Seed);
-            uint decided = host.RunUntilDecided(EndToEndBudgetTicks);
-            ulong endState = host.Kernel.CalculateStateHash();
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(AiBehaviorId.Value, Is.EqualTo("r5.779A1B5B"),
-                    "the AI identifier changed — bump the revision and write the journal entry");
-                Assert.That(decided, Is.EqualTo(2548u),
-                    "the AI decides the canonical match on a different tick than the pinned one");
-                Assert.That($"0x{endState:X16}", Is.EqualTo("0x14472B2B943ED2BB"),
-                    "same identifier, different end state: behaviour moved without the revision moving");
-            });
+            // r6 MOVED THE IDENTIFIER AND NOT THE MATCH, and that is worth one
+            // sentence rather than a shrug. The strength gate replaces the head
+            // count, but its threshold is capped at what production can still
+            // deliver — and with the shipped army cap at twelve that ceiling
+            // binds first on both seats (twelve Alliance riflemen ARE 1.200
+            // points; twelve Legion recruits are 528 and the cap allows no
+            // thirteenth). So the gate ships decoupled and dormant, and the
+            // number it unblocks is a later PR's business.
+            //
+            // That this is visible at all is what D-101 bought: the match
+            // numbers live in CanonicalAiOutcomeTests now. Identifier moved and
+            // outcome unmoved is exactly the "declared change, no effect yet"
+            // case — under the old coupled pin it was indistinguishable from a
+            // simulation change.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
+                "the AI identifier changed — bump the revision and write the journal entry");
         }
 
         // ----------------------------------------------------------------
@@ -721,7 +735,10 @@ namespace Nova.SimRunner.Tests
                 stagingDistanceCells: shipped.StagingDistanceCells,
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: 0,
-                retreatDangerCells: shipped.RetreatDangerCells);
+                retreatDangerCells: shipped.RetreatDangerCells,
+                // The COUNT path on purpose — this test pins the r5 rule, and
+                // the strength path has its own test.
+                waveStrengthPoints: 0);
 
             AiHost host = BuildMatch(Seed, probe);
             int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
@@ -743,6 +760,134 @@ namespace Nova.SimRunner.Tests
                 "marched can never come back, so a wave threshold fixed at the wave size can never be " +
                 "met again — the reinforcement stands at the staging cell until the time limit while " +
                 "the units that did march hold the front alone");
+        }
+
+        /// <summary>
+        /// The wave marches on STRENGTH, not on a head count — and the AI seat
+        /// of this fixture is the Legion, which is exactly where the difference
+        /// lives.
+        /// <para>
+        /// Twelve Legion recruits weigh 528 combat points; twelve Alliance
+        /// riflemen weigh 1.200. The head count calls both "a full wave of
+        /// twelve", so the Legion attacks at 44 % of the strength the same rule
+        /// hands the Alliance. With <c>waveStrengthPoints</c> at 1.200 the
+        /// Legion has to gather more recruits before it may march.
+        /// </para>
+        /// <para>
+        /// THE ARMY CAP IS RAISED TO 36 IN THE PROBE, and both the raise and
+        /// its size are load-bearing. The threshold is capped at what
+        /// production can still deliver, so at the shipped cap of twelve the
+        /// ceiling binds first and the two paths decide identically — which is
+        /// precisely why the shipped profile's end state is unchanged in
+        /// <see cref="AiBehaviorId_TracksWhatTheAiActuallyDoes"/>. A probe at
+        /// the shipped cap would pass on r5 as well and prove nothing.
+        /// <para>
+        /// 36 rather than 24 because 1.200 points are 28 recruits: a cap of 24
+        /// can hold at most 1.056 points, so the ceiling would STILL bind and
+        /// the test would measure "the wave waits for a full army cap" while
+        /// claiming to measure the threshold. That is what the second assertion
+        /// below exists to keep out.
+        /// </para>
+        /// </para>
+        /// <para>
+        /// NEGATIVE CONTROL: the two runs differ in ONE profile value and
+        /// nothing else. On the count path (<c>waveStrengthPoints</c> 0, which
+        /// is r5's only behaviour) both runs launch at the same twelve units,
+        /// the two numbers below are equal and the assertion fails. That the
+        /// off value exists is what makes this comparison possible at all —
+        /// the same property the lab uses to measure one-sided (M001).
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_GathersMoreOfTheWeakerUnit_WhenTheWaveIsMeasuredInStrength()
+        {
+            int atCountGate = CombatUnitsAtFirstLaunch(StrengthGateProbe(waveStrengthPoints: 0));
+            int atStrengthGate = CombatUnitsAtFirstLaunch(StrengthGateProbe(waveStrengthPoints: 1200));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(atCountGate, Is.GreaterThan(0),
+                    "the count path never launched a wave at all — the probe profile is broken, " +
+                    "not the rule under test");
+                Assert.That(atCountGate, Is.LessThanOrEqualTo(StrengthGateProbe(0).WaveSize + 2),
+                    "the count path is supposed to march at the wave size (plus at most one queued " +
+                    "batch that popped in the same decision)");
+                Assert.That(atStrengthGate, Is.GreaterThan(atCountGate),
+                    "the Legion marched with the same number of recruits whether the wave was measured " +
+                    "in heads or in combat points — twelve recruits are 528 points against the 1.200 " +
+                    "the threshold asks for, so the strength path has to keep gathering");
+
+                // AND IT WAS THE THRESHOLD THAT RELEASED IT, not an exhausted
+                // army cap. Without this line the test passes just as happily
+                // when waveStrengthPoints is ignored altogether and the wave
+                // simply waits for the cap to fill — which is what an earlier
+                // version of this probe measured without saying so, because its
+                // cap of 24 could not hold 1.200 points of recruits in the
+                // first place. 1.200 points are 28 recruits; the cap is 36.
+                Assert.That(atStrengthGate, Is.LessThan(StrengthGateProbe(0).TargetArmySize),
+                    "the wave only left once the army cap was full, so the point threshold decided " +
+                    "nothing — the profile value is not being read as a threshold at all");
+            });
+        }
+
+        /// <summary>
+        /// The probe for the strength gate: the shipped profile with the army
+        /// cap raised to 24 (see the test's remarks for why), retreat off so
+        /// nothing pulls a unit back over the ring while we are counting, and
+        /// the one value under test passed in.
+        /// </summary>
+        private static AiProfile StrengthGateProbe(int waveStrengthPoints)
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            return new AiProfile(
+                profileId: waveStrengthPoints > 0 ? "strength-gate-probe" : "count-gate-probe",
+                decisionTickInterval: shipped.DecisionTickInterval,
+                placementSearchRadius: shipped.PlacementSearchRadius,
+                powerReserve: shipped.PowerReserve,
+                targetHarvesters: shipped.TargetHarvesters,
+                harvesterQueueBatch: shipped.HarvesterQueueBatch,
+                targetArmySize: 36,
+                attackSquadThreshold: shipped.AttackSquadThreshold,
+                infantryQueueBatch: shipped.InfantryQueueBatch,
+                targetDamageWeight: shipped.TargetDamageWeight,
+                targetThreatWeight: shipped.TargetThreatWeight,
+                targetFinishWeight: shipped.TargetFinishWeight,
+                targetDistanceWeight: shipped.TargetDistanceWeight,
+                waveSize: shipped.WaveSize,
+                stagingDistanceCells: shipped.StagingDistanceCells,
+                stagingToleranceCells: shipped.StagingToleranceCells,
+                retreatHealthPercent: 0,
+                retreatDangerCells: shipped.RetreatDangerCells,
+                waveStrengthPoints: waveStrengthPoints);
+        }
+
+        /// <summary>
+        /// Living combat units the AI owns at the moment the FIRST of them
+        /// leaves the staging ring; 0 if no wave ever launched.
+        /// <para>
+        /// The count is taken at the launch tick and not at the decision that
+        /// ordered it, because the decision is not observable from outside the
+        /// system — a unit crossing the ring is. Nothing has been lost by then:
+        /// the first wave of the match walks into an empty map.
+        /// </para>
+        /// </summary>
+        private static int CombatUnitsAtFirstLaunch(AiProfile probe)
+        {
+            AiHost host = BuildMatch(Seed, probe);
+            int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True,
+                "without the AI's HQ there is no staging ring to measure against");
+
+            for (int i = 0; i < EndToEndBudgetTicks && !host.Victory.IsDecided; i++)
+            {
+                host.Step();
+                if (CountCombatUnitsOutsideRing(host, AiSlot, hqX, hqY, ring) > 0)
+                {
+                    return CountCombatUnits(host, AiSlot);
+                }
+            }
+            return 0;
         }
 
         /// <summary>

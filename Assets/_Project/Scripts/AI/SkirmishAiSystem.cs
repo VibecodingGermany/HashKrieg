@@ -455,7 +455,7 @@ namespace Nova.AI
 
             // ---- (5) Army: keep infantry queued up to the cap as funds allow. ----
             if (barracksRaw != 0
-                && SimDefinitions.TryGetUnit(faction, UnitRole.BasicInfantry, out SimUnitDefinition infantryDef))
+                && SimDefinitions.TryGetUnit(faction, ProducedCombatRole, out SimUnitDefinition infantryDef))
             {
                 int have = combatCount + CountQueuedAt(barracksRaw, infantryDef.DefinitionId);
                 int batch = Math.Min(InfantryQueueBatch, _profile.TargetArmySize - have);
@@ -469,7 +469,8 @@ namespace Nova.AI
             // per unit, then submit the assignments grouped. See the three
             // steps below; the rules are exactly the ones the previous
             // whole-army block applied. ----
-            ArmyPosture posture = ResolveArmyPosture(combatCount, combatUnits, hqCellX, hqCellY);
+            ArmyPosture posture = ResolveArmyPosture(
+                faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY);
             if (posture.Engages)
             {
                 // Cells of the visible ARMED enemies, collected once per
@@ -557,9 +558,12 @@ namespace Nova.AI
             public int StagingCellY;
 
             /// <summary>
-            /// True when enough units are gathered AT the staging cell for the
-            /// wave to march — or when waves are off, in which case every unit
-            /// is its own wave and this is always true.
+            /// True when what waits AT the staging cell is enough for the wave
+            /// to march — since r6 that is a sum of combat points, and only on
+            /// the off path (<see cref="AiProfile.WaveStrengthPoints"/> 0) a
+            /// count of units. Always true while waves are off entirely
+            /// (<see cref="AiProfile.WaveSize"/> 1), where every unit is its
+            /// own wave.
             /// </summary>
             public bool WaveReady;
         }
@@ -589,7 +593,9 @@ namespace Nova.AI
         /// but auto-acquisition does since D-087 — an explicit order simply
         /// outranks it and is never retargeted.
         /// </summary>
-        private ArmyPosture ResolveArmyPosture(int combatCount, List<UnitState> combatUnits, int hqCellX, int hqCellY)
+        private ArmyPosture ResolveArmyPosture(
+            FactionId faction, uint barracksRaw, int combatCount, List<UnitState> combatUnits,
+            int hqCellX, int hqCellY)
         {
             var posture = new ArmyPosture
             {
@@ -632,11 +638,50 @@ namespace Nova.AI
 
             int gathered = 0;
             int committed = 0;
+            long gatheredStrength = 0;
             for (int i = 0; i < combatUnits.Count; i++)
             {
                 UnitState unit = combatUnits[i];
-                if (IsCommittedToTheWave(in unit, hqCellX, hqCellY)) committed++;
-                else gathered++;
+                if (IsCommittedToTheWave(in unit, hqCellX, hqCellY))
+                {
+                    committed++;
+                }
+                else
+                {
+                    gathered++;
+                    gatheredStrength += CombatStrength.Of(faction, unit.Role, unit.CurrentHealth);
+                }
+            }
+
+            // ---- the wave marches on STRENGTH, not on a head count ----
+            //
+            // A count does not know what a head is worth. Twelve Legion
+            // recruits weigh 528 points against twelve Alliance riflemen's
+            // 1.200, and the count calls both "a full wave" — so the Legion
+            // attacks at 44 % of the strength the same rule gives the Alliance,
+            // and pays for it in the loss column.
+            //
+            // waveStrengthPoints 0 skips this and leaves the count below
+            // untouched, bit for bit. That off setting is not politeness: a
+            // rule that lives only in C# reaches BOTH sides of a self-play
+            // match, and "later decided, more losses" then cannot be told from
+            // "two stronger armies" (finding M001).
+            //
+            // The second half of the condition is a guard, not a rule: a
+            // produced role worth 0 points would make the reachability cap
+            // meaningless (nothing production adds could ever close a gap), so
+            // the count path answers instead of a strength path that cannot.
+            // No shipped faction hits it — both Barracks build an armed unit.
+            int wavePoints = _profile.Profile.WaveStrengthPoints;
+            int producedStrength = wavePoints > 0
+                ? CombatStrength.OfFullHealth(faction, ProducedCombatRole)
+                : 0;
+            if (wavePoints > 0 && producedStrength > 0)
+            {
+                posture.WaveReady = WaveStrengthGate.IsReady(
+                    wavePoints, gatheredStrength, gathered, committed, producedStrength,
+                    _profile.TargetArmySize, canProduce: barracksRaw != 0);
+                return posture;
             }
 
             // The wave waits for what production can still deliver, not for a
@@ -663,6 +708,21 @@ namespace Nova.AI
             posture.WaveReady = gathered >= threshold;
             return posture;
         }
+
+        /// <summary>
+        /// The role the Barracks keeps queueing in step (5) — the one unit type
+        /// production can actually add to a gathering wave, and therefore the
+        /// one whose full-health strength says what "one more unit" is worth to
+        /// the wave threshold.
+        /// <para>
+        /// TWO PLACES HAVE TO AGREE ON IT, so they read the same constant
+        /// rather than the same literal twice. A test could only assert the
+        /// agreement after the fact; sharing the constant means they cannot
+        /// disagree in the first place, which is the difference between a
+        /// checked invariant and an enforced one.
+        /// </para>
+        /// </summary>
+        private const UnitRole ProducedCombatRole = UnitRole.BasicInfantry;
 
         /// <summary>
         /// The wave size actually used, clamped to the army cap.

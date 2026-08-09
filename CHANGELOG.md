@@ -17,6 +17,41 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
+  (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als
+  `Schaden × Leben / Feuerintervall` — ganzzahlig, eine Division, eine
+  festgeschriebene Abschneidung, unbewaffnet ergibt 0 ohne Sonderfall. Das neue
+  Profilfeld `waveStrengthPoints` (ausgeliefert 1200, **0 schaltet die Regel
+  aus**) ersetzt damit das Abzählen am Sammelpunkt. Der Anlass ist eine
+  Asymmetrie, die eine Kopfzahl nicht sehen kann: zwölf Allianz-Schützen wiegen
+  1.200 Punkte, zwölf Legions-Rekruten 528 — die Legion marschiert also mit
+  44 % der Angriffsstärke los, die dieselbe Regel der Allianz gibt, und das
+  steht in der Verlustspalte (51 gegen 23). Die r5-Regel wandert in Punkten
+  mit: der Schwellwert wird weiterhin gegen das gekappt, was die Produktion
+  noch liefern kann, damit ein Überlebender außerhalb des Rings die nächste
+  Welle nicht blockiert. **Mit der ausgelieferten Armeeobergrenze 12 ändert das
+  noch nichts** — die Punktklausel kann nur entscheiden, solange ein Kopf der
+  Obergrenze frei ist, also bei elf Schützen mit 1.100 Punkten gegen eine
+  Schwelle von 1.200. Der gepinnte Endzustand der kanonischen Partie in
+  `SkirmishAiTests` steht dadurch unverändert bei Tick 2.548 und
+  `0x14472B2B943ED2BB`; im KI-gegen-KI-Lauf des Labors ist die Partie
+  ebenfalls byteidentisch (Tick 5.773, `0x2B34B4E194257940`).
+  Das ist der Zweck dieses Schritts: Wellengröße und
+  Produktionsobergrenze hängen nicht mehr an derselben Zahl, bevor an dieser
+  Zahl gedreht wird. Im Labor einseitig gemessen: die Obergrenze **allein**
+  anzuheben macht die Legion schlechter (Verluste 51 → 64, Austausch 45 → 34),
+  mit dem Tor und Obergrenze 30 gewinnt derselbe Sitz und entscheidet schneller
+  als heute (Tick 5.005 gegen 5.773, 23 statt 51 eigene Verluste, Austausch 139
+  gegen 45). Das ist ausdrücklich keine Änderung dieses Eintrags — die
+  Obergrenze liegt als Literal in `MatchRunner` — und vor ihr gehört eine
+  Abbruchregel: die Aussetzzeit am Sammelpunkt steigt dabei von 3.502 auf
+  12.326 Einheit-Ticks je 1.000.
+  **Im laufenden Spiel gespielt:** kein sichtbarer Unterschied zum bisherigen
+  Verhalten, wie erwartet — bei der ausgelieferten Armeeobergrenze entscheidet
+  das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
+  sie belegt keine Verbesserung.
+
 ### Behoben
 - **#53: Das Lager begrenzt das Konto (D-024/D-096)** — das Aetherium-Konto hat
   jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
@@ -30,6 +65,36 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
   Verlust. Ausformung der Zerstörungsregel durch Inhaberentscheidung
   (Zerfall statt Slot-gebundenem Einmalverlust)
+- **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
+  Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
+  solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im
+  Klartext („Radar: schaltet die Minimap frei — ohne Radar keine Karte"). Die
+  Radar-Abdeckung kommt vom Gebäude statt von jeder Einheit: nur ein fertiges
+  Radargebäude strahlt (Sichtweite × 2), `FogOfWarSystem` bekommt das
+  Bau-Register dafür als Pflicht-Abhängigkeit, und `GetRadarSignatures` wird
+  erstmals von der Präsentation konsumiert (signal-orange Pings: ein Zeichen,
+  kein Ziel). `GetTeamView` unverändert — Vertragsfläche des Einheitenstrangs.
+  Kein Baseline-Eingriff: die Pings sind eine abgeleitete Ansicht, kein
+  autorisierter Zustand
+- **#43: Der erste Sammler erntet von allein** — der Gratis-Sammler einer fertig
+  gebauten Raffinerie bekommt seinen Ernteauftrag bei der Geburt: das nächstgelegene
+  Feld mit Restreserve (deterministisch nach Index bei Gleichstand). Die Schenkung
+  greift jetzt nur noch, solange kein eigener Sammler lebt — vorher schenkte jede
+  zweite Raffinerie und jeder Wiederaufbau erneut. Der Latch wird aus dem
+  Einheitenbestand abgeleitet statt gespeichert (kein Formatbruch im
+  Wirtschaftsblock), und alle Fehlerwege der Schenkung — voller Entitätenspeicher,
+  fehlende Fraktionsdefinition, keine freie Zelle in acht Ringen — werden
+  protokolliert statt still verschluckt. Die Fahrt zum Feld übernehmen die
+  bestehenden Eskorten (Client `UpdateHarvesterEscort`, KI `SkirmishAiSystem`):
+  kein neuer Befehlstyp, kein neues Zustandsfeld
+- **#46: Produzierte Einheiten verlassen das Gebäude** — die Spawn-Suche des
+  `ProductionSystem` verankert am Footprint-Zentrum des Produktionsgebäudes
+  statt am Sammelpunkt; die fertige Einheit bekommt einen stehenden
+  Bewegungsbefehl auf den Sammelpunkt (direkter `SetTarget`-Schreibzugriff,
+  gleiche Klasse wie der Push-out — kein neuer Befehlstyp). Der Sammelpunkt
+  ist wieder ein Ziel statt eines Teleporters; Einheiten fahren aus dem
+  Gebäude heraus. Macht #57 (hohle Gebäude-Assets) sichtbarer — Art-Befund
+  für den GrayboxLog, kein Code-Eingriff
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
@@ -101,6 +166,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
+  (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
+  Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei
+  jeder Änderung an der Simulation, in der die KI spielt — im ersten
+  Wirtschaftssprint riss das jedes Paket, ohne dass eine Zeile KI-Code berührt
+  war, und die im Test hinterlegte Prozedur schickte den falschen Strang ins
+  Verhaltensjournal. Entscheidungstick und Endzustand liegen jetzt in
+  `CanonicalAiOutcomeTests` beim Maintainer-Strang, die Kennung bleibt beim
+  Einheitenstrang. Die Diagnose bleibt erhalten: der neue Test liest die Kennung
+  mit und unterscheidet im Fehlertext zwischen KI- und Simulationsänderung. Neu
+  ist eine Zusicherung, die es vorher nicht gab — eine **unentschiedene** Partie
+  gilt als Defekt und nicht als verschobener Pin. Dazu bekommt
+  `tools/Nova.SimRunner.Tests/` erstmals eine Eigentümerzeile in der
+  Schreibhoheitstabelle: geteilt je Datei, fremde Testdateien nur nach Ansage.
 - **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
   Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
   zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8

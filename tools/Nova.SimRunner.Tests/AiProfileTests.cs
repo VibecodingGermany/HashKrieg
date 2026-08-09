@@ -1,7 +1,12 @@
+using System;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Nova.AI;
 using Nova.AI.Data;
+using Nova.Simulation.State;
 
 namespace Nova.SimRunner.Tests
 {
@@ -43,16 +48,134 @@ namespace Nova.SimRunner.Tests
             Assert.That(shipped.HarvesterQueueBatch, Is.EqualTo(2));
 
             // The wave values, which are NOT a copy of an older constant:
-            // waves did not exist before behaviour revision 3. The size sits
-            // AT the army cap on purpose — that is the rule ("attack at full
-            // strength, never reinforce piecemeal") expressed as one number,
-            // and the pairing is asserted here so a later change to the cap
-            // cannot quietly turn the wave rule into something else.
+            // waves did not exist before behaviour revision 3.
+            //
+            // UNTIL r6 THE PAIRING ASSERTED HERE WAS waveSize == targetArmySize
+            // ("the shipped wave is the whole army"). That pairing is gone on
+            // purpose: the wave is measured in combat points now, and waveSize
+            // is only the off switch plus the threshold of the count path. Tying
+            // it back to the cap would undo the decoupling r6 exists for.
             Assert.That(shipped.WaveSize, Is.EqualTo(12));
-            Assert.That(shipped.WaveSize, Is.EqualTo(shipped.TargetArmySize),
-                "the shipped wave is the whole army; 1 would be the off setting");
             Assert.That(shipped.StagingDistanceCells, Is.EqualTo(12));
             Assert.That(shipped.StagingToleranceCells, Is.EqualTo(4));
+
+            Assert.That(shipped.WaveStrengthPoints, Is.EqualTo(1200));
+        }
+
+        /// <summary>
+        /// The strength gate ships DORMANT, and this states the exact
+        /// inequality that makes it so.
+        /// <para>
+        /// The threshold is capped at what production can still deliver, so the
+        /// point clause can only decide anything while at least one head is
+        /// still free — that is, at <c>gathered &lt;= cap - 1</c>. The gate
+        /// therefore stays asleep exactly while
+        /// </para>
+        /// <code>
+        /// (cap - 1) * strength(strongest faction's produced unit) &lt; waveStrengthPoints
+        /// </code>
+        /// <para>
+        /// and today that reads 11 * 100 &lt; 1200. THE MARGIN IS NINE POINTS PER
+        /// RIFLEMAN, which is why this is computed from
+        /// <see cref="CombatStrength"/> and not from a copied literal: weapon
+        /// characteristics are this strand's own work, and raising the Alliance
+        /// rifleman by one damage (10 to 11 is 110 points) would wake the gate
+        /// in the shipped game. A test carrying its own copy of "44" would have
+        /// slept through exactly that.
+        /// </para>
+        /// <para>
+        /// WHEN THIS GOES RED, read the behaviour journal entry V007 in the lab
+        /// repository before touching it. Either the cap moved — the intended
+        /// next step, and then this assertion should be DELETED rather than
+        /// loosened — or a weapon number moved and woke the gate by accident,
+        /// which is a behaviour change that needs a revision bump and a
+        /// measurement.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TheStrengthGateIsDormantAtTheShippedArmyCap()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+
+            int strongestProducedUnit = Math.Max(
+                CombatStrength.OfFullHealth(FactionId.Alliance, UnitRole.BasicInfantry),
+                CombatStrength.OfFullHealth(FactionId.Legion, UnitRole.BasicInfantry));
+
+            Assert.That((shipped.TargetArmySize - 1) * strongestProducedUnit,
+                Is.LessThan(shipped.WaveStrengthPoints),
+                "the strength gate can now decide something the head count could not, so the shipped " +
+                "behaviour is no longer unchanged — see AiBehaviorId's r6 entry and journal V007");
+        }
+
+        /// <summary>
+        /// The four numbers <c>MatchRunner</c> passes by hand have to agree with
+        /// the shipped profile, and nothing but this test says so.
+        /// <para>
+        /// <c>MatchRunner</c> takes fifteen of the nineteen profile values from
+        /// <see cref="AiProfiles.Ms1Canonical"/> through the historical
+        /// constructor and OVERRIDES four with literals of its own. Those four
+        /// can drift from the profile without anything noticing: the profile
+        /// hash in <see cref="AiBehaviorId"/> is computed over
+        /// <c>Ms1Canonical</c>, and the end-state pin in <c>SkirmishAiTests</c>
+        /// mirrors MatchRunner's literals rather than reading them — so both
+        /// guards look past the gap from opposite sides.
+        /// </para>
+        /// <para>
+        /// It matters right now because the army cap is the number the strength
+        /// gate of r6 waits on: raise it in <c>MatchRunner</c> alone and the
+        /// game changes while <c>Ms1Canonical</c>, the profile hash and the pin
+        /// all keep saying 12.
+        /// </para>
+        /// <para>
+        /// Reading a file of the network strand is not editing it. If this goes
+        /// red because MatchRunner moved deliberately, the fix is to move the
+        /// value in <see cref="AiProfiles.Ms1Canonical"/> with it.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void MatchRunnerPassesTheSameFourNumbersTheShippedProfileCarries()
+        {
+            string source = File.ReadAllText(Path.Combine(
+                ResolveScriptsRoot(), "Gameplay", "Match", "MatchRunner.cs"));
+
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+
+            Assert.Multiple(() =>
+            {
+                AssertLiteral(source, "targetPowerMargin", shipped.PowerReserve);
+                AssertLiteral(source, "targetArmySize", shipped.TargetArmySize);
+                AssertLiteral(source, "attackSquadThreshold", shipped.AttackSquadThreshold);
+                AssertLiteral(source, "targetHarvesterCount", shipped.TargetHarvesters);
+            });
+        }
+
+        private static void AssertLiteral(string source, string argumentName, int expected)
+        {
+            Match match = Regex.Match(source, $@"{argumentName}\s*:\s*(-?\d+)");
+            Assert.That(match.Success, Is.True,
+                $"MatchRunner no longer passes {argumentName} — the AI profile it builds has changed shape");
+            Assert.That(int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), Is.EqualTo(expected),
+                $"MatchRunner passes a different {argumentName} than AiProfiles.Ms1Canonical carries; " +
+                "the shipped AI and the profile the tests measure have drifted apart");
+        }
+
+        /// <summary>
+        /// The checkout's <c>Assets/_Project/Scripts</c>, found from the test
+        /// binary — same walk as <c>NoFloatInSimulationTests</c>, so the scan
+        /// works from any checkout path.
+        /// </summary>
+        private static string ResolveScriptsRoot()
+        {
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory != null)
+            {
+                string candidate = Path.Combine(directory.FullName, "Assets", "_Project", "Scripts");
+                if (Directory.Exists(candidate)) return candidate;
+                directory = directory.Parent;
+            }
+
+            Assert.Fail($"could not locate Assets/_Project/Scripts above {AppContext.BaseDirectory}");
+            return null;
         }
 
         [Test]
@@ -134,7 +257,8 @@ namespace Nova.SimRunner.Tests
                 targetDamageWeight: 12, targetThreatWeight: 8,
                 targetFinishWeight: 2, targetDistanceWeight: 5,
                 waveSize: 5, stagingDistanceCells: 20, stagingToleranceCells: 3,
-                retreatHealthPercent: 30, retreatDangerCells: 6);
+                retreatHealthPercent: 30, retreatDangerCells: 6,
+                waveStrengthPoints: 900);
 
             var bound = new AiFactionProfile("Legion", tuned);
 
