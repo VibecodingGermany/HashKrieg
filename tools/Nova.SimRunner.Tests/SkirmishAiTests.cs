@@ -451,9 +451,9 @@ namespace Nova.SimRunner.Tests
             {
                 Assert.That(AiBehaviorId.Value, Is.EqualTo("r5.779A1B5B"),
                     "the AI identifier changed — bump the revision and write the journal entry");
-                Assert.That(decided, Is.EqualTo(2709u),
+                Assert.That(decided, Is.EqualTo(2548u),
                     "the AI decides the canonical match on a different tick than the pinned one");
-                Assert.That($"0x{endState:X16}", Is.EqualTo("0xDDE44F64DC295EB6"),
+                Assert.That($"0x{endState:X16}", Is.EqualTo("0x14472B2B943ED2BB"),
                     "same identifier, different end state: behaviour moved without the revision moving");
             });
         }

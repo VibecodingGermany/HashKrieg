@@ -59,7 +59,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gerichtet — das, was die Dokumentation die ganze Zeit versprochen hatte.
   **Offen bleibt die Ursache:** das Kommandoschema kennt kein „Ziel löschen", eine
   rohe 0 wird als `InvalidEntityId` abgewiesen. Ein sauberes Freigeben braucht
-  eine Schemaentscheidung und damit eine D-ID.
+  eine Schemaentscheidung und damit eine D-ID. Messbarer Nebeneffekt: die
+  kanonische Testpartie entscheidet jetzt auf Tick 2548 statt 2709 — die KI
+  gewinnt 161 Ticks früher, weil nachrückende Einheiten nicht mehr zu Hause
+  festhängen. Der Bezeichner steht auf `r5`, der gepinnte Endzustand ist
+  mitgeführt.
 
 ### Hinzugefügt
 - **Drei Werkzeuge zum Zusehen im F3-Panel (Einheitenstrang, optional):** Ein
