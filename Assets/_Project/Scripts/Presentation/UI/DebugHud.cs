@@ -7,7 +7,9 @@ using Nova.AI.Data;
 using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Combat;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 using Nova.Simulation.Victory;
 using EntityId = Nova.Core.EntityId;
@@ -64,6 +66,21 @@ namespace Nova.Presentation.UI
         [SerializeField] private int _fontSize = 13;
 
         private readonly StringBuilder _builder = new StringBuilder(256);
+
+        /// <summary>
+        /// The simulation's identity, computed ONCE. Both halves are constant
+        /// for the lifetime of the process — the definition table is static
+        /// data and the schema versions are consts — and
+        /// <see cref="SimDefinitions.ComputeDefinitionsHash64"/> walks both
+        /// tables, which is not a per-frame cost worth paying for a label.
+        /// </summary>
+        private static readonly string SimulationId =
+            $"sim {SimDefinitions.ComputeDefinitionsHash64():X16}  schema " +
+            $"s{MatchFingerprint.StateSchemaVersionV1}/" +
+            $"c{MatchFingerprint.CommandSchemaVersionV1}/" +
+            $"p{MatchFingerprint.PayloadSchemaVersionV1}/" +
+            $"n{MatchFingerprint.SnapshotSchemaVersionV1}/" +
+            $"x{MatchFingerprint.SidecarSchemaVersionV1}";
 
         /// <summary>
         /// Per-role combat profile text, sized to the weapon table itself so
@@ -239,6 +256,15 @@ namespace Nova.Presentation.UI
             // report and an entry in the behaviour journal can be tied to each
             // other without asking anybody what was built that day.
             GUILayout.Label($"AI behaviour {AiBehaviorId.Value}", _labelStyle);
+
+            // WHICH SIMULATION is this? The definition table's hash plus the
+            // five schema versions — the same values the match fingerprint
+            // seals, and the reason a simulation-changing merge invalidates
+            // every distributed test build: unequal builds are separated by
+            // exactly these numbers, not by a version string somebody
+            // remembered to bump. Two testers comparing screenshots can tell
+            // in one glance whether they are playing the same game.
+            GUILayout.Label(SimulationId, _labelStyle);
         }
 
         /// <summary>
