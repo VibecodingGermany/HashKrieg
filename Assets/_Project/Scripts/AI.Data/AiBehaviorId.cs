@@ -70,8 +70,45 @@ namespace Nova.AI.Data
         /// match), and a retreating unit is pointed at its pursuer instead of
         /// carrying a march target it can no longer reach.
         /// </para>
+        /// <para>
+        /// r6 gives the wave a unit of measure. It marched on a COUNT of
+        /// gathered units, and a count cannot tell an Alliance rifleman (100
+        /// points of damage times health per firing interval) from a Legion
+        /// recruit (44): twelve of each were both "a full wave", one of them at
+        /// 44 % of the attack strength of the other. The gate now sums
+        /// <c>CombatStrength</c> over the units inside the staging ring and
+        /// compares it against <c>waveStrengthPoints</c>. The r5 rule survives
+        /// translated into points — the threshold is still capped at what
+        /// production can actually still deliver, so a survivor standing
+        /// outside the ring cannot stall the next wave. Off setting:
+        /// <c>waveStrengthPoints</c> 0, which restores the count.
+        /// </para>
+        /// <para>
+        /// IT SHIPS DORMANT, and that is the point rather than an oversight.
+        /// The threshold is capped at what production can still deliver, so the
+        /// point clause can only decide anything while at least one head of the
+        /// army cap is free — at the shipped cap of 12 that means eleven
+        /// riflemen, 1.100 points, against a threshold of 1.200. The gate
+        /// therefore decides exactly like the count it replaces and the
+        /// canonical match is byte-identical. What the revision buys is the
+        /// DECOUPLING: the wave's threshold is no longer a head count paired to
+        /// the production cap, which is the precondition for moving that cap.
+        /// Measured one-sided, moving it WITHOUT the gate makes the Legion
+        /// worse (own losses 51 to 64); with the gate and a cap of 30 the same
+        /// seat decides faster than today with 23 own losses. The cap itself is
+        /// one of four values <c>MatchRunner</c> overrides with literals of its
+        /// own, so it is not this strand's to move.
+        /// <para>
+        /// THE MARGIN IS NINE POINTS PER RIFLEMAN, and weapon numbers are this
+        /// strand's own work: one more damage on the Alliance rifleman wakes
+        /// the gate without anyone touching the cap.
+        /// <c>AiProfileTests.TheStrengthGateIsDormantAtTheShippedArmyCap</c>
+        /// computes that margin from <c>CombatStrength</c> rather than trusting
+        /// a copied number, and goes red either way.
+        /// </para>
+        /// </para>
         /// </summary>
-        public const int Revision = 5;
+        public const int Revision = 6;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
@@ -121,6 +158,7 @@ namespace Nova.AI.Data
             writer.WriteInt32(profile.StagingToleranceCells);
             writer.WriteInt32(profile.RetreatHealthPercent);
             writer.WriteInt32(profile.RetreatDangerCells);
+            writer.WriteInt32(profile.WaveStrengthPoints);
             return writer.Digest();
         }
     }

@@ -148,7 +148,10 @@ namespace Nova.SimRunner.Tests
                 stagingDistanceCells: shipped.StagingDistanceCells,
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: shipped.RetreatHealthPercent,
-                retreatDangerCells: shipped.RetreatDangerCells);
+                retreatDangerCells: shipped.RetreatDangerCells,
+                // Waves off means waves off: the strength gate is the same
+                // rule and switches off with them.
+                waveStrengthPoints: 0);
         }
 
         private static AiHost BuildAiHost(ulong seed, AiProfile? profile = null)
@@ -451,7 +454,21 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void AiBehaviorId_TracksWhichAiThisIs()
         {
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r5.779A1B5B"),
+            // r6 MOVED THE IDENTIFIER AND NOT THE MATCH, and that is worth one
+            // sentence rather than a shrug. The strength gate replaces the head
+            // count, but its threshold is capped at what production can still
+            // deliver — and with the shipped army cap at twelve that ceiling
+            // binds first on both seats (twelve Alliance riflemen ARE 1.200
+            // points; twelve Legion recruits are 528 and the cap allows no
+            // thirteenth). So the gate ships decoupled and dormant, and the
+            // number it unblocks is a later PR's business.
+            //
+            // That this is visible at all is what D-101 bought: the match
+            // numbers live in CanonicalAiOutcomeTests now. Identifier moved and
+            // outcome unmoved is exactly the "declared change, no effect yet"
+            // case — under the old coupled pin it was indistinguishable from a
+            // simulation change.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 
@@ -718,7 +735,10 @@ namespace Nova.SimRunner.Tests
                 stagingDistanceCells: shipped.StagingDistanceCells,
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: 0,
-                retreatDangerCells: shipped.RetreatDangerCells);
+                retreatDangerCells: shipped.RetreatDangerCells,
+                // The COUNT path on purpose — this test pins the r5 rule, and
+                // the strength path has its own test.
+                waveStrengthPoints: 0);
 
             AiHost host = BuildMatch(Seed, probe);
             int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
@@ -740,6 +760,134 @@ namespace Nova.SimRunner.Tests
                 "marched can never come back, so a wave threshold fixed at the wave size can never be " +
                 "met again — the reinforcement stands at the staging cell until the time limit while " +
                 "the units that did march hold the front alone");
+        }
+
+        /// <summary>
+        /// The wave marches on STRENGTH, not on a head count — and the AI seat
+        /// of this fixture is the Legion, which is exactly where the difference
+        /// lives.
+        /// <para>
+        /// Twelve Legion recruits weigh 528 combat points; twelve Alliance
+        /// riflemen weigh 1.200. The head count calls both "a full wave of
+        /// twelve", so the Legion attacks at 44 % of the strength the same rule
+        /// hands the Alliance. With <c>waveStrengthPoints</c> at 1.200 the
+        /// Legion has to gather more recruits before it may march.
+        /// </para>
+        /// <para>
+        /// THE ARMY CAP IS RAISED TO 36 IN THE PROBE, and both the raise and
+        /// its size are load-bearing. The threshold is capped at what
+        /// production can still deliver, so at the shipped cap of twelve the
+        /// ceiling binds first and the two paths decide identically — which is
+        /// precisely why the shipped profile's end state is unchanged in
+        /// <see cref="AiBehaviorId_TracksWhatTheAiActuallyDoes"/>. A probe at
+        /// the shipped cap would pass on r5 as well and prove nothing.
+        /// <para>
+        /// 36 rather than 24 because 1.200 points are 28 recruits: a cap of 24
+        /// can hold at most 1.056 points, so the ceiling would STILL bind and
+        /// the test would measure "the wave waits for a full army cap" while
+        /// claiming to measure the threshold. That is what the second assertion
+        /// below exists to keep out.
+        /// </para>
+        /// </para>
+        /// <para>
+        /// NEGATIVE CONTROL: the two runs differ in ONE profile value and
+        /// nothing else. On the count path (<c>waveStrengthPoints</c> 0, which
+        /// is r5's only behaviour) both runs launch at the same twelve units,
+        /// the two numbers below are equal and the assertion fails. That the
+        /// off value exists is what makes this comparison possible at all —
+        /// the same property the lab uses to measure one-sided (M001).
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_GathersMoreOfTheWeakerUnit_WhenTheWaveIsMeasuredInStrength()
+        {
+            int atCountGate = CombatUnitsAtFirstLaunch(StrengthGateProbe(waveStrengthPoints: 0));
+            int atStrengthGate = CombatUnitsAtFirstLaunch(StrengthGateProbe(waveStrengthPoints: 1200));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(atCountGate, Is.GreaterThan(0),
+                    "the count path never launched a wave at all — the probe profile is broken, " +
+                    "not the rule under test");
+                Assert.That(atCountGate, Is.LessThanOrEqualTo(StrengthGateProbe(0).WaveSize + 2),
+                    "the count path is supposed to march at the wave size (plus at most one queued " +
+                    "batch that popped in the same decision)");
+                Assert.That(atStrengthGate, Is.GreaterThan(atCountGate),
+                    "the Legion marched with the same number of recruits whether the wave was measured " +
+                    "in heads or in combat points — twelve recruits are 528 points against the 1.200 " +
+                    "the threshold asks for, so the strength path has to keep gathering");
+
+                // AND IT WAS THE THRESHOLD THAT RELEASED IT, not an exhausted
+                // army cap. Without this line the test passes just as happily
+                // when waveStrengthPoints is ignored altogether and the wave
+                // simply waits for the cap to fill — which is what an earlier
+                // version of this probe measured without saying so, because its
+                // cap of 24 could not hold 1.200 points of recruits in the
+                // first place. 1.200 points are 28 recruits; the cap is 36.
+                Assert.That(atStrengthGate, Is.LessThan(StrengthGateProbe(0).TargetArmySize),
+                    "the wave only left once the army cap was full, so the point threshold decided " +
+                    "nothing — the profile value is not being read as a threshold at all");
+            });
+        }
+
+        /// <summary>
+        /// The probe for the strength gate: the shipped profile with the army
+        /// cap raised to 24 (see the test's remarks for why), retreat off so
+        /// nothing pulls a unit back over the ring while we are counting, and
+        /// the one value under test passed in.
+        /// </summary>
+        private static AiProfile StrengthGateProbe(int waveStrengthPoints)
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            return new AiProfile(
+                profileId: waveStrengthPoints > 0 ? "strength-gate-probe" : "count-gate-probe",
+                decisionTickInterval: shipped.DecisionTickInterval,
+                placementSearchRadius: shipped.PlacementSearchRadius,
+                powerReserve: shipped.PowerReserve,
+                targetHarvesters: shipped.TargetHarvesters,
+                harvesterQueueBatch: shipped.HarvesterQueueBatch,
+                targetArmySize: 36,
+                attackSquadThreshold: shipped.AttackSquadThreshold,
+                infantryQueueBatch: shipped.InfantryQueueBatch,
+                targetDamageWeight: shipped.TargetDamageWeight,
+                targetThreatWeight: shipped.TargetThreatWeight,
+                targetFinishWeight: shipped.TargetFinishWeight,
+                targetDistanceWeight: shipped.TargetDistanceWeight,
+                waveSize: shipped.WaveSize,
+                stagingDistanceCells: shipped.StagingDistanceCells,
+                stagingToleranceCells: shipped.StagingToleranceCells,
+                retreatHealthPercent: 0,
+                retreatDangerCells: shipped.RetreatDangerCells,
+                waveStrengthPoints: waveStrengthPoints);
+        }
+
+        /// <summary>
+        /// Living combat units the AI owns at the moment the FIRST of them
+        /// leaves the staging ring; 0 if no wave ever launched.
+        /// <para>
+        /// The count is taken at the launch tick and not at the decision that
+        /// ordered it, because the decision is not observable from outside the
+        /// system — a unit crossing the ring is. Nothing has been lost by then:
+        /// the first wave of the match walks into an empty map.
+        /// </para>
+        /// </summary>
+        private static int CombatUnitsAtFirstLaunch(AiProfile probe)
+        {
+            AiHost host = BuildMatch(Seed, probe);
+            int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True,
+                "without the AI's HQ there is no staging ring to measure against");
+
+            for (int i = 0; i < EndToEndBudgetTicks && !host.Victory.IsDecided; i++)
+            {
+                host.Step();
+                if (CountCombatUnitsOutsideRing(host, AiSlot, hqX, hqY, ring) > 0)
+                {
+                    return CountCombatUnits(host, AiSlot);
+                }
+            }
+            return 0;
         }
 
         /// <summary>
