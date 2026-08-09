@@ -63,8 +63,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   schwer zu formulieren, sondern nicht formulierbar. Nachweis ist keine
   Testzusage, sondern eine Zahl: Entscheidungstick und Endzustand bleiben
   identisch, der Bezeichner-Pin geht ohne Änderung durch. 564/564
-  SimRunner-Tests, Baseline-Dateien unberührt. **Im laufenden Spiel nicht
-  geprüft.**
+  SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt und bestätigt:** „Kam
+  in Welle." Kein Fall, in dem etwas kaputt aussah. Die Fortsetzung hat der
+  Spieler dabei selbst benannt — automatischer Wechsel zum Tröpfeln, wenn die
+  Armee bereits auf dem Angriffsweg ist, als Unterstützung; das kommt in einem
+  eigenen PR.
 - **Die KI zielt nach Wirkung statt nach Listenreihenfolge (Einheitenstrang,
   KI-Verhalten `r2`):** Die Zielwahl lautete „HQ, sonst das ERSTE sichtbare
   Gebäude, sonst die ERSTE sichtbare Einheit". Diese Reihenfolge ist die des
