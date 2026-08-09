@@ -1,6 +1,6 @@
-# Parallelbetrieb Sprint 13–15 — zwei Stränge, eine Simulation
+# Parallelbetrieb Sprint 13–18 — zwei Stränge, eine Simulation
 
-**Version:** 1.2.1 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers und Strangverantwortliche | **Sprint:** 13–15 | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
+**Version:** 1.3.0 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers und Strangverantwortliche | **Sprint:** 13–18 | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md), [16](16_Sprint_Wirtschaft.md), [18](18_Sprint_Befehl_und_Auswahl.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
 
 ## Warum es dieses Dokument gibt
 
@@ -20,19 +20,37 @@ Client aus unterschiedlichen Commits stammt.
 
 Dieses Dokument löst den Widerspruch, statt ihn auszusitzen.
 
-## Die Grundentscheidung: unser Strang fasst die Simulation nicht an
+> **Zum Dateinamen:** Er bleibt `13-15_Parallelbetrieb.md`, obwohl das Dokument
+> seit D-092 die Sprints 13–18 abdeckt. Ein Umbenennen bräche **24 eingehende
+> Links in zwölf Dateien**. Der Titel ist massgeblich, nicht der Dateiname.
 
-Sprints 13, 14 und 15 sind so geschnitten, dass sie **keine Datei unter
-`Assets/_Project/Scripts/Simulation/` und keine unter `Scripts/AI*` ändern.**
-Netzwerk, Matchrahmen, Oberfläche und Relay-Betrieb reichen dafür aus.
+## Die Grundentscheidung: die Trennung läuft über Dateien, nicht über Verhalten
 
-Damit gehört der gesamte Simulations-Verhaltensraum für die Dauer von 13–15
-dem Einheitenstrang allein. Das ist kein Zugeständnis, sondern der Grund,
-warum beide Stränge überhaupt nebeneinander laufen können.
+> **Geändert mit [D-092](../DecisionLog.md) (2026-08-09).** Bis dahin galt die
+> schärfere Fassung: Sprints 13–15 fassen **gar keine** Datei unter
+> `Scripts/Simulation/` an, und der gesamte Simulations-Verhaltensraum gehört
+> für ihre Dauer dem Einheitenstrang allein. Diese Fassung ist überholt, weil
+> der erste Betatest acht Fehler genau in `Construction/`, `Economy/`,
+> `Production/` und dem zugehörigen HUD gemeldet hat — Ordner, die kein Strang bearbeiten durfte, solange
+> die Regel galt. Der Wortlaut bleibt hier stehen, damit nachvollziehbar ist,
+> wovon abgewichen wurde.
 
-Die Folge für uns: **Strang C aus Sprint 12 (Wirtschaftsdruck) wandert hinter
-Sprint 15.** Er bleibt in unserer Hand, aber er ist simulationsverändernd und
-würde die Trennung sofort aufheben. Er wird als Sprint 16 geführt.
+Ab Sprint 16 arbeiten **beide** Stränge in der Simulation. Die Trennung, die den
+Parallelbetrieb trägt, ist ab jetzt ausschliesslich die Schreibhoheitstabelle
+unten — sie ist vollständig, und jeder Pfad hat genau einen Eigentümer.
+
+Was das kostet und was es nicht kostet:
+
+| | |
+|---|---|
+| **Dateikonflikte** | unverändert ausgeschlossen — die Tabelle ist disjunkt |
+| **Determinismus-Baselines** | ab jetzt können **beide** Stränge sie bewegen. Die Regel „Verhalten und Baseline nie im selben PR" wird damit zur wichtigsten Regel dieses Dokuments, nicht zur zweitwichtigsten |
+| **Verteilte Testbuilds** | altern schneller, weil zwei Quellen den Fingerprint bewegen. Das Merge-Fenster unten ist die Antwort |
+| **Der Definitions-Hash** | `SimDefinitions` geht in `DefinitionsHash64` ein, und der Relay vergleicht ihn **serverseitig** (`RelayServerCore`). Jede Zahlenänderung dort verlangt einen Relay-Redeploy und gleiche Builds auf beiden Seiten — siehe „Definitions-Hash" unten |
+
+**Sprint 16** ist damit der Strang C aus Sprint 12 (Knappheit, Lager, Radar,
+Low Power, Bauvoraussetzungen, Platzierung) plus die Betatest-Befunde im selben
+Schreibbereich. Er läuft **parallel** zu 13B, nicht dahinter.
 
 ## Schreibhoheit
 
@@ -48,7 +66,7 @@ Freiraum.
 | `Scripts/Simulation/Movement/` | **Einheitenstrang** | |
 | `Scripts/Simulation/Combat/` | **Einheitenstrang** | inkl. `WeaponProfiles`, `DamageMatrix`, `ArmorClass` |
 | `Scripts/Simulation/Factions/` | **Einheitenstrang** | Legion-Waffenidentität |
-| `Scripts/Simulation/Pathfinding/` | **Einheitenstrang (13–15)** | `MovementSystem` hängt im Konstruktor daran; ohne Flow-Field-Zugriff ist B3 nicht lösbar. **`CostField` ist Vertragsfläche** — siehe unten |
+| `Scripts/Simulation/Pathfinding/` | **Einheitenstrang (13–18)** | `MovementSystem` hängt im Konstruktor daran; ohne Flow-Field-Zugriff ist B3 nicht lösbar. **`CostField` ist Vertragsfläche** — siehe unten |
 | `Scripts/Networking/` | **Netzstrang** | |
 | `Scripts/Gameplay/Match/` | **Netzstrang** | `MatchConfig`, `MatchBootstrap`, `MatchRunner` — inkl. der Systemregistrierung |
 | `Scripts/Gameplay/UI/`, `Scripts/Gameplay/Input/` | **Netzstrang** | Verbindungs- und Lobbyoberfläche, Fraktionsauswahl |
@@ -58,28 +76,47 @@ Freiraum.
 | `Scripts/Data/` | **Netzstrang** | Registries und Karten, überwiegend Unity-Assets — mergen schlecht, ein Schreiber |
 | `Scripts/Simulation/Vision/` | **Netzstrang** | `FogOfWarSystem`. **Vertragsfläche:** `CombatSystem` konsumiert `GetTeamView` |
 | `Scripts/Simulation/Commanders/`, `Victory/` | **Netzstrang** | |
-| `Scripts/Simulation/Construction/`, `Economy/`, `Production/` | **Netzstrang (ab Sprint 16)** | in 13–15 fasst sie niemand an |
+| `Scripts/Simulation/Construction/`, `Economy/`, `Production/` | **Netzstrang — ab Sprint 16 aktiv** | seit D-092 in Arbeit, nicht mehr gesperrt. **Vertragsfläche:** die Platzierungsprüfung (`ValidatePlacement`) liest `Pathfinding.CostField` |
 | `tools/Nova.RelayServer/`, `tools/packaging/` | **Netzstrang** | |
+| `tools/lobby/` (neu, D-098) | **Netzstrang** | SQL, Policies und Edge Functions der Lobby als Quelltext; ausgerollt wird im Supabase-Projekt ausserhalb des Repos |
 | `Scripts/Simulation/Definitions/` | **geteilt — Absprache nötig** | Vertragsfläche: `WeaponDefinition`/`UnitDefinition` braucht der Einheitenstrang, `BuildingDefinition`/`SimDefinitions` der Wirtschaftsstrang |
 | `Scripts/Simulation/SimulationKernel.cs` | **niemand ohne D-ID** | Tick-Reihenfolge, siehe „Neue Systeme" |
 | `Scripts/Simulation/Systems/` | **niemand ohne D-ID** | `ISimSystem` ist der Systemvertrag selbst |
 | `Scripts/Simulation/CommandsV1/` | **niemand ohne D-ID** | Command- und Payload-Schema |
-| `Scripts/Simulation/Replays/`, `Snapshots/`, `State/` | **niemand ohne D-ID** | Speicherformat und Fingerprint — Änderung ist eine Inhaberentscheidung |
+| `Scripts/Simulation/Replays/`, `Snapshots/` | **niemand ohne D-ID** | Speicherformat und Fingerprint — Änderung ist eine Inhaberentscheidung |
+| `Scripts/Simulation/State/` — **Layout und Serialisierung** | **niemand ohne D-ID** | Feldbestand, Feldreihenfolge, `StateVersion`, Blockformat. Das ist der Teil, der Snapshots und Replays unlesbar macht |
+| `Scripts/Simulation/State/` — **Befehlsanwendung** (`UnitCommandStateView`) | **Netzstrang** | mit D-092 aus dem Frost gelöst: *was* ein bestehender `CommandKind` in den Zustand schreibt, ist Verhalten, nicht Format. **Kein neuer `CommandKind`** — das Register bleibt eingefroren |
 | `CHANGELOG.md` | **serialisiert** | ein Eintrag pro PR, Konflikte löst der Mergende |
 | `docs/production/hashkrieg/` | **Maintainer** | Planungsstand; Befunde kommen per Mail oder Issue, nicht per PR |
 
 Berührt ein PR fremdes Terrain, wird er nicht gemergt, sondern zurückgegeben.
 Das gilt in beide Richtungen.
 
+### Die Trennlinie in `UnitCommandStateView`
+
+Sie verläuft nicht zwischen Befehlsarten, sondern zwischen **Zielsetzung** und
+**Ausführung**:
+
+| | Wer | Beispiel |
+|---|---|---|
+| Was ein Befehl in den Zustand **schreibt** | **Netzstrang** | `Stop` löscht `AttackTarget`; `Move` verteilt Zielzellen; `Harvest` setzt `HarvestFieldId` |
+| Wie eine Einheit daraufhin **fährt und schiesst** | **Einheitenstrang** | `MovementSystem` fährt zur Zielzelle, `CombatSystem` erfasst und feuert |
+
+Präzedenz ist [D-088](../DecisionLog.md): die Formationsverteilung in `ApplyMove`
+hat das Maintainer-Team gebaut, während `MovementSystem` beim Einheitenstrang lag.
+D-092 schreibt diese bereits gelebte Linie nur auf.
+
 ### Vertragsflächen in fremdem Besitz
 
-Zwei Ordner gehören einem Strang, werden aber vom anderen konsumiert. Dort gilt
+Vier Flächen gehören einem Strang, werden aber vom anderen konsumiert. Dort gilt
 zusätzlich: **Verhalten ändern ja, Vertrag ändern nur nach Absprache.**
 
 | Fläche | Eigentümer | Konsument | Was ohne Absprache nicht geht |
 |---|---|---|---|
 | `Pathfinding.CostField` | Einheitenstrang | `ConstructionSystem` (Platzierungsprüfung, Sprint 16) | Signatur oder Begehbarkeits-Semantik von `IsWalkable` ändern. Flow-Field-Erzeugung und Pathfinding-Interna sind frei |
 | `FogOfWarSystem.GetTeamView` | Netzstrang | `CombatSystem` (Zielerlaubnis) | Rückgabeform oder Sichtbarkeitsregel ändern, ohne den Einheitenstrang zu informieren |
+| `WeaponProfiles`-Slot `UnitRole.Unit` | Einheitenstrang | `ConstructionSystem` (Baustellen tragen heute diese Rolle) | Sprint 16 löst die Kopplung auf, indem die Baustelle `def.Role` statt `UnitRole.Unit` bekommt. Bis dahin gilt: der Fallback-Schaden von 15 ist **keine** Baustellenregel, sondern ein Nebeneffekt. Wer den Slot umwidmet, sagt es an |
+| `UnitState.AttackTarget` | Einheitenstrang (`CombatSystem`) | `UnitCommandStateView` (`Stop` löscht es, Sprint 16) | das Feld **löschen** darf der Netzstrang. Eine Regel, *wann automatisch neu erfasst wird* (D-087, Auto-Zielerfassung), gehört dem Einheitenstrang. Ein „Feuer einstellen" ist deshalb kein Netzstrang-Paket |
 
 ## Neue Systeme — wer die Tick-Reihenfolge setzt
 
@@ -151,27 +188,66 @@ altern damit bei jedem simulationsverändernden Merge.
 | **Kein Fenster während eines Netznachweises** | Läuft gerade A8 Stufe 2–4 oder eine Abnahmerunde, ist das Fenster zu |
 | **Nach jedem Fenster** | Build für **jede** Plattform, an der jemand testet, neuer Build an alle Testenden, alter Build ist ungültig |
 | **Der Netzstrang testet gegen einen festen Stand** | Abnahmeläufe nennen den Commit, gegen den sie liefen — sonst ist das Ergebnis nicht zuordenbar |
+| **Ein Fenster hat einen Strang** | seit D-092 bewegen beide Stränge Baselines. In einem Fenster mergen wir die PRs **eines** Strangs, prüfen die Baselines, und öffnen dann das nächste. Zwei Stränge in einem Fenster machen einen roten Test nicht zuordenbar |
+
+### Der Definitions-Hash — die teuerste Zahl im Projekt
+
+`SimDefinitions.ComputeDefinitionsHash64()` fasst Gebäude- und Einheitenwerte
+zusammen. Der Relay berechnet ihn **im Serverprozess** und lehnt jeden Peer mit
+abweichendem Hash ab (`RelayServerCore`). Kein Test pinnt ihn auf ein Literal —
+die Bremse ist rein betrieblich:
+
+> **Jede geänderte Zahl in `SimDefinitions` verlangt einen Relay-Redeploy und
+> gleiche Builds auf beiden Seiten.** Solange der Relay nur lokal läuft, kostet
+> das nichts. Nach dem VPS-Rollout kostet es einen Serverzugang.
+
+Daraus folgt die Reihenfolge: **alles, was `SimDefinitions` anfasst, passiert vor
+dem VPS-Rollout, nicht danach.** Das betrifft in Sprint 16 die Feldwerte (C1) und
+die Bauvoraussetzungs-Bitmaske (C5).
+
+### Die kanonische Startaufstellung wird an fünf Stellen gepflegt
+
+Wer die Startaufstellung ändert, ändert sie **synchron** in:
+
+1. `Assets/_Project/Scripts/Gameplay/Match/MatchBootstrap.cs` — `SetupSlot`
+2. `tools/Nova.SimRunner/Determinism10000Scenario.cs` — `SetupMatch`
+3. `tools/Nova.SimRunner.Tests/CanonicalMatchSetupTests.cs`
+4. `Assets/Tests/EditMode/Gameplay/CanonicalMatchSetupTests.cs` (handgespiegelt)
+5. `Assets/_Project/Scripts/Presentation/Maps/GlutrinneBlockoutView.cs` —
+   Feldmarker und Steinstreu-Ausschluss stehen dort als **zwei feste Aufrufe**
+   (`LocalFieldCell`, `EnemyFieldCell`) statt als Schleife über die registrierten
+   Felder
+
+Die Spiegelung von 3 und 4 ist im Test selbst vermerkt („Any edit to the reference
+must be applied to BOTH copies"). Das ist die stillste Falle im ganzen
+Parallelbetrieb: vier von fünf Stellen zu pflegen ergibt entweder einen roten
+Test, der wie ein Determinismusfehler aussieht und keiner ist — oder Felder ohne
+sichtbaren Marker.
 
 ### Plattformen
 
-`tools/packaging/` enthält heute nur den macOS-Weg. Solange das so ist, kann am
-Netznachweis (A8 Stufen 2–4) nur teilnehmen, wer einen Mac hat — der
-Einheitenstrang wäre damit von genau der Runde ausgeschlossen, deren Verhalten er
-baut.
-
-**Der Linux-Build ist deshalb eine Bringschuld des Netzstrangs** und liegt als
-Paket 13.7 in [Sprint 13](13_Sprint_Netzpartie.md). Die .NET-Toolchain für die
-SimRunner-Tests richtet sich jeder Strang selbst ein; das ist keine Bringschuld.
-
-Wer den Commit seines Builds prüfen will:
+Beide Wege stehen: `tools/packaging/build-mac.sh` und `build-linux.sh` (Paket
+13.7, seit `e15f5e6`). Beide brennen denselben `NovaBuildCommit` ein.
 
 ```bash
 # macOS
 defaults read /Applications/ProjectNova.app/Contents/Info.plist NovaBuildCommit
 
-# Linux (nach 13.7)
+# Linux
 cat ProjectNova_Data/NovaBuildCommit.txt
 ```
+
+Zwei Einschränkungen, die bleiben: beide Skripte laufen **nur auf einem Mac**
+(Unity-Hub-Pfad fest verdrahtet, Linux ist eine Cross-Kompilierung und braucht
+das Hub-Modul `LinuxStandaloneSupport`), und **kein C#-Code liest den Stempel** —
+das Spiel kennt seinen eigenen Build nicht. Solange das so ist, kann keine Lobby
+ungleiche Builds im Klartext erklären; der Leser ist Vorarbeit von
+[Sprint 14](14_Sprint_Lobby.md).
+
+Die .NET-Toolchain für die SimRunner-Tests richtet sich jeder Strang selbst ein;
+das ist keine Bringschuld. `global.json` pinnt `8.0.318` mit
+`rollForward: disable` — wer ein neueres SDK hat, baut nicht und muss den
+Nachweis über die CI im PR führen.
 
 ## Der externe Beitragende — Zugangsmodell
 
@@ -215,7 +291,8 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
-| 1.2.0 | 2026-08-09 | Zwei Pfade nachgetragen, die der Einheitenstrang in der Praxis braucht und die die Tabelle nicht kannte: `tools/Nova.AiLab/` samt Tests (Messwerkzeug, kein Spielcode) und `Presentation/UI/DebugHud.cs` als ausdrückliche Ausnahme aus `Presentation/`. Beide Lücken lagen im Dokument, nicht im Verhalten des Beitragenden | Producer / Agent (Umsetzung) |
+| 1.3.0 | 2026-08-09 | **D-092:** Trennung von „Verhaltensraum" auf „Dateihoheit" umgestellt — Sprint 16 läuft parallel zu 13B statt dahinter. `Simulation/State/` in Layout (weiter eingefroren) und Befehlsanwendung (Eigentümer des jeweiligen Befehls) getrennt. Zwei Vertragsflächen ergänzt (`WeaponProfiles`-Slot `UnitRole.Unit`, `UnitState.AttackTarget`). Merge-Fenster auf einen Strang je Fenster verschärft. Abschnitte „Definitions-Hash" und „kanonische Startaufstellung an vier Stellen" ergänzt. Plattform-Abschnitt berichtigt: der Linux-Build existiert seit `e15f5e6`, die offene Bringschuld ist stattdessen ein `NovaBuildCommit`-Leser im Spiel | Orchestrator |
+| 1.2.2 | 2026-08-09 | Zwei Pfade nachgetragen, die der Einheitenstrang in der Praxis braucht und die die Tabelle nicht kannte: `tools/Nova.AiLab/` samt Tests (Messwerkzeug, kein Spielcode) und `Presentation/UI/DebugHud.cs` als ausdrückliche Ausnahme aus `Presentation/`. Beide Lücken lagen im Dokument, nicht im Verhalten des Beitragenden | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-08 | D-091: konkrete Merge-Accounts, Maintainer-Peer-Review, CLA-/Review-Prüfung und vorbereiteter Tier-2-Rollout ergänzt | Producer / Agent (Umsetzung) |
 | 1.2.1 | 2026-08-08 | Metadata-only Checks auf vertrauenswürdigen Zielbranch-Kontext gehärtet und D-ID-Pflicht auf echte Entscheidungen vereinheitlicht | Producer / Agent (Umsetzung) |

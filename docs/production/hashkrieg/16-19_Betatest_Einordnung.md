@@ -2,6 +2,38 @@
 
 **Status:** Vorschlag zur Sprintbildung — **keine beschlossene Sprintplanung** | **Quelle:** [Testberichte/2026-08-09_a434e2c_T-01.md](Testberichte/2026-08-09_a434e2c_T-01.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md), [Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) | **Leitsatz:** die Schreibhoheit entscheidet die Sprintgrenze, nicht das Thema
 
+> **Überholt — historischer Vorschlag.** Der Großauftrag und die Sprintdateien 16
+> und 18 vom 2026-08-09 haben diesen Text abgelöst. Verbindlich sind
+> [AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md),
+> [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) und
+> [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md). Der Text
+> unten bleibt unverändert stehen, damit nachvollziehbar ist, woraus die Sprints
+> entstanden sind — er wird nicht nachgezogen.
+>
+> **Die Paketnummern unten sind nicht die des Sprints 16.** Dieselbe Nummer meint
+> hier und dort Verschiedenes: 16.4 heißt hier „Lager und Radar", in der
+> Sprintdatei „Das Lager wird ein Gebäude"; 16.5 heißt hier „Energie wird
+> sichtbar", dort „Das Radar wird ein Gebäude". Maßgeblich ist die Nummerierung
+> der Sprintdatei — an sie bindet der Großauftrag die Reihenfolge.
+>
+> **Die vier offenen Inhaberfragen sind geschlossen:** #53 und #54 mit
+> [D-093](../DecisionLog.md), #45 mit [D-094](../DecisionLog.md), #52 mit
+> [D-092](../DecisionLog.md) und Sprint 18.
+>
+> **Vier Aussagen unten sind am Code widerlegt:**
+>
+> - **#48 ist ein Platzierungsfehler, kein fehlendes Feature.**
+>   `DebugHud.DrawStatusBar` zeigt Aetherium und Strombilanz dauerhaft an, samt
+>   `(LOW POWER)`. Sie steht nur nicht dort, wo gebaut wird.
+> - **#52 ist zur Hälfte gebaut.** Die Zielverteilung existiert seit Sprint 11 in
+>   `UnitCommandStateView.ApplyMove`. Offen ist allein die Ausrichtung; einen
+>   neuen Befehlstyp braucht sie nicht.
+> - **#44 braucht keine neue Rolle in `Definitions/`.** `SpawnBuildingEntity`
+>   vergibt heute `completed ? def.Role : UnitRole.Unit`; die Baustelle bekommt
+>   die bestehende `def.Role`. Der geteilte Bereich wird dafür nicht angefasst.
+> - **#47 und #45 laufen nicht ohne Sprintbindung.** Beide stehen als Paket 16.10
+>   in Block 1. Sprintfrei ist allein #49 als Block 0.
+
 ## Zweck
 
 Der erste Betatest-Bericht (Build `a434e2c`, 09.08.2026) ist in 16 Issues
@@ -228,3 +260,4 @@ dort aber nicht.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-08-09 | Einordnung der Issues #43–#58 aus dem ersten Betatest-Bericht | Orchestrator |
+| 1.1.0 | 2026-08-09 | Kopfkasten: Dokument als überholter Vorschlag gekennzeichnet, Nummernkollision mit Sprint 16 benannt, die vier Inhaberfragen als geschlossen vermerkt, vier am Code widerlegte Aussagen richtiggestellt | Orchestrator |

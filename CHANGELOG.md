@@ -18,6 +18,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Geändert
+- **Der erste Betatest ist eingeordnet, und die Sprintfolge ist danach neu
+  geschnitten.** Der Bericht zu Build `a434e2c` (Tester T-01) liegt anonymisiert
+  in der Mappe, der Ablauf dafür ist in `Nutzerfeedback_Ablauf.md` festgehalten,
+  und die 16 daraus entstandenen Issues (#43–#58) sind auf Sprints verteilt. Neu
+  sind die Sprintdateien 16 (Wirtschaft: Knappheit, Lager, Radar, Low Power,
+  Bauvoraussetzungen, Platzierung — zusammengeführt mit Strang C aus Sprint 12)
+  und 18 (Befehl und Auswahl), dazu ein gebündelter Arbeitsauftrag über die
+  Blöcke 0 bis 4. Das Regelwerk zum Parallelbetrieb stellt die Trennung
+  zwischen Netz- und Einheitenstrang von „Verhaltensraum" auf **Dateihoheit**
+  um (D-092), womit Sprint 16 neben statt hinter dem Einheitenstrang läuft; der
+  Frost auf `Simulation/State/` ist dabei in Layout (weiter eingefroren) und
+  Befehlsanwendung (Netzstrang) getrennt worden. Eine Prüfung der neuen
+  Dokumente gegen den Quelltext hat sechs Annahmen widerlegt, die sonst in die
+  Umsetzung gegangen wären — darunter, dass die Energieanzeige fehle (sie
+  existiert in `DebugHud.DrawStatusBar` und steht nur an der falschen Stelle),
+  dass Paket 16.7 den Definitions-Hash bewege (die Feldwerte liegen in
+  `MatchBootstrap`, nicht in `SimDefinitions`), dass die Verteidigungsabschaltung
+  bei Strommangel vom Wirtschaftsstrang aus erreichbar sei (`Simulation/Combat/`
+  kennt keinen Strombegriff) und dass die kanonische Startaufstellung an vier
+  Stellen gepflegt werde (es sind fünf; `GlutrinneBlockoutView` setzt die
+  Feldmarker als zwei feste Aufrufe).
 - **Die fertige Raffinerie stellt ihren ersten Sammler kostenlos hin.** Der
   Sammler kostet 700 AE und die Raffinerie ist seit D-077 sein einziger
   Produzent. Wer sich vor ihrer Fertigstellung unter 700 AE herunterbaut, hatte

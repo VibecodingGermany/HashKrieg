@@ -1,6 +1,6 @@
 # Sprint 13: Die erste echte Netzpartie — zwei Menschen, zwei Rechner, ein Server
 
-**Version:** 1.1.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang | **Sprint:** 13 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) (A1–A7 umgesetzt, A8 Stufen 2–4 offen) | **Parallel zu:** [13.0](13-0_Sprint_Freigabe.md), [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human (13.1 ist Oberfläche) | **Leitsatz:** der Beweis ist eine gespielte Runde, kein grüner Test
+**Version:** 1.2.0 | **Status:** teilweise umgesetzt (13.1 und 13.7 seit `e15f5e6`); 13.2 bis 13.5 offen | **Verantwortungsbereich:** Netzstrang | **Sprint:** 13 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) (A1–A7 umgesetzt, A8 Stufen 2–4 offen) | **Parallel zu:** [13.0](13-0_Sprint_Freigabe.md), [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human (13.1 ist Oberfläche) | **Leitsatz:** der Beweis ist eine gespielte Runde, kein grüner Test
 
 ## Ziel
 
@@ -8,9 +8,17 @@ Zwei Menschen an zwei Rechnern spielen eine vollständige Partie über den Relay
 auf dem VPS. Vorher hat das niemand getan.
 
 Sprint 12 hat den Netzpfad gebaut und headless bis Tick 10.023 bewiesen. Was
-fehlt, ist nicht Technik, sondern der Weg vom Doppelklick bis zum laufenden
-Match: es gibt **keine Oberfläche, in die jemand Serveradresse und Match-Code
-eintippen könnte**, und der Relay läuft auf keinem erreichbaren Host.
+fehlte, war nicht Technik, sondern der Weg vom Doppelklick bis zum laufenden
+Match. Die Oberfläche dafür steht seit `e15f5e6` (13.1), der Linux-Build
+ebenfalls (13.7). Offen bleibt: der Relay läuft auf keinem erreichbaren Host,
+und niemand hat die Partie gespielt.
+
+**Wer den Rest erledigen kann:** 13.2 braucht Zugangsdaten zum VPS. 13.3 braucht
+einen Menschen an zwei Unity-Fenstern. 13.4 und 13.5 brauchen zwei Menschen an
+zwei Rechnern. Keines davon ist ein Agentenauftrag; der Großauftrag vom
+2026-08-09 ([AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md)) weist alle vier
+ausdrücklich als nicht enthalten aus. Was hier noch fehlt, fehlt an Zugang und
+an Menschen, nicht an Code.
 
 ## Ausgangslage — geprüft, nicht übernommen
 
@@ -21,7 +29,8 @@ eintippen könnte**, und der Relay läuft auf keinem erreichbaren Host.
 | Relay-Server, systemd-Unit, `deploy.sh` | vorhanden (A7), nie auf einem Linux-Host gelaufen |
 | A8 Stufe 1 (headless Zwei-Klienten-Soak) | nachgewiesen |
 | A8 Stufen 2–4 (zwei Fenster, LAN, VPS) | **offen** |
-| Verbindungsoberfläche | **existiert nicht** |
+| Verbindungsoberfläche | umgesetzt, `e15f5e6` (13.1) — `MainMenuController.BuildNetworkJoin` |
+| Linux-Build | umgesetzt, `e15f5e6` (13.7) — `tools/packaging/build-linux.sh` |
 
 ## Pakete
 
@@ -93,6 +102,19 @@ das der erste Schritt und wird notiert.
 Dieses Paket kommt **vor** 13.4, sonst ist Stufe 3 nur zwischen zwei Macs
 belegbar.
 
+**Umgesetzt mit `e15f5e6`:** `BuildScript.BuildLinux64` und
+`tools/packaging/build-linux.sh` nach dem Muster von `build-mac.sh`, mit dem
+Stempel in `ProjectNova_Data/NovaBuildCommit.txt`.
+
+**Aktenfehler, der dabei offen blieb:** Beide Packaging-Skripte brennen den
+`NovaBuildCommit` ein, aber **keine einzige C#-Datei liest ihn** — das Spiel
+kennt seinen eigenen Build nicht und kann ihn weder anzeigen noch melden. Der
+Stempel ist damit nur von außen lesbar (`defaults read … NovaBuildCommit`, `cat
+ProjectNova_Data/NovaBuildCommit.txt`). Der fehlende Leser wird nicht hier
+nachgezogen, sondern als Paket 14.0 im Großauftrag vom 2026-08-09
+([AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md)); ohne ihn ist der
+Build-Abgleich in Sprint 14 nicht baubar.
+
 ## Schreibhoheit
 
 | Pfad | |
@@ -141,11 +163,13 @@ eine Verfügbarkeitsfrage, und sie entscheidet über das Sprintziel.
 | Kandidat | Was fehlt |
 |---|---|
 | Der zweite Maintainer | Zeit; Rückkehr in den nächsten Wochen angekündigt |
-| Der Einheitenstrang | ein Linux-Build — genau Paket 13.7 |
+| Der Einheitenstrang | nichts mehr an Technik — der Linux-Build steht seit `e15f5e6` |
 
-Daraus folgt die Reihenfolge: **13.7 wird früh gebaut, nicht am Ende.** Er ist
-nicht Beiwerk, sondern die Bedingung dafür, dass Stufe 3 und 4 überhaupt jemanden
-zum Mitspielen haben. Steht kein zweiter Mensch bereit, endet der Sprint sauber
+Die Reihenfolge lautete: **13.7 wird früh gebaut, nicht am Ende.** Das ist
+eingelöst. Der Build war nicht Beiwerk, sondern die Bedingung dafür, dass Stufe 3
+und 4 überhaupt jemanden zum Mitspielen haben; diese Bedingung ist jetzt erfüllt,
+der Engpass ist ab hier reine Verfügbarkeit. Steht kein zweiter Mensch bereit,
+endet der Sprint sauber
 nach 13.3 und die Stufen 3 und 4 werden als offen ausgewiesen, statt sie als
 erledigt zu behaupten.
 
@@ -176,5 +200,6 @@ nachgewiesen und Linux-Build bereitgestellt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-09 | Stand nach `e15f5e6` nachgezogen: 13.1 (Verbindungsdialog) und 13.7 (Linux-Build) sind umgesetzt, der Sprint steht damit auf „teilweise umgesetzt". Ausgangslage berichtigt (Verbindungsoberfläche nicht mehr „existiert nicht"; Zeile zum Linux-Build ergänzt). Einordnung der Restarbeit ergänzt: 13.2 braucht VPS-Zugangsdaten, 13.3 einen Menschen an zwei Fenstern, 13.4 und 13.5 zwei Menschen an zwei Rechnern — im Großauftrag vom 2026-08-09 ausdrücklich nicht enthalten. Aktenfehler bei 13.7 vermerkt: kein C#-Code liest den `NovaBuildCommit`, der Leser kommt als Paket 14.0 | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Paket 13.6 (Baseline-Wächter) nach [Sprint 13.0](13-0_Sprint_Freigabe.md) verschoben, weil der auslösende Strang früher anfängt; damit auch `.github/workflows/` aus der Schreibhoheit raus und der Sprint gegen 13.0 konfliktfrei. Paket 13.7 (Linux-Build) ergänzt und als Vorbedingung für Abnahmestufe 3 markiert. Abschnitt „Der zweite Mensch" ergänzt: 13.4 und 13.5 sind verfügbarkeits-, nicht technikbegrenzt | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-08 | Erstfassung | Producer / Agent (Umsetzung) |

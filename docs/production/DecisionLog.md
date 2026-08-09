@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.29.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 13.0
+**Version:** 1.31.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -2500,6 +2500,467 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
 
 ---
 
+### D-092 | verbindlich | Sprint 16 (Parallelbetrieb über Dateihoheit statt Verhaltensraum)
+
+**Status:** Inhaberentscheidung vom 2026-08-09. Sie ist in
+[13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) Fassung 1.3.0
+eingearbeitet; der überholte Wortlaut steht dort weiterhin zitiert, damit
+nachvollziehbar bleibt, wovon abgewichen wurde.
+
+**Kontext:** Die bisherige Regel trennte Netzstrang und externen Einheitenstrang
+über den *Verhaltensraum*: Sprints 13–15 fassen gar keine Datei unter
+`Scripts/Simulation/` an, und die gesamte Simulation gehört für ihre Dauer dem
+Einheitenstrang. Der erste Betatest hat sechs Fehler gemeldet, die genau in
+`Construction/`, `Economy/` und `Production/` liegen — Ordner, die unter dieser
+Regel kein Strang bearbeiten durfte. Zusätzlich lag `Scripts/Simulation/State/`
+vollständig im Frost („niemand ohne D-ID"), obwohl zwei der Befunde (#43, #45)
+einen schreibenden Zugriff auf den Einheitenzustand brauchen. Zugleich stand
+Strang C aus [12_Sprint_Zu_Zweit.md](hashkrieg/12_Sprint_Zu_Zweit.md)
+(Knappheit, Lager, Radar, Low Power, Bauvoraussetzungen, Platzierung) hinter dem
+Netzstrang in der Warteschlange.
+
+**Alternativen:**
+
+1. Bei der alten Regel bleiben und Sprint 16 hinter Sprint 15 lassen —
+   verworfen: sechs Betatest-Befunde liegen in `Construction/`, `Economy/` und
+   `Production/` und blieben damit bis nach dem Netzstrang unbearbeitet. Jede
+   weitere Testrunde meldet dieselben Fehler erneut.
+2. Sprint 16 dem externen Einheitenstrang übergeben — verworfen: der Strang hat
+   eine eigene, fortlaufende Paketliste (B1–B5), und Wirtschaft ist ausdrücklich
+   nicht sein Gegenstand. Außerdem läge damit die gesamte Simulation bei einem
+   externen Beitragenden.
+3. Nur die Betatest-Fehler herausziehen und Strang C weiter verschieben —
+   verworfen: dieselben Ordner würden zweimal geöffnet, und die Fehler #53
+   (Lager) und #54 (Radar) sind ohne die Wirtschaftsmechanik gar nicht behebbar.
+4. **Gewählt: Trennung über Dateihoheit, Sprint 16 parallel zu 13B.** Preis:
+   beide Stränge bewegen ab jetzt Determinismus-Baselines. Deshalb wird das
+   Merge-Fenster auf **einen Strang je Fenster** verschärft.
+
+Für den Frost auf `Scripts/Simulation/State/` zusätzlich geprüft:
+
+5. Den Frost unverändert lassen — verworfen: dann bleiben #43 und #45
+   unbehebbar, weil der nötige Zustandszugriff keinem Strang erlaubt wäre.
+6. Den Frost ganz aufheben — verworfen: das Zustandslayout ist genau das, was
+   Snapshots und Replays unlesbar macht.
+7. **Gewählt: Layout bleibt eingefroren, die Befehlsanwendung folgt dem
+   Eigentümer des jeweiligen Befehls.**
+
+**Entscheidung:**
+
+1. Die Trennung des Parallelbetriebs ist ab sofort ausschließlich die
+   Schreibhoheitstabelle in
+   [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md). Sie ist
+   vollständig; jeder Pfad unter `Assets/_Project/Scripts/` hat genau einen
+   Eigentümer, und ein unzugeordneter Pfad ist ein Fehler im Dokument, kein
+   Freiraum. `Construction/`, `Economy/` und `Production/` gehören dem
+   Netzstrang und sind ab Sprint 16 aktiv statt gesperrt.
+2. **Sprint 16 läuft parallel zu 13B**, nicht dahinter. Er führt Strang C aus
+   Sprint 12 und die Betatest-Befunde im selben Schreibbereich zusammen.
+3. `Scripts/Simulation/State/` zerfällt in zwei Teile. **Layout und
+   Serialisierung** — Feldbestand, Feldreihenfolge, `StateVersion`, Blockformat
+   — bleiben eingefroren und brauchen weiterhin eine eigene D-ID. Die
+   **Befehlsanwendung** (`UnitCommandStateView`) gehört dem Netzstrang. Die
+   Trennlinie verläuft nicht zwischen Befehlsarten, sondern zwischen
+   **Zielsetzung und Ausführung**: Was ein Befehl in den Zustand **schreibt**,
+   gehört dem Netzstrang — `Stop` löscht `UnitState.AttackTarget`, `Move`
+   verteilt Zielzellen, `Harvest` setzt `HarvestFieldId`,
+   `CommandKind.AttackTarget` schreibt das Ziel.
+   Wie eine Einheit daraufhin **fährt und schießt**, gehört dem Einheitenstrang
+   — `MovementSystem` fährt zur Zielzelle, `CombatSystem` erfasst und feuert.
+   Präzedenz ist D-088: die Formationsverteilung in `ApplyMove` hat das
+   Maintainer-Team gebaut, während `MovementSystem` beim Einheitenstrang lag.
+4. **Kein neuer `CommandKind`.** Das Register `Simulation/CommandsV1/` bleibt
+   eingefroren; kein Paket aus Sprint 16 oder 18 braucht einen neuen Befehlstyp.
+5. Ein Merge-Fenster nimmt die PRs **eines** Strangs auf, prüft die Baselines
+   und öffnet dann das nächste.
+
+**Begründung:** Dateikonflikte verhindert die Schreibhoheitstabelle, nicht die
+Verhaltensregel — die Tabelle ist disjunkt, und daran ändert Sprint 16 nichts.
+Was die Verhaltensregel zusätzlich leistete, war ein Determinismus-Argument:
+solange nur ein Strang die Simulation bewegt, ist ein roter Baseline-Test
+eindeutig zuordenbar. Genau diese Zuordenbarkeit stellt das Ein-Strang-Fenster
+wieder her, ohne einen ganzen Ordnerbaum stillzulegen. Für `State/` gilt die
+gleiche Unterscheidung eine Ebene tiefer: *was* ein `CommandKind` mit dem
+Zustand tut, ist Verhalten und lässt sich testen; *wie* der Zustand auf Bytes
+abgebildet wird, ist Format und entwertet bei jeder Änderung vorhandene
+Snapshots und Replays. Nur das Zweite muss eingefroren bleiben.
+
+**Konsequenzen:** [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md)
+steht auf 1.3.0 und gilt für 13–18 statt 13–15. Zwei Vertragsflächen sind dort
+ergänzt: der `WeaponProfiles`-Slot `UnitRole.Unit`, den Baustellen heute tragen,
+und `UnitState.AttackTarget`. Die Regel „Verhalten und Baseline nie im selben
+PR" wird damit zur wichtigsten Regel des Dokuments, nicht zur zweitwichtigsten,
+denn ab jetzt können beide Stränge Baselines bewegen. Verteilte Testbuilds
+altern schneller, weil zwei Quellen den Fingerprint bewegen. Sprint 16 und
+Sprint 18 führen eigene, gegen 13B disjunkte Schreibhoheitstabellen.
+
+**Wortlautberichtigung 2026-08-09:** Punkt 3 teilte die Befehlsanwendung
+zunächst nach Befehlsarten auf („Wirtschafts- und Baubefehle dem Netzstrang,
+Bewegungs- und Kampfbefehle dem Einheitenstrang"). Das widersprach dem
+Regelwerk, das `Move` und `Stop` ausdrücklich dem Netzstrang zuschlägt, und es
+ist am Code nicht durchführbar: `UnitCommandStateView.Apply` behandelt Move,
+Stop, AttackTarget, Harvest, Bau und Produktion in einer einzigen Datei. Der
+Wortlaut ist auf die Linie zwischen Zielsetzung und Ausführung nachgezogen. Die
+Entscheidung selbst ist unverändert — deshalb keine neue D-ID.
+
+---
+
+### D-093 | verbindlich | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
+
+**Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
+Paketen liegt beim Agenten. Umgesetzt in
+[16_Sprint_Wirtschaft.md](hashkrieg/16_Sprint_Wirtschaft.md) 16.4 und 16.5.
+
+**Kontext:** Lager und Radar stehen im MVP-Content-Manifest, sind als Asset
+fertig und im Baumenü wählbar — und tun im Code nichts. `AddCredits` addiert
+bedingungslos in ein `long`; `UnitRole.Storage` hat außer `PowerRequired 5` kein
+Verhalten. Kein Simulationscode liest `UnitRole.Radar`;
+`FogOfWarSystem.GetRadarSignatures` hat null Produktionsaufrufer und
+multipliziert überdies die `SightRadius` **jeder** eigenen Entität, statt von
+einem Gebäude auszugehen. `MinimapHud` zeichnet bedingungslos. Der erste
+Betatest hat beides gemeldet (#53, #54). D-024 hat die Silo-Logik bereits
+entschieden, aber nicht, wie sie technisch getragen wird.
+
+**Alternativen für das Lager:**
+
+1. Kapazität als neues Feld im Wirtschaftszustand — verworfen: das bumpt
+   `EconomySystem.StateVersion`, `TryParseState` lehnt danach jede ältere
+   Fassung ab, alle vorhandenen Snapshots und Replays wären wertlos, und ob
+   `MatchFingerprint.StateSchemaVersionV1` nachziehen muss, wäre eine eigene
+   Inhaberentscheidung.
+2. Das Lager ersatzlos streichen — verworfen: es steht im MVP-Content-Manifest
+   und ist als Asset fertig. Ein gestrichenes Gebäude ist teurer als ein
+   wirksames.
+3. Dem Lager eine andere Wirkung geben, etwa auf die Ernterate — verworfen: das
+   verschiebt die Wirkung in die Ökonomie, ohne den eigentlichen Fehler zu
+   beheben. Das Konto hat keine Obergrenze, also gibt es keinen Ausgabenanreiz.
+4. **Gewählt: eine aus dem Gebäudebestand abgeleitete Obergrenze.** Kein neues
+   Feld, kein Formatbruch.
+
+**Alternativen für das Radar:**
+
+5. Das Radar streichen — verworfen, gleiche Begründung wie beim Lager.
+6. Das Radar gibt nur zusätzliche Sichtweite, ohne an der Minimap zu hängen —
+   verworfen: die Minimap ist heute immer sichtbar, das Gebäude bliebe damit für
+   den Spieler wirkungslos.
+7. **Gewählt: das Radar schaltet die Minimap frei und leitet seine Abdeckung vom
+   Gebäude ab.**
+
+**Entscheidung:**
+
+1. **AE-Obergrenze:** HQ 2.000 AE Basis, +2.000 je Lager, Überschuss verfällt,
+   25 % Verlust bei Zerstörung. Das setzt D-024 um und ergänzt die dort offen
+   gelassene Basis-Kapazität.
+2. **Die Kapazität wird aus dem Gebäudebestand abgeleitet, nicht gespeichert.**
+   Kein neues Feld im Wirtschaftszustand, kein `StateVersion`-Bump.
+3. **Die Minimap hängt am Radar.** `MinimapHud` zeichnet nur noch, wenn der
+   lokale Slot ein fertiges Radar besitzt; die Abfrage
+   `ConstructionSystem.HasFinishedBuilding(slot, UnitRole.Radar)` existiert
+   bereits.
+4. **Die Radar-Abdeckung kommt vom Gebäude**, nicht von der `SightRadius` jeder
+   Entität. `GetRadarSignatures` wird damit erstmals von der Präsentation
+   konsumiert.
+5. `FogOfWarSystem.GetTeamView` bleibt unverändert — es ist Vertragsfläche des
+   Einheitenstrangs.
+6. Der Verlust einer bisher immer vorhandenen Minimap ist beabsichtigt und wird
+   am Bauknopf des Radars im Klartext erklärt.
+
+**Begründung:** Ein Gebäude, das Strom zieht und nichts tut, ist kein
+Platzhalter, sondern ein Schaden — es kostet den Spieler Aetherium und Energie
+und gibt nichts zurück. Beide Wirkungen sind ohne Formatbruch erreichbar, und
+genau daran hängt die Entscheidung: die abgeleitete Obergrenze kostet etwas
+Rechenzeit pro Abfrage, ein gespeichertes Feld kostet jeden Snapshot und jedes
+Replay im Bestand. Die Kopplung der Minimap an das Radar ist zugleich die
+einzige Variante, die das Gebäude für den Spieler spürbar macht, ohne eine neue
+Anzeige zu erfinden.
+
+**Konsequenzen:** `MatchFingerprint.StateSchemaVersionV1` bleibt unberührt,
+vorhandene Snapshots und Replays bleiben lesbar. `AddCredits` hat vier Aufrufer
+— Abladen, Streichung, Abbruch und Verkauf —, alle im Schreibbereich des
+Netzstrangs. Erst zusammen mit der Low-Power-Abschaltreihenfolge (16.6) wird die
+Kopplung zur Waffe: ein zerstörtes Kraftwerk nimmt Radar, Verteidigung und damit
+die Minimap mit. Dass die Sperre der Minimap zunächst als Rückschritt gelesen
+wird, ist einkalkuliert; der Befund geht bewusst in die nächste Testrunde.
+Nachweisbar ist die Sache nur in einer gespielten Runde — `Presentation/` ist in
+keinem CI-Testlauf enthalten.
+
+---
+
+### D-094 | verbindlich | Sprint 16 (Stoppen löscht den Angriffsbefehl, Halte-Feuer bleibt beim Einheitenstrang)
+
+**Status:** Inhaberentscheidung vom 2026-08-09. Umgesetzt in
+[16_Sprint_Wirtschaft.md](hashkrieg/16_Sprint_Wirtschaft.md) 16.10.
+
+**Kontext:** `UnitCommandStateView` räumt bei `CommandKind.Stop` heute Bewegung,
+Ernte und Reparatur ab — den Angriff nicht. `UnitState.AttackTarget` bleibt
+stehen, und die Einheit feuert weiter. Der erste Betatest (T-01) hat das als
+#45 gemeldet: der Knopf stoppte nichts, was der Tester stoppen wollte.
+`AttackTarget` gehört dem Einheitenstrang (`CombatSystem`); die Befehlsanwendung
+gehört seit D-092 dem Eigentümer des jeweiligen Befehls.
+
+**Alternativen:**
+
+1. „Stoppen" bekommt ein echtes Halte-Feuer — verworfen: ein Haltezustand gehört
+   in `Simulation/Combat/`, das exklusiv dem externen Einheitenstrang gehört.
+   Außerdem setzt die Auto-Zielerfassung aus D-087 im nächsten Tick ohnehin ein
+   neues Ziel, solange kein Haltezustand existiert.
+2. „Stoppen" unverändert lassen — verworfen: der Knopf löscht heute Bewegung,
+   Ernte und Reparatur, aber nicht den Angriff. Der Befund ist berechtigt.
+3. Den Knopf entfernen — verworfen: er wird in jedem RTS erwartet, und seine
+   Wirkung auf Bewegung und Ernte ist heute schon korrekt.
+4. **Gewählt: „Stoppen" löscht zusätzlich `AttackTarget`; das Halte-Feuer wird
+   als Befund an den Einheitenstrang gegeben.**
+
+**Entscheidung:**
+
+1. `UnitCommandStateView` räumt bei `CommandKind.Stop` zusätzlich
+   `UnitState.AttackTarget` ab. Kein neues Feld, kein neuer `CommandKind`.
+2. Ein echtes „Feuer einstellen" ist **kein** Netzstrang-Paket. Es braucht einen
+   Haltezustand in `Simulation/Combat/` und geht als Befund an
+   [13B](hashkrieg/13B_Sprint_Einheitenverhalten.md).
+3. In der Schreibhoheitstabelle steht `UnitState.AttackTarget` als
+   Vertragsfläche: das Feld **löschen** darf der Netzstrang, eine Regel darüber,
+   *wann automatisch neu erfasst wird*, gehört dem Einheitenstrang.
+
+**Begründung:** Die Grenze verläuft zwischen „ein Feld räumen" und „eine Regel
+über das Wiederbelegen dieses Feldes aufstellen". Das Erste ist Befehlsanwendung
+und damit nach D-092 beim Eigentümer des Befehls; das Zweite ist Kampfverhalten
+und gehört zu D-087. Der halbe Schritt ist trotzdem der richtige: Ein Angriff,
+der nach dem Stopp-Befehl unverändert weiterläuft, ist ein anderer Fehler als
+eine Einheit, die nach dem Stopp erneut selbst ein Ziel erfasst. Der erste ist
+mit einer Zeile in der Befehlsanwendung behoben, der zweite braucht fremdes
+Terrain.
+
+**Konsequenzen:** Aus Spielersicht bleibt „Stoppen" unvollständig, solange die
+Auto-Zielerfassung greift — das ist benannt, nicht behoben, und steht in Sprint
+16 wie in [Sprint 18](hashkrieg/18_Sprint_Befehl_und_Auswahl.md) ausdrücklich
+unter „bewusst nicht in diesem Sprint". Der Einheitenstrang erhält den Befund
+zum Halte-Feuer als Eingang, nicht als Auftrag. Ein Nachweis ist nur in einer
+gespielten Runde möglich.
+
+---
+
+### D-095 | ENTWURF — Inhaberentscheidung ausstehend | Sprint 17 (Tier-3-Auslöser präzisiert)
+
+**Status:** **ENTWURF.** Ein Tier-Wechsel ist laut
+[GOVERNANCE.md](../../GOVERNANCE.md) ausdrücklich eine Inhaberentscheidung, und
+der Inhaber hat sie am 2026-08-09 nicht getroffen — er hat die Formalitäten für
+die geschlossene Beta vertagt. Der Entwurf steht hier fertig begründet, damit er
+nur noch bestätigt werden muss; die Tier-Tabelle in GOVERNANCE.md bleibt bis
+dahin **unverändert**.
+
+> **Nichts im Großauftrag vom 2026-08-09 hängt daran.** Die Blöcke 0 bis 4
+> laufen unter Tier 2 weiter, gleich wie diese Frage ausgeht. Sie ist ein
+> Vorrat, kein Blocker.
+
+Gegenstand ist die Tier-Tabelle in [GOVERNANCE.md](../../GOVERNANCE.md); der
+Anlass steht in
+[17_Sprint_Zugangsprotokoll.md](hashkrieg/17_Sprint_Zugangsprotokoll.md),
+Abschnitt „Governance: die Tier-Frage".
+
+**Kontext:** Die Tier-Tabelle nennt „Nutzerdaten im Spiel" als Auslöser für
+Tier 3, und Sprint 14 hält in seiner Risikotabelle fest: „Vor dem ersten Feld,
+das es wäre, D-ID." Sprint 17 protokolliert Herkunfts-IP und Geräte-Kennung —
+personenbezogene Daten. Nach dem Buchstaben weckt damit ein reines
+Betriebsprotokoll die unter D-076 schlafend gelegte Gate-Kette, obwohl der
+Kreis der Spielenden geschlossen ist, kein Build verkauft wird und es kein
+Publikum gibt.
+
+**Alternativen:**
+
+1. Den Auslöser buchstabengetreu lesen und die Kette wecken — verworfen: Der
+   Tier-3-Apparat beantwortet die Frage „können wir es Dritten beweisen".
+   Betriebsprotokolle werfen diese Frage nicht auf. Sie werfen
+   Datenschutzfragen auf, und die beantwortet man mit Datensparsamkeit und
+   Löschfristen, nicht mit einer Nachweiskette.
+2. Sprint 17 zurückstellen, bis die Tier-Frage anderweitig geklärt ist —
+   verworfen: Seit Sprint 14 nimmt ein Server von uns Verbindungen fremder
+   Rechner entgegen, ohne Protokoll und ohne Handbremse. Das Problem wartet
+   nicht auf eine Governance-Debatte.
+3. Den datenbezogenen Auslöser ersatzlos streichen — verworfen: Dann fiele auch
+   der Fall weg, für den er gedacht war (Konten, Zahlungsdaten, echtes
+   Publikum), und Tier 3 hinge allein an Vertragsereignissen.
+4. **Gewählt: den Auslöser präzisieren statt die Kette wecken.**
+
+**Entscheidung:**
+
+1. Tier 3 hängt an **Veröffentlichung, Geld und Publikum** — Steam-Seite,
+   bezahlter Build, Publisher-Vertrag. Nicht an jeder personenbezogenen
+   Verarbeitung.
+2. **Betriebs- und Missbrauchsdaten mit Löschfristen bleiben Tier 2.** Für die
+   geschlossene Beta gilt das auch mit der Klartext-Adresse aus D-096: Der
+   Kreis ist geschlossen, die Frist läuft automatisch als `pg_cron`-Job, und
+   die Umstellung auf Hashing steht als Q-041 im
+   [Fragenkatalog](OpenQuestions.md).
+3. Umzusetzen ist das in der Tier-Tabelle in `GOVERNANCE.md` (Zeile „Auslöser")
+   plus einem Satz zur Abgrenzung. Die Datei ist ein Hot-File — serialisiert,
+   ein Schreiber.
+
+**Begründung:** Ein Auslöser, der bei jeder personenbezogenen Verarbeitung
+greift, verwechselt zwei verschiedene Fragen. Die eine ist die Beweisfrage
+gegenüber Dritten — dafür wurde der Tier-3-Apparat gebaut. Die andere ist die
+Datenschutzfrage, und deren Werkzeuge sind Zweckbindung, Sparsamkeit und
+Fristen. Der bisherige Wortlaut hätte den teuren Apparat für die billige Frage
+angeworfen und damit beide Antworten verschlechtert: die Kette wäre für
+Protokollzeilen erwacht, und die Löschfrist wäre trotzdem noch nötig gewesen.
+
+**Konsequenzen:** `GOVERNANCE.md` trägt in der Zeile „Auslöser" heute noch
+„Nutzerdaten im Spiel" und ist nachzuziehen — serialisiert, nicht parallel zu
+einem anderen Schreiber. Die Gate-Kette bleibt schlafend; ihr Weckpfad aus
+D-076 ist unberührt. Öffnet sich der Beta-Kreis, ist zusammen mit Q-041 auch
+diese Abgrenzung erneut zu prüfen: Publikum ist genau eines der drei Merkmale,
+an denen Tier 3 künftig hängt.
+
+---
+
+### D-096 | verbindlich | Sprint 17 (Identitätsmodell und Klartext-IP für die geschlossene Beta)
+
+**Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
+Paketen liegt beim Agenten. Umgesetzt in
+[17_Sprint_Zugangsprotokoll.md](hashkrieg/17_Sprint_Zugangsprotokoll.md) 17.1
+bis 17.5.
+
+**Kontext:** Das Zugriffsprotokoll braucht ein Merkmal, an dem sich Wiederkehr,
+Häufung und Missbrauch ablesen lassen. Die Merkmalsprüfung in Sprint 17 fällt
+nüchtern aus: Die **MAC-Adresse** endet am ersten Router, weder Lobby noch
+Relay sehen sie jemals; meldet der Client sie selbst, ist sie eine
+Selbstauskunft, die unter Windows in einer halben Minute geändert ist. Die
+**IP-Adresse** sieht der Server ohnehin — das einzige Merkmal, das der Client
+nicht fälschen kann —, aber sie wechselt und ist hinter CGNAT geteilt. Eine
+**Installationskennung** erkennt Wiederkehrer, solange niemand sie löscht; der
+**Geräte-Anker** überlebt das Löschen als zweite Spur. Der harte Anker (Konto,
+Lizenz, Steam-ID nach D-007) kommt erst mit dem Verkauf. Die frühere Vorgabe
+lautete „keine rohe IP in der Datenbank".
+
+**Alternativen:**
+
+1. `HMAC(pepper, ip)` — Wiederkehr bliebe erkennbar, und ein Datenbankleck gäbe
+   keine Adressliste her. Verworfen: Die Betreiberfrage „wer spielt da" bleibt
+   unbeantwortet. Der Hash zeigt, *dass* jemand wiederkommt, nicht *wer* — im
+   geschlossenen Kreis der falsche Tausch.
+2. Nur das gekürzte Netzpräfix speichern, keine Adresse — die sparsamste
+   Variante, kein Rohwert. Verworfen: Sie trennt zwei Anschlüsse im selben
+   `/24` nicht, und damit verliert die Einzelsperre aus 17.2 ihre Grundlage.
+3. Die MAC-Adresse als Kennung erheben — verworfen: Sie überquert kein NAT und
+   ist als Selbstauskunft trivial fälschbar. Ein Merkmal, das nur der Ehrliche
+   korrekt meldet, taugt nicht zur Missbrauchsabwehr.
+4. **Gewählt: Klartext-Adresse plus gekürztes Präfix, begrenzt durch eine
+   Löschfrist statt durch einen Hash.**
+
+**Entscheidung:**
+
+1. **Für die geschlossene Beta wird die Herkunfts-IP im Klartext gespeichert**,
+   dazu das gekürzte Netzpräfix (`/24` bei IPv4, `/48` bei IPv6). Die frühere
+   Vorgabe „keine rohe IP in der Datenbank" gilt für diese Phase nicht.
+2. Die Begrenzung, die an die Stelle des Hashes tritt, ist die **Löschfrist von
+   30 Tagen**. Sie hängt an einem `pg_cron`-Job, nicht an Erinnerung.
+3. **Installationskennung und Geräte-Anker bleiben serverseitig gepeppert
+   gehasht**; die Rohwerte werden nirgends gespeichert. Der Pepper liegt
+   ausschließlich in der Function-Umgebung, wie das Relay-Token-Geheimnis.
+4. **Die MAC-Adresse wird ausdrücklich verworfen** und in keiner Ausbaustufe
+   erhoben.
+5. **IP- und Präfixsperren sind immer befristet** — Adresse höchstens 30 Tage,
+   Netz höchstens 7 Tage, erzwungen per Datenbank-Constraint. Nur Sperren auf
+   die Installationskennung dürfen unbefristet sein.
+6. **Vor Öffnung der Beta ist neu zu entscheiden.** Die Umstellung auf Hashing
+   steht als Q-041 im [Fragenkatalog](OpenQuestions.md) und ist vor der
+   Öffnung zu beantworten, nicht danach.
+
+**Begründung:** Der Zweck des Protokolls entscheidet über seine Form. Gebaut
+wird es, damit der Betreiber eines geschlossenen Kreises sieht, wer spielt —
+und genau diese Abfrage macht ein nicht umkehrbarer Hash unmöglich. Was der
+Hash schützen soll, schützt hier die Frist: Nach dreißig Tagen ist die Zeile
+weg, ohne dass jemand daran denken muss. Bei den Sperren dreht sich das
+Argument um: Hinter einer CGNAT-Adresse sitzen Unbeteiligte, und eine
+dynamische Adresse gehört morgen jemand anderem — eine unbefristete IP-Sperre
+sperrt mit Sicherheit irgendwann den Falschen aus. Die nüchterne Grenze des
+ganzen Modells ist benannt: Auf einem Rechner, den der Gegner kontrolliert,
+gibt es keine unfälschbare Identität. Geliefert werden Reibung und
+Sichtbarkeit, nicht Sicherheit.
+
+**Konsequenzen:** `access_log` führt die Adresse als Klartext-Feld neben dem
+Präfix; eine Stichprobe darf trotzdem keine rohe Installationskennung
+enthalten. Die Löschfristen sind Teil der Abnahme, nicht Betriebsroutine — ein
+Lauf des Jobs muss nachweislich gelöscht haben. Geht der Pepper verloren,
+werden alle Hashes unbrauchbar und die Zuordnung ist weg; er gehört in dieselbe
+Sicherung wie das Relay-Token-Geheimnis. Der harte Anker kommt mit dem
+Vertriebsweg und setzt sich später neben `install_hash`, ohne Tabellen,
+Sperrarten oder Bedienweg zu ändern. Q-041 bleibt bis zur Öffnung der Beta
+offen.
+
+---
+
+### D-098 | in Kraft — vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden | Sprint 14 (Ablage der Lobby-Serverseite)
+
+**Status:** Vom Agenten unter Delegation entschieden, **nicht vom Inhaber
+selbst** — als solches gekennzeichnet und überstimmbar. Gegenstand ist Paket
+14.0 aus dem [Großauftrag vom 2026-08-09](hashkrieg/AUFTRAG_Grossblock.md),
+Block 3; die D-ID stammt aus dem für
+[Sprint 17](hashkrieg/17_Sprint_Zugangsprotokoll.md) reservierten Bereich.
+
+**Kontext:** Sprint 14 hat heute null Zeilen im Repository: kein
+Supabase-Client, keine Edge Function, kein Schema. Die Sprintdatei hat den
+Ablageort der Serverseite offengelassen. Damit stünde SQL, Policies und Edge
+Functions nichts entgegen, ausschließlich im Supabase-Projekt zu leben, wo sie
+niemand versioniert, niemand reviewt und niemand einem Client-Commit zuordnen
+kann.
+
+**Alternativen:**
+
+1. Die Serverseite bleibt nur im Supabase-Projekt und wird dort im Editor
+   gepflegt — verworfen: Unversionierter Servercode ist genau das, was in sechs
+   Monaten niemand mehr nachvollzieht. Kein Diff, kein Review, kein Rückweg auf
+   einen früheren Stand, und der Zusammenhang zum Build, der die Function
+   aufruft, ist nicht herstellbar.
+2. Ein eigenes Repository für die Serverseite — verworfen: Es trennt den
+   Function-Vertrag von dem Client, der ihn aufruft; jede Vertragsänderung
+   bräuchte zwei PRs in zwei Repositories, und die Schreibhoheitstabelle aus
+   [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) müsste über
+   Repo-Grenzen hinweg gelten. Dazu käme ein zweiter Satz Governance —
+   `CODEOWNERS`, CI, Lizenz, Beitragsregeln — für eine Handvoll Dateien.
+3. Nur das Runbook ins Repository, der Quelltext bleibt im Supabase-Projekt —
+   verworfen: Dann beschreibt das Runbook einen Stand, den niemand
+   gegenprüfen kann, und Beschreibung und Wirklichkeit laufen auseinander.
+   Genau das ist bei `docs/tech/LobbySupabase.md` schon einmal passiert: an
+   mehreren Stellen verlinkt, nie geschrieben.
+4. **Gewählt: SQL, Policies und Edge Functions als Quelltext im Repository
+   unter `tools/lobby/`, das Runbook nach `docs/tech/LobbySupabase.md`.**
+
+**Entscheidung:**
+
+1. `tools/lobby/` (neu) nimmt SQL, Policies und Edge Functions der Lobby als
+   Quelltext auf. Der Ordner liegt neben `tools/Nova.RelayServer/` und
+   `tools/packaging/` — Betriebswerkzeug, kein Spielcode. Er berührt keine
+   Assembly und keine Simulationsfläche und bewegt damit keine Baseline.
+2. Das Runbook entsteht als `docs/tech/LobbySupabase.md` in Sprint 14 und
+   schließt damit zugleich einen Aktenfehler: Die Datei ist heute verlinkt,
+   aber nicht vorhanden.
+3. **Ausgerollt wird weiterhin im Supabase-Projekt außerhalb des Repositories.**
+   Das Repository hält den Stand, nicht den Betrieb; den Deploy führt der
+   Inhaber aus.
+4. `tools/lobby/` gehört in der Schreibhoheitstabelle dem **Netzstrang**.
+
+**Begründung:** Servercode, der nur in einer Weboberfläche existiert, ist
+Wissen ohne Träger — er lässt sich nicht reviewen, nicht zurückrollen und nicht
+mit dem Client-Commit in Beziehung setzen, der ihn aufruft. Ein eigenes
+Repository löst dasselbe Problem, kauft es aber mit doppelter Governance und
+einer Schreibhoheit, die an der Repo-Grenze endet. Der Ordner im vorhandenen
+Repository kostet dagegen nichts: Er liegt außerhalb jeder Simulationsfläche,
+und `tools/` trägt mit Relay und Packaging bereits Betriebswerkzeug, das nicht
+im Spiel läuft.
+
+**Konsequenzen:**
+[13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) führt
+`tools/lobby/` bereits als Netzstrang-Zeile. Der Ordner existiert noch nicht;
+er entsteht mit Sprint 14. Geheimnisse bleiben draußen — Pepper und
+Relay-Token-Geheimnis liegen in der Function-Umgebung, die Regel „keine Secrets
+im Repository" gilt unverändert und wird durch diesen Ordner eher schärfer
+geprüft als vorher. Eine spätere Umkehr auf ein eigenes Repository ist ein
+Verschieben von Dateien plus einer Zeile in der Schreibhoheitstabelle, keine
+Strukturänderung — deshalb ist diese Entscheidung billig überstimmbar.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2549,6 +3010,10 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
   verlangt — bei den KI-Quellen sind `promptText`, `providerTermsUrl`,
   `providerTermsRetrievedAt` und ein wörtliches `outputOwnership`-Zitat
   Pflichtfelder, die nur der Inhaber liefern kann.
+- **D-097 steht in derselben Delegationslage** (Ablage der Lobby-Serverseite
+  unter `tools/lobby/`). Der Inhaber möge den Ablageort bestätigen oder einen
+  anderen anweisen; eine Umkehr verschiebt Dateien und eine Zeile in der
+  Schreibhoheitstabelle. Bis dahin gilt D-097.
 - **D-078 bis D-082 sind reserviert** für die Übertragung der
   Inhaberentscheidungen E-1 bis E-5 aus
   [hashkrieg/00_Entscheidungen.md](hashkrieg/00_Entscheidungen.md); die dortige
@@ -2600,3 +3065,5 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
 | 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |
+| 1.30.0 | 2026-08-09 | D-092, D-093 und D-094 aufgenommen: Parallelbetrieb trennt über Dateihoheit statt Verhaltensraum (Sprint 16 parallel zu 13B, `Simulation/State/` in eingefrorenes Layout und strangeigene Befehlsanwendung geteilt, ein Strang je Merge-Fenster); Lager erhält eine aus dem Gebäudebestand **abgeleitete** AE-Obergrenze statt eines Zustandsfeldes und das Radar schaltet die Minimap frei; „Stoppen" löscht zusätzlich `UnitState.AttackTarget`, das Halte-Feuer bleibt beim Einheitenstrang | Project Owner / Orchestrator |
+| 1.31.0 | 2026-08-09 | D-095 bis D-097 nachgetragen, nachdem sie anderswo bereits als geltend zitiert wurden: Tier-3-Auslöser auf Veröffentlichung, Geld und Publikum präzisiert statt auf jede personenbezogene Verarbeitung; Identitätsmodell der geschlossenen Beta mit Klartext-IP plus gekürztem Netzpräfix und 30-Tage-Löschfrist statt `HMAC(pepper, ip)`, MAC-Adresse verworfen, IP- und Präfixsperren zwingend befristet; Lobby-Serverseite als Quelltext unter `tools/lobby/` statt nur im Supabase-Projekt (vom Agenten unter Delegation entschieden, überstimmbar, in den Offenen Punkten vermerkt). D-092 Punkt 3 im Wortlaut auf das Regelwerk nachgezogen — die Befehlsanwendung trennt zwischen Zielsetzung und Ausführung, nicht zwischen Befehlsarten; dieselbe Entscheidung, keine neue D-ID. Kopfzeile von Sprint 13.0 auf 16 berichtigt | Project Owner / Agent (unter Delegation) |
