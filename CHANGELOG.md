@@ -17,6 +17,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Geändert
+- **Die fertige Raffinerie stellt ihren ersten Sammler kostenlos hin.** Der
+  Sammler kostet 700 AE und die Raffinerie ist seit D-077 sein einziger
+  Produzent. Wer sich vor ihrer Fertigstellung unter 700 AE herunterbaut, hatte
+  damit keine Möglichkeit mehr, überhaupt noch etwas einzunehmen — die Partie
+  war ohne Zutun des Gegners vorbei. Der Sammler erscheint jetzt beim
+  Fertigwerden auf der nächsten freien Zelle neben dem Bauplatz, gefunden mit
+  derselben deterministischen Ringsuche wie das Verdrängen von Einheiten. Findet
+  sich keine Zelle, unterbleibt die Gabe und der Sammler wird wie bisher gekauft.
+  Die Änderung hält keinen eigenen Zustand und lässt das Snapshot-Layout
+  unberührt; sie verschiebt aber die Determinismus-Baseline des
+  10000-Tick-Szenarios.
+
 ### Hinzugefügt
 - **Verbindungsdialog und Linux-Build (Sprint 13, Pakete 13.1 und 13.7):** Das
   Hauptmenü hat einen Bereich „Netzpartie" mit Serveradresse, Port, maskiertem
