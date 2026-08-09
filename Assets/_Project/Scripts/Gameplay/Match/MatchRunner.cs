@@ -336,7 +336,7 @@ namespace Nova.Gameplay.Match
             }
             if (!IsRunning) return;
 
-            // LAB BRANCH ONLY (MatchSpeedDebug, never part of a feature PR).
+            // Diagnostic fast-forward (MatchSpeedDebug), off at 1x.
             // The multiplier scales WALL-CLOCK time, not the simulation: the
             // kernel still steps whole 10-Hz ticks, in order, one at a time —
             // a match watched at 4x ends on the same tick with the same state

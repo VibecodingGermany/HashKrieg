@@ -1,5 +1,6 @@
-// Lab tool. Lives on the lab branch only and is never part of a feature PR —
-// see the class remarks for what it is allowed to touch and what it is not.
+// Diagnostic aid, not gameplay. It changes what the screen shows and what the
+// clock hands to the tick loop, never what the simulation computes — see the
+// class remarks for the exact boundary and how it is kept.
 namespace Nova.Gameplay.Match
 {
     /// <summary>
