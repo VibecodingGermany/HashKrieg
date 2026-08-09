@@ -122,3 +122,12 @@ output/
 
 # Repo-local .NET SDK
 .dotnet/
+
+# ── Sprint 14: Lobby-Laufzeitdateien (D-092/D-094) ─────────────────────────
+# lobby-config.json enthält den Supabase-Anon-Key der lokalen Installation
+# (Template: lobby-config.example.json — das Beispiel bleibt versioniert).
+# NovaBuildCommit.txt stempelt BuildCommitStamp vor jedem Player-Build.
+/[Aa]ssets/_Project/Resources/lobby-config.json
+/[Aa]ssets/_Project/Resources/lobby-config.json.meta
+/[Aa]ssets/_Project/Resources/NovaBuildCommit.txt
+/[Aa]ssets/_Project/Resources/NovaBuildCommit.txt.meta

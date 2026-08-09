@@ -479,6 +479,73 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
+        /// Lobby entry point (sprint 14, D-092): the LobbySession delivers a
+        /// fully populated network configuration — relay endpoint, D-093
+        /// match token and BOTH slot factions, which the relay offer does not
+        /// carry — so unlike <see cref="TryStartNetworkJoin"/> nothing is
+        /// parsed here. Validation runs through the same
+        /// <see cref="MatchConfig.ValidateAndClone"/> gauntlet, and from
+        /// <see cref="StartGrayboxMatch(MatchConfig)"/> on the relay
+        /// handshake is byte-identical to the direct path.
+        /// </summary>
+        /// <param name="config">The lobby-assembled configuration (NetworkVsHuman plus factions).</param>
+        /// <param name="expectedSlot">Slot the lobby assigned (0 = creator, 1 = joiner); the offer is rejected on mismatch.</param>
+        public bool TryStartLobbyMatch(MatchConfig config, byte expectedSlot)
+        {
+            if (config == null)
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.Technical,
+                    "Die Lobby hat keine Matchkonfiguration geliefert.");
+                return false;
+            }
+            if (expectedSlot != LocalSlot && expectedSlot != EnemySlot)
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.RoleMismatch,
+                    "Die Lobby hat einen ungültigen Slot zugewiesen.");
+                return false;
+            }
+            if (IsMatchReady || (_pendingConfig != null && _pendingConfig.IsNetworkMatch))
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.Technical,
+                    "Eine Partie oder Verbindung ist bereits aktiv.");
+                return false;
+            }
+
+            MatchConfig validated;
+            try
+            {
+                validated = config.ValidateAndClone();
+            }
+            catch (Exception exception)
+            {
+                FailNetworkJoin(
+                    NetworkJoinFailure.Technical,
+                    $"Die Lobby-Matchkonfiguration ist ungültig: {exception.Message}");
+                return false;
+            }
+
+            ResetNetworkJoin();
+            _expectedNetworkSlot = expectedSlot;
+            SetJoinStatus(NetworkJoinPhase.Connecting, "Verbinde mit dem Relay …");
+
+            // Same canonical match parameters as the direct path: both lobby
+            // clients must open the identical map or their fingerprints diverge.
+            validated.Seed = _seed;
+            validated.MapWidth = _mapWidth;
+            validated.MapHeight = _mapHeight;
+            validated.EntityCapacity = _entityCapacity;
+            validated.StartingCredits =
+                Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE;
+            StartGrayboxMatch(validated);
+            return _pendingConfig != null
+                && _pendingConfig.IsNetworkMatch
+                && _networkJoinStatus.Phase != NetworkJoinPhase.Failed;
+        }
+
+        /// <summary>
         /// Cancels connect/proof waiting and clears every prepared network
         /// opening. A later retry always constructs a fresh relay client.
         /// </summary>

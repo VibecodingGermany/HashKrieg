@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.17.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 12 Stränge A und B technisch umgesetzt; Parallelbetrieb für externe Beiträge vorbereitet | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 13.0
+**Version:** 0.18.0 | **Status:** unveröffentlichter Arbeitsstand – Lobby (Sprint 14) client- und relay-seitig implementiert und getestet; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 14
 
 ## Zweck
 
@@ -134,6 +134,9 @@ gelisteten Kernverträge.
 - [Networking](tech/Networking.md) – D-089-1v1-Profil und historisches Vollspiel-Zielbild
 - [RelayServer](tech/RelayServer.md) – Konfiguration, systemd, Artefakt,
   Deploy, Rollback, Firewall und ehrlicher Abnahmestand des TCP-Relays
+- [Lobby/Supabase](tech/LobbySupabase.md) – Vertrag, Schema,
+  Edge-Function-Referenzen und Betriebspfad der Sprint-14-Lobby (D-092 bis D-094);
+  Supabase-Anlage und gespielte Abnahme offen
 - Architecture Reviews: [Performance](tech/review/Review_Performance.md),
   [Wartbarkeit](tech/review/Review_Wartbarkeit_Prozess.md),
   [Architektur-Kohärenz](tech/review/Review_ArchitekturKohaerenz.md),
@@ -267,3 +270,4 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.15.0 | 2026-08-05 | GB-003 indexiert: DemoRunbook.md und StatusSnapshot_2026-08-05.md aufgenommen (Asset-Bereitschaft, Glutrinne-Blockout, Demo-Vorbereitung); ScopeLedger 0.4.0 und GrayboxLog 0.3.0 fortgeschrieben; kein Gate-Status | Technical Writer |
 | 0.16.0 | 2026-08-07 | D-089-Netzprofil, RelayServer-Runbook und Sprint-12-Strang-A-Stand indexiert; manuelle Netzwerkabnahme ausdrücklich offen | Technical Writer |
 | 0.17.0 | 2026-08-08 | D-091 und Sprint 13.0 indexiert: Tier-2-Beitragsmodell, Lizenz- und Merge-Schutz vorbereitet | Technical Writer |
+| 0.18.0 | 2026-08-09 | Sprint-14-Lobby indexiert: LobbySupabase.md (Vertrag, Schema, Edge-Function-Referenzen, Betriebspfad) und RelayServer.md 1.1.0 (kurzlebige Lobby-Tokens) aufgenommen, D-092 bis D-094; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme ausdrücklich offen | Agent (Umsetzung) |

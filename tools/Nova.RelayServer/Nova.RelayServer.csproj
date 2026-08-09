@@ -16,6 +16,9 @@
     <Compile Include="..\..\Assets\_Project\Scripts\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\..\Assets\_Project\Scripts\Simulation\**\*.cs" Link="Simulation\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\..\Assets\_Project\Scripts\Networking\**\*.cs" Link="Networking\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The sprint-14 lobby client (D-092) talks to Supabase Edge Functions and
+         needs Newtonsoft.Json — the relay binary must not pull it in. -->
+    <Compile Remove="..\..\Assets\_Project\Scripts\Networking\Lobby\**\*.cs" />
   </ItemGroup>
 
 </Project>

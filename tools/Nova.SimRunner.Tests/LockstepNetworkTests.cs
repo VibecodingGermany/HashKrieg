@@ -442,11 +442,14 @@ namespace Nova.SimRunner.Tests
                 var factions = new byte[CommandLimits.ReservedPlayerSlots];
                 factions[0] = (byte)FactionId.Alliance;
                 factions[1] = (byte)FactionId.Legion;
+                // The proof binds the seed the relay actually offered —
+                // static or lobby-derived (D-093) — never a test constant.
+                ulong offeredSeed = Client != null ? Client.Seed : Seed;
                 return MatchFingerprint.CreateCurrent(
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
                     SimDefinitions.ComputeDefinitionsHash64(),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
-                    slots, factions, Seed, Kernel.CalculateStateHash(), Session.InputDelayTicks);
+                    slots, factions, offeredSeed, Kernel.CalculateStateHash(), Session.InputDelayTicks);
             }
 
             public void SubmitIntent<TPayload>(in TPayload payload) where TPayload : struct, ICommandPayload
@@ -1441,6 +1444,302 @@ namespace Nova.SimRunner.Tests
             server.Stop();
         }
 
+        // ------------------------------------------------------------------
+        // Lobby-minted match tokens (D-093, sprint 14.5): the relay shares
+        // an HMAC secret with the external lobby and accepts short-lived
+        // tokens next to the static one — over REAL loopback TCP here.
+        // ------------------------------------------------------------------
+
+        private static readonly byte[] LobbySecret = CreateLobbySecret(0x40);
+        private static readonly byte[] ForeignLobbySecret = CreateLobbySecret(0x70);
+
+        // Fixed wall instant exactly on the boundary of bucket 500 — the
+        // injected wall clock makes every token window deterministic.
+        private const long LobbyNowMs =
+            LobbyToken.BucketEpochMilliseconds + 500 * LobbyToken.BucketDurationMilliseconds;
+
+        private static byte[] CreateLobbySecret(byte first)
+        {
+            var secret = new byte[32];
+            for (int i = 0; i < secret.Length; i++)
+            {
+                secret[i] = (byte)(first + i * 3);
+            }
+            return secret;
+        }
+
+        private static ulong MintLobbyToken(ushort matchId, uint bucketOffsetBack = 0)
+        {
+            uint bucket = (uint)LobbyToken.BucketFromUnixMs(LobbyNowMs) - bucketOffsetBack;
+            return LobbyToken.Mint(LobbySecret, bucket, matchId);
+        }
+
+        private static RelayServerCore CreateLobbyServer(byte[] lobbyTokenSecret)
+        {
+            return new RelayServerCore(
+                Token, Seed, Delay, string.Empty, _ => { },
+                lobbyTokenSecret: lobbyTokenSecret,
+                wallClockUnixMs: () => LobbyNowMs);
+        }
+
+        [Test]
+        public void LobbyToken_FullHandshake_Starts_AndBothClientsGetTheDerivedSeed()
+        {
+            ulong lobbyToken = MintLobbyToken(0x123);
+            ulong expectedSeed = LobbyToken.DeriveSeed(LobbySecret, lobbyToken);
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            ClientHost hostA = null;
+            ClientHost hostB = null;
+            try
+            {
+                server.Start(0);
+                (hostA, hostB) = StartMatch(server, token: lobbyToken);
+
+                Assert.That(hostA.Client.Phase, Is.EqualTo(RelayClientPhase.Running));
+                Assert.That(hostB.Client.Phase, Is.EqualTo(RelayClientPhase.Running));
+                Assert.That(hostA.Client.Seed, Is.EqualTo(expectedSeed));
+                Assert.That(hostB.Client.Seed, Is.EqualTo(expectedSeed));
+                Assert.That(server.Seed, Is.EqualTo(expectedSeed));
+                Assert.That(expectedSeed, Is.Not.EqualTo(Seed),
+                    "a lobby match must run on the token-derived seed, not the static one");
+            }
+            finally
+            {
+                hostA?.Client.Disconnect();
+                hostB?.Client.Disconnect();
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_DifferentSecondToken_IsRejected_AndWaitingPeerStaysReusable()
+        {
+            ulong lobbyToken = MintLobbyToken(0x201);
+            ulong otherToken = MintLobbyToken(0x202);
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            try
+            {
+                server.Start(0);
+                var valid = new RelayMatchClient();
+                valid.Connect("127.0.0.1", server.Port, lobbyToken);
+                PumpUntil(server, valid, null, () => valid.HasOffer, "valid lobby offer");
+
+                var wrong = new RelayMatchClient();
+                wrong.Connect("127.0.0.1", server.Port, otherToken);
+                PumpUntil(server, valid, wrong,
+                    () => wrong.Phase == RelayClientPhase.Ended,
+                    "different-token rejection");
+
+                Assert.That(valid.AssignedSlot, Is.EqualTo(0));
+                Assert.That(valid.Phase, Is.EqualTo(RelayClientPhase.WaitingOffer));
+                Assert.That(valid.Seed, Is.EqualTo(LobbyToken.DeriveSeed(LobbySecret, lobbyToken)));
+                Assert.That(wrong.RejectReason, Does.Contain("match code"));
+                Assert.That(server.PeerCount, Is.EqualTo(1));
+
+                var replacement = new RelayMatchClient();
+                replacement.Connect("127.0.0.1", server.Port, lobbyToken);
+                PumpUntil(server, valid, replacement, () => replacement.HasOffer,
+                    "the identical lobby token receives the freed slot");
+                Assert.That(replacement.AssignedSlot, Is.EqualTo(1));
+                Assert.That(replacement.Seed, Is.EqualTo(valid.Seed));
+                Assert.That(valid.Phase, Is.EqualTo(RelayClientPhase.WaitingOffer));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_ExpiredOrForeignSecret_IsRejectedLikeAWrongMatchCode()
+        {
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            try
+            {
+                server.Start(0);
+                var expired = new RelayMatchClient();
+                expired.Connect("127.0.0.1", server.Port, MintLobbyToken(0x301, bucketOffsetBack: 6));
+                PumpUntil(server, expired, null,
+                    () => expired.Phase == RelayClientPhase.Ended, "expired lobby token rejection");
+                Assert.That(expired.RejectReason, Does.Contain("match code"));
+                Assert.That(server.PeerCount, Is.Zero);
+
+                // Well-formed window, but minted against a different secret.
+                ulong foreignToken = LobbyToken.Mint(ForeignLobbySecret,
+                    (uint)LobbyToken.BucketFromUnixMs(LobbyNowMs), 0x302);
+                var foreign = new RelayMatchClient();
+                foreign.Connect("127.0.0.1", server.Port, foreignToken);
+                PumpUntil(server, foreign, null,
+                    () => foreign.Phase == RelayClientPhase.Ended, "foreign-secret token rejection");
+                Assert.That(foreign.RejectReason, Does.Contain("match code"));
+                Assert.That(server.PeerCount, Is.Zero);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_IsConsumedByMatchReset_AndAFreshTokenStillWorks()
+        {
+            ulong lobbyToken = MintLobbyToken(0x401);
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            ClientHost hostA = null;
+            ClientHost hostB = null;
+            try
+            {
+                server.Start(0);
+                (hostA, hostB) = StartMatch(server, token: lobbyToken);
+
+                // End the match: slot 1 leaves, the relay ends and resets.
+                RelayMatchClient leaving = hostA.Client.AssignedSlot == 1 ? hostA.Client : hostB.Client;
+                RelayMatchClient survivor = hostA.Client.AssignedSlot == 0 ? hostA.Client : hostB.Client;
+                leaving.Disconnect();
+                PumpUntil(server, survivor, null,
+                    () => survivor.Phase == RelayClientPhase.Ended && server.PeerCount == 0,
+                    "ordered peer-lost shutdown and relay reset");
+                survivor.Disconnect();
+
+                var consumed = new RelayMatchClient();
+                consumed.Connect("127.0.0.1", server.Port, lobbyToken);
+                PumpUntil(server, consumed, null,
+                    () => consumed.Phase == RelayClientPhase.Ended, "consumed lobby token rejection");
+                Assert.That(consumed.RejectReason, Does.Contain("match code"));
+                Assert.That(server.PeerCount, Is.Zero);
+
+                ulong freshToken = MintLobbyToken(0x402);
+                var next = new RelayMatchClient();
+                next.Connect("127.0.0.1", server.Port, freshToken);
+                PumpUntil(server, next, null, () => next.HasOffer,
+                    "a fresh lobby token after the reset");
+                Assert.That(next.Seed, Is.EqualTo(LobbyToken.DeriveSeed(LobbySecret, freshToken)));
+                next.Disconnect();
+            }
+            finally
+            {
+                hostA?.Client.Disconnect();
+                hostB?.Client.Disconnect();
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void StaticToken_WorksUnlimited_WhenLobbySecretIsConfigured()
+        {
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            ClientHost hostA = null;
+            ClientHost hostB = null;
+            try
+            {
+                server.Start(0);
+                (hostA, hostB) = StartMatch(server);
+                Assert.That(hostA.Client.Seed, Is.EqualTo(Seed));
+                Assert.That(hostB.Client.Seed, Is.EqualTo(Seed));
+
+                // The static token is not single-use: after the reset it works again.
+                RelayMatchClient leaving = hostA.Client.AssignedSlot == 1 ? hostA.Client : hostB.Client;
+                RelayMatchClient survivor = hostA.Client.AssignedSlot == 0 ? hostA.Client : hostB.Client;
+                leaving.Disconnect();
+                PumpUntil(server, survivor, null,
+                    () => survivor.Phase == RelayClientPhase.Ended && server.PeerCount == 0,
+                    "ordered peer-lost shutdown and relay reset");
+                survivor.Disconnect();
+
+                var again = new RelayMatchClient();
+                again.Connect("127.0.0.1", server.Port, Token);
+                PumpUntil(server, again, null, () => again.HasOffer,
+                    "static token reusable after the reset");
+                Assert.That(again.Seed, Is.EqualTo(Seed));
+                again.Disconnect();
+            }
+            finally
+            {
+                hostA?.Client.Disconnect();
+                hostB?.Client.Disconnect();
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_WithoutConfiguredSecret_IsRejectedLikeAWrongMatchCode()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            try
+            {
+                server.Start(0);
+                var client = new RelayMatchClient();
+                client.Connect("127.0.0.1", server.Port, MintLobbyToken(0x501));
+                PumpUntil(server, client, null,
+                    () => client.Phase == RelayClientPhase.Ended,
+                    "lobby token rejection without a configured secret");
+                Assert.That(client.RejectReason, Does.Contain("match code"));
+                Assert.That(server.PeerCount, Is.Zero);
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_BoundSeedSurvivesAStaticPeerJoiningSecond()
+        {
+            // Mixed pair: the lobby token binds first; a static-token peer
+            // joins second and must see the derived seed, never rebind it.
+            ulong lobbyToken = MintLobbyToken(0x601);
+            ulong expectedSeed = LobbyToken.DeriveSeed(LobbySecret, lobbyToken);
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            try
+            {
+                server.Start(0);
+                var lobbyPeer = new RelayMatchClient();
+                lobbyPeer.Connect("127.0.0.1", server.Port, lobbyToken);
+                PumpUntil(server, lobbyPeer, null, () => lobbyPeer.HasOffer,
+                    "lobby offer binds the derived seed first");
+
+                var staticPeer = new RelayMatchClient();
+                staticPeer.Connect("127.0.0.1", server.Port, Token);
+                PumpUntil(server, lobbyPeer, staticPeer,
+                    () => staticPeer.HasOffer, "static peer joins second");
+                Assert.That(lobbyPeer.Seed, Is.EqualTo(expectedSeed));
+                Assert.That(staticPeer.Seed, Is.EqualTo(expectedSeed));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
+        [Test]
+        public void LobbyToken_CannotRebindWhileAStaticPeerWaits()
+        {
+            RelayServerCore server = CreateLobbyServer(LobbySecret);
+            try
+            {
+                server.Start(0);
+                var waiting = new RelayMatchClient();
+                waiting.Connect("127.0.0.1", server.Port, Token);
+                PumpUntil(server, waiting, null, () => waiting.HasOffer, "static waiting offer");
+                Assert.That(waiting.Seed, Is.EqualTo(Seed));
+
+                var lobbyPeer = new RelayMatchClient();
+                lobbyPeer.Connect("127.0.0.1", server.Port, MintLobbyToken(0x701));
+                PumpUntil(server, waiting, lobbyPeer,
+                    () => lobbyPeer.Phase == RelayClientPhase.Ended,
+                    "lobby token rejected while a static match formation waits");
+                Assert.That(lobbyPeer.RejectReason, Does.Contain("match code"));
+                Assert.That(waiting.Phase, Is.EqualTo(RelayClientPhase.WaitingOffer));
+                Assert.That(server.Seed, Is.EqualTo(Seed),
+                    "the rejected lobby token must not have rebound the match seed");
+                Assert.That(server.PeerCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                server.Stop();
+            }
+        }
+
         [Test]
         public void CleanFinFromSlot1_EndsRunningMatchWithoutBreakingThePollLoop()
         {
@@ -2175,12 +2474,14 @@ namespace Nova.SimRunner.Tests
         // ------------------------------------------------------------------
 
         private static (ClientHost, ClientHost) StartMatch(
-            RelayServerCore server, RelayMatchClient clientA = null, RelayMatchClient clientB = null)
+            RelayServerCore server, RelayMatchClient clientA = null, RelayMatchClient clientB = null,
+            ulong? token = null)
         {
             clientA = clientA ?? new RelayMatchClient();
             clientB = clientB ?? new RelayMatchClient();
-            clientA.Connect("127.0.0.1", server.Port, Token);
-            clientB.Connect("127.0.0.1", server.Port, Token);
+            ulong matchToken = token ?? Token;
+            clientA.Connect("127.0.0.1", server.Port, matchToken);
+            clientB.Connect("127.0.0.1", server.Port, matchToken);
             PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
             ClientHost hostA = ClientHost.Create(clientA);
             ClientHost hostB = ClientHost.Create(clientB);

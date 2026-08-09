@@ -62,7 +62,8 @@ namespace Nova.RelayServer
                         configuration.Seed,
                         configuration.InputDelayTicks,
                         configuration.RecordDirectory,
-                        log)));
+                        log,
+                        lobbyTokenSecret: configuration.LobbyTokenSecret)));
         }
 
         internal int Run(string[] args, ManualResetEventSlim stopRequested)

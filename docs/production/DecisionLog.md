@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.29.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 13.0
+**Version:** 1.30.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 14
 
 ## Zweck
 
@@ -2500,6 +2500,42 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
 
 ---
 
+### D-092 | verbindlich | Sprint 14 (Lobby-Vermittlung: Supabase Edge Functions, schlanker Client, Polling)
+
+**Kontext:** Sprint 14 ersetzt das Abtelefonieren von Serveradresse, Match-Code und Slot durch eine Lobby: Match per kurzem Code anlegen und beitreten, Fraktionswahl, Bereitschaft, Build-Abgleich. Offen waren: Wo läuft die Vermittlungslogik, wie spricht der Client sie an, und wo liegt der Client-Code im Repo?
+**Alternativen:** (a) Supabase Edge Functions (Deno) als einzige Serverlogik, dazu ein schlanker HTTPS-Client (HttpClient + Newtonsoft.Json) mit ~1,5-s-Polling, anon-Key im Client, Row-Level-Security deny-all auf den Tabellen; Client-Code engine-frei unter `Scripts/Networking/Lobby/`; (b) direkter PostgREST-/REST-Tabellenzugriff des Clients mit RLS-Policies; (c) Supabase Realtime (WebSocket-Subscriptions) statt Polling; (d) UnityWebRequest + JsonUtility in der Gameplay-/Präsentationsassembly; (e) externes supabase-csharp-SDK oder ein eigenes Vermittlungs-Backend.
+**Entscheidung:** (a).
+**Begründung:** Das Token-Minting (D-093) braucht ein serverseitiges Geheimnis — nur Functions können es halten; bei (b) läge das Secret im Client oder das Token ungeschützt in der Tabelle. RLS deny-all plus Service-Role-Key ausschliesslich in der Function-Umgebung minimiert die Angriffsfläche; der anon-Key ist per Sprint-Vorgabe kein Geheimnis, bleibt aber unkonfiguriert aus dem Repo (gitignorte `lobby-config.json` bzw. `NOVA_LOBBY_URL`/`NOVA_LOBBY_ANON_KEY`). Polling reicht für genau zwei Spieler; (c) brächte WebSocket-Client und Verbindungsmanagement ohne Mehrwert. Die engine-freie Platzierung macht den Client mit dem kanonischen `dotnet test` prüfbar (22 Tests gegen einen In-Prozess-Mock); (d) hätte ihn in die nur lokal laufenden Unity-EditMode-Tests verwiesen, und JsonUtility trägt die Vertrags-DTOs (verschachtelte Slot-Arrays, Null-Felder) nicht sauber. (e) ist eine schwere Abhängigkeit für fünf flache Endpunkte.
+**Konsequenzen:** Neue Dependency `com.unity.nuget.newtonsoft-json` (Unity) bzw. `Newtonsoft.Json` (net8-Tests); `<Compile Remove>` im Relay-csproj, damit der Client nicht ins Relay-Binary wandert; Vertrag, Schema und Function-Referenzquelltexte in [../tech/LobbySupabase.md](../tech/LobbySupabase.md); Lobby-UI in `Presentation/UI`, Glue in `Gameplay` (Schreibhoheit Netzstrang, Assembly-Trennung Presentation.UI ↔ Networking bleibt gewahrt); keine Accounts und keine personenbezogenen Daten — vor dem ersten personenbeziehbaren Feld ist eine neue D-ID fällig. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden — überstimmbar.**
+
+**Verworfen:** (b) PostgREST-Direktzugriff — kann das Minting-Secret nicht serverseitig halten; (c) Realtime — überdimensioniert für eine Zwei-Personen-Lobby; (d) UnityWebRequest in Gameplay — verliert die Headless-Testbarkeit des kanonischen Checks; (e) SDK/Eigenbackend — Abhängigkeit bzw. Betrieb ohne Verhältnis zum Umfang.
+
+---
+
+### D-093 | verbindlich | Sprint 14.5 (kurzlebige HMAC-Match-Tokens für den Relay)
+
+**Kontext:** Der Relay verlangt seit A6 ein Match-Token — bisher ein statischer `ulong` aus `NOVA_MATCH_TOKEN` für die gesamte Prozesslebensdauer, per Anruf abgestimmt. Die Lobby soll pro Match ein kurzlebiges Token vergeben und beiden Clients übergeben, ohne dass der Relay neue Kanäle oder nennenswerten Zustand bekommt und ohne den Direktweg aus Sprint 13 zu brechen.
+**Alternativen:** (a) strukturiertes 64-bit-Token [20 bit Expiry-Bucket à 5 min ‖ 12 bit Match-Id ‖ 32 bit HMAC-SHA256-Tag] gegen ein per Konfiguration geteiltes Secret; Relay validiert lokal, Match-Seed wird per HMAC aus dem Token abgeleitet, statisches Token bleibt für den Direktweg; (b) Token-Registry/-Datei am Relay, die die Lobby über einen neuen Provisionierungskanal (SSH/HTTP-Hook auf dem VPS) beschreibt; (c) Relay fragt bei jedem Hello aktiv per REST gegen Supabase (Pull-Validierung); (d) Protokolländerung: längeres signiertes Token mit `ProtocolVersion`-Bump.
+**Entscheidung:** (a) — Richtung vom Inhaber im Sprint-Gespräch bestätigt, Ausformung vom Agenten unter Delegation, überstimmbar.
+**Begründung:** (a) bricht das Protokoll nicht — Hello bleibt Version + `u64`, `ProtocolVersion` 1 unverändert — und braucht keinen Laufzeit-Kanal zwischen Lobby und Relay ((b)) und keine Kopplung des Relay an Supabase-Verfügbarkeit; (c) hätte zusätzlich den Service-Role-Key auf den Relay-Host gebracht und den Relay weniger „dumm" gemacht. (d) ist die sauberste Langform, sperrt aber alle vorhandenen Builds und widerspricht dem Sprint-Leitsatz, der Relay bleibe, was er ist. Der 32-bit-Tag reicht, weil der Relay Tokens nur im 5-Sekunden-Hello-Fenster prüft und ein Match pro Prozess bindet. Single-Use wird prozessintern über Match-Resets hinweg gehalten und per Expiry gepurgt; die Seed-Ableitung (`HMAC(secret, "NOVA-LOBBY-SEED-V1" ‖ token)`, ODER 1) macht die Lobby zur Seed-Quelle, ohne das Offer-Protokoll anzufassen — das Offer bleibt auf dem Draht autoritativ.
+**Konsequenzen:** `LobbyToken.cs` (engine-frei, nur BCL) mit exakt dokumentierter, von der Deno-Function zu spiegelnder Serialisierung; `RelayServerCore` akzeptiert neben dem statischen Token validierte Lobby-Tokens (gleiches Token für beide Peers, Verbrauch nach Reset, abgeleiteter Seed vor dem Offer); neue optionale Env `NOVA_RELAY_TOKEN_SECRET` (64 Hex, fail-closed validiert, `NOVA_MATCH_TOKEN` bleibt Pflicht für den Direktweg); Doku in [../tech/RelayServer.md](../tech/RelayServer.md) 1.1.0 und [../tech/LobbySupabase.md](../tech/LobbySupabase.md); Tests inklusive Zwei-Client-Handshake über echten TCP-Relay. Einschränkungen (dokumentiert): ein gebundenes Token bleibt bis zum Match-Reset gebunden; Bucket-Wrap ca. 2036; die Lobby muss Match-Id-Kollisionen durch Neu-Minten vermeiden.
+
+**Verworfen:** (b) Token-Datei — neuer Provisionierungskanal und VPS-Infra ausserhalb des Repos für ein Problem, das ein Shared Secret ohne Kanal löst; (c) Relay-Pull — Verfügbarkeitskopplung an Supabase und Service-Key auf dem Relay; (d) Protokolländerung — Versionsbruch ohne zwingenden Grund.
+
+---
+
+### D-094 | verbindlich | Sprint 14.4 (Build-Commit zur Laufzeit lesbar)
+
+**Kontext:** Die Lobby soll ungleiche Builds schon beim Beitritt im Klartext erklären („Ihr habt unterschiedliche Versionen — hol dir Build `<commit>`"), bevor der Relay sie spät und technisch abweist (A4). Der Build-Commit steht bisher nur in `Info.plist`/`NovaBuildCommit.txt` der Pakete und wird zur Laufzeit nirgends gelesen.
+**Alternativen:** (a) `IPreprocessBuildWithReport` in `Nova.Editor` schreibt `git rev-parse --short HEAD` (plus `-dirty`, analog `build-mac.sh`) vor jedem Player-Build in die gitignorte `Assets/_Project/Resources/NovaBuildCommit.txt`; Runtime-Reader `BuildInfo.Commit` mit Fallback `dev-editor`; (b) `Info.plist` bzw. plattformabhängige Paketdateien zur Laufzeit lesen; (c) eingecheckte generierte C#-Datei (`BuildInfo.g.cs`), die jeder Build neu erzeugt; (d) die Packaging-Skripte schreiben die Datei vor dem Unity-Aufruf.
+**Entscheidung:** (a).
+**Begründung:** (a) deckt alle Build-Wege (Skripte, Editor-Menü, künftige CI) plattformgleich ab, ohne die laufende Windows-Packaging-Arbeit in `tools/packaging/` zu berühren. (b) ist plattformspezifisch und fragil (Signatur-/Notarisierungsreihenfolge auf macOS, abweichende Ablagen auf Linux/Windows). (c) verschmutzt den Arbeitsbaum oder erzwingt Leer-Commits für einen Wert, der die Paketierung ohnehin kennt. (d) greift in fremde WIP ein und lässt Editor-Builds aussen vor. Der Fallback `dev-editor` hält Editor-gegen-Editor-Spiele ohne Konfiguration spielbar; zwei `dev-editor` gelten als gleicher Build und passieren den Lobby-Abgleich — als dokumentierter Entwicklungsweg, nicht als Schutz.
+**Konsequenzen:** `BuildInfo.Commit` in `Gameplay/Match`, `BuildCommitStamp` in `Assets/_Project/Editor/`, `.gitignore`-Einträge für die Stempel-Datei; die Lobby vergleicht den Commit beim Beitritt (409 `build_mismatch` mit beiden Commits im Klartext, Vertrag in [../tech/LobbySupabase.md](../tech/LobbySupabase.md)); der Relay-Fingerprint (A4) bleibt die letzte, technische Sperre unverändert dahinter. **Vom Agenten unter ausdrücklicher Inhaber-Delegation entschieden — überstimmbar.**
+
+**Verworfen:** (b) Plattformdatei-Lese — fragil und dreifach zu pflegen; (c) generierte eingecheckte Quelle — Tree-Dirt bzw. Leer-Commits; (d) Skript-Stempel — kollidiert mit laufender Arbeit an `tools/packaging/` und erfasst Editor-Builds nicht.
+
+---
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -2555,6 +2591,16 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
   „Offene Punkte"-Zeile nennt noch den zu kurzen Bereich D-078 bis D-081 und
   begründet die Reservierung mit einem inzwischen erfolgten Eintrag (D-077).
   Beides ist in jener Datei nachzuziehen, nicht hier.
+- **D-092 bis D-094 stehen in derselben Delegationslage** wie D-074/D-083
+  (Lobby-Vermittlung über Supabase Edge Functions, kurzlebige
+  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-093 hat der
+  Inhaber die Richtung (HMAC-Token) selbst vorgegeben, die Ausformung sowie
+  D-092/D-094 hat der Agent unter Delegation entschieden — gekennzeichnet und
+  überstimmbar. **Offen darin:** Das Supabase-Projekt ist noch nicht angelegt
+  und die Function-Referenzen in
+  [../tech/LobbySupabase.md](../tech/LobbySupabase.md) noch nicht gegen ein
+  lebendes Projekt gelaufen; der erste Deploy-Lauf gehört dem Inhaber
+  (Betriebspfad im selben Dokument).
 
 ## Nächste Schritte
 
@@ -2600,3 +2646,4 @@ kombinieren und bietet weniger Vier-Augen-Schutz.
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
 | 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |
+| 1.30.0 | 2026-08-09 | D-092 bis D-094 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-093-Richtung vom Inhaber vorgegeben, Ausformung sowie D-092/D-094 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-093 Richtung: Dennis Westermann |

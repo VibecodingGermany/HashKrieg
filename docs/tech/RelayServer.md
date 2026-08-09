@@ -1,6 +1,6 @@
 # Relay-Server – Betrieb, Deploy und Rollback
 
-**Version:** 1.0.0 | **Status:** Sprint 12 A1–A7 implementiert; A8 Stufe 1 nachgewiesen, Stufen 2–4 offen | **Verantwortungsbereich:** Lead Multiplayer Engineer / Betrieb | **Sprint:** 12
+**Version:** 1.1.0 | **Status:** Sprint 12 A1–A7 implementiert; A8 Stufe 1 nachgewiesen, Stufen 2–4 offen | **Verantwortungsbereich:** Lead Multiplayer Engineer / Betrieb | **Sprint:** 12
 
 ## Zweck
 
@@ -78,6 +78,63 @@ persistiert er den Tick erst in `NOVAREC2`, wenn er beide Slot-Completions
 bestätigt hat. Dieser Persistenz-Barrier ist nicht mit einem Roundtrip-Gate für
 die eigene Client-Completion zu verwechseln.
 
+## Match-Tokens: statisch und Lobby-gemintet
+
+Der Relay akzeptiert seit Sprint 14.5 ([D-093](../production/DecisionLog.md))
+zwei Token-Arten im selben 64-Bit-Feld des `Hello`. Das Protokoll bleibt bei
+Version 1; ein Lobby-Token ist auf dem Draht nur ein weiterer `u64`-Wert. Der
+Codec liegt in
+[`LobbyToken.cs`](../../Assets/_Project/Scripts/Networking/LobbyToken.cs), die
+Lobby-Edge-Function (Deno) muss ihn bitgenau spiegeln.
+
+**Statisches Token** (`NOVA_MATCH_TOKEN`): wie bisher vom Administrator
+provisioniert, unbegrenzt wiederverwendbar; der Match-Seed ist konfiguriert
+(`NOVA_RELAY_SEED`) oder wird je Match neu gewürfelt. Bleibt Pflicht und ist
+der Direktweg für Tests und Betrieb ohne Lobby.
+
+**Lobby-Token**: kurzlebig, von der externen Lobby (Supabase) pro Match
+gemintet. Lobby und Relay teilen ausschließlich das statische HMAC-Secret
+`NOVA_RELAY_TOKEN_SECRET` per Konfiguration — es gibt bewusst keinen neuen
+Kanal zwischen ihnen. Layout der 64 Bit:
+
+- Bits 63..44: 20-bit Ablauf-Bucket =
+  `floor((unixMs − 2026-01-01T00:00:00Z) / 300000)`, also 5-Minuten-Scheiben.
+- Bits 43..32: 12-bit Match-Id (Zufallszahl der Lobby).
+- Bits 31..0: 32-bit Tag = erste 4 Bytes von
+  `HMAC-SHA256(secret, ASCII "NOVA-LOBBY-TOKEN-V1" ‖ bucket als u32 big-endian ‖
+  matchId als u16 big-endian)`.
+
+Semantik im Relay:
+
+- Gültig ist ein Lobby-Token, wenn der Tag stimmt (Fixed-Time-Vergleich) und
+  sein Bucket im Fenster `[aktuell − 5, aktuell]` liegt — ein 30-Minuten-Fenster.
+- **Single-Use:** Der erste Peer bindet das Token an das Match; der zweite Peer
+  muss exakt dasselbe Token vorzeigen. Nach dem Match-Reset ist das Token
+  verbraucht und nie wieder verwendbar — auch wenn das Match nie gestartet ist.
+  Verbrauchte Einträge werden gepurgt, sobald ihr Bucket das Gültigkeitsfenster
+  verlassen hat (solche Tokens können nie wieder gültig werden).
+- **Seed:** Der Offer-Seed eines Lobby-Matches wird aus dem Token abgeleitet —
+  `HMAC-SHA256(secret, ASCII "NOVA-LOBBY-SEED-V1" ‖ token als u64 big-endian)`,
+  erste 8 Bytes, Ergebnis `| 1`, damit er nie die Zufallsseed-Konvention 0
+  berührt. Beide Clients erhalten so denselben Seed, ohne dass er je übertragen
+  oder verhandelt wird.
+- Ablehnungen nennen weiterhin nur „wrong match code"; Token und
+  Token-Bestandteile erscheinen weder in Logs noch in Fehlertexten.
+- Ein gebundenes Token wird erst beim Match-Reset freigegeben beziehungsweise
+  verbraucht: Verschwindet der wartende Peer vor Matchbeginn, bleibt das Token
+  bis zum Reset gebunden und andere Lobby-Matches warten.
+
+Grenzen dieses Vertrags:
+
+- Der 32-bit Tag ist ein Zulassungs-MAC, keine Transportverschlüsselung;
+  Online-Raten scheitert praktisch an den zwei Slots und dem
+  5-Sekunden-Handshake-Timeout je Verbindung.
+- Der 20-bit Bucket läuft nach 2^20 Scheiben (≈ 9,97 Jahre) über, frühestens
+  2036; das Minting danach ist nicht Teil dieses Vertrags.
+- Die 12-bit Match-Id kann innerhalb eines Fensters kollidieren: gleiche
+  Bucket- und Id-Werte ergeben dasselbe Token. Die Lobby muss Ids so ziehen,
+  dass sie innerhalb eines 30-Minuten-Fensters nicht doppelt vergibt.
+
 ## Release-Artefakt und Verzeichnislayout
 
 Der Workflow veröffentlicht **kein Single-File-Binary**, sondern einen
@@ -124,6 +181,7 @@ aus der Umgebung:
 | `NOVA_INPUT_DELAY_TICKS` | nein | `3` | dezimal 1–60 |
 | `NOVA_RECORD_DIR` | nein | Aufzeichnung aus | absoluter Pfad, nicht `/` |
 | `NOVA_RELAY_SEED` | nein | neuer, zufälliger Seed | wenn gesetzt: exakt 16 unpräfixierte Hexzeichen, nicht null |
+| `NOVA_RELAY_TOKEN_SECRET` | nein | nur statisches Token | wenn gesetzt: exakt 64 unpräfixierte Hexzeichen (32 Bytes); wird nie geloggt |
 
 Ist `NOVA_RECORD_DIR` gesetzt, prüft der Prozess vor dem Listener-Start, ob er
 das Verzeichnis erstellen, eine Probe schreiben, auf den Datenträger flushen
@@ -502,3 +560,4 @@ abgenommen.
 |---|---|---|---|
 | 0.1.0 | 2026-08-07 | Vorläufiges Server-/Protokollblatt für A1–A5 | Agent (Umsetzung) |
 | 1.0.0 | 2026-08-07 | D-089-Vertrag, vollständigen Artifact-/systemd-/Deploy-/Rollback-Pfad und ehrlichen A8-Nachweisstand dokumentiert | Technical Writer |
+| 1.1.0 | 2026-08-09 | Kurzlebige Lobby-Match-Tokens (D-093, Sprint 14.5) | Agent (Umsetzung) |
