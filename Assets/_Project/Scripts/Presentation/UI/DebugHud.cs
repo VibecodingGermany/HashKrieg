@@ -92,6 +92,7 @@ namespace Nova.Presentation.UI
         private GUIStyle _labelStyle;
         private GUIStyle _outcomeStyle;
         private GUIStyle _statusStyle;
+        private GUIStyle _buttonStyle;
 
         // F3 panel scroll position: the panel's height is bounded by its
         // HudLayout zone, so surplus content scrolls instead of running out.
@@ -116,6 +117,16 @@ namespace Nova.Presentation.UI
             if (Input.GetKeyDown(KeyCode.F3))
             {
                 _visible = !_visible;
+            }
+
+            // F4 reveals the whole map for judging the opponent AI. It is
+            // bound only while the panel is open — the reveal is a diagnostic
+            // control and belongs to the diagnostic view, not to the running
+            // match's key map. It does keep working after the panel is closed
+            // again, which is the point: an uncluttered view of the enemy.
+            if (_visible && Input.GetKeyDown(KeyCode.F4))
+            {
+                FogRevealDebug.Toggle();
             }
         }
 
@@ -181,6 +192,7 @@ namespace Nova.Presentation.UI
                 if (_input != null) GUILayout.Label($"Last command: {_input.LastCommandStatus}", _labelStyle);
                 string legend = _input != null ? _input.ControlLegend : null;
                 GUILayout.Label(string.IsNullOrEmpty(legend) ? "Controls: no RtsDeviceInput in the scene." : legend, _labelStyle);
+                DrawFogRevealControl();
             }
 
             GUILayout.EndScrollView();
@@ -238,9 +250,39 @@ namespace Nova.Presentation.UI
                 }
 
                 _builder.Append("   |   F3: debug panel");
+
+                // A revealed map must say so on screen. Otherwise a
+                // screenshot claims a sight the player never had, and the
+                // observation it is supposed to support is worth nothing.
+                if (FogRevealDebug.RevealAll) _builder.Append("   |   FOG REVEALED (lab)");
             }
 
             GUI.Label(HudLayout.StatusStrip(scale, _fontSize + 6f, 8f), _builder.ToString(), _statusStyle);
+        }
+
+        /// <summary>
+        /// The lab reveal switch (F4, or this button). Presentation only: the
+        /// fog system keeps computing and committing the same team views and
+        /// the AI keeps reading its own, so a revealed match plays exactly
+        /// like a fogged one — see <see cref="FogRevealDebug"/>. It sits in
+        /// the F3 panel because that is where the diagnostics live, and it is
+        /// labelled with what it costs: what one sees here, a player would
+        /// not have seen.
+        /// </summary>
+        private void DrawFogRevealControl()
+        {
+            if (_buttonStyle == null)
+            {
+                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = _fontSize, richText = false };
+            }
+
+            string caption = FogRevealDebug.RevealAll
+                ? "Fog of War: REVEALED — F4 restores it"
+                : "Fog of War: on — F4 reveals the map (lab, presentation only)";
+            if (GUILayout.Button(caption, _buttonStyle))
+            {
+                FogRevealDebug.Toggle();
+            }
         }
 
         private void DrawMatchLine()
