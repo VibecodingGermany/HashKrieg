@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.32.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.33.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -2924,6 +2924,74 @@ Vertriebsweg und setzt sich später neben `install_hash`, ohne Tabellen,
 Sperrarten oder Bedienweg zu ändern. Q-041 bleibt bis zur Öffnung der Beta
 offen.
 
+---
+
+### D-101 | verbindlich | Sprint 16 (der Ausgangspin der kanonischen KI-Partie wird vom Identitätspin getrennt)
+
+**Status:** Inhaberentscheidung vom 2026-08-09, umgesetzt im selben Zug.
+
+**Kontext:** `SkirmishAiTests.AiBehaviorId_TracksWhatTheAiActuallyDoes` pinnte
+drei Werte in einer Zusicherung: die KI-Kennung `AiBehaviorId.Value`, den
+Entscheidungstick der kanonischen Partie und deren Endzustands-Hash. Die
+Kopplung war beabsichtigt — der Kommentar begründet sie damit, dass die Kennung
+geänderte Zahlen fängt und der Endzustand geänderte Regeln.
+
+Der erste Wirtschaftssprint hat gezeigt, dass die Kopplung an der falschen Naht
+liegt: Entscheidungstick und Endzustand bewegen sich bei **jeder** Änderung an
+der Simulation, in der die KI spielt. Paket 16.1 verschob den Endzustand, 16.2
+zusätzlich den Tick — beide fassen keine Zeile KI-Code an. Die im Test
+hinterlegte Prozedur schickte den Netzstrang damit in Arns Verhaltensjournal,
+also in das falsche Buch. Der Test liegt zudem in
+`tools/Nova.SimRunner.Tests/`, einem Verzeichnis, das in der
+Schreibhoheitstabelle gar keinen Eigentümer hatte.
+
+**Alternativen:**
+
+1. **Arn zieht den Pin nach jedem Merge des Netzstrangs nach.** Verworfen: bei
+   zehn Paketen in Sprint 16 sind das zehn Runden Ping-Pong über einen
+   Fork-PR-Weg, und jede blockiert einen fertigen Maintainer-PR an einer
+   Zahl, die niemand aus seinem Strang bewegt hat.
+2. **Der Netzstrang aktualisiert die Zahlen selbst, der Test bleibt, wo er
+   ist.** Verworfen: dann schreibt ein Strang regelmäßig in die Testdatei des
+   anderen, ohne dass die Tabelle das deckt — genau die Unklarheit, die den
+   Fall erzeugt hat. Ausserdem bliebe die irreführende Prozedur im Kommentar
+   stehen.
+3. **Den Ausgangspin ersatzlos streichen.** Verworfen: er ist der einzige Test,
+   der bemerkt, dass die KI die kanonische Partie überhaupt nicht mehr
+   entscheidet. Genau das ist in Paket 16.3 passiert (Entscheidungstick 0), und
+   ohne den Pin wäre es niemandem aufgefallen.
+4. **ANGENOMMEN: der Pin wird geteilt.** Die Kennung bleibt beim
+   Einheitenstrang (`SkirmishAiTests.AiBehaviorId_TracksWhichAiThisIs`),
+   Entscheidungstick und Endzustand ziehen in `CanonicalAiOutcomeTests` um,
+   das der Netzstrang besitzt.
+
+**Entscheidung:**
+
+1. `CanonicalAiOutcomeTests` (neu, Netzstrang) pinnt Entscheidungstick und
+   Endzustands-Hash der kanonischen KI-Partie.
+2. `SkirmishAiTests` behält die Kennung und deren Prozedur (Revision bumpen,
+   Journaleintrag) unverändert.
+3. Der Ausgangstest **liest die Kennung mit** und macht die Unterscheidung im
+   Fehlertext: Ausgang bewegt **und** Kennung bewegt heisst KI-Änderung;
+   Ausgang bewegt und Kennung unverändert heisst Simulationsänderung.
+4. **Unentschieden ist ein Defekt, kein verschobener Pin.** Der Ausgangstest
+   sichert das zuerst und getrennt zu, damit der Fehlertext beide Fälle
+   auseinanderhält.
+5. `tools/Nova.SimRunner.Tests/` bekommt eine Eigentümerzeile: geteilt je
+   Datei, fremde Testdateien nur nach Ansage. Der KI-Harness (`AiHost`,
+   `BuildMatch`) wird Vertragsfläche und dafür `internal`.
+
+**Begründung:** Die Kennung beantwortet „welche KI ist das", der Ausgang
+beantwortet „hat sich irgendetwas bewegt". Das sind zwei Fragen, und nur die
+erste gehört dem Einheitenstrang. Die Diagnose, die die Kopplung leistete, geht
+nicht verloren — sie wandert aus der Zusicherung in den Fehlertext, wo sie
+ohnehin hingehört: gelesen wird sie erst, wenn der Test rot ist.
+
+**Konsequenzen:** Vier Deklarationen in `SkirmishAiTests` werden `internal`,
+die Zusicherung dort schrumpft auf eine Zeile, der erklärende Kommentar
+verweist auf die neue Datei. Der Einheitenstrang ist zu informieren (Issue #75).
+Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3004,6 +3072,7 @@ offen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
 | 1.1.0 | 2026-07-21 | D-006 (Unity 6.3 LTS + URP bestätigt) aus Sprint-1-Validierung | Lead Technical Director |
 | 1.2.0 | 2026-07-21 | D-007 bis D-019: verbindliche Game-Design-Grundlagen (Q-001–Q-012, Q-016, Q-017) | Game Director |
