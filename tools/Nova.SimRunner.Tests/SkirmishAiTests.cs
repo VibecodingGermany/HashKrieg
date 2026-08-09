@@ -373,5 +373,187 @@ namespace Nova.SimRunner.Tests
             Assert.That(first.Kernel.CalculateStateHash(), Is.EqualTo(second.Kernel.CalculateStateHash()),
                 "the full AI loop (intents through the sealed stream) must reproduce the identical end state");
         }
+
+        // ----------------------------------------------------------------
+        // (e) Target choice is a score, not the order of the visible list
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Two enemies appear next to the army at the same moment and at
+        /// practically the same distance: an unarmed Harvester spawned FIRST,
+        /// and a BattleTank spawned second. The army has to shoot the tank.
+        /// <para>
+        /// This test is written so that the PREVIOUS rule would fail it. That
+        /// rule took the first non-building entity out of the visibility list,
+        /// which is an ascending entity scan — so the harvester, spawned
+        /// first, would have won on nothing but its lower index.
+        /// </para>
+        /// <para>
+        /// The margin is deliberately not marginal. Legion infantry deals 8
+        /// kinetic; against the tank's Heavy armor that resolves to 2 and
+        /// against the harvester's Light armor to 6, so the damage term even
+        /// favours the harvester (60 against 20). The threat term decides it:
+        /// the tank hits back for 60, the harvester for nothing, which at
+        /// weight 6 is 360 against 0. A wrong target here is a wrong ORDER of
+        /// terms, not a rounding difference — and that is what makes the
+        /// assertion worth having.
+        /// </para>
+        /// <para>
+        /// Why this test exists at all: the end-to-end test above kept passing
+        /// while target selection changed and the match decided 4.260 ticks
+        /// earlier. It asserts outcome and winner, never the choice.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_ShootsTheDangerousTarget_NotTheFirstOneInTheVisibleList()
+        {
+            AiHost host = BuildMatch(Seed);
+
+            // Wait for the attack squad; the AI only issues AttackTarget from
+            // its threshold upwards.
+            const int SquadThreshold = 6;
+            int budget = EndToEndBudgetTicks;
+            while (budget-- > 0 && CountUnits(host, AiSlot, UnitRole.BasicInfantry) < SquadThreshold)
+            {
+                host.Step();
+            }
+            Assert.That(CountUnits(host, AiSlot, UnitRole.BasicInfantry), Is.GreaterThanOrEqualTo(SquadThreshold),
+                "the AI never reached its attack squad, so it never chose a target");
+
+            Assert.That(TryFirstCombatCell(host, AiSlot, out int armyX, out int armyY), Is.True);
+
+            // The army as it stands NOW. Infantry keeps rolling out of the
+            // Barracks, and a unit born after this point auto-acquires a
+            // target of its own (D-087) before the next decision reaches it —
+            // that is correct behaviour and not what this test is about.
+            List<EntityId> army = CombatUnitIds(host, AiSlot);
+
+            // Order matters: the harvester takes the LOWER entity index, which
+            // is exactly the advantage the old rule handed out.
+            EntityId harvester = SpawnEnemyUnit(host, UnitRole.Harvester, armyX + 3, armyY);
+            EntityId tank = SpawnEnemyUnit(host, UnitRole.BattleTank, armyX + 3, armyY + 1);
+            Assert.That(harvester.Index, Is.LessThan(tank.Index),
+                "the test only discriminates while the harmless target is seen first");
+
+            RunToDecisionWithSquad(host, SquadThreshold);
+
+            Assert.That(ArmyAttackTarget(host, army), Is.EqualTo(tank),
+                "the army must shoot what actually threatens it, not what it happened to see first");
+        }
+
+        /// <summary>
+        /// Steps to just past a decision tick at which the AI actually holds
+        /// its attack squad.
+        /// <para>
+        /// Waiting a fixed number of ticks is not enough, and the reason is a
+        /// finding in its own right: BELOW the squad threshold the AI issues no
+        /// AttackTarget at all, so what its units carry is D-087
+        /// auto-acquisition — the NEAREST visible hostile, harmless or not.
+        /// Measured in this scenario: with five units, four shoot the harvester
+        /// while a battle tank stands one cell away. The score only governs
+        /// from the threshold upwards.
+        /// </para>
+        /// </summary>
+        private static void RunToDecisionWithSquad(AiHost host, int squadThreshold)
+        {
+            ushort cadence = host.Ai.DecisionTickInterval;
+            const int Budget = 2000;
+            for (int i = 0; i < Budget; i++)
+            {
+                host.Step();
+                if (CountCombatUnits(host, AiSlot) >= squadThreshold
+                    && (host.Kernel.CurrentTick.Value % cadence) == 0)
+                {
+                    host.Run(2); // the sealed intent lands on the following tick
+                    return;
+                }
+            }
+            Assert.Fail($"the AI never held {squadThreshold} combat units on a decision tick within {Budget} ticks");
+        }
+
+        private static int CountCombatUnits(AiHost host, byte slot)
+        {
+            int count = 0;
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                count++;
+            }
+            return count;
+        }
+
+        private static List<EntityId> CombatUnitIds(AiHost host, byte slot)
+        {
+            var ids = new List<EntityId>();
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                ids.Add(u.Id);
+            }
+            return ids;
+        }
+
+        /// <summary>Cell of the lowest-indexed living combat unit of a slot.</summary>
+        private static bool TryFirstCombatCell(AiHost host, byte slot, out int cellX, out int cellY)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                cellX = SimFixed.WorldToGrid(u.Transform.PositionX);
+                cellY = SimFixed.WorldToGrid(u.Transform.PositionY);
+                return true;
+            }
+            cellX = 0;
+            cellY = 0;
+            return false;
+        }
+
+        private static EntityId SpawnEnemyUnit(AiHost host, UnitRole role, int cellX, int cellY)
+        {
+            FactionId faction = host.Economy.GetSlotFaction(HumanSlot);
+            Assert.That(SimDefinitions.TryGetUnit(faction, role, out SimUnitDefinition def), Is.True,
+                $"{faction} has no {role}");
+            return host.Entities.SpawnUnit(
+                HumanSlot,
+                new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
+                def.MoveSpeed,
+                maxHealth: def.MaxHealth,
+                role: role);
+        }
+
+        /// <summary>
+        /// The target the army agrees on. The AI hands ONE target to every
+        /// combat unit, so a split would itself be the failure — the assertion
+        /// says so rather than silently reading the first unit.
+        /// </summary>
+        private static EntityId ArmyAttackTarget(AiHost host, List<EntityId> army)
+        {
+            EntityId agreed = EntityId.Invalid;
+            int checkedUnits = 0;
+            for (int i = 0; i < army.Count; i++)
+            {
+                if (!host.Entities.TryGetUnit(army[i], out UnitState u) || !u.IsActive) continue;
+                if (!u.AttackTarget.IsValid) continue;
+                checkedUnits++;
+                if (!agreed.IsValid)
+                {
+                    agreed = u.AttackTarget;
+                    continue;
+                }
+                Assert.That(u.AttackTarget, Is.EqualTo(agreed),
+                    "the army was handed ONE target; a split means the choice did not reach everyone");
+            }
+            Assert.That(checkedUnits, Is.GreaterThan(0), "no unit of the army carries an attack order at all");
+            return agreed;
+        }
     }
 }

@@ -18,6 +18,36 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Geändert
+- **Die KI zielt nach Wirkung statt nach Listenreihenfolge (Einheitenstrang,
+  KI-Verhalten `r2`):** Die Zielwahl lautete „HQ, sonst das ERSTE sichtbare
+  Gebäude, sonst die ERSTE sichtbare Einheit". Diese Reihenfolge ist die des
+  Sichtbarkeitsscans, also der Entitätsindex — die Armee lief an einem Panzer
+  vorbei, um ein Lagerhaus zu beschiessen, weil kinetischer Schaden auf Medium
+  mit 50 % und auf Building mit 30 % landet und die alte Regel das nicht sehen
+  konnte. Stattdessen ein ganzzahliger Score aus vier Profilgewichten: gelandeter
+  Schaden gegen die Rüstungsklasse, Bedrohung durch das Ziel, fehlendes Leben,
+  minus mittlere Entfernung. Gleichstand bricht auf der niedrigeren rohen
+  Entity-Id, nie auf der Listenposition. Das feindliche HQ bleibt ein
+  Kurzschluss und ist bewusst **kein** Gewicht: sein Verlust entscheidet die
+  Partie (D-077), und eine Siegbedingung ist keine Vorliebe.
+  **Gemessen**, Referenzpartie gegen sich selbst: Entscheidung bei Tick 8.715
+  statt 12.975 (−33 %), Verluste 70/97 statt 113/137 — beide Seiten verlieren
+  weniger, obwohl beide dasselbe neue Zielverhalten fahren. Nicht für jedes
+  Profil eine Verbesserung: `greedy-economy` und `fast-cadence` entscheiden
+  später und verlieren mehr.
+  Neu dazu: **`AiBehaviorId`** beantwortet „welche KI ist das" in einem String,
+  den man von einem Screenshot ablesen kann — eine von Hand gebumpte Revision
+  für Coderegeln, ein Hash über alle Profilzahlen für die Werte. Ein Test nagelt
+  ihn zusammen mit dem Endzustand der kanonischen Partie fest, sodass eine
+  Verhaltensänderung ohne Bump rot wird. Die F3-Anzeige zeigt ihn und daneben
+  die **Kennung der Simulation** (Hash der Definitionstabelle plus die fünf
+  Schemaversionen) — die Werte, an denen ungleiche Testbuilds auseinandergehen.
+  Ohne Anzeige im Spiel ist die Forderung nach einer gesehenen Runde schwer zu
+  erfüllen. 562/562 SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt — und
+  die Regel war dabei nicht erkennbar:** „Zielwahl nicht eindeutig erkennbar bis
+  dato". Wer in einer Schlacht mit zwölf Einheiten auf welches Ziel schiesst, ist
+  mit blossem Auge kaum auseinanderzuhalten. Sie ist gemessen und getestet, aber
+  nicht gesehen.
 - **KI-Profile als Datenschicht (`Nova.AI.Data`, Einheitenstrang):** Die
   Stellschrauben der Skirmish-KI lagen an zwei Orten — als Konstruktor-Defaults
   auf `AiFactionProfile` und als `const`-Felder in `SkirmishAiSystem`. Tunen

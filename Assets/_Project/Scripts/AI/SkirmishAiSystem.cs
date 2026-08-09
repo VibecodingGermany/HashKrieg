@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Nova.AI.Data;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Combat;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
@@ -466,7 +468,7 @@ namespace Nova.AI
             // are never addressed. ----
             if (combatCount >= _profile.AttackSquadThreshold && _aiPlayerId < _fogOfWar.TeamCount)
             {
-                uint targetRaw = FindPreferredVisibleEnemy(out int targetCellX, out int targetCellY);
+                uint targetRaw = FindBestVisibleEnemyByScore(combatUnits, out int targetCellX, out int targetCellY);
                 int moveX, moveY;
                 if (targetRaw != 0)
                 {
@@ -693,53 +695,128 @@ namespace Nova.AI
         /// visible enemy unit. 0 when nothing enemy is visible — radar pings
         /// deliberately grant no targeting right (FogOfWar.md section 3).
         /// </summary>
-        private uint FindPreferredVisibleEnemy(out int cellX, out int cellY)
+        /// <summary>
+        /// Picks the visible enemy the army shoots at, by integer score.
+        /// <para>
+        /// Replaces the previous rule "HQ, else the FIRST visible building,
+        /// else the FIRST visible unit". That rule read the order of the
+        /// visibility list as if it were a preference, so the army walked past
+        /// a tank to shell a warehouse — kinetic damage lands on Medium armor
+        /// at 50 % and on Building at 30 %, which the old rule could not see.
+        /// </para>
+        /// <para>
+        /// The enemy HQ still short-circuits, and that is NOT a weight the
+        /// score could outvote: destroying it decides the match (D-077). A
+        /// win condition is not a preference.
+        /// </para>
+        /// <para>
+        /// The score is per ARMY, not per unit, because one shared target is
+        /// what this call returns. For the homogeneous army the AI builds
+        /// today the ordering is identical to the per-attacker formula: the
+        /// mean over n identical attackers is the single attacker's value.
+        /// Mixed armies average, and per-unit targeting is a separate step.
+        /// </para>
+        /// <para>
+        /// Integers throughout — <c>DamageMatrix</c> already speaks integer
+        /// percent (100 == 1.00) — and ties break on the lower raw entity id,
+        /// so the result never depends on the visibility list's order.
+        /// </para>
+        /// </summary>
+        private uint FindBestVisibleEnemyByScore(List<UnitState> army, out int cellX, out int cellY)
         {
             cellX = 0;
             cellY = 0;
             var visible = new List<EntityId>();
             _fogOfWar.GetVisibleEntities(_aiPlayerId, visible);
 
-            uint buildingRaw = 0, unitRaw = 0;
-            int buildingCellX = 0, buildingCellY = 0, unitCellX = 0, unitCellY = 0;
+            uint bestRaw = 0;
+            long bestScore = 0;
+            int bestX = 0, bestY = 0;
+
             for (int i = 0; i < visible.Count; i++)
             {
                 if (!_entityManager.TryGetUnit(visible[i], out UnitState u)) continue;
+
+                // Own units are skipped HERE and nowhere else: ValidateDomain
+                // has no AttackTarget case and the fire phase checks range and
+                // visibility but never the owner, so an explicit order at an
+                // own unit would actually fire. The auto-acquisition filters
+                // hostile strictly; the command path does not.
                 if (u.PlayerId == _aiPlayerId) continue;
+
                 uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw == 0) continue;
                 int x = GridCellOf(u.Transform.PositionX);
                 int y = GridCellOf(u.Transform.PositionY);
+
                 if (u.Role == UnitRole.HQ)
                 {
                     cellX = x;
                     cellY = y;
-                    return raw; // the decisive target: first visible HQ wins immediately
+                    return raw; // win condition (D-077), not a preference
                 }
-                if (SimDefinitions.IsBuildingRole(u.Role))
+
+                long score = ScoreTarget(army, in u, x, y);
+                if (bestRaw == 0 || score > bestScore || (score == bestScore && raw < bestRaw))
                 {
-                    if (buildingRaw == 0) { buildingRaw = raw; buildingCellX = x; buildingCellY = y; }
-                }
-                else if (unitRaw == 0)
-                {
-                    unitRaw = raw;
-                    unitCellX = x;
-                    unitCellY = y;
+                    bestScore = score;
+                    bestRaw = raw;
+                    bestX = x;
+                    bestY = y;
                 }
             }
 
-            if (buildingRaw != 0)
+            cellX = bestX;
+            cellY = bestY;
+            return bestRaw;
+        }
+
+        /// <summary>
+        /// One target's score for the whole army. All four terms are integers
+        /// and all four weights come from the profile (Nova.AI.Data), so
+        /// tuning never touches this file.
+        /// </summary>
+        private long ScoreTarget(List<UnitState> army, in UnitState target, int targetCellX, int targetCellY)
+        {
+            FactionId targetFaction = _economy.GetSlotFaction(target.PlayerId);
+            ArmorClass armor = WeaponProfiles.GetArmorClass(targetFaction, target.Role);
+
+            long damageSum = 0;
+            long distanceSum = 0;
+            for (int i = 0; i < army.Count; i++)
             {
-                cellX = buildingCellX;
-                cellY = buildingCellY;
-                return buildingRaw;
+                UnitState attacker = army[i];
+                WeaponProfile weapon = WeaponProfiles.Get(
+                    _economy.GetSlotFaction(attacker.PlayerId), attacker.Role);
+                damageSum += DamageMatrix.Resolve(weapon.AttackDamage, weapon.DamageType, armor);
+
+                int ax = GridCellOf(attacker.Transform.PositionX);
+                int ay = GridCellOf(attacker.Transform.PositionY);
+                int dx = ax > targetCellX ? ax - targetCellX : targetCellX - ax;
+                int dy = ay > targetCellY ? ay - targetCellY : targetCellY - ay;
+                distanceSum += dx > dy ? dx : dy;
             }
-            if (unitRaw != 0)
-            {
-                cellX = unitCellX;
-                cellY = unitCellY;
-            }
-            return unitRaw;
+
+            // Integer mean, so the weights keep their meaning independent of
+            // army size. Truncation is deterministic and identical on both
+            // machines — that is the only property that matters here.
+            int divisor = army.Count > 0 ? army.Count : 1;
+            long effectiveDamage = damageSum / divisor;
+            long distance = distanceSum / divisor;
+
+            // What the target does back. An unarmed harvester at the fence
+            // scores 0 threat, correctly.
+            long threat = WeaponProfiles.Get(targetFaction, target.Role).AttackDamage;
+
+            long missingHealthPercent = target.MaxHealth > 0
+                ? 100 - ((long)target.CurrentHealth * 100 / target.MaxHealth)
+                : 0;
+
+            AiProfile p = _profile.Profile;
+            return (p.TargetDamageWeight * effectiveDamage)
+                 + (p.TargetThreatWeight * threat)
+                 + (p.TargetFinishWeight * missingHealthPercent)
+                 - (p.TargetDistanceWeight * distance);
         }
 
         /// <summary>Units of <paramref name="unitDefId"/> still queued (not yet spawned) at one producer.</summary>
