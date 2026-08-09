@@ -47,8 +47,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   naheliegende Gegenstrategie und ungemessen. Wie bei den Wellen gilt: Der feste
   Schwellwert ist eine Zwischenstufe — ob ein Rückzug richtig ist, hängt von der
   Lage ab, und die soll die KI später selbst beurteilen.
-  565/565 SimRunner-Tests, Baseline-Dateien unberührt. **Im laufenden Spiel nicht
-  geprüft.**
+  565/565 SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt und bestätigt,
+  in beiden Hälften:** „Angeschlagene drehen um und gehen in nächster Gruppe
+  wieder mit los auf Angriff." Die zweite Hälfte ist die, an der die Konstruktion
+  hing — ohne Heilung war die Sorge, dass Verwundete zu Hause versauern und die
+  Armeeobergrenze belegen. Sie tun es nicht. Das Ködern mit einer einzelnen
+  Einheit bleibt ungemessen und ungesehen.
 - **Die KI greift in Wellen an, statt einzeln nachzutröpfeln (Einheitenstrang,
   KI-Verhalten `r3`):** Bisher lief jede fertige Einheit sofort allein quer über
   die Karte — kein Angriff, sondern ein Förderband; man konnte sich mit drei
