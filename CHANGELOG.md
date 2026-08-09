@@ -18,6 +18,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **#46: Produzierte Einheiten verlassen das Gebäude** — die Spawn-Suche des
+  `ProductionSystem` verankert am Footprint-Zentrum des Produktionsgebäudes
+  statt am Sammelpunkt; die fertige Einheit bekommt einen stehenden
+  Bewegungsbefehl auf den Sammelpunkt (direkter `SetTarget`-Schreibzugriff,
+  gleiche Klasse wie der Push-out — kein neuer Befehlstyp). Der Sammelpunkt
+  ist wieder ein Ziel statt eines Teleporters; Einheiten fahren aus dem
+  Gebäude heraus. Macht #57 (hohle Gebäude-Assets) sichtbarer — Art-Befund
+  für den GrayboxLog, kein Code-Eingriff
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem

@@ -50,10 +50,17 @@ namespace Nova.Simulation.Production
     /// Q16.16 — <see cref="PlayerEconomyState.ProductionSpeedMultiplierQ16"/>
     /// raw per tick (1.0 at full power, exactly 0.5 under low power; no
     /// rounding, 0.5 is exact in Q16.16). On completion the unit spawns at
-    /// the building's rally point: the rally CELL is tried first, then
-    /// expanding Chebyshev rings 1..<see cref="SpawnSearchMaxRing"/>, within
-    /// a ring in ascending (y, x) order; a cell is free when no placement
-    /// footprint covers it and no active unit stands on it.
+    /// the building's FOOTPRINT (16.2, #46: the rally point is a destination,
+    /// not a teleporter): expanding Chebyshev rings 0..<see cref="SpawnSearchMaxRing"/>
+    /// from the building's center cell, within a ring in ascending (y, x)
+    /// order; a cell is free when no placement footprint covers it and no
+    /// active unit stands on it. The footprint itself always loses to the
+    /// occupancy rule, so the first hits are the ring just outside it, and
+    /// freshly produced units walk OUT of the building instead of appearing
+    /// at the rally point. A spawned unit immediately gets a standing move
+    /// order to the rally cell (a direct <c>SetTarget</c> write, the same
+    /// write class as the construction push-out's — no command record, no
+    /// new command kind; movement then drives the walk).
     /// When no free cell exists inside the search range or the entity store
     /// is full (MS-1 cap 1.024, mvp-v1.json capacity.entityStoreCap), the
     /// finished unit waits: progress stays clamped at the threshold and the
@@ -359,7 +366,8 @@ namespace Nova.Simulation.Production
         /// Phase 4: drops rows whose building died (queue lost without
         /// refund), then progresses every producer's first entry by the
         /// owner's exact Q16.16 speed multiplier and spawns finished units at
-        /// the rally point — in strict ascending row order.
+        /// the building's footprint with a standing move order to the rally
+        /// point — in strict ascending row order.
         /// </summary>
         public void ExecuteTick(Tick tick)
         {
@@ -393,19 +401,33 @@ namespace Nova.Simulation.Production
                         entry.ProgressRaw = thresholdRaw;
                         break;
                     }
-                    if (!TryFindSpawnCell(row, out int cellX, out int cellY))
+                    if (!TryFindSpawnCell(in building, out int cellX, out int cellY))
                     {
                         // No free cell inside the search range: same documented pause.
                         entry.ProgressRaw = thresholdRaw;
                         break;
                     }
 
-                    _entityManager.SpawnUnit(
+                    EntityId spawned = _entityManager.SpawnUnit(
                         building.PlayerId,
                         new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
                         def.MoveSpeed,
                         maxHealth: def.MaxHealth,
                         role: def.Role);
+
+                    // 16.2 (#46): the unit walks OUT of the building to the
+                    // rally point instead of appearing there. Direct state
+                    // write, same class as the construction push-out's
+                    // SetTarget — movement drives the walk from the next
+                    // phase on. A rally cell coinciding with the spawn cell
+                    // needs no order at all.
+                    int rallyCellX = Math.Max(0, SimFixed.WorldToGrid(SimFixed.FromRaw(row.RallyXRaw)));
+                    int rallyCellY = Math.Max(0, SimFixed.WorldToGrid(SimFixed.FromRaw(row.RallyYRaw)));
+                    if (rallyCellX != cellX || rallyCellY != cellY)
+                    {
+                        _entityManager.GetUnitRef(spawned).SetTarget(new GridPos2D(rallyCellX, rallyCellY));
+                    }
+
                     entry.RemainingCount--;
                     entry.ProgressRaw -= thresholdRaw;
                 }
@@ -422,17 +444,20 @@ namespace Nova.Simulation.Production
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Spawn cell search (documented deterministic algorithm): the rally
-        /// cell first, then expanding Chebyshev rings 1..SpawnSearchMaxRing,
-        /// within a ring ascending (y, x); a cell is free when no placement
-        /// footprint covers it AND no active unit stands on it — freshly
-        /// produced units form a line in front of the building instead of
-        /// stacking on the rally cell.
+        /// Spawn cell search (documented deterministic algorithm, 16.2/#46):
+        /// expanding Chebyshev rings 0..SpawnSearchMaxRing from the
+        /// building's CENTER CELL — the footprint always loses to the
+        /// occupancy rule, so the first hits are the ring just outside the
+        /// building. Within a ring ascending (y, x); a cell is free when no
+        /// placement footprint covers it AND no active unit stands on it —
+        /// freshly produced units form a line at the building's edge instead
+        /// of stacking on one cell. The rally point is the ORDER target the
+        /// spawned unit walks to, no longer the spawn anchor.
         /// </summary>
-        private bool TryFindSpawnCell(ProducerRow row, out int cellX, out int cellY)
+        private bool TryFindSpawnCell(in UnitState building, out int cellX, out int cellY)
         {
-            int rallyCellX = Math.Max(0, SimFixed.WorldToGrid(SimFixed.FromRaw(row.RallyXRaw)));
-            int rallyCellY = Math.Max(0, SimFixed.WorldToGrid(SimFixed.FromRaw(row.RallyYRaw)));
+            int centerX = Math.Max(0, SimFixed.WorldToGrid(building.Transform.PositionX));
+            int centerY = Math.Max(0, SimFixed.WorldToGrid(building.Transform.PositionY));
 
             for (int ring = 0; ring <= SpawnSearchMaxRing; ring++)
             {
@@ -441,8 +466,8 @@ namespace Nova.Simulation.Production
                     for (int dx = -ring; dx <= ring; dx++)
                     {
                         if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
-                        int x = rallyCellX + dx;
-                        int y = rallyCellY + dy;
+                        int x = centerX + dx;
+                        int y = centerY + dy;
                         if (_construction.IsCellFree(x, y) && !_entityManager.HasActiveUnitOnCell(x, y))
                         {
                             cellX = x;
