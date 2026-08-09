@@ -103,8 +103,9 @@ namespace Nova.AI
         // THE NUMBERS LIVE IN Nova.AI.Data. What used to be four const fields
         // here are profile values now — behaviour in C#, numbers in one place
         // (AIArchitecture.md section 3). The shipped profile carries exactly
-        // the constants that stood here, so this move changes nothing;
-        // that the baselines stay green is the proof it was clean.
+        // the constants that stood here, so this move changes nothing; the
+        // proof is the unchanged end-state pin in SkirmishAiTests, not the
+        // four determinism baselines — those never run this system.
 
         /// <summary>Decision cadence in ticks: 20 ticks = 2.0 s on the canonical 10 Hz clock.</summary>
         public ushort DecisionTickInterval => _profile.Profile.DecisionTickInterval;

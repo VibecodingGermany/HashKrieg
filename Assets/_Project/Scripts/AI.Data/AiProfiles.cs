@@ -24,8 +24,17 @@ namespace Nova.AI.Data
         /// threshold 6, harvesters 2) and four from <c>const</c> fields inside
         /// <c>SkirmishAiSystem</c> (cadence 20, placement radius 8, both queue
         /// batches 2). Nothing was rounded, retuned or "improved" on the way
-        /// across. If any of them changes, the four baseline files go red — and
-        /// that is the check, not an accident.
+        /// across, and <c>AiProfileTests</c> asserts every one of them value
+        /// for value.
+        /// </para>
+        /// <para>
+        /// WHAT DOES NOT CHECK THIS: the four determinism baselines. Not one
+        /// of them runs the skirmish AI — <c>Determinism10000Scenario</c>
+        /// registers Economy, Construction, Production, Pathfinding, Movement,
+        /// FogOfWar, Combat and Victory, and the other three pin snapshot
+        /// bytes, command serialisation and the RNG. Every number here can
+        /// move without turning any of them red. The guard against that is the
+        /// end-state pin in <c>SkirmishAiTests</c>.
         /// </para>
         /// </summary>
         public static readonly AiProfile Ms1Canonical = new AiProfile(
@@ -42,9 +51,10 @@ namespace Nova.AI.Data
             // are NOT a copy of a shipped constant — there was no scoring
             // before, only "HQ, else the first visible building, else the
             // first visible unit". They come from the plan's sketch
-            // (AiSimulationEnvironment.md section 4.6) and the four
-            // determinism baselines go red because of them; that is the
-            // change, not a defect.
+            // (AiSimulationEnvironment.md section 4.6). They change how the AI
+            // plays and therefore move the end-state pin in SkirmishAiTests;
+            // the four determinism baselines do not see this system and stay
+            // green either way.
             targetDamageWeight: 10,
             targetThreatWeight: 6,
             targetFinishWeight: 3,

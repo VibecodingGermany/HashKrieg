@@ -21,9 +21,10 @@ namespace Nova.AI.Data
     /// simulation, and <c>NoFloatInSimulationTests</c> checks. Every field
     /// here is an integer, and any weighting introduced later has to be too.</item>
     /// <item><b>The shipped profile keeps today's values exactly.</b> Moving
-    /// the numbers out of the code therefore changes NO behaviour, the four
-    /// baseline files stay green, and that is precisely the proof the move was
-    /// clean.</item>
+    /// the numbers out of the code therefore changes NO behaviour. What proves
+    /// it is <c>AiProfileTests</c> (every field asserted value for value) and
+    /// the unchanged end-state pin in <c>SkirmishAiTests</c> — NOT the four
+    /// determinism baselines, which never run the skirmish AI.</item>
     /// </list>
     /// <para>
     /// ENGINE-FREE AND SIMULATION-FREE. This assembly references Nova.Core and
