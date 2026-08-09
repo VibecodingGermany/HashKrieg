@@ -128,6 +128,16 @@ namespace Nova.Presentation.UI
             {
                 FogRevealDebug.Toggle();
             }
+
+            // F5 steps through the fast-forward speeds. Same binding rule as
+            // F4: only while the panel is open, because it is a diagnostic
+            // control and not part of the running match's key map. It keeps
+            // working after the panel is closed, which is the point — one
+            // watches an uncluttered map at 4x, not a panel.
+            if (_visible && Input.GetKeyDown(KeyCode.F5))
+            {
+                MatchSpeedDebug.Cycle();
+            }
         }
 
         private void OnGUI()
@@ -193,6 +203,7 @@ namespace Nova.Presentation.UI
                 string legend = _input != null ? _input.ControlLegend : null;
                 GUILayout.Label(string.IsNullOrEmpty(legend) ? "Controls: no RtsDeviceInput in the scene." : legend, _labelStyle);
                 DrawFogRevealControl();
+                DrawMatchSpeedControl();
             }
 
             GUILayout.EndScrollView();
@@ -255,6 +266,15 @@ namespace Nova.Presentation.UI
                 // screenshot claims a sight the player never had, and the
                 // observation it is supposed to support is worth nothing.
                 if (FogRevealDebug.RevealAll) _builder.Append("   |   FOG REVEALED (lab)");
+
+                // A fast-forwarded match must say so as loudly as a revealed
+                // one. Everything on screen still happens at 10 Hz — but what
+                // a viewer JUDGES as "the AI reacted quickly" is wall-clock,
+                // and at 10x that judgement is worthless without the label.
+                if (MatchSpeedDebug.IsFastForwarding)
+                {
+                    _builder.Append("   |   ").Append(MatchSpeedDebug.Multiplier).Append("x SPEED (lab)");
+                }
             }
 
             GUI.Label(HudLayout.StatusStrip(scale, _fontSize + 6f, 8f), _builder.ToString(), _statusStyle);
@@ -282,6 +302,41 @@ namespace Nova.Presentation.UI
             if (GUILayout.Button(caption, _buttonStyle))
             {
                 FogRevealDebug.Toggle();
+            }
+        }
+
+        /// <summary>
+        /// The lab fast-forward (F5, or this button). It scales wall-clock
+        /// time only: the kernel steps the same 10-Hz ticks in the same order,
+        /// so a match watched at 10x ends on the same tick with the same state
+        /// hash — see <see cref="MatchSpeedDebug"/>. It sits beside the fog
+        /// reveal because both answer the same question, "what is the opponent
+        /// actually doing", and both are labelled with what they cost.
+        /// <para>
+        /// In a relay match the button says so instead of lying: two peers at
+        /// different wall-clock rates only wait for each other in the lockstep
+        /// barrier.
+        /// </para>
+        /// </summary>
+        private void DrawMatchSpeedControl()
+        {
+            if (_buttonStyle == null)
+            {
+                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = _fontSize, richText = false };
+            }
+
+            if (_runner != null && _runner.IsRelayMatch)
+            {
+                GUILayout.Label("Speed: 1x — a relay match always runs at 10 Hz", _labelStyle);
+                return;
+            }
+
+            string caption = MatchSpeedDebug.IsFastForwarding
+                ? $"Speed: {MatchSpeedDebug.Multiplier}x — F5 for the next step (lab, wall clock only)"
+                : "Speed: 1x — F5 fast-forwards 2x / 4x / 10x (lab, wall clock only)";
+            if (GUILayout.Button(caption, _buttonStyle))
+            {
+                MatchSpeedDebug.Cycle();
             }
         }
 
