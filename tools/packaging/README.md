@@ -1,31 +1,37 @@
 # Verteilbare Builds
 
-**Dokumentversion:** 2.0.0 | **Stand:** 2026-08-08 | **Governance-Tier:** 2
+**Dokumentversion:** 3.0.0 | **Stand:** 2026-08-09 | **Governance-Tier:** 2
 
-Reproduzierbare Testpakete für macOS und Linux. macOS wird signiert und
-notarisiert als DMG verteilt; Linux wird als `tar.gz` mit einem von außen
-prüfbaren Commit-Stempel geliefert.
+Reproduzierbare Testpakete für macOS, Windows und Linux. macOS wird signiert
+und notarisiert als DMG verteilt; Windows als `zip` und Linux als `tar.gz`,
+beide mit einem von außen prüfbaren Commit-Stempel.
 
 ## Kurzfassung
 
 ```bash
 tools/packaging/build-mac.sh
+tools/packaging/build-windows.sh
 tools/packaging/build-linux.sh
 ```
 
 Ergebnisse:
 
 - macOS: `Builds/dist/ProjectNova-<commit>.dmg`
+- Windows x64: `Builds/dist/ProjectNova-win-x64-<commit>.zip`
 - Linux x64: `Builds/dist/ProjectNova-linux-x64-<commit>.tar.gz`
+
+Wer die Pakete an Testende gibt, schickt die
+[Betatest-Anleitung](../../docs/production/Betatest.md) mit. Sie erklärt
+Installation, Commit-Prüfung, bewusste Lücken und den Rückmeldeweg.
 
 ## Optionen
 
-| Flag | macOS | Linux |
-|---|---|---|
-| *(keine)* | bauen → signieren → notarisieren → DMG | bauen → stempeln → `tar.gz` |
-| `--fast` | nur bauen, unsigniert, kein DMG | – |
-| `--skip-build` | vorhandenen Build neu verpacken | vorhandenen Build neu stempeln und verpacken |
-| `--open` | Ergebnis danach öffnen | – |
+| Flag | macOS | Windows | Linux |
+|---|---|---|---|
+| *(keine)* | bauen → signieren → notarisieren → DMG | bauen → stempeln → `zip` | bauen → stempeln → `tar.gz` |
+| `--fast` | nur bauen, unsigniert, kein DMG | – | – |
+| `--skip-build` | vorhandenen Build neu verpacken | vorhandenen Build neu stempeln und verpacken | vorhandenen Build neu stempeln und verpacken |
+| `--open` | Ergebnis danach öffnen | – | – |
 
 Für die eigene Iteration ist `--fast` der richtige Weg: Signieren und
 Notarisieren kosten Minuten und bringen auf dem eigenen Rechner nichts. Ein
@@ -38,15 +44,22 @@ Fingerprint-Sperre). Beide Spieler brauchen also **genau denselben Commit**.
 Der Hash steht deshalb im Paketnamen und im Player:
 
 - im DMG-Dateinamen — `ProjectNova-1526d7a.dmg`
-- in `LIESMICH.txt` im DMG
+- in `LIESMICH.txt` im DMG und im Windows-ZIP
 - im `Info.plist` der App unter `NovaBuildCommit`
-- unter Linux in `ProjectNova_Data/NovaBuildCommit.txt`
+- unter Windows und Linux in `ProjectNova_Data/NovaBuildCommit.txt`
 
-Beide Player-Stempel lassen sich beim Empfänger ohne Rückfrage prüfen:
+Alle Player-Stempel lassen sich beim Empfänger ohne Rückfrage prüfen:
 
 ```bash
+# macOS
 defaults read /Applications/ProjectNova.app/Contents/Info.plist NovaBuildCommit
+# Linux
 cat ProjectNova_Data/NovaBuildCommit.txt
+```
+
+```bat
+REM Windows
+type ProjectNova_Data\NovaBuildCommit.txt
 ```
 
 Ein Build aus einem unsauberen Arbeitsbaum bekommt `-dirty` angehängt und ist
@@ -61,19 +74,47 @@ Für macOS:
 - notarytool-Profil `apple-notary`
 - Unity mit `MacStandaloneSupport` in der Version aus `ProjectSettings/ProjectVersion.txt`
 
+Für Windows:
+
+- dieselbe gepinnte Unity-Version aus `ProjectSettings/ProjectVersion.txt`
+- das Hub-Modul `Windows Build Support (Mono)` unter
+  `PlaybackEngines/WindowsStandaloneSupport`
+
+```bash
+"/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" -- --headless \
+  install-modules --version 6000.5.4f1 --module windows-mono --childModules
+```
+
 Für Linux:
 
 - dieselbe gepinnte Unity-Version aus `ProjectSettings/ProjectVersion.txt`
 - das Hub-Modul `Linux Build Support (Mono)` unter
   `PlaybackEngines/LinuxStandaloneSupport`
 
-`build-linux.sh` installiert ein fehlendes Modul nicht. Es bricht vor dem
-Build mit dem erwarteten Pfad ab. `--skip-build` verlangt stattdessen einen
-vorhandenen ausführbaren Player unter
+Die Skripte installieren ein fehlendes Modul nicht. Sie brechen vor dem Build
+mit dem erwarteten Pfad ab — `build-windows.sh` nennt dabei den Hub-Befehl von
+oben. `--skip-build` verlangt stattdessen einen vorhandenen Player unter
+`Builds/Windows64/ProjectNova.exe` beziehungsweise
 `Builds/Linux64/ProjectNova.x86_64`.
 
 Der Unity-Editor muss geschlossen sein — er hält eine Sperre auf `Library/`.
 Das Skript prüft das und bricht mit klarer Meldung ab.
+
+## Windows ist unsigniert — und das bleibt vorerst so
+
+Der Windows-Player wird von macOS aus mit dem Mono-Backend gebaut und **nicht
+signiert**. SmartScreen zeigt beim ersten Start deshalb „Der Computer wurde
+durch Windows geschützt"; der Weg darum herum („Weitere Informationen" →
+„Trotzdem ausführen") steht in der `LIESMICH.txt` im Paket und in der
+[Betatest-Anleitung](../../docs/production/Betatest.md).
+
+Eine Windows-Codesignatur bräuchte ein EV-Zertifikat mit Hardware-Token und
+laufender Reputation bei Microsoft. Für ein bis zwei Testende ist das Aufwand
+ohne Ertrag — für eine öffentliche Verteilung wäre es eine eigene Entscheidung.
+
+**Ehrliche Einschränkung:** Der Windows-Build entsteht auf einem Mac. Ob er
+startet, weiß erst der erste Mensch, der ihn startet. Bis dahin ist „gebaut"
+nicht „lauffähig".
 
 ## Zwei Entscheidungen, die im Skript stecken
 
@@ -103,5 +144,6 @@ protokolliert werden. Die Skripte liefern nur das zuordenbare Artefakt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 3.0.0 | 2026-08-09 | Windows-x64-Build als `zip` mit Commit-Stempel und LIESMICH ergänzt; fehlendes Hub-Modul und SmartScreen-Warnung benannt; Verweis auf die Betatest-Anleitung | Project Nova Team |
 | 2.0.0 | 2026-08-08 | Linux-x64-Build, Commit-Stempel und `tar.gz`-Verteilung ergänzt; offene Netzabnahmen ehrlich benannt | Project Nova Team |
 | 1.0.0 | 2026-08-08 | macOS-Build-, Signatur-, Notarisierungs- und DMG-Weg dokumentiert | Project Nova Team |
