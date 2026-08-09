@@ -31,6 +31,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   10000-Tick-Szenarios.
 
 ### Hinzugefügt
+- **Lobby über Supabase (Sprint 14, Pakete 14.1–14.5, D-092 bis D-094):** Ein
+  Spieler legt ein Match an und bekommt einen kurzen, vorlesbaren Code
+  (`XXX-XXX`, Alphabet ohne `0`/`O`/`1`/`I`/`L`); der zweite tritt damit bei —
+  inklusive Fraktionswahl (Allianz/Legion, schreibt in `FactionPerSlot`),
+  beidseitiger Bereitschaft und Build-Abgleich schon beim Beitritt („Ihr habt
+  unterschiedliche Versionen — hol dir Build `<commit>`"). Erst wenn beide
+  bereit sind, erhalten die Clients das Match-Token und verbinden sich zum
+  Relay. Das Token ist jetzt kurzlebig: Die Lobby mintet pro Match einen
+  64-bit-HMAC-Token (30 Minuten gültig, einmal verwendbar), den der Relay
+  lokal gegen ein geteiltes Secret prüft und aus dem er den Match-Seed
+  ableitet; der statische `NOVA_MATCH_TOKEN`-Direktweg aus Sprint 13 bleibt
+  unverändert nutzbar. Die Vermittlung ist ein Supabase-Projekt ausserhalb
+  des Repos (Edge Functions, Tabellen per RLS vollständig gesperrt); Vertrag,
+  Schema und Function-Referenzen stehen in `docs/tech/LobbySupabase.md`, die
+  Client-Konfiguration ist gitignort (`Resources/lobby-config.json` oder
+  `NOVA_LOBBY_URL`/`NOVA_LOBBY_ANON_KEY`). Der Build-Commit steht zur
+  Laufzeit bereit (`BuildInfo.Commit`, beim Player-Build gestempelt, sonst
+  `dev-editor`). Neue Dependency: `com.unity.nuget.newtonsoft-json`. Client,
+  Relay-Token und Glue sind mit 605/605 grünen Tests belegt; die
+  Supabase-Anlage, das Relay-Redeploy und die gespielte Zwei-Personen-Abnahme
+  stehen noch aus.
 - **Verbindungsdialog und Linux-Build (Sprint 13, Pakete 13.1 und 13.7):** Das
   Hauptmenü hat einen Bereich „Netzpartie" mit Serveradresse, Port, maskiertem
   Match-Code, Rollenwahl Host/Gast und einem Statusband, das die Zustände des

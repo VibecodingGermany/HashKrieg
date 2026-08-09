@@ -92,6 +92,18 @@ namespace Nova.Networking
         private readonly List<Peer> _peers = new List<Peer>();
         private readonly byte[] _activeSlots = { 0, 1 };
         private readonly Func<uint> _clockMilliseconds;
+        // D-093: shared HMAC secret for short-lived lobby-minted tokens;
+        // null (or empty) disables the lobby path entirely. Held by value so
+        // later caller-side mutation cannot change admission decisions.
+        private readonly byte[] _lobbyTokenSecret;
+        // Wall clock for lobby-token expiry. _clockMilliseconds is a
+        // monotonic tick source (it wraps, and tests inject it) and cannot
+        // judge real-world expiry, so token validation needs wall time.
+        private readonly Func<long> _wallClockUnixMs;
+        // The lobby token bound to the pending match (null = none) and the
+        // single-use graveyard of tokens whose matches already closed.
+        private readonly HashSet<ulong> _usedLobbyTokens = new HashSet<ulong>();
+        private ulong? _currentLobbyToken;
         private readonly Dictionary<uint, TickState> _pendingTicks = new Dictionary<uint, TickState>();
         private readonly Dictionary<uint, CommandRecord[]> _confirmedFrames =
             new Dictionary<uint, CommandRecord[]>();
@@ -148,10 +160,22 @@ namespace Nova.Networking
         }
 #endif
 
+        /// <param name="lobbyTokenSecret">
+        /// Optional shared lobby HMAC secret (D-093): when set, Hello also
+        /// accepts short-lived lobby-minted tokens (<see cref="LobbyToken"/>);
+        /// when null, only the static <paramref name="matchToken"/> is accepted.
+        /// </param>
+        /// <param name="wallClockUnixMs">
+        /// Wall clock for lobby-token expiry; defaults to the system UTC
+        /// clock. Separate from <paramref name="clockMilliseconds"/>, which
+        /// is the monotonic handshake/timeout source.
+        /// </param>
         public RelayServerCore(
             ulong matchToken, ulong seed, uint inputDelayTicks,
             string recordDirectory, Action<string> log,
-            Func<uint> clockMilliseconds = null)
+            Func<uint> clockMilliseconds = null,
+            byte[] lobbyTokenSecret = null,
+            Func<long> wallClockUnixMs = null)
         {
             if (matchToken == 0) throw new ArgumentOutOfRangeException(nameof(matchToken));
             if (!RelayProtocol.IsSupportedInputDelay(inputDelayTicks))
@@ -165,6 +189,11 @@ namespace Nova.Networking
             _recordDirectory = recordDirectory;
             _log = log ?? (_ => { });
             _clockMilliseconds = clockMilliseconds ?? (() => unchecked((uint)Environment.TickCount));
+            _lobbyTokenSecret = lobbyTokenSecret == null || lobbyTokenSecret.Length == 0
+                ? null
+                : (byte[])lobbyTokenSecret.Clone();
+            _wallClockUnixMs = wallClockUnixMs
+                ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
         /// <summary>Starts the listener on 0.0.0.0:<paramref name="port"/>; port 0 picks a free one (test lane).</summary>
@@ -334,7 +363,7 @@ namespace Nova.Networking
                     bool helloParsed = RelayProtocol.TryParseHello(
                         payload, out byte version, out ulong token);
                     if (peer.HelloOk || !helloParsed
-                        || version != RelayProtocol.ProtocolVersion || token != _matchToken)
+                        || version != RelayProtocol.ProtocolVersion || !IsHelloTokenAccepted(token))
                     {
                         Send(peer, RelayFrameType.Reject,
                             RelayProtocol.CreateReasonPayload(RelayFrameType.Reject,
@@ -505,6 +534,43 @@ namespace Nova.Networking
                     _log($"slot {peer.Slot}: unexpected client frame type {type}");
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Admission of the Hello match token. The static configured token
+        /// is always accepted and stays reusable without limit. Otherwise,
+        /// with a lobby secret configured (D-093), the first peer of a match
+        /// may bind a short-lived lobby token: validation derives the match
+        /// seed from the token BEFORE the Offer (which carries the seed) is
+        /// sent, and a second peer must present the exact same token — it
+        /// is not revalidated, so a bucket roll-over mid-handshake cannot
+        /// split a pair. Any other, expired or already consumed token is
+        /// refused with the same generic "wrong match code" as a bad static
+        /// token; token material never appears in logs or reject reasons.
+        /// </summary>
+        private bool IsHelloTokenAccepted(ulong token)
+        {
+            if (token == _matchToken) return true;
+            if (_lobbyTokenSecret == null) return false;
+            if (_currentLobbyToken.HasValue)
+            {
+                return token == _currentLobbyToken.Value;
+            }
+            for (int i = 0; i < _peers.Count; i++)
+            {
+                // A match formation on the static path is already in
+                // progress; rebinding the seed now would yank the waiting
+                // peer's Offer out from under its fingerprint proof.
+                if (_peers[i].HelloOk) return false;
+            }
+            if (_usedLobbyTokens.Contains(token)) return false;
+            if (!LobbyToken.TryValidate(token, _lobbyTokenSecret, _wallClockUnixMs(), out _))
+            {
+                return false;
+            }
+            _currentLobbyToken = token;
+            _seed = LobbyToken.DeriveSeed(_lobbyTokenSecret, token);
+            return true;
         }
 
         // ------------------------------------------------------------------
@@ -1066,6 +1132,23 @@ namespace Nova.Networking
                 try { _peers[i].Client.Dispose(); } catch { /* ignore */ }
             }
             _peers.Clear();
+            // A lobby token is single-use (D-093): once the match that bound
+            // it closes, the token moves to the used set and can never bind
+            // again — even before expiry. The static token stays unlimited.
+            if (_currentLobbyToken.HasValue)
+            {
+                _usedLobbyTokens.Add(_currentLobbyToken.Value);
+                _currentLobbyToken = null;
+            }
+            // Entries whose bucket has left the validity window can never
+            // validate again (a minted bucket never moves backwards), so
+            // purging them cannot reopen a consumed token; the set stays
+            // bounded by the number of matches inside one 30-minute window.
+            if (_usedLobbyTokens.Count > 0)
+            {
+                long wallNow = _wallClockUnixMs();
+                _usedLobbyTokens.RemoveWhere(token => LobbyToken.IsExpired(token, wallNow));
+            }
             _seed = _configuredSeed;
             if (_listener != null)
             {

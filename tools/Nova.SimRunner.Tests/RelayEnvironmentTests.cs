@@ -149,6 +149,47 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void TokenSecret_IsAbsentMeansNull_AndExactly64HexParsesTo32Bytes()
+        {
+            var values = ValidValues();
+            Assert.That(RelayEnvironment.TryParse(
+                    values, out RelayEnvironment environment, out string error),
+                Is.True, error);
+            Assert.That(environment.LobbyTokenSecret, Is.Null,
+                "an absent NOVA_RELAY_TOKEN_SECRET disables the lobby path");
+
+            RelayEnvironment parsed = ParseWith(
+                RelayEnvironment.TokenSecretVariable,
+                "0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF");
+            var expected = new byte[32];
+            for (int i = 0; i < expected.Length; i += 8)
+            {
+                expected[i] = 0x01;
+                expected[i + 1] = 0x23;
+                expected[i + 2] = 0x45;
+                expected[i + 3] = 0x67;
+                expected[i + 4] = 0x89;
+                expected[i + 5] = 0xAB;
+                expected[i + 6] = 0xCD;
+                expected[i + 7] = 0xEF;
+            }
+            Assert.That(parsed.LobbyTokenSecret, Is.EqualTo(expected));
+        }
+
+        [TestCase("")]
+        [TestCase("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde")]
+        [TestCase("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0")]
+        [TestCase("xz3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+        [TestCase("0x3456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+        [TestCase(" 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+        public void TokenSecret_RejectsMalformedValues_AndNeverLeaks(string text)
+        {
+            AssertRejectedWithoutValue(
+                With(RelayEnvironment.TokenSecretVariable, text), text,
+                RelayEnvironment.TokenSecretVariable);
+        }
+
+        [Test]
         public void Seed_IsGeneratedWhenAbsent_AndStrictWhenPresent()
         {
             Assert.That(ParseWith(
