@@ -100,6 +100,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
+  (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
+  Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei
+  jeder Änderung an der Simulation, in der die KI spielt — im ersten
+  Wirtschaftssprint riss das jedes Paket, ohne dass eine Zeile KI-Code berührt
+  war, und die im Test hinterlegte Prozedur schickte den falschen Strang ins
+  Verhaltensjournal. Entscheidungstick und Endzustand liegen jetzt in
+  `CanonicalAiOutcomeTests` beim Maintainer-Strang, die Kennung bleibt beim
+  Einheitenstrang. Die Diagnose bleibt erhalten: der neue Test liest die Kennung
+  mit und unterscheidet im Fehlertext zwischen KI- und Simulationsänderung. Neu
+  ist eine Zusicherung, die es vorher nicht gab — eine **unentschiedene** Partie
+  gilt als Defekt und nicht als verschobener Pin. Dazu bekommt
+  `tools/Nova.SimRunner.Tests/` erstmals eine Eigentümerzeile in der
+  Schreibhoheitstabelle: geteilt je Datei, fremde Testdateien nur nach Ansage.
 - **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
   Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
   zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8
