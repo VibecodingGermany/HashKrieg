@@ -154,6 +154,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **16.8/D-103: Bauvoraussetzungen sind jetzt echte All-of-Ketten.** Eine
+  separate `UnitRoleMask` ersetzt das singuläre `PrerequisiteRole`, beide
+  Fraktionen verwenden dieselbe neun Rollen umfassende Kette, und Executor wie
+  Baubar leiten alle fehlenden fertigen eigenen Gebäude aus derselben
+  fail-closed Maske ab. Die Maske ist vollständig vom `DefinitionsHash64`
+  gedeckt; Relay und Clients müssen daher aus demselben Commit stammen. Kein
+  Zustands- oder Befehlsformat und keine Golden-Baseline wurde geändert.
 - **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
   (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
   Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei

@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Spielbare Spezifikation aller 12 Gebäudetypen (D-008) für die drei Fraktionen 
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung), D-103 (MS-1-Bauvoraussetzungen)
 - [./Factions.md](./Factions.md) – Fraktionsidentitäten
 - [./Economy.md](./Economy.md) – AE-Währung, Energie, Low-Power-Regel, Harvester-Werte, Lager-Kapazität (D-024)
 - [./ResearchTree.md](./ResearchTree.md) – Tech-Tiers 1–3
@@ -25,13 +25,32 @@ Raffinerie, Lager, Kaserne, Fahrzeugfabrik, Forschungslabor, Radar und
 Verteidigungsplattform – jeweils mit den dort festgelegten Allianz- und
 Legionsnamen. Mauern, Flugfeld und Superwaffe bleiben Post-MVP.
 
-Jede Seite startet mit fertiggestelltem HQ und fertiggestellter Raffinerie. Nur
-diese Start-Raffinerie darf ihre normale Kraftwerk-Voraussetzung umgehen und
-erzeugt keinen zusätzlichen Harvester. Ein fertiggestelltes Forschungslabor
-schaltet T2 unmittelbar frei; Forschung, Forschungsqueue und T3 sind
-deaktiviert. Die Verteidigungsplattform unterstützt `MG` auf T1 und `Rocket`
-auf T2; `Flak` ist nicht Teil von MS-1. Bei Widerspruch übersteuert dieser
-Abschnitt den nachfolgenden Vollspielentwurf.
+Jede Seite startet gemäß D-077 mit einem fertiggestellten HQ und einem Builder,
+aber ohne Raffinerie. Die erste fertiggebaute Raffinerie erzeugt den ersten
+Harvester; die Raffinerie selbst hat in MS-1 keine Bauvoraussetzung.
+
+Für die Platzierung gelten gemäß D-103 folgende **All-of-Voraussetzungen** bei
+Allianz und Legion identisch. Jeder genannte Gebäudetyp muss als eigenes,
+fertiggestelltes Gebäude vorhanden sein; Baustellen genügen nicht.
+
+| Gebäude | MS-1-Platzierungsvoraussetzungen |
+|---|---|
+| HQ | keine |
+| Kraftwerk | HQ |
+| Raffinerie | keine |
+| Lager | Raffinerie |
+| Kaserne | HQ **und** Kraftwerk |
+| Fahrzeugfabrik | Raffinerie **und** Kaserne |
+| Forschungslabor | Fahrzeugfabrik |
+| Radar | Kraftwerk **und** Kaserne |
+| Verteidigungsplattform (Basis) | Kraftwerk |
+
+Ein fertiggestelltes Forschungslabor schaltet T2 unmittelbar frei; Forschung,
+Forschungsqueue und T3 sind deaktiviert. Die Voraussetzung der
+Verteidigungsplattform meint nur das Basisgebäude. Die Modulfreischaltungen aus
+§3 (Kaserne/Radar/Forschungslabor) bleiben davon getrennt. Die Plattform
+unterstützt `MG` auf T1 und `Rocket` auf T2; `Flak` ist nicht Teil von MS-1.
+Bei Widerspruch übersteuert dieser Abschnitt den nachfolgenden Vollspielentwurf.
 
 ## 1. Grundprinzipien
 
@@ -267,3 +286,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.4.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): als führende Quelle für Gebäudekosten/-energie/-bauzeiten festgelegt (Review F-03, D-047-Grundsatzregel); Offene Punkte bereinigt | Lead Gameplay Designer |
 | 0.4.1 | 2026-07-21 | Offener Punkt "Flak-DPS-Korridor" geschlossen: veralteter Querverweis auf Aircraft.md (90 DPS) entfernt, auf Weapons.md als einzige Werte-Quelle (25–40 Schaden/1,5 s, ×2,0 vs. Luft ≈ 33–53 DPS, D-047) umformuliert | Lead Gameplay Designer |
 | 0.5.0 | 2026-07-24 | Neun Gebäuderollen, Start-Ausnahme, T2-Freischaltung und MG-/Raketenmodule für MS-1 gemäß D-056 abgegrenzt | Lead Gameplay Designer |
+| 0.6.0 | 2026-08-09 | D-077-Startzustand berichtigt und die neun All-of-Platzierungsvoraussetzungen samt Trennung von Plattformbasis und Modulen gemäß D-103 festgeschrieben | Agent (unter Delegation) |

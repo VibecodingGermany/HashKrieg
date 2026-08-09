@@ -6,6 +6,26 @@ using Nova.Simulation.State;
 namespace Nova.Simulation.Definitions
 {
     /// <summary>
+    /// Set of completed own building roles required before placement. Bit n
+    /// is the stable wire value n of <see cref="UnitRole"/>; UnitRole itself
+    /// remains an unchanged single-value wire enum.
+    /// </summary>
+    [Flags]
+    public enum UnitRoleMask : uint
+    {
+        None = 0,
+        HQ = 1u << (int)UnitRole.HQ,
+        Refinery = 1u << (int)UnitRole.Refinery,
+        Power = 1u << (int)UnitRole.Power,
+        Storage = 1u << (int)UnitRole.Storage,
+        Barracks = 1u << (int)UnitRole.Barracks,
+        VehicleFactory = 1u << (int)UnitRole.VehicleFactory,
+        ResearchLab = 1u << (int)UnitRole.ResearchLab,
+        Radar = 1u << (int)UnitRole.Radar,
+        DefensePlatform = 1u << (int)UnitRole.DefensePlatform,
+    }
+
+    /// <summary>
     /// Canonical numeric definition of one MS-1 building role of ONE faction
     /// (quality/content/mvp-v1.json section 3, factions[0]/factions[1]).
     /// Pure value type, engine-free.
@@ -33,11 +53,11 @@ namespace Nova.Simulation.Definitions
         /// <summary>Power this building draws from its owner's grid once completed.</summary>
         public int PowerRequired { get; }
 
-        /// <summary>True when placement requires a completed own building of <see cref="PrerequisiteRole"/>.</summary>
-        public bool HasPrerequisite { get; }
+        /// <summary>All completed own building roles required for placement (all-of semantics).</summary>
+        public UnitRoleMask PrerequisiteRoles { get; }
 
-        /// <summary>Required completed own building role; meaningful only when <see cref="HasPrerequisite"/>.</summary>
-        public UnitRole PrerequisiteRole { get; }
+        /// <summary>True when <see cref="PrerequisiteRoles"/> is non-empty.</summary>
+        public bool HasPrerequisite => PrerequisiteRoles != UnitRoleMask.None;
 
         /// <summary>Hit points of the completed building.</summary>
         public int MaxHealth { get; }
@@ -84,7 +104,7 @@ namespace Nova.Simulation.Definitions
         public SimBuildingDefinition(
             ushort definitionId, FactionId faction, UnitRole role, int costAE, int buildTicks,
             int powerProvided, int powerRequired,
-            bool hasPrerequisite, UnitRole prerequisiteRole, int maxHealth,
+            UnitRoleMask prerequisiteRoles, int maxHealth,
             ArmorClass armorClass, DamageType damageType,
             int attackDamage, int attackRangeTiles, int attackCooldownTicks)
         {
@@ -95,8 +115,7 @@ namespace Nova.Simulation.Definitions
             BuildTicks = buildTicks;
             PowerProvided = powerProvided;
             PowerRequired = powerRequired;
-            HasPrerequisite = hasPrerequisite;
-            PrerequisiteRole = prerequisiteRole;
+            PrerequisiteRoles = prerequisiteRoles;
             MaxHealth = maxHealth;
             ArmorClass = armorClass;
             DamageType = damageType;
@@ -374,29 +393,29 @@ namespace Nova.Simulation.Definitions
         private static readonly SimBuildingDefinition[] Buildings =
         {
             // --- Alliance (factions[0]) ---
-            new SimBuildingDefinition(3,  FactionId.Alliance, UnitRole.HQ,              costAE: 2500, buildTicks: 600, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 2000, armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(5,  FactionId.Alliance, UnitRole.Power,           costAE: 450,  buildTicks: 150, powerProvided: 100, powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(4,  FactionId.Alliance, UnitRole.Refinery,        costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 800,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
-            new SimBuildingDefinition(6,  FactionId.Alliance, UnitRole.Storage,         costAE: 300,  buildTicks: 100, powerProvided: 0,   powerRequired: 5,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(7,  FactionId.Alliance, UnitRole.Barracks,        costAE: 500,  buildTicks: 180, powerProvided: 0,   powerRequired: 15, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 600,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(8,  FactionId.Alliance, UnitRole.VehicleFactory,  costAE: 900,  buildTicks: 250, powerProvided: 0,   powerRequired: 25, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 900,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(9,  FactionId.Alliance, UnitRole.ResearchLab,     costAE: 1000, buildTicks: 300, powerProvided: 0,   powerRequired: 30, hasPrerequisite: true,  prerequisiteRole: UnitRole.Barracks,  maxHealth: 700,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(10, FactionId.Alliance, UnitRole.Radar,           costAE: 400,  buildTicks: 150, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 500,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(11, FactionId.Alliance, UnitRole.DefensePlatform, costAE: 400,  buildTicks: 120, powerProvided: 0,   powerRequired: 10, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 600,  armorClass: ArmorClass.Building, damageType: DamageType.Kinetic,  attackDamage: 20, attackRangeTiles: 10, attackCooldownTicks: 10),
+            new SimBuildingDefinition(3,  FactionId.Alliance, UnitRole.HQ,              costAE: 2500, buildTicks: 600, powerProvided: 30,  powerRequired: 0,  prerequisiteRoles: UnitRoleMask.None,                         maxHealth: 2000, armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(5,  FactionId.Alliance, UnitRole.Power,           costAE: 450,  buildTicks: 150, powerProvided: 100, powerRequired: 0,  prerequisiteRoles: UnitRoleMask.HQ,                           maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(4,  FactionId.Alliance, UnitRole.Refinery,        costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, prerequisiteRoles: UnitRoleMask.None,                         maxHealth: 800,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
+            new SimBuildingDefinition(6,  FactionId.Alliance, UnitRole.Storage,         costAE: 300,  buildTicks: 100, powerProvided: 0,   powerRequired: 5,  prerequisiteRoles: UnitRoleMask.Refinery,                     maxHealth: 400,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(7,  FactionId.Alliance, UnitRole.Barracks,        costAE: 500,  buildTicks: 180, powerProvided: 0,   powerRequired: 15, prerequisiteRoles: UnitRoleMask.HQ | UnitRoleMask.Power,       maxHealth: 600,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(8,  FactionId.Alliance, UnitRole.VehicleFactory,  costAE: 900,  buildTicks: 250, powerProvided: 0,   powerRequired: 25, prerequisiteRoles: UnitRoleMask.Refinery | UnitRoleMask.Barracks, maxHealth: 900, armorClass: ArmorClass.Building, damageType: Unarmed,          attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(9,  FactionId.Alliance, UnitRole.ResearchLab,     costAE: 1000, buildTicks: 300, powerProvided: 0,   powerRequired: 30, prerequisiteRoles: UnitRoleMask.VehicleFactory,               maxHealth: 700,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(10, FactionId.Alliance, UnitRole.Radar,           costAE: 400,  buildTicks: 150, powerProvided: 0,   powerRequired: 20, prerequisiteRoles: UnitRoleMask.Power | UnitRoleMask.Barracks, maxHealth: 500, armorClass: ArmorClass.Building, damageType: Unarmed,          attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(11, FactionId.Alliance, UnitRole.DefensePlatform, costAE: 400,  buildTicks: 120, powerProvided: 0,   powerRequired: 10, prerequisiteRoles: UnitRoleMask.Power,                        maxHealth: 600,  armorClass: ArmorClass.Building, damageType: DamageType.Kinetic, attackDamage: 20, attackRangeTiles: 10, attackCooldownTicks: 10),
 
             // --- Legion (factions[1]): Buildings.md section 2 concrete values;
             // HP derived: (alliance * 85) / 100 (derivation rule). The
             // DefensePlatform weapon stays identical — faction-neutral module
             // content (Buildings.md section 3). ---
-            new SimBuildingDefinition(20, FactionId.Legion,   UnitRole.HQ,              costAE: 2000, buildTicks: 500, powerProvided: 30,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 1700, armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(22, FactionId.Legion,   UnitRole.Power,           costAE: 350,  buildTicks: 120, powerProvided: 80,  powerRequired: 0,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(21, FactionId.Legion,   UnitRole.Refinery,        costAE: 550,  buildTicks: 160, powerProvided: 0,   powerRequired: 15, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 680,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
-            new SimBuildingDefinition(23, FactionId.Legion,   UnitRole.Storage,         costAE: 250,  buildTicks: 80,  powerProvided: 0,   powerRequired: 5,  hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(24, FactionId.Legion,   UnitRole.Barracks,        costAE: 400,  buildTicks: 140, powerProvided: 0,   powerRequired: 10, hasPrerequisite: false, prerequisiteRole: UnitRole.Unit,      maxHealth: 510,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(25, FactionId.Legion,   UnitRole.VehicleFactory,  costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, hasPrerequisite: true,  prerequisiteRole: UnitRole.Refinery,  maxHealth: 765,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(26, FactionId.Legion,   UnitRole.ResearchLab,     costAE: 800,  buildTicks: 240, powerProvided: 0,   powerRequired: 25, hasPrerequisite: true,  prerequisiteRole: UnitRole.Barracks,  maxHealth: 595,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(27, FactionId.Legion,   UnitRole.Radar,           costAE: 300,  buildTicks: 120, powerProvided: 0,   powerRequired: 15, hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 425,  armorClass: ArmorClass.Building, damageType: Unarmed,             attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
-            new SimBuildingDefinition(28, FactionId.Legion,   UnitRole.DefensePlatform, costAE: 300,  buildTicks: 100, powerProvided: 0,   powerRequired: 8,  hasPrerequisite: true,  prerequisiteRole: UnitRole.Power,     maxHealth: 510,  armorClass: ArmorClass.Building, damageType: DamageType.Kinetic,  attackDamage: 20, attackRangeTiles: 10, attackCooldownTicks: 10),
+            new SimBuildingDefinition(20, FactionId.Legion,   UnitRole.HQ,              costAE: 2000, buildTicks: 500, powerProvided: 30,  powerRequired: 0,  prerequisiteRoles: UnitRoleMask.None,                         maxHealth: 1700, armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(22, FactionId.Legion,   UnitRole.Power,           costAE: 350,  buildTicks: 120, powerProvided: 80,  powerRequired: 0,  prerequisiteRoles: UnitRoleMask.HQ,                           maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(21, FactionId.Legion,   UnitRole.Refinery,        costAE: 550,  buildTicks: 160, powerProvided: 0,   powerRequired: 15, prerequisiteRoles: UnitRoleMask.None,                         maxHealth: 680,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0), // D-077: no Power-plant prerequisite
+            new SimBuildingDefinition(23, FactionId.Legion,   UnitRole.Storage,         costAE: 250,  buildTicks: 80,  powerProvided: 0,   powerRequired: 5,  prerequisiteRoles: UnitRoleMask.Refinery,                     maxHealth: 340,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(24, FactionId.Legion,   UnitRole.Barracks,        costAE: 400,  buildTicks: 140, powerProvided: 0,   powerRequired: 10, prerequisiteRoles: UnitRoleMask.HQ | UnitRoleMask.Power,       maxHealth: 510,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(25, FactionId.Legion,   UnitRole.VehicleFactory,  costAE: 700,  buildTicks: 200, powerProvided: 0,   powerRequired: 20, prerequisiteRoles: UnitRoleMask.Refinery | UnitRoleMask.Barracks, maxHealth: 765, armorClass: ArmorClass.Building, damageType: Unarmed,          attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(26, FactionId.Legion,   UnitRole.ResearchLab,     costAE: 800,  buildTicks: 240, powerProvided: 0,   powerRequired: 25, prerequisiteRoles: UnitRoleMask.VehicleFactory,               maxHealth: 595,  armorClass: ArmorClass.Building, damageType: Unarmed,            attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(27, FactionId.Legion,   UnitRole.Radar,           costAE: 300,  buildTicks: 120, powerProvided: 0,   powerRequired: 15, prerequisiteRoles: UnitRoleMask.Power | UnitRoleMask.Barracks, maxHealth: 425, armorClass: ArmorClass.Building, damageType: Unarmed,          attackDamage: 0,  attackRangeTiles: 0,  attackCooldownTicks: 0),
+            new SimBuildingDefinition(28, FactionId.Legion,   UnitRole.DefensePlatform, costAE: 300,  buildTicks: 100, powerProvided: 0,   powerRequired: 8,  prerequisiteRoles: UnitRoleMask.Power,                        maxHealth: 510,  armorClass: ArmorClass.Building, damageType: DamageType.Kinetic, attackDamage: 20, attackRangeTiles: 10, attackCooldownTicks: 10),
         };
 
         private static readonly SimUnitDefinition[] Units =
@@ -540,7 +559,7 @@ namespace Nova.Simulation.Definitions
         /// 21-field layout in canonical order: kind u8 (0 = building, 1 =
         /// unit), faction u8, role u8, costAE i32, buildTicks i32,
         /// powerProvided i32, powerRequired i32, hasPrerequisite u8,
-        /// prerequisiteRole u8, tier u8, producerRole u8, maxHealth i32,
+        /// prerequisiteRoles u32, tier u8, producerRole u8, maxHealth i32,
         /// moveSpeed raw i32, armorClass u8, damageType u8, attackDamage i32,
         /// attackRangeTiles i32, attackCooldownTicks i32, cargoCapacityAE i32.
         /// Fields a kind does
@@ -598,7 +617,7 @@ namespace Nova.Simulation.Definitions
             hash.WriteInt32(def.PowerProvided);
             hash.WriteInt32(def.PowerRequired);
             hash.WriteUInt8(def.HasPrerequisite ? (byte)1 : (byte)0);
-            hash.WriteUInt8((byte)def.PrerequisiteRole);
+            hash.WriteUInt32((uint)def.PrerequisiteRoles);
             hash.WriteUInt8(0); // tier: buildings have none
             hash.WriteUInt8(0); // producerRole: buildings have none
             hash.WriteInt32(def.MaxHealth);
@@ -622,7 +641,7 @@ namespace Nova.Simulation.Definitions
             hash.WriteInt32(0); // powerProvided: units have none
             hash.WriteInt32(0); // powerRequired: units have none
             hash.WriteUInt8(0); // hasPrerequisite: units have none
-            hash.WriteUInt8(0); // prerequisiteRole: units have none
+            hash.WriteUInt32(0); // prerequisiteRoles: units have none
             hash.WriteUInt8(def.Tier);
             hash.WriteUInt8((byte)def.ProducerRole);
             hash.WriteInt32(def.MaxHealth);

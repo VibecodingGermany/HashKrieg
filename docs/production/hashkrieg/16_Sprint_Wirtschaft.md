@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.0.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.2.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -60,7 +60,7 @@ sondern ein Platzierungsfehler.** Das ändert den Aufwand, nicht die Dringlichke
 | `Scripts/Simulation/Production/` | 16.2 |
 | `Scripts/Simulation/Vision/FogOfWarSystem.cs` | 16.5 — Vertragsfläche, `GetTeamView` bleibt unverändert |
 | `Scripts/Simulation/State/UnitCommandStateView.cs` | 16.10 — **nur Befehlsanwendung**, kein Feld, keine Reihenfolge, kein `StateVersion` |
-| `Scripts/Simulation/Definitions/SimDefinitions.cs` | 16.8 — `PrerequisiteRole`. **Geteilt mit 13B, Absprache vor dem PR** |
+| `Scripts/Simulation/Definitions/SimDefinitions.cs` | 16.8 — `PrerequisiteRoles`. **Geteilt mit 13B, Absprache vor dem PR** |
 | `Scripts/Gameplay/Match/MatchBootstrap.cs` | 16.7 — Startaufstellung |
 | `Scripts/Presentation/Maps/GlutrinneBlockoutView.cs` | 16.7 — Feldmarker und Steinstreu-Ausschluss |
 | `Scripts/Presentation/UI/` (`BuildMenuHud`, `MinimapHud`, `MatchFrameHud`) | 16.5, 16.10 |
@@ -220,14 +220,37 @@ Der Definitions-Hash bewegt sich hier **nicht** — das tut nur 16.8.
 
 ### 16.8 · Die Bauvoraussetzungs-Kette (C5) — **fasst `SimDefinitions` an**
 
-`SimBuildingDefinition.PrerequisiteRole` ist ein **einzelnes** Feld; das Design
-nennt für sechs von neun Rollen Mehrfachvoraussetzungen. Eine Bitmaske über
-`UnitRole` reicht.
+`SimBuildingDefinition.PrerequisiteRole` war ein **einzelnes** Feld. D-103
+ersetzt es durch `UnitRoleMask PrerequisiteRoles`; `UnitRole` selbst bleibt als
+Wire-Enum unverändert. Die Prüfung ist All-of und scheitert bei unbekannten Bits
+geschlossen. Für Allianz und Legion gilt dieselbe Tabelle:
 
-> **`PrerequisiteRole` geht in `DefinitionsHash64` ein**
-> (`hash.WriteUInt8((byte)def.PrerequisiteRole)`). Eine Formatänderung bewegt den
-> Definitions-Hash, und der Relay vergleicht ihn serverseitig. Deshalb liegt
-> dieses Paket **vor** dem VPS-Rollout, nicht danach.
+| Rolle | Fertige eigene Voraussetzungen |
+|---|---|
+| HQ | keine |
+| Kraftwerk | HQ |
+| Raffinerie | keine |
+| Lager | Raffinerie |
+| Kaserne | HQ + Kraftwerk |
+| Fahrzeugfabrik | Raffinerie + Kaserne |
+| Forschungslabor | Fahrzeugfabrik |
+| Radar | Kraftwerk + Kaserne |
+| Verteidigungsplattform | Kraftwerk |
+
+Die Baubar zählt alle aktuell fehlenden Rollen in stabiler Reihenfolge auf.
+Die singuläre Abfrage bleibt für Radar-/Onboarding-Verbraucher erhalten und
+delegiert auf dieselbe Maskenprüfung.
+
+> **`PrerequisiteRoles` geht in `DefinitionsHash64` ein**
+> (`hasPrerequisite u8`, danach `prerequisiteRoles u32`). Die Formatänderung
+> bewegt den Definitions-Hash, und der Relay vergleicht ihn serverseitig.
+> Deshalb müssen Relay und beide Clients aus demselben Commit ausgerollt werden;
+> das Paket liegt **vor** dem VPS-Rollout, nicht danach.
+
+Die ausgelieferte Skirmish-KI plant bislang Raffinerie → Kaserne. Das neue
+Kraftwerk-Tor verlangt den koordinierten, getrennten Handoff im fremden
+`Scripts/AI*`-Schreibbereich; 16.8 wird erst nach dessen grünem Integrationslauf
+gemergt.
 
 ### 16.9 · Platzierungsregeln und Reparaturkosten (C6)
 
@@ -286,7 +309,7 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
 
 | Risiko | Umgang |
 |---|---|
-| **Der Relay lehnt nach 16.8 alle Clients ab** | `PrerequisiteRole` bewegt `DefinitionsHash64`, der Relay vergleicht ihn serverseitig. 16.8 liegt **vor** dem VPS-Rollout; danach kostet dieselbe Änderung einen Serverzugang. 16.7 ist davon **nicht** betroffen |
+| **Der Relay lehnt nach 16.8 alle alten Clients ab** | `PrerequisiteRoles` bewegt `DefinitionsHash64`, der Relay vergleicht ihn serverseitig. 16.8 liegt **vor** dem VPS-Rollout; danach kostet dieselbe Änderung einen Serverzugang. 16.7 ist davon **nicht** betroffen |
 | **Vier von fünf Spiegeln der Startaufstellung gepflegt** | roter Test, der wie ein Determinismusfehler aussieht — oder drei Aetherium-Felder ohne sichtbaren Marker. Die fünf Stellen stehen in 16.7 |
 | **Baseline und Verhalten im selben PR** | wird nicht gemergt. `Determinism10000Scenario.cs` liegt ausserhalb der Guard-Präfixe und darf im selben PR nachgezogen werden — `Determinism10000Tests.cs` nicht |
 | **Ein 13B-Merge im selben Fenster** | ein Fenster hat einen Strang (Regelwerk, Merge-Fenster) |
@@ -355,3 +378,4 @@ Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |
+| 1.2.0 | 2026-08-09 | Paket 16.8 mit D-103 konkretisiert: identische All-of-Kette für beide Fraktionen, fail-closed Maskenvertrag, Definitions-Hash-Folge und KI-Handoff festgeschrieben | Agent (unter Delegation) |

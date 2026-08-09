@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.33.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.35.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -2992,6 +2992,64 @@ die Zusicherung dort schrumpft auf eine Zeile, der erklärende Kommentar
 verweist auf die neue Datei. Der Einheitenstrang ist zu informieren (Issue #75).
 Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
 
+---
+
+### D-103 | verbindlich | Sprint 16 (Bauvoraussetzungen werden eine All-of-Bitmaske)
+
+**Status:** Am 2026-08-09 vom Agenten unter ausdrücklicher Inhaberdelegation
+entschieden; überstimmbar. Umsetzung und Integrationsnachweis in Paket 16.8.
+
+**Kontext:** `SimBuildingDefinition.PrerequisiteRole` konnte genau eine fertige
+Gebäuderolle ausdrücken. Der verbindliche Gebäudeentwurf nennt dagegen für
+Kaserne, Fahrzeugfabrik und Radar mehrere gleichzeitige Voraussetzungen. Eine
+zweite Spezialprüfung pro Rolle würde Definitionstabelle, Executor und UI
+auseinanderlaufen lassen. Das Feld ist außerdem Teil von `DefinitionsHash64`;
+seine Darstellung ist deshalb Match- und Relay-Kompatibilität, nicht nur eine
+lokale C#-Signatur.
+
+**Alternativen:**
+
+1. Das einzelne Feld behalten und Mehrfachregeln im `ConstructionSystem`
+   hartcodieren — verworfen, weil Definition, Executor und Baubar dann drei
+   Wahrheiten pflegen.
+2. Eine variable Liste je Definition — verworfen, weil sie Allokation,
+   Ordnungsregeln und eine längere Hash-Kodierung einführt, obwohl höchstens
+   neun stabile Rollen abzubilden sind.
+3. **Gewählt: eine `uint`-Bitmaske über die unveränderten `UnitRole`-Wirewerte.**
+   Bit `n` steht für Rollenwert `n`; die Prüfung verlangt alle gesetzten Bits.
+
+**Entscheidung:**
+
+1. `UnitRole` bleibt unverändert. `UnitRoleMask` ist ein separates
+   `[Flags]`-Enum; `SimBuildingDefinition.PrerequisiteRoles` ersetzt das
+   singuläre Feld. `HasPrerequisite` bleibt abgeleitet (`mask != 0`).
+2. Allianz und Legion verwenden identisch: HQ keine; Kraftwerk HQ; Raffinerie
+   keine; Lager Raffinerie; Kaserne HQ + Kraftwerk; Fahrzeugfabrik Raffinerie +
+   Kaserne; Forschungslabor Fahrzeugfabrik; Radar Kraftwerk + Kaserne;
+   Verteidigungsplattform Kraftwerk.
+3. Die Raffinerie bleibt gemäß D-077 voraussetzungslos. Bei der
+   Verteidigungsplattform betrifft die Kraftwerk-Voraussetzung nur die Basis;
+   Modulfreischaltungen bleiben ein getrennter Vertrag.
+4. Nur eigene, fertiggestellte Gebäude erfüllen Bits. Baustellen, fremde
+   Gebäude und unbekannte Bits erfüllen nichts; unbekannte Bits scheitern damit
+   geschlossen.
+5. `DefinitionsHash64` schreibt weiterhin den abgeleiteten
+   `hasPrerequisite u8` und danach die vollständige Maske als `u32`. Der Hash
+   bewegt sich absichtlich; Relay und Clients müssen aus demselben Commit
+   stammen. Zustands-, Befehls- und Relay-Protokollversionen ändern sich nicht.
+
+**Begründung:** Die Maske ist die kleinste tabellarische Darstellung, die
+All-of vollständig ausdrückt, ohne `UnitRole` oder persistenten Zustand zu
+verändern. Eine gemeinsame Missing-Mask-Abfrage lässt Executor und UI exakt
+dieselbe Semantik verwenden und kann alle fehlenden Rollen stabil benennen.
+
+**Konsequenzen:** Die Skirmish-KI muss vor der Kaserne ein Kraftwerk planen.
+Dieser Eingriff liegt im extern verwalteten `Scripts/AI*`-Bereich und erfolgt
+koordiniert als eigener Handoff; Paket 16.8 wird ohne dessen grünen
+Integrationslauf nicht gemergt. Der Definitions-Hash macht alte Relay-/Client-
+Builds bewusst inkompatibel. Keine Golden-Baseline und kein persistentes
+Zustandsformat wird in diesem Paket geändert.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3072,6 +3130,7 @@ Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.35.0 | 2026-08-09 | D-103 aufgenommen: Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske über unveränderte `UnitRole`-Wirewerte; Hash-, Fail-Closed-, Plattformmodul- und KI-Handoff-Folgen festgeschrieben | Agent (unter Delegation) |
 | 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
 | 1.1.0 | 2026-07-21 | D-006 (Unity 6.3 LTS + URP bestätigt) aus Sprint-1-Validierung | Lead Technical Director |

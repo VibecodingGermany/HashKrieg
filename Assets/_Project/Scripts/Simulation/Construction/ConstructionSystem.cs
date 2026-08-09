@@ -289,21 +289,47 @@ namespace Nova.Simulation.Construction
             return IndexOfBuilding(rawEntityId) >= 0;
         }
 
-        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
-        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        /// <summary>
+        /// Missing completed own building roles for an all-of prerequisite.
+        /// Unknown bits stay missing (fail closed).
+        /// </summary>
+        public UnitRoleMask GetMissingPrerequisiteRoles(byte playerSlot, UnitRoleMask requiredRoles)
         {
+            if (requiredRoles == UnitRoleMask.None) return UnitRoleMask.None;
+
+            UnitRoleMask completedRoles = UnitRoleMask.None;
             for (int i = 0; i < MaxBuildings; i++)
             {
                 if (!_buildings[i].IsActive) continue;
                 if (!SimDefinitions.TryGetBuilding(_buildings[i].BuildingDefId, out SimBuildingDefinition def)) continue;
-                if (def.Role != role) continue;
+
                 EntityId id = UnitCommandStateView.ToEntityId(_buildings[i].RawEntityId);
-                if (_entityManager.TryGetUnit(id, out UnitState unit) && unit.PlayerId == playerSlot)
-                {
-                    return true;
-                }
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+
+                completedRoles |= RoleMask(def.Role);
             }
-            return false;
+            return requiredRoles & ~completedRoles;
+        }
+
+        /// <summary>True when the slot owns every COMPLETED building role in the all-of mask.</summary>
+        public bool HasFinishedBuildings(byte playerSlot, UnitRoleMask requiredRoles)
+        {
+            return GetMissingPrerequisiteRoles(playerSlot, requiredRoles) == UnitRoleMask.None;
+        }
+
+        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
+        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        {
+            UnitRoleMask roleMask = RoleMask(role);
+            return roleMask != UnitRoleMask.None && HasFinishedBuildings(playerSlot, roleMask);
+        }
+
+        private static UnitRoleMask RoleMask(UnitRole role)
+        {
+            int bit = (int)role;
+            return bit >= 0 && bit < 32
+                ? (UnitRoleMask)(1u << bit)
+                : UnitRoleMask.None;
         }
 
         // ------------------------------------------------------------------
@@ -314,7 +340,7 @@ namespace Nova.Simulation.Construction
         /// <summary>
         /// Full state-dependent placement validation in fixed order: unknown
         /// definition, foreign-faction definition, out-of-map footprint and
-        /// occupied cells (RejectedInvalidTarget), then prerequisite role,
+        /// occupied cells (RejectedInvalidTarget), then prerequisite roles,
         /// power rule and site capacity (RejectedPrerequisitesNotMet). Cost
         /// is the executor's separate check (RejectedInsufficientResources)
         /// and runs BEFORE this.
@@ -337,7 +363,7 @@ namespace Nova.Simulation.Construction
             {
                 return CommandResultCode.RejectedInvalidTarget;
             }
-            if (def.HasPrerequisite && !HasFinishedBuilding(playerSlot, def.PrerequisiteRole))
+            if (!HasFinishedBuildings(playerSlot, def.PrerequisiteRoles))
             {
                 return CommandResultCode.RejectedPrerequisitesNotMet;
             }
