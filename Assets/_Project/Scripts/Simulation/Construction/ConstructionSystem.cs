@@ -664,6 +664,55 @@ namespace Nova.Simulation.Construction
             {
                 _t2Unlocked[ownerSlot] = true; // phase 5: T2 unlock (mvp-v1.json technology model)
             }
+            if (def.Role == UnitRole.Refinery)
+            {
+                GrantFoundingHarvester(ownerSlot, originX, originY);
+            }
+        }
+
+        /// <summary>
+        /// A finished Refinery hands out its first Harvester for free.
+        /// <para>
+        /// Without it the opening can dead-end: the Harvester costs 700 AE and
+        /// the Refinery is its only producer, so a player who spends down below
+        /// 700 before the Refinery finishes has no way left to earn anything.
+        /// Nothing in the simulation recovers from that — the run is over
+        /// without an opponent doing a thing. The grant is the cheapest fix
+        /// that keeps the economy reachable from every spend order.
+        /// </para>
+        /// <para>
+        /// Deterministic by construction: it runs inside the construction phase
+        /// in ascending site order, picks its cell with the same ring search as
+        /// the push-out, and keeps no state of its own — the spawn either
+        /// happens now or not at all. Nothing here survives a tick boundary, so
+        /// the snapshot layout is untouched.
+        /// </para>
+        /// </summary>
+        private void GrantFoundingHarvester(byte ownerSlot, int originX, int originY)
+        {
+            if (_entityManager.ActiveCount >= _entityManager.Capacity) return;
+            if (!SimDefinitions.TryGetUnit(
+                    _economy.GetSlotFaction(ownerSlot), UnitRole.Harvester,
+                    out SimUnitDefinition harvester))
+            {
+                return;
+            }
+
+            // Search outward from the footprint centre; ring 0 is the centre
+            // cell itself, which the footprint just occupied, so the first hit
+            // is always outside the building.
+            int centre = SimDefinitions.BuildingFootprintCells / 2;
+            if (!TryFindPushOutCell(originX + centre, originY + centre, out int cellX, out int cellY))
+            {
+                return; // hemmed in: the player buys the Harvester the normal way
+            }
+
+            _entityManager.SpawnUnit(
+                ownerSlot,
+                new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
+                harvester.MoveSpeed,
+                maxHealth: harvester.MaxHealth,
+                role: harvester.Role);
         }
 
         private void ProcessRepairOrders()

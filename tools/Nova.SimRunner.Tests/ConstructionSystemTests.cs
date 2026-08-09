@@ -461,6 +461,61 @@ namespace Nova.SimRunner.Tests
             Assert.That(f.Construction.IsT2Unlocked(0), Is.True);
         }
 
+        private static int CountUnits(Fixture f, byte slot, UnitRole role)
+        {
+            UnitState[] units = f.Entities.RawUnits;
+            int count = 0;
+            for (int i = 0; i < f.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role) count++;
+            }
+            return count;
+        }
+
+        [Test]
+        public void RefineryCompletion_GrantsTheFirstHarvesterFree()
+        {
+            // The dead end this closes: the Harvester costs 700 AE and the
+            // Refinery is its only producer since D-077. A player who spends
+            // down below 700 before the Refinery finishes can never earn
+            // again — no Harvester, no Aetherium, no money for a Harvester.
+            var f = new Fixture(startingCredits: 1000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "HQ provides the 30 power the Refinery draws from");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1); // commit the balance
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4 (Alliance, 700 AE, 200 ticks)");
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0), "none before completion");
+
+            f.Step(150);
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0), "not while the site is still running");
+            long creditsBefore = f.Economy.GetPlayerEconomy(0).AetheriumCredits;
+
+            f.Step(100); // past the 200-tick build time
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "a finished Refinery hands out its first Harvester");
+            Assert.That(CountUnits(f, 1, UnitRole.Harvester), Is.EqualTo(0),
+                "the grant belongs to the building's owner alone");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(creditsBefore),
+                "the grant is free: nothing is charged at completion");
+        }
+
+        [Test]
+        public void PlaceCompletedBuilding_Refinery_GrantsNothing_MatchStartIsUnchanged()
+        {
+            // PlaceCompletedBuilding is the match-start path (starting HQ plus
+            // Refinery). The grant deliberately hangs on finishing a site, not
+            // on instant placement — otherwise every match would begin with a
+            // free Harvester, which is a balance change nobody asked for.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 20, 20).IsValid, Is.True);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0),
+                "an instantly placed Refinery grants nothing");
+        }
+
         [Test]
         public void CancelConstruction_Refunds75Percent_AndFreesFootprint()
         {
