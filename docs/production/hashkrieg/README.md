@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.4.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen; Sprint 13.0 bereitet externe Beiträge unter Tier 2 vor | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 13
+**Version:** 0.6.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 12 Stränge A/B technisch umgesetzt, gespielte Abnahmen offen; Sprint 13.0 bereitet externe Beiträge unter Tier 2 vor; erster Betatest-Bericht eingeordnet | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 13
 
 ## Zweck
 
@@ -49,6 +49,9 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [13B_Sprint_Einheitenverhalten.md](13B_Sprint_Einheitenverhalten.md) | Sprint 13B (externer Beitragender, PR-only); Einheitenverhalten, KI und Legion-Waffenidentität — fortlaufend parallel zu 13–15 |
 | [14_Sprint_Lobby.md](14_Sprint_Lobby.md) | Sprint 14 (Maintainer); Match per Code über Supabase, Fraktionswahl, Build-Abgleich vor dem Verbinden |
 | [15_Sprint_Netzstabilitaet.md](15_Sprint_Netzstabilitaet.md) | Sprint 15 (Maintainer); Reconnect, Desync-Erstbefund, adaptive Eingabeverzögerung, Dauerbetrieb des Relays |
+| [16-19_Betatest_Einordnung.md](16-19_Betatest_Einordnung.md) | **Einordnung des ersten Betatest-Berichts** in die Sprintfolge — Issues #43–#58, nach Schreibhoheit geschnitten, mit den offenen Inhaberentscheidungen |
+| [17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md) | Sprint 17 (Maintainer); Zugriffsprotokoll, Sperrliste und Erstmeldung — Paket A liegt ausserhalb des Repos und ist sofort vorziehbar |
+| [Testberichte/](Testberichte/) | **Anonymisierte** Fassungen der eingegangenen Betatest-Berichte, je Build und Kennung — Ablauf: [../Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) |
 
 ## Das Wichtigste in fünf Sätzen
 
@@ -179,9 +182,15 @@ Masterplans grundlegend — sonst nichts.
    Simulationszustand und Baselines und hebt damit die Trennung auf, die den
    Parallelbetrieb erst möglich macht (siehe
    [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md)).
+5. **Sprint 17 Paket A** ([17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md))
+   liegt vollständig im Supabase-Projekt und berührt keine Datei unter
+   `Assets/`. Es ist deshalb an der Sprintreihenfolge vorbei vorziehbar,
+   sobald das Projekt steht — Paket B wartet auf Sprint 15.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.4.0 | 2026-08-08 | Sprint 13.0 und D-091 als Voraussetzung für externe Beiträge unter Tier 2 ergänzt | Producer / Agent (Umsetzung) |
+| 0.5.0 | 2026-08-09 | Sprint 17 (Zugangsprotokoll, Sperrliste, Erstmeldung) aufgenommen; Paket A als vorziehbar vermerkt | Producer / Agent (Umsetzung) |
+| 0.6.0 | 2026-08-09 | Ersten Betatest-Bericht **anonymisiert** aufgenommen und in die Sprintfolge eingeordnet (Issues #43–#58); Testberichte-Ordner angelegt, Ablauf in [../Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) festgelegt | Orchestrator |

@@ -175,6 +175,7 @@ gelisteten Kernverträge.
 - [SprintPlanning](production/SprintPlanning.md)
 - [Roadmap](production/Roadmap.md)
 - [DecisionLog](production/DecisionLog.md)
+- [Nutzerfeedback_Ablauf](production/Nutzerfeedback_Ablauf.md) – **verbindlich:** wie Testberichte aus der Datenbank anonymisiert, zerlegt und zu Sprintvorschlägen gebündelt werden
 - [OpenQuestions](production/OpenQuestions.md)
 - [RiskAnalysis](production/RiskAnalysis.md)
 - [GrayboxLog](production/GrayboxLog.md) – Sitzungsprotokoll der Graybox-Spur (D-067, Entwurf)
