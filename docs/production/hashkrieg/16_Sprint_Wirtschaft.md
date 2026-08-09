@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.0.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.3.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -231,15 +231,27 @@ nennt für sechs von neun Rollen Mehrfachvoraussetzungen. Eine Bitmaske über
 
 ### 16.9 · Platzierungsregeln und Reparaturkosten (C6)
 
-- **Platzierung:** Bau-Einflussradius 8 Zellen um HQ / Lager / Kraftwerk,
-  Mindestabstand zu Aetherium-Feldern, Gebäudeabstand. Heute prüft der Code nur
-  „innerhalb der Karte" und „Zelle frei". Die Begehbarkeitsprüfung liest
-  `Pathfinding.CostField` — **Vertragsfläche, `IsWalkable` wird benutzt, nicht
-  geändert.**
-- **Reparatur kostet 30 % des Neupreises.** Zwei Details, die dazugehören:
-  - `ProcessRepairOrders` hat **keine Ziel-Deduplikation** — mehrere Bauarbeiter
-    am selben Gebäude zahlen im selben Tick mehrfach. Das ist zu lösen, sonst
-    ist es der Betatest-Fehler der nächsten Runde.
+- **Platzierung (D-104):** Abstände werden footprintbasiert in der
+  Chebyshev-Metrik gemessen. Jede der neun Footprintzellen muss über
+  `CostField.IsWalkable` begehbar sein. Ein Neubau braucht in höchstens acht
+  Zellen Entfernung ein eigenes, lebendes, fertiges HQ, Lager oder Kraftwerk
+  und zu jeder aktiven Baustelle beziehungsweise jedem lebenden fertigen
+  Gebäude mindestens Abstand 2. Feldüberlappung ist immer verboten;
+  Raffinerien brauchen zu mindestens einem registrierten Feld Abstand 1 bis 3,
+  alle anderen Gebäude zu jedem Feld mindestens Abstand 2. Erschöpfte Felder
+  zählen weiter. `Pathfinding.CostField` bleibt Vertragsfläche:
+  **`IsWalkable` wird benutzt, nicht geändert.**
+- **Reparatur kostet kumulativ 30 % des Neupreises (D-104).** Für
+  `R = floor(CostAE × 30 / 100)` und
+  `S(h) = floor(R × clamp(h, 0, MaxHealth) / MaxHealth)` kostet ein Tick
+  `S(h1) − S(h0)`. Das teleskopiert ohne Rundungsdrift und ohne neues
+  Zustandsfeld. Reicht AE nicht, ändern sich Guthaben und Trefferpunkte nicht.
+  Pro Ziel und Tick gewinnt der erste valide, beschädigte und erreichbare
+  Auftrag; spätere Aufträge wirken nicht, der Gewinner claimt auch bei
+  fehlendem AE, und andere Ziele laufen weiter.
+  Zwei bestehende Details gehören dazu:
+  - `ProcessRepairOrders` hatte **keine Ziel-Deduplikation** — mehrere
+    Bauarbeiter heilten dasselbe Gebäude im selben Tick mehrfach.
   - Die Bauphase läuft **nach** `RecomputePower` im selben Tick. Ein Abzug in der
     Reparaturschleife wirkt darum erst im Folgetick auf die Strombilanz. Das ist
     hinnehmbar; die Tickreihenfolge zu drehen wäre `SimulationKernel.cs` und
@@ -329,8 +341,11 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 |---|---|---|
 | D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
+| D-104 | Footprintbasierte Chebyshev-Platzierung; Reparatur kostet kumulativ 30 % des Neupreises, höchstens ein wirksamer Auftrag je Ziel und Tick | Inhaber (Zielwerte) / Agent (Ausformung) |
 
-D-096 und D-097 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
+D-096, D-097 und D-104 sind im [DecisionLog](../DecisionLog.md) eingetragen;
+D-102 und D-103 bleiben seriell für die vorhergehenden Pakete 16.7 und 16.8
+reserviert. D-098
 (Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
 D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
 [Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
@@ -354,4 +369,5 @@ Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.3.0 | 2026-08-09 | Paket 16.9 mit D-104 konkretisiert: footprintbasierte Einfluss-, Feld-, Gelände- und Gebäudeabstände sowie zustandslose kumulative 30-Prozent-Reparaturkosten und Ziel-Deduplikation festgeschrieben | Project Owner / Agent (unter Delegation) |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |

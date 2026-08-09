@@ -154,6 +154,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **16.9/C6: Bauplätze und Reparaturen kosten Raum und Aetherium (D-104).**
+  Neubauten folgen footprintbasierten Einfluss-, Feld-, Gelände- und
+  Gebäudeabständen; Reparaturen kosten kumulativ 30 % des Neupreises. Je Ziel
+  und Tick wirkt nur der erste valide und erreichbare Reparaturauftrag, und bei
+  fehlendem AE bleiben Guthaben und Trefferpunkte vollständig unverändert
 - **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
   (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
   Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei

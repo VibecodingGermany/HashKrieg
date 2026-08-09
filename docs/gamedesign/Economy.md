@@ -1,6 +1,6 @@
 # Wirtschaftssystem (Economy)
 
-**Version:** 0.4.0 | **Status:** Entwurf (Korrekturlauf Sprint 4) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.5.0 | **Status:** Entwurf (Korrekturlauf Sprint 16) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -100,8 +100,8 @@ Begründung: Mit 1.000 AE Start und ~600 AE/min ist Tier 1 sofort, Tier 2 nach ~
 
 | Regel | Wert v0.1 |
 |---|---|
-| Reparatur (Allianz/Legion, Gebäude) | Kosten 50 % der Baukosten für 0→100 % HP, anteilig; Rate ~3 % HP/s; nur bei positivem Energiesaldo in voller Rate, bei Low-Power halbiert |
-| Reparatur (Fahrzeuge) | Über Repair-Drohne (D-014) oder Werft-Funktion der Fahrzeugfabrik, gleiche 50-%-Regel |
+| Reparatur (Allianz/Legion, Gebäude) | **MS-1: kumulativ 30 %** der Baukosten für 0→100 % HP (D-104), anteilig über `S(h)`, ohne Rundungsdrift; Rate 10 HP/Tick, bei Low Power 5 HP/Tick |
+| Reparatur (Fahrzeuge) | Über Repair-Drohne (D-014) oder Werft-Funktion der Fahrzeugfabrik; bis zur Umsetzung gilt derselbe 30-%-Startwert aus D-104 |
 | Evolvierte | Keine aktive Reparatur: Regeneration ~1 % HP/s kostenlos, doppelt so schnell auf/nahe **lebender** Aetherium-Felder (D-011; Einschränkung auf lebende Felder gemäß D-027); kein AE-Abzug – Ausgleich über langsamere Rate |
 | Verkauf | 50 % der investierten AE zurück (Basiswert, keine Reparatur-Rückerstattung); 5 s Abwickel-Phase, Gebäude in dieser Zeit verwundbar und funktionslos; Evolvierte "Rückbau" übernimmt dieselbe 50-%-Regel (Resorption) |
 
@@ -156,3 +156,4 @@ Leitplanke: Gesamt-AE-Fluss pro Spieler über ein typisches 25-min-Match ≈ 25.
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Gebäudekosten/-energie durch Verweise auf Buildings.md ersetzt (Review F-03, D-047-Grundsatzregel); Economy.md behält nur Systemlogik (Raten, Low-Power, Lager) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-21 | F-03 vollständig geschlossen: Harvester-Kosten in der Fraktions-Wirtschaftsmodifier-Tabelle durch Verweis auf die führende Quelle [Vehicles.md](./Vehicles.md) ersetzt (D-047) – keine dritte Zahl mehr neben Vehicles.md (700/550/620 AE) | Lead Gameplay Designer |
+| 0.5.0 | 2026-08-09 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |

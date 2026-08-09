@@ -1,6 +1,6 @@
 # Panzerungssystem (Armor System)
 
-**Version:** 0.4.0 | **Status:** Entwurf – Matrix führend nach D-074, in Code implementiert | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.5.0 | **Status:** Entwurf – Matrix führend nach D-074, Reparaturwert nach D-104 | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -99,7 +99,10 @@ Allianz und Legion heilen nicht passiv; Reparatur ist aktive, kostenpflichtige A
 | Infanterie | Nicht reparierbar; Allianz: Medic-Einheit heilt Infanterie (separates Heil-Profil, analog 3 %/s); Legion: **keine Infanterie-Heilung** (D-027.4 – Masse-Identität, Ausgleich über günstige Neuproduktion: Ersatz statt Erhalt) |
 | Evolvierte | Keine Reparatur-Mechanik (D-011); Bio-Heiler heilt nur Infanterie |
 
-Kostenprinzip: Reparatur kostet einen Bruchteil des Neubaus (Faustregel: Volle Reparatur ≈ 50 % der Baukosten). Begründung: Erhalt soll sich lohnen, aber nicht gratis sein – das hält AE-Druck (D-010) auch im Verteidigungsspiel aufrecht.
+Kostenprinzip: Reparatur kostet in MS-1 kumulativ **30 % der Baukosten** für
+0→100 % HP (D-104). Begründung: Erhalt soll sich lohnen, aber nicht gratis sein
+– das hält AE-Druck (D-010) auch im Verteidigungsspiel aufrecht. Die Höhe bleibt
+als Q-047 nach der ersten gespielten Runde zu prüfen.
 
 ## Wechselwirkungen mit dem Schadenssystem
 
@@ -126,3 +129,4 @@ Kostenprinzip: Reparatur kostet einen Bruchteil des Neubaus (Faustregel: Volle R
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Feinschliff Sprint 2 Runde 2 (D-031) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-26 | Autoritätsvermerk nach D-074 ergänzt: die 6 × 6-Matrix ist alleinige kanonische Quelle und in `Nova.Simulation.Combat.DamageMatrix` implementiert; Lokaltabellen in Infantry.md/Vehicles.md aufgehoben. **Keiner der 36 Werte geändert** | Agent (unter Inhaber-Delegation, D-074) |
+| 0.5.0 | 2026-08-09 | D-104: die widersprüchliche 50-%-Faustregel auf den implementierten kumulativen MS-1-Startwert von 30 % vereinheitlicht; Q-047 bleibt als Balancingfrage offen | Project Owner / Agent (unter Delegation) |

@@ -372,7 +372,7 @@ namespace Nova.SimRunner.Tests
 
             // Slot 0 gets a real construction site: power provider + builder
             // + credits are the placement prerequisites.
-            EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 40, 40);
+            EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 26, 20);
             Assert.That(power.IsValid, Is.True, "power provider");
             EntityId builder = host.SpawnUnit(0, 19, 20, UnitRole.Builder);
             host.Step(1);

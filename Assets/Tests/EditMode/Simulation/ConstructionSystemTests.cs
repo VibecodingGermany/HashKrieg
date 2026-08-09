@@ -28,20 +28,29 @@ namespace Nova.Simulation.Tests
         {
             public EntityManager Entities { get; }
             public EconomySystem Economy { get; }
+            public CostField CostField { get; }
             public ConstructionSystem Construction { get; }
             public SimulationKernel Kernel { get; }
 
-            public Fixture(long startingCredits = 1000, System.Action<EconomySystem> configure = null)
+            public Fixture(
+                long startingCredits = 1000,
+                System.Action<EconomySystem> configure = null,
+                bool addDefaultField = true)
             {
                 Entities = new EntityManager(64);
                 Economy = new EconomySystem(Entities, startingCredits);
-                Construction = new ConstructionSystem(Entities, Economy);
+                CostField = new CostField(ConstructionSystem.GridSize, ConstructionSystem.GridSize);
+                Construction = new ConstructionSystem(Entities, Economy, CostField);
                 Kernel = new SimulationKernel(new SimRandom(42UL));
                 Kernel.RegisterSystem(Economy);
                 Kernel.RegisterSystem(Construction);
                 // Pre-start configuration hook (e.g. slot factions): the
                 // SetSlotFaction guard locks the assignment at Kernel.Start().
                 configure?.Invoke(Economy);
+                if (addDefaultField && Economy.FieldCount == 0)
+                {
+                    Economy.TryAddField(63, new GridPos2D(20, 24), 9000);
+                }
                 Kernel.Start();
             }
 
@@ -199,7 +208,7 @@ namespace Nova.Simulation.Tests
             // Legion one (id 24) — a known id naming unbuildable content is an
             // invalid target, exactly like an unknown one.
             var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
-            Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 40, 40).IsValid, Is.True,
+            Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 26, 20).IsValid, Is.True,
                 "Legion power provider so the power rule does not mask the faction check");
             f.Step(1); // commit the balance
             f.SpawnBuilder(0, 19, 20);
@@ -218,7 +227,7 @@ namespace Nova.Simulation.Tests
         public void PlaceBuilding_LegionSlot_ChargesLegionCost_AndBuildsFaster()
         {
             var f = new Fixture(configure: e => e.SetSlotFaction(1, FactionId.Legion));
-            Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 40, 40).IsValid, Is.True, "Legion power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(1, 22, 26, 20).IsValid, Is.True, "Legion power provider");
             f.SpawnBuilder(1, 19, 20);
             f.Step(1); // commit the balance (Legion Power plant provides 80)
             Assert.That(f.Economy.GetPlayerEconomy(1).PowerProvided, Is.EqualTo(80),
@@ -255,7 +264,7 @@ namespace Nova.Simulation.Tests
         public void PlaceBuilding_ChargesExactCost_AndCreatesSiteEntity()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1); // commit the balance (phase-2 recompute)
 
@@ -283,6 +292,7 @@ namespace Nova.Simulation.Tests
         public void PlaceBuilding_InsufficientFunds_FailsAndMutatesNothing()
         {
             var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "influence anchor");
             f.SpawnBuilder(0, 19, 20);
 
             Assert.That(f.Construction.TryPlaceBuilding(0, 3, 20, 20), Is.False, "HQ costs 2500 (Buildings.md), balance is 1000");
@@ -310,14 +320,148 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void ValidatePlacement_RequiresEveryFootprintCellToBeWalkable()
+        {
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 12, 20).IsValid, Is.True, "influence anchor");
+
+            f.CostField.SetCost(22, 22, 254);
+            Assert.That(f.Construction.ValidatePlacement(0, 5, 20, 20), Is.EqualTo(CommandResultCode.Applied),
+                "rough terrain costs 1 through 254 stay walkable");
+
+            f.CostField.SetCost(22, 22, CostField.ImpassableCost);
+            Assert.That(f.Construction.ValidatePlacement(0, 5, 20, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "one impassable cell rejects the whole 3x3 footprint");
+        }
+
+        [Test]
+        public void ValidatePlacement_InfluenceUsesOwnLivingCompletedFootprints_AtDistanceEight()
+        {
+            var own = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(own.Construction.PlaceCompletedBuilding(0, 5, 10, 10).IsValid, Is.True);
+            Assert.That(own.Construction.ValidatePlacement(0, 5, 20, 10), Is.EqualTo(CommandResultCode.Applied),
+                "footprint distance 8 is inside influence");
+            Assert.That(own.Construction.ValidatePlacement(0, 5, 21, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "footprint distance 9 is outside influence");
+
+            var enemy = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(enemy.Construction.PlaceCompletedBuilding(1, 5, 10, 10).IsValid, Is.True);
+            Assert.That(enemy.Construction.ValidatePlacement(0, 5, 20, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "an enemy completed anchor never supplies influence");
+
+            var dead = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            EntityId deadAnchor = dead.Construction.PlaceCompletedBuilding(0, 5, 10, 10);
+            Assert.That(dead.Entities.DespawnUnit(deadAnchor), Is.True);
+            Assert.That(dead.Construction.ValidatePlacement(0, 5, 20, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "a dead completed-table entry is not a living anchor");
+
+            var siteOnly = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            EntityId originalAnchor = siteOnly.Construction.PlaceCompletedBuilding(0, 3, 0, 10);
+            Assert.That(siteOnly.Construction.TryPlaceBuilding(0, 5, 10, 10), Is.True, "create an active Power site");
+            Assert.That(siteOnly.Entities.DespawnUnit(originalAnchor), Is.True, "remove the only completed anchor");
+            Assert.That(siteOnly.Construction.ValidatePlacement(0, 5, 20, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "an active site supplies spacing, never construction influence");
+        }
+
+        [Test]
+        public void ValidatePlacement_RequiresOneEmptyRingAroundBuildingsAndSites()
+        {
+            var buildings = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(buildings.Construction.PlaceCompletedBuilding(0, 5, 10, 10).IsValid, Is.True);
+            Assert.That(buildings.Construction.ValidatePlacement(0, 5, 13, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "edge-adjacent footprints have distance 1");
+            Assert.That(buildings.Construction.ValidatePlacement(0, 5, 13, 13), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "diagonally adjacent footprints also have distance 1");
+            Assert.That(buildings.Construction.ValidatePlacement(0, 5, 14, 10), Is.EqualTo(CommandResultCode.Applied),
+                "one empty cardinal ring gives distance 2");
+            Assert.That(buildings.Construction.ValidatePlacement(0, 5, 14, 14), Is.EqualTo(CommandResultCode.Applied),
+                "one empty diagonal ring gives distance 2");
+
+            var sites = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(sites.Construction.PlaceCompletedBuilding(0, 5, 10, 10).IsValid, Is.True);
+            Assert.That(sites.Construction.TryPlaceBuilding(0, 5, 14, 10), Is.True, "site at legal distance 2");
+            Assert.That(sites.Construction.ValidatePlacement(0, 5, 17, 10), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "an active site enforces the same empty ring");
+            Assert.That(sites.Construction.ValidatePlacement(0, 5, 18, 10), Is.EqualTo(CommandResultCode.Applied));
+        }
+
+        [Test]
+        public void ValidatePlacement_EnforcesRoleSpecificFieldDistances()
+        {
+            var distanceZero = PlacementFixtureWithField(20, 20);
+            Assert.That(distanceZero.Construction.ValidatePlacement(0, 4, 18, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget));
+
+            var distanceOne = PlacementFixtureWithField(20, 20);
+            Assert.That(distanceOne.Construction.ValidatePlacement(0, 4, 17, 20), Is.EqualTo(CommandResultCode.Applied),
+                "Refinery distance 1 is legal");
+            Assert.That(distanceOne.Construction.ValidatePlacement(0, 5, 17, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "every other role rejects field distance 1");
+
+            var distanceTwo = PlacementFixtureWithField(20, 20);
+            Assert.That(distanceTwo.Construction.ValidatePlacement(0, 5, 16, 20), Is.EqualTo(CommandResultCode.Applied),
+                "every non-Refinery accepts field distance 2");
+
+            var distanceThree = PlacementFixtureWithField(20, 20);
+            Assert.That(distanceThree.Construction.ValidatePlacement(0, 4, 15, 20), Is.EqualTo(CommandResultCode.Applied),
+                "Refinery distance 3 is legal");
+
+            var distanceFour = PlacementFixtureWithField(20, 20);
+            Assert.That(distanceFour.Construction.ValidatePlacement(0, 4, 14, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "Refinery distance 4 is outside its required field band");
+
+            var noField = new Fixture(addDefaultField: false);
+            Assert.That(noField.Construction.PlaceCompletedBuilding(0, 5, 8, 20).IsValid, Is.True);
+            Assert.That(noField.Construction.ValidatePlacement(0, 4, 16, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "a Refinery needs at least one registered field");
+        }
+
+        [Test]
+        public void ValidatePlacement_ExhaustedFieldsRemainPermanentSpacingFeatures()
+        {
+            var f = PlacementFixtureWithField(20, 20, reserveAE: 1);
+            EntityId harvester = f.Entities.SpawnUnit(
+                0,
+                new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(20)),
+                SimFixed.FromInt(2),
+                role: UnitRole.Harvester);
+            f.Entities.GetUnitRef(harvester).HarvestFieldId = 1;
+            f.Step(1);
+            Assert.That(f.Economy.TryGetField(1, out AetheriumField field) && field.IsExhausted, Is.True);
+            Assert.That(f.Construction.ValidatePlacement(0, 5, 17, 20), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "exhaustion changes reserve, not the field's permanent map cell");
+        }
+
+        [Test]
+        public void PlaceCompletedBuilding_BypassesGameplayPlacementGeometry()
+        {
+            var f = new Fixture(addDefaultField: false);
+            f.CostField.SetCost(20, 20, CostField.ImpassableCost);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 20, 20).IsValid, Is.True,
+                "deterministic setup bypasses terrain, influence and field-distance validation");
+        }
+
+        private static Fixture PlacementFixtureWithField(int fieldX, int fieldY, long reserveAE = 9000)
+        {
+            var f = new Fixture(
+                configure: economy => Assert.That(
+                    economy.TryAddField(1, new GridPos2D(fieldX, fieldY), reserveAE),
+                    Is.True),
+                addDefaultField: false);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 8, 20).IsValid, Is.True, "influence anchor");
+            f.Step(1);
+            return f;
+        }
+
+        [Test]
         public void PlaceBuilding_MissingPrerequisite_IsRejectedPrerequisitesNotMet()
         {
             var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 26, 20).IsValid, Is.True, "non-Power influence anchor");
             f.SpawnBuilder(0, 19, 20);
 
             Assert.That(f.Construction.ValidatePlacement(0, 11, 20, 20), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet),
                 "a DefensePlatform requires a completed own Power plant");
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 30, 20).IsValid, Is.True);
             f.Step(1); // commit the balance (100 provided)
             Assert.That(f.Construction.ValidatePlacement(0, 11, 20, 20), Is.EqualTo(CommandResultCode.Applied));
         }
@@ -328,7 +472,7 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             f.SpawnBuilder(0, 19, 20);
             // Committed balance: HQ 30 provided, Refinery 20 required -> 10 free.
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True);
             Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 44, 40).IsValid, Is.True);
             f.Step(1); // let the economy recompute the balance
 
@@ -336,7 +480,7 @@ namespace Nova.Simulation.Tests
                 "VehicleFactory draws 25 but only 10 are free");
             Assert.That(f.Construction.ValidatePlacement(0, 6, 20, 20), Is.EqualTo(CommandResultCode.Applied),
                 "Storage draws 5 of the 10 free power");
-            Assert.That(f.Construction.ValidatePlacement(0, 5, 60, 60), Is.EqualTo(CommandResultCode.Applied),
+            Assert.That(f.Construction.ValidatePlacement(0, 5, 20, 20), Is.EqualTo(CommandResultCode.Applied),
                 "power-providing buildings are exempt from the rule");
         }
 
@@ -348,7 +492,7 @@ namespace Nova.Simulation.Tests
             // factions. With a completed HQ (30 provided, covering the 20
             // draw) the command path accepts it directly — the classic loop
             // start needs no Power plant first.
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ provides 30");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True, "HQ provides 30");
             f.Step(1); // commit the balance
             Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.Applied),
                 "no Power plant required (D-077)");
@@ -359,14 +503,14 @@ namespace Nova.Simulation.Tests
             f.Step(1); // commit 30 provided / 20 required
             // ... while the command path keeps enforcing it: the 10 free
             // power cannot cover a third Refinery's 20.
-            Assert.That(f.Construction.ValidatePlacement(0, 4, 30, 30), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
+            Assert.That(f.Construction.ValidatePlacement(0, 4, 20, 20), Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
         }
 
         [Test]
         public void SiteProgress_RequiresBuilderInReach_PausesWhenAway()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             EntityId builder = f.SpawnBuilder(0, 60, 60); // far away
             f.Step(1); // commit the balance
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True);
@@ -393,6 +537,8 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             // Low power: a completed Refinery draws 20 with nothing provided.
             Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 40, 40).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 6, 26, 20).IsValid, Is.True,
+                "Storage supplies influence without adding power");
             f.SpawnBuilder(0, 19, 20);
             Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True, "Power plant def 5, 150 ticks");
             f.Step(1);
@@ -413,13 +559,14 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role, Is.EqualTo(UnitRole.Power),
                 "the plant completes after exactly 300 low-power ticks");
             Assert.That(f.Construction.SiteCount, Is.EqualTo(0));
-            Assert.That(f.Construction.BuildingCount, Is.EqualTo(2));
+            Assert.That(f.Construction.BuildingCount, Is.EqualTo(3));
         }
 
         [Test]
         public void Completion_BecomesRoleEntity_PowerAppliesFromNextTick()
         {
             var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True, "HQ influence and 30 power");
             f.SpawnBuilder(0, 19, 20);
             Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True);
             uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
@@ -430,10 +577,10 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role, Is.EqualTo(UnitRole.Power));
             Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).CurrentHealth, Is.EqualTo(400),
                 "completion restores full HP");
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(0),
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(30),
                 "the economy ran before construction inside the completion tick");
             f.Step(1);
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(100),
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(130),
                 "power applies from the next economy recompute on");
         }
 
@@ -441,7 +588,7 @@ namespace Nova.Simulation.Tests
         public void ResearchLabCompletion_UnlocksT2()
         {
             var f = new Fixture(startingCredits: 3000);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True); // power
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True); // power
             Assert.That(f.Construction.PlaceCompletedBuilding(0, 7, 44, 40).IsValid, Is.True); // barracks prerequisite
             f.SpawnBuilder(0, 19, 20);
             f.Step(1);
@@ -481,7 +628,7 @@ namespace Nova.Simulation.Tests
             // down below 700 before the Refinery finishes can never earn
             // again — no Harvester, no Aetherium, no money for a Harvester.
             var f = new Fixture(startingCredits: 1000);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True,
                 "HQ provides the 30 power the Refinery draws from");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1); // commit the balance
@@ -511,10 +658,10 @@ namespace Nova.Simulation.Tests
             // the Refinery's footprint centre, ties resolved by index.
             var f = new Fixture(startingCredits: 1000, configure: eco =>
             {
-                Assert.That(eco.TryAddField(1, new GridPos2D(30, 30), 9000), Is.True);
+                Assert.That(eco.TryAddField(1, new GridPos2D(20, 24), 9000), Is.True);
                 Assert.That(eco.TryAddField(2, new GridPos2D(60, 60), 9000), Is.True);
             });
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ power");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True, "HQ power");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1);
 
@@ -523,7 +670,7 @@ namespace Nova.Simulation.Tests
 
             Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True, "the grant happened");
             Assert.That(harvester.HarvestFieldId, Is.EqualTo(1),
-                "field 1 at (30,30) is closer to the footprint centre (21,21) than field 2 at (60,60)");
+                "field 1 at (20,24) is closer to the footprint centre (21,21) than field 2 at (60,60)");
 
             f.Step(50);
             Assert.That(TryFindHarvester(f, 0, out harvester), Is.True);
@@ -534,17 +681,28 @@ namespace Nova.Simulation.Tests
         [Test]
         public void RefineryCompletion_WithoutFields_GrantedHarvesterCarriesNoOrder()
         {
-            var f = new Fixture(startingCredits: 1000);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            var f = new Fixture(startingCredits: 1000, configure: eco =>
+            {
+                Assert.That(eco.TryAddField(1, new GridPos2D(20, 24), 1), Is.True);
+            });
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True);
             f.SpawnBuilder(0, 19, 20);
+            EntityId temporaryHarvester = f.Entities.SpawnUnit(
+                0,
+                new Transform2D(SimFixed.FromInt(20), SimFixed.FromInt(24)),
+                SimFixed.FromInt(2),
+                role: UnitRole.Harvester);
+            f.Entities.GetUnitRef(temporaryHarvester).HarvestFieldId = 1;
             f.Step(1);
+            Assert.That(f.Economy.TryGetField(1, out AetheriumField field) && field.IsExhausted, Is.True);
+            Assert.That(f.Entities.DespawnUnit(temporaryHarvester), Is.True);
 
             Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True);
             f.Step(250);
 
             Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True);
             Assert.That(harvester.HarvestFieldId, Is.EqualTo(0),
-                "no field registered: the grant still happens, only the order is skipped");
+                "only exhausted fields remain: the grant still happens, only the order is skipped");
         }
 
         [Test]
@@ -553,9 +711,13 @@ namespace Nova.Simulation.Tests
             // #43 latch: the grant is derived from the unit store — a second
             // Refinery (or a rebuild) grants nothing while any own Harvester
             // lives. Before 16.1 EVERY completed Refinery handed one out.
-            var f = new Fixture(startingCredits: 3000);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ");
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True,
+            var f = new Fixture(startingCredits: 3000, configure: economy =>
+            {
+                Assert.That(economy.TryAddField(1, new GridPos2D(20, 24), 9000), Is.True);
+                Assert.That(economy.TryAddField(2, new GridPos2D(29, 24), 9000), Is.True);
+            });
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True, "HQ");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 30, 20).IsValid, Is.True,
                 "power plant: two Refineries overdraw the HQ's 30 alone");
             EntityId builderOne = f.SpawnBuilder(0, 19, 20);
             f.Step(1);
@@ -581,9 +743,13 @@ namespace Nova.Simulation.Tests
             // The latch is the dead-end insurance, not a once-per-match
             // counter: with every Harvester lost the next completed Refinery
             // grants again.
-            var f = new Fixture(startingCredits: 3000);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True);
+            var f = new Fixture(startingCredits: 3000, configure: economy =>
+            {
+                Assert.That(economy.TryAddField(1, new GridPos2D(20, 24), 9000), Is.True);
+                Assert.That(economy.TryAddField(2, new GridPos2D(29, 24), 9000), Is.True);
+            });
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 30, 20).IsValid, Is.True);
             EntityId builderOne = f.SpawnBuilder(0, 19, 20);
             f.Step(1);
 
@@ -634,7 +800,7 @@ namespace Nova.Simulation.Tests
         public void CancelConstruction_Refunds75Percent_AndFreesFootprint()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1); // commit the balance
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True); // 500 spent
@@ -657,7 +823,7 @@ namespace Nova.Simulation.Tests
         public void Sell_CompletedBuilding_Refunds50Percent_SiteIsNotSellable()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint raw = UnitCommandStateView.ToRawEntityId(barracks);
 
@@ -680,8 +846,10 @@ namespace Nova.Simulation.Tests
         {
             var f = new Fixture();
             EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "full-power repair rate");
             uint raw = UnitCommandStateView.ToRawEntityId(barracks);
-            f.Entities.GetUnitRef(barracks).CurrentHealth = 100;
+            f.Entities.GetUnitRef(barracks).CurrentHealth = 0;
+            f.Step(1);
 
             EntityId farBuilder = f.SpawnBuilder(0, 60, 60);
             uint farRaw = UnitCommandStateView.ToRawEntityId(farBuilder);
@@ -689,16 +857,160 @@ namespace Nova.Simulation.Tests
                 "validation checks role and damage, not reach");
             f.Construction.AssignRepairOrder(farRaw, raw);
             f.Step(10);
-            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(100),
+            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(0),
                 "out of reach: the order is held, not dropped");
 
             f.Entities.GetUnitRef(farBuilder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
             f.Step(10);
-            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(200),
+            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(100),
                 "10 HP per tick in reach (provisional rate)");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(975L),
+                "S(100)-S(0) charges exactly 25 AE");
             f.Step(50);
             Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(600),
                 "repair caps at MaxHealth and the order resolves");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(850L),
+                "repairing the full 0..Max health scale costs floor(500*30/100)=150 AE");
+            f.Entities.GetUnitRef(barracks).CurrentHealth = 590;
+            f.Step(1);
+            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(590),
+                "the order was removed when full and does not silently re-arm");
+        }
+
+        [Test]
+        public void Repair_CumulativeFloorTelescopesFromOddHealth()
+        {
+            var f = new Fixture();
+            EntityId power = f.Construction.PlaceCompletedBuilding(0, 5, 20, 20);
+            f.Entities.GetUnitRef(power).CurrentHealth = 37;
+            EntityId builder = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+            f.Construction.AssignRepairOrder(
+                UnitCommandStateView.ToRawEntityId(builder),
+                UnitCommandStateView.ToRawEntityId(power));
+
+            f.Step(37);
+
+            Assert.That(f.Entities.GetUnitRef(power).CurrentHealth, Is.EqualTo(400));
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(877L),
+                "135 - floor(135*37/400) = 123 AE with no per-tick rounding drift");
+        }
+
+        [Test]
+        public void Repair_LowPowerUsesFiveHp_AndZeroPriceBandStillHeals()
+        {
+            var f = new Fixture(configure: economy => economy.SetSlotFaction(0, FactionId.Legion));
+            EntityId defense = f.Construction.PlaceCompletedBuilding(0, 28, 20, 20);
+            f.Entities.GetUnitRef(defense).CurrentHealth = 6;
+            EntityId builder = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+            Assert.That(f.Economy.GetPlayerEconomy(0).IsLowPower, Is.True);
+            f.Construction.AssignRepairOrder(
+                UnitCommandStateView.ToRawEntityId(builder),
+                UnitCommandStateView.ToRawEntityId(defense));
+
+            f.Step(1);
+
+            Assert.That(f.Entities.GetUnitRef(defense).CurrentHealth, Is.EqualTo(11), "low power halves 10 HP to 5 HP");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L),
+                "S(6) and S(11) are both 1 AE, so the zero-price floor band still heals");
+
+            f.Step(100);
+            Assert.That(f.Entities.GetUnitRef(defense).CurrentHealth, Is.EqualTo(510));
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(911L));
+
+            var fullPower = new Fixture(configure: economy => economy.SetSlotFaction(0, FactionId.Legion));
+            EntityId fullPowerDefense = fullPower.Construction.PlaceCompletedBuilding(0, 28, 20, 20);
+            Assert.That(fullPower.Construction.PlaceCompletedBuilding(0, 22, 26, 20).IsValid, Is.True);
+            fullPower.Entities.GetUnitRef(fullPowerDefense).CurrentHealth = 6;
+            EntityId fullPowerBuilder = fullPower.SpawnBuilder(0, 19, 20);
+            fullPower.Step(1);
+            fullPower.Construction.AssignRepairOrder(
+                UnitCommandStateView.ToRawEntityId(fullPowerBuilder),
+                UnitCommandStateView.ToRawEntityId(fullPowerDefense));
+            fullPower.Step(51);
+
+            Assert.That(fullPower.Entities.GetUnitRef(fullPowerDefense).CurrentHealth, Is.EqualTo(510));
+            Assert.That(fullPower.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(911L),
+                "rate 5 and rate 10 telescope to the same S(Max)-S(6)=89 AE total");
+        }
+
+        [Test]
+        public void Repair_TwoReachableBuilders_HealAndDebitOnlyOnce()
+        {
+            var f = new Fixture();
+            EntityId target = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True);
+            f.Entities.GetUnitRef(target).CurrentHealth = 100;
+            EntityId first = f.SpawnBuilder(0, 19, 20);
+            EntityId second = f.SpawnBuilder(0, 19, 21);
+            f.Step(1);
+            uint targetRaw = UnitCommandStateView.ToRawEntityId(target);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(first), targetRaw);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(second), targetRaw);
+
+            f.Step(1);
+
+            Assert.That(f.Entities.GetUnitRef(target).CurrentHealth, Is.EqualTo(110));
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(998L),
+                "one target receives one S(110)-S(100) debit despite two reachable Builders");
+        }
+
+        [Test]
+        public void Repair_OutOfReachFirstOrder_DoesNotBlockReachableSecond()
+        {
+            var f = new Fixture();
+            EntityId target = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True);
+            f.Entities.GetUnitRef(target).CurrentHealth = 100;
+            EntityId far = f.SpawnBuilder(0, 60, 60);
+            EntityId near = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+            uint targetRaw = UnitCommandStateView.ToRawEntityId(target);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(far), targetRaw);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(near), targetRaw);
+
+            f.Step(1);
+
+            Assert.That(f.Entities.GetUnitRef(target).CurrentHealth, Is.EqualTo(110));
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(998L));
+        }
+
+        [Test]
+        public void Repair_InsufficientWinnerClaimsTarget_AndOtherTargetsContinue()
+        {
+            var f = new Fixture(startingCredits: 2);
+            EntityId hq = f.Construction.PlaceCompletedBuilding(0, 3, 20, 20);
+            EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 40, 20);
+            f.Entities.GetUnitRef(hq).CurrentHealth = 100;
+            f.Entities.GetUnitRef(barracks).CurrentHealth = 100;
+            EntityId firstHqBuilder = f.SpawnBuilder(0, 19, 20);
+            EntityId secondHqBuilder = f.SpawnBuilder(0, 19, 21);
+            EntityId barracksBuilder = f.SpawnBuilder(0, 39, 20);
+            f.Step(1);
+
+            uint hqRaw = UnitCommandStateView.ToRawEntityId(hq);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(firstHqBuilder), hqRaw);
+            f.Construction.AssignRepairOrder(UnitCommandStateView.ToRawEntityId(secondHqBuilder), hqRaw);
+            f.Construction.AssignRepairOrder(
+                UnitCommandStateView.ToRawEntityId(barracksBuilder),
+                UnitCommandStateView.ToRawEntityId(barracks));
+
+            f.Step(1);
+
+            Assert.That(f.Entities.GetUnitRef(hq).CurrentHealth, Is.EqualTo(100),
+                "the first reachable HQ order claims before its 4 AE spend fails");
+            Assert.That(f.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(110),
+                "a different target still processes in the same tick");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(0L));
+
+            Assert.That(f.Entities.DespawnUnit(firstHqBuilder), Is.True, "invalidate the previous winner");
+            f.Economy.GetPlayerEconomy(0).AddCredits(4);
+            f.Step(1);
+
+            Assert.That(f.Entities.GetUnitRef(hq).CurrentHealth, Is.EqualTo(110),
+                "the later same-target order stayed active and resumes after credits arrive");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(0L));
         }
 
         [Test]
@@ -727,7 +1039,7 @@ namespace Nova.Simulation.Tests
         public void DestroyedSite_AbortsWithoutRefund_AndFreesFootprint()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1); // commit the balance
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True);
@@ -745,6 +1057,7 @@ namespace Nova.Simulation.Tests
         public void Snapshot_Roundtrip_IsByteIdentical_AndTamperingIsRejected()
         {
             var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 12, 20).IsValid, Is.True, "influence anchor");
             EntityId builder = f.SpawnBuilder(0, 19, 20);
             Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True);
             EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 30, 30);
@@ -780,7 +1093,7 @@ namespace Nova.Simulation.Tests
         public void Snapshot_AssignedBuilderRoleViolation_IsRejectedWithoutMutation()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             f.SpawnBuilder(0, 19, 20);
             EntityId soldier = f.Entities.SpawnUnit(
                 0, new Transform2D(SimFixed.FromInt(50), SimFixed.FromInt(50)), SimFixed.FromInt(4),
@@ -817,7 +1130,7 @@ namespace Nova.Simulation.Tests
         public void ProgressSites_ReassignsNonBuilderAssignment_DefenseInDepth()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
             EntityId builder = f.SpawnBuilder(0, 19, 20);
             f.Step(1);
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True);

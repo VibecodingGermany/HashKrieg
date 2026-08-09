@@ -479,7 +479,7 @@ namespace Nova.SimRunner.Tests
                 if (tick == 40)
                 {
                     SubmitIntent(new PlaceBuildingPayload(refineryDef,
-                        (ushort)(slot == 0 ? 7 : 118), (ushort)(slot == 0 ? 4 : 116)));
+                        (ushort)(slot == 0 ? 8 : 118), (ushort)(slot == 0 ? 4 : 116)));
                 }
                 // The infantry marches at the enemy base: auto-acquisition
                 // (D-087) turns this into real combat ticks on the wire.

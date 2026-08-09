@@ -34,21 +34,24 @@ namespace Nova.Simulation.Construction
     /// <see cref="PlayerEconomyState.TrySpendCredits"/> (a refusal rejects
     /// the command with RejectedInsufficientResources before anything
     /// mutates). The state-dependent validation order is fixed and
-    /// deterministic: unknown definition, footprint outside the 128x128
-    /// grid or occupied cells (RejectedInvalidTarget), then missing
-    /// prerequisite role and the power rule (RejectedPrerequisitesNotMet).
+    /// deterministic: unknown/foreign definition; footprint outside the
+    /// 128x128 grid or occupied cells; then D-104 terrain, influence,
+    /// building-clearance and Aetherium-field geometry (all
+    /// RejectedInvalidTarget); then missing prerequisite role, the power rule
+    /// and site capacity (RejectedPrerequisitesNotMet).
     /// The power rule: a building with PowerRequired &gt; 0 may only be
     /// placed while the owner's last committed balance
     /// (previous tick's phase-2 recompute) covers the additional draw:
     /// PowerProvided - PowerRequired &gt;= PowerRequired of the new
     /// building. The Refinery carries NO prerequisite since D-077 (the
     /// classic loop start — quality/content/mvp-v1.json
-    /// startStatePerPlayer): placed through the command path it is gated
-    /// only by funds, footprint and the power rule. The remaining
+    /// startStatePerPlayer): placed through the command path it is gated by
+    /// funds, D-104 geometry and the power rule. The remaining
     /// prerequisite roles (VehicleFactory needs a Refinery, ResearchLab a
     /// Barracks, Radar and DefensePlatform a Power plant) are unchanged.
-    /// <see cref="PlaceCompletedBuilding"/> bypasses placement validation
-    /// entirely — it is the direct write the match start is placed with.
+    /// <see cref="PlaceCompletedBuilding"/> bypasses gameplay placement
+    /// validation entirely, including D-104 geometry — it is the direct write
+    /// deterministic match setup uses.
     /// </para>
     /// <para>
     /// Same-tick power stacking (documented, same precedent as the combat
@@ -99,10 +102,11 @@ namespace Nova.Simulation.Construction
     /// (floor) and despawns it; a running production queue on a sold or
     /// destroyed building is lost without refund (production domain).
     /// Repair assigns a Builder a standing repair order on an own completed
-    /// damaged building: in reach (same Chebyshev rule) the target gains
-    /// <see cref="RepairRateHpPerTick"/> HP per tick up to its MaxHealth,
-    /// where the order resolves; out of reach the order is HELD, never
-    /// dropped; Stop clears it. Repair is unaffected by low power.
+    /// damaged building. In reach (same Chebyshev rule) the target gains
+    /// <see cref="RepairRateHpPerTick"/> HP per tick, halved under low power,
+    /// and pays an exact cumulative integer share of 30% of its new price.
+    /// At most one reachable Builder may repair a target per tick; out-of-
+    /// reach orders are HELD, never dropped, and Stop clears them.
     /// </para>
     /// <para>
     /// State (snapshot block <see cref="SnapshotBlockIds.Construction"/>,
@@ -156,6 +160,22 @@ namespace Nova.Simulation.Construction
 
         /// <summary>Provisional repair rate in HP per tick per repairing Builder (Q-040 candidate).</summary>
         public const int RepairRateHpPerTick = 10;
+
+        /// <summary>Full rebuild-equivalent repair price as a percentage of the building's new price (D-104).</summary>
+        public const int RepairCostPercent = 30;
+
+        /// <summary>Maximum footprint-aware Chebyshev distance from an own construction anchor (D-104).</summary>
+        public const int BuildInfluenceRadiusCells = 8;
+
+        /// <summary>Minimum footprint-aware Chebyshev distance between construction footprints (D-104).</summary>
+        public const int MinimumBuildingDistanceCells = 2;
+
+        /// <summary>Allowed field-distance interval for a Refinery footprint (D-104).</summary>
+        public const int RefineryMinimumFieldDistanceCells = 1;
+        public const int RefineryMaximumFieldDistanceCells = 3;
+
+        /// <summary>Minimum field distance for every non-Refinery building footprint (D-104).</summary>
+        public const int MinimumNonRefineryFieldDistanceCells = 2;
 
         private struct SiteState
         {
@@ -314,10 +334,11 @@ namespace Nova.Simulation.Construction
         /// <summary>
         /// Full state-dependent placement validation in fixed order: unknown
         /// definition, foreign-faction definition, out-of-map footprint and
-        /// occupied cells (RejectedInvalidTarget), then prerequisite role,
-        /// power rule and site capacity (RejectedPrerequisitesNotMet). Cost
-        /// is the executor's separate check (RejectedInsufficientResources)
-        /// and runs BEFORE this.
+        /// occupied cells; then terrain, build influence, one-cell building
+        /// ring and field spacing (RejectedInvalidTarget); then prerequisite
+        /// role, power rule and site capacity
+        /// (RejectedPrerequisitesNotMet). Cost is the executor's separate
+        /// check (RejectedInsufficientResources) and runs BEFORE this.
         /// </summary>
         public CommandResultCode ValidatePlacement(byte playerSlot, ushort buildingDefId, int originX, int originY)
         {
@@ -334,6 +355,13 @@ namespace Nova.Simulation.Construction
                 return CommandResultCode.RejectedInvalidTarget;
             }
             if (!FootprintInsideMap(originX, originY) || !FootprintFree(originX, originY))
+            {
+                return CommandResultCode.RejectedInvalidTarget;
+            }
+            if (!FootprintIsWalkable(originX, originY)
+                || !IsInsideBuildInfluence(playerSlot, originX, originY)
+                || !HasMinimumBuildingSpacing(originX, originY)
+                || !HasValidFieldSpacing(def.Role, originX, originY))
             {
                 return CommandResultCode.RejectedInvalidTarget;
             }
@@ -446,11 +474,10 @@ namespace Nova.Simulation.Construction
         }
 
         /// <summary>
-        /// Match-setup placement of a COMPLETED building: bypasses cost,
-        /// prerequisite and power validation by contract (the only caller is
-        /// deterministic host content wiring — this is how the manifest's
-        /// starting HQ + Refinery and the start-refinery prerequisite
-        /// exception are honored). Applies the same completion effects as a
+        /// Match-setup placement of a COMPLETED building: bypasses cost and all
+        /// gameplay placement validation by contract, including D-104 terrain,
+        /// influence and spacing (callers are deterministic host content
+        /// wiring and explicit test setup). Applies the same completion effects as a
         /// finished site: building-role entity at full HP, footprint occupied,
         /// ResearchLab sets the T2 unlock. Returns EntityId.Invalid when the
         /// definition is unknown, the footprint is blocked or the placement
@@ -778,6 +805,15 @@ namespace Nova.Simulation.Construction
 
         private void ProcessRepairOrders()
         {
+            Span<uint> claimedTargets = stackalloc uint[MaxRepairOrders];
+            Span<byte> winningOrders = stackalloc byte[MaxRepairOrders];
+            winningOrders.Clear();
+            int claimedTargetCount = 0;
+
+            // Select winners from the tick-start state before any target is
+            // healed. This preserves later same-target orders even when the
+            // winner reaches full health, while still clearing targets that
+            // were already full when the tick began.
             for (int i = 0; i < MaxRepairOrders; i++)
             {
                 ref RepairOrderState order = ref _repairs[i];
@@ -785,7 +821,9 @@ namespace Nova.Simulation.Construction
 
                 EntityId builderId = UnitCommandStateView.ToEntityId(order.BuilderRaw);
                 EntityId targetId = UnitCommandStateView.ToEntityId(order.TargetRaw);
-                if (!_entityManager.IsValid(builderId) || !_entityManager.IsValid(targetId))
+                if (!_entityManager.TryGetUnit(builderId, out UnitState builder)
+                    || builder.Role != UnitRole.Builder
+                    || !_entityManager.TryGetUnit(targetId, out UnitState target))
                 {
                     order.IsActive = false;
                     continue;
@@ -798,22 +836,90 @@ namespace Nova.Simulation.Construction
                     continue;
                 }
 
-                ref UnitState target = ref _entityManager.GetUnitRef(targetId);
-                if (target.CurrentHealth >= target.MaxHealth)
+                if (!SimDefinitions.TryGetBuilding(
+                        _buildings[placementIndex].BuildingDefId,
+                        out _))
                 {
-                    order.IsActive = false; // fully repaired: the order resolves
+                    order.IsActive = false;
                     continue;
                 }
 
-                ref readonly UnitState builder = ref _entityManager.GetUnitRef(builderId);
+                if (target.CurrentHealth >= target.MaxHealth)
+                {
+                    order.IsActive = false; // fully repaired at tick start: the order resolves
+                    continue;
+                }
+
                 if (!IsInReachOfFootprint(in builder, _buildings[placementIndex].OriginX, _buildings[placementIndex].OriginY))
                 {
                     continue; // held, not dropped
                 }
 
-                int repaired = target.CurrentHealth + RepairRateHpPerTick;
-                target.CurrentHealth = repaired > target.MaxHealth ? target.MaxHealth : repaired;
+                // Once a damaged target has been claimed this tick, later
+                // reachable orders remain standing without paying or healing.
+                // The claim also survives an insufficient-credit refusal so
+                // order-table multiplicity can never multiply repair work.
+                bool alreadyClaimed = false;
+                for (int claimed = 0; claimed < claimedTargetCount; claimed++)
+                {
+                    if (claimedTargets[claimed] == order.TargetRaw)
+                    {
+                        alreadyClaimed = true;
+                        break;
+                    }
+                }
+                if (alreadyClaimed)
+                {
+                    continue;
+                }
+
+                claimedTargets[claimedTargetCount++] = order.TargetRaw;
+                winningOrders[i] = 1;
             }
+
+            for (int i = 0; i < MaxRepairOrders; i++)
+            {
+                if (winningOrders[i] == 0) continue;
+
+                ref RepairOrderState order = ref _repairs[i];
+                EntityId targetId = UnitCommandStateView.ToEntityId(order.TargetRaw);
+                int placementIndex = IndexOfBuilding(order.TargetRaw);
+                ref UnitState target = ref _entityManager.GetUnitRef(targetId);
+
+                SimDefinitions.TryGetBuilding(
+                    _buildings[placementIndex].BuildingDefId,
+                    out SimBuildingDefinition def);
+
+                ref PlayerEconomyState repairEco = ref _economy.GetPlayerEconomy(target.PlayerId);
+                int rate = repairEco.IsLowPower
+                    ? RepairRateHpPerTick / 2
+                    : RepairRateHpPerTick;
+                int healthBefore = Math.Max(0, target.CurrentHealth);
+                int healthAfter = Math.Min(target.MaxHealth, healthBefore + rate);
+
+                long fullRepairCost = (long)def.CostAE * RepairCostPercent / 100;
+                long paidBefore = RepairCostAtHealth(fullRepairCost, healthBefore, target.MaxHealth);
+                long paidAfter = RepairCostAtHealth(fullRepairCost, healthAfter, target.MaxHealth);
+                long tickCost = paidAfter - paidBefore;
+
+                if (tickCost > 0 && !repairEco.TrySpendCredits(tickCost))
+                {
+                    continue; // atomic refusal: no debit and no healing
+                }
+
+                target.CurrentHealth = healthAfter;
+                if (healthAfter >= target.MaxHealth)
+                {
+                    order.IsActive = false;
+                }
+            }
+        }
+
+        private static long RepairCostAtHealth(long fullRepairCost, int health, int maxHealth)
+        {
+            if (fullRepairCost <= 0 || health <= 0 || maxHealth <= 0) return 0;
+            if (health >= maxHealth) return fullRepairCost;
+            return fullRepairCost * health / maxHealth;
         }
 
         // ------------------------------------------------------------------
@@ -894,6 +1000,121 @@ namespace Nova.Simulation.Construction
         {
             int f = SimDefinitions.BuildingFootprintCells;
             return originX >= 0 && originY >= 0 && originX + f <= GridSize && originY + f <= GridSize;
+        }
+
+        private bool FootprintIsWalkable(int originX, int originY)
+        {
+            if (_costField == null) return true;
+
+            int f = SimDefinitions.BuildingFootprintCells;
+            for (int y = originY; y < originY + f; y++)
+            {
+                for (int x = originX; x < originX + f; x++)
+                {
+                    if (!_costField.IsWalkable((ushort)x, (ushort)y)) return false;
+                }
+            }
+            return true;
+        }
+
+        private bool IsInsideBuildInfluence(byte playerSlot, int originX, int originY)
+        {
+            for (int i = 0; i < MaxBuildings; i++)
+            {
+                ref readonly PlacementState placement = ref _buildings[i];
+                if (!placement.IsActive) continue;
+                if (!SimDefinitions.TryGetBuilding(placement.BuildingDefId, out SimBuildingDefinition def)) continue;
+                if (def.Role != UnitRole.HQ && def.Role != UnitRole.Storage && def.Role != UnitRole.Power) continue;
+
+                EntityId id = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+                if (FootprintDistance(originX, originY, placement.OriginX, placement.OriginY) <= BuildInfluenceRadiusCells)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool HasMinimumBuildingSpacing(int originX, int originY)
+        {
+            for (int i = 0; i < MaxSites; i++)
+            {
+                ref readonly SiteState site = ref _sites[i];
+                if (site.IsActive
+                    && FootprintDistance(originX, originY, site.OriginX, site.OriginY) < MinimumBuildingDistanceCells)
+                {
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < MaxBuildings; i++)
+            {
+                ref readonly PlacementState placement = ref _buildings[i];
+                if (!placement.IsActive) continue;
+                EntityId id = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                if (!_entityManager.IsValid(id)) continue;
+                if (FootprintDistance(originX, originY, placement.OriginX, placement.OriginY) < MinimumBuildingDistanceCells)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private bool HasValidFieldSpacing(UnitRole role, int originX, int originY)
+        {
+            bool refineryHasFieldInRange = false;
+            for (int i = 0; i < _economy.FieldCount; i++)
+            {
+                if (!_economy.TryGetFieldAtIndex(i, out AetheriumField field)) return false;
+                int distance = PointToFootprintDistance(field.GridPos.X, field.GridPos.Y, originX, originY);
+                if (distance == 0) return false;
+
+                if (role == UnitRole.Refinery)
+                {
+                    if (distance >= RefineryMinimumFieldDistanceCells
+                        && distance <= RefineryMaximumFieldDistanceCells)
+                    {
+                        refineryHasFieldInRange = true;
+                    }
+                }
+                else if (distance < MinimumNonRefineryFieldDistanceCells)
+                {
+                    return false;
+                }
+            }
+
+            return role != UnitRole.Refinery || refineryHasFieldInRange;
+        }
+
+        private static int PointToFootprintDistance(int pointX, int pointY, int originX, int originY)
+        {
+            int f = SimDefinitions.BuildingFootprintCells;
+            return RectangleDistance(
+                pointX, pointY, pointX, pointY,
+                originX, originY, originX + f - 1, originY + f - 1);
+        }
+
+        private static int FootprintDistance(int leftOriginX, int leftOriginY, int rightOriginX, int rightOriginY)
+        {
+            int f = SimDefinitions.BuildingFootprintCells;
+            return RectangleDistance(
+                leftOriginX, leftOriginY, leftOriginX + f - 1, leftOriginY + f - 1,
+                rightOriginX, rightOriginY, rightOriginX + f - 1, rightOriginY + f - 1);
+        }
+
+        private static int RectangleDistance(
+            int leftMinX, int leftMinY, int leftMaxX, int leftMaxY,
+            int rightMinX, int rightMinY, int rightMaxX, int rightMaxY)
+        {
+            int dx = leftMaxX < rightMinX
+                ? rightMinX - leftMaxX
+                : rightMaxX < leftMinX ? leftMinX - rightMaxX : 0;
+            int dy = leftMaxY < rightMinY
+                ? rightMinY - leftMaxY
+                : rightMaxY < leftMinY ? leftMinY - rightMaxY : 0;
+            return Math.Max(dx, dy);
         }
 
         private bool FootprintFree(int originX, int originY)
