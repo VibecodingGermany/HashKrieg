@@ -80,6 +80,30 @@ namespace Nova.AI.Data
         /// <summary>Infantry queued per decision tick while below the army cap.</summary>
         public int InfantryQueueBatch { get; }
 
+        // ---- target scoring ----
+        //
+        // Four weights over ONE integer score, no scalar quality function:
+        // this decides which visible enemy the army shoots at, it does not
+        // rate the AI. The enemy HQ is not in here on purpose — losing it
+        // decides the match (D-077), so it is the win condition and not a
+        // preference a weight could outvote.
+
+        /// <summary>
+        /// Weight on the damage the army actually lands: the counter table
+        /// resolved against the target's armor class, in integer percent
+        /// (100 == 1.00), averaged over the living combat units.
+        /// </summary>
+        public int TargetDamageWeight { get; }
+
+        /// <summary>Weight on how hard the target hits back — its own weapon damage, 0 for anything unarmed.</summary>
+        public int TargetThreatWeight { get; }
+
+        /// <summary>Weight on finishing wounded targets: percent of health already missing.</summary>
+        public int TargetFinishWeight { get; }
+
+        /// <summary>Penalty per cell of average Chebyshev distance between the army and the target.</summary>
+        public int TargetDistanceWeight { get; }
+
         public AiProfile(
             string profileId,
             ushort decisionTickInterval,
@@ -89,7 +113,11 @@ namespace Nova.AI.Data
             int harvesterQueueBatch,
             int targetArmySize,
             int attackSquadThreshold,
-            int infantryQueueBatch)
+            int infantryQueueBatch,
+            int targetDamageWeight,
+            int targetThreatWeight,
+            int targetFinishWeight,
+            int targetDistanceWeight)
         {
             ProfileId = profileId ?? string.Empty;
             DecisionTickInterval = decisionTickInterval;
@@ -100,6 +128,10 @@ namespace Nova.AI.Data
             TargetArmySize = targetArmySize;
             AttackSquadThreshold = attackSquadThreshold;
             InfantryQueueBatch = infantryQueueBatch;
+            TargetDamageWeight = targetDamageWeight;
+            TargetThreatWeight = targetThreatWeight;
+            TargetFinishWeight = targetFinishWeight;
+            TargetDistanceWeight = targetDistanceWeight;
         }
 
         /// <summary>
@@ -122,7 +154,11 @@ namespace Nova.AI.Data
             && HarvesterQueueBatch == other.HarvesterQueueBatch
             && TargetArmySize == other.TargetArmySize
             && AttackSquadThreshold == other.AttackSquadThreshold
-            && InfantryQueueBatch == other.InfantryQueueBatch;
+            && InfantryQueueBatch == other.InfantryQueueBatch
+            && TargetDamageWeight == other.TargetDamageWeight
+            && TargetThreatWeight == other.TargetThreatWeight
+            && TargetFinishWeight == other.TargetFinishWeight
+            && TargetDistanceWeight == other.TargetDistanceWeight;
 
         public override bool Equals(object obj) => obj is AiProfile other && Equals(other);
 
@@ -139,6 +175,10 @@ namespace Nova.AI.Data
                 hash = (hash * 397) ^ TargetArmySize;
                 hash = (hash * 397) ^ AttackSquadThreshold;
                 hash = (hash * 397) ^ InfantryQueueBatch;
+                hash = (hash * 397) ^ TargetDamageWeight;
+                hash = (hash * 397) ^ TargetThreatWeight;
+                hash = (hash * 397) ^ TargetFinishWeight;
+                hash = (hash * 397) ^ TargetDistanceWeight;
                 return hash;
             }
         }

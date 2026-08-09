@@ -118,7 +118,9 @@ namespace Nova.SimRunner.Tests
             var tuned = new AiProfile(
                 profileId: "legion-aggressive", decisionTickInterval: 10, placementSearchRadius: 6,
                 powerReserve: 20, targetHarvesters: 4, harvesterQueueBatch: 3,
-                targetArmySize: 20, attackSquadThreshold: 10, infantryQueueBatch: 4);
+                targetArmySize: 20, attackSquadThreshold: 10, infantryQueueBatch: 4,
+                targetDamageWeight: 12, targetThreatWeight: 8,
+                targetFinishWeight: 2, targetDistanceWeight: 5);
 
             var bound = new AiFactionProfile("Legion", tuned);
 
@@ -126,6 +128,8 @@ namespace Nova.SimRunner.Tests
             Assert.That(bound.TargetArmySize, Is.EqualTo(20));
             Assert.That(bound.Profile.DecisionTickInterval, Is.EqualTo((ushort)10),
                 "the cadence is tunable now — it used to be a const nobody could reach");
+            Assert.That(bound.Profile.TargetDamageWeight, Is.EqualTo(12),
+                "the target weights are tunable data too, not constants in the behaviour");
         }
 
         // ----------------------------------------------------------------

@@ -70,7 +70,11 @@ namespace Nova.AI
                 harvesterQueueBatch: shipped.HarvesterQueueBatch,
                 targetArmySize: targetArmySize,
                 attackSquadThreshold: attackSquadThreshold,
-                infantryQueueBatch: shipped.InfantryQueueBatch);
+                infantryQueueBatch: shipped.InfantryQueueBatch,
+                targetDamageWeight: shipped.TargetDamageWeight,
+                targetThreatWeight: shipped.TargetThreatWeight,
+                targetFinishWeight: shipped.TargetFinishWeight,
+                targetDistanceWeight: shipped.TargetDistanceWeight);
         }
 
         /// <summary>Binds a faction name to a fully specified profile — the tuning path.</summary>

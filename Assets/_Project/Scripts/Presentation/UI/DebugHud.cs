@@ -3,6 +3,7 @@
 using System;
 using System.Text;
 using UnityEngine;
+using Nova.AI.Data;
 using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Combat;
@@ -230,6 +231,14 @@ namespace Nova.Presentation.UI
             uint tick = _runner.Kernel != null ? _runner.Kernel.CurrentTick.Value : 0u;
             string state = _runner.IsRunning ? "running" : _runner.Kernel == null ? "not initialized" : "stopped";
             GUILayout.Label($"Nova graybox HUD — tick {tick} ({state}, 10 Hz lockstep)", _labelStyle);
+
+            // Which AI is this? The identifier changes whenever the skirmish AI
+            // behaves differently — profile numbers automatically, behaviour
+            // code through a hand-bumped revision that a test pins against the
+            // canonical match's end state. It exists so a screenshot, a lab
+            // report and an entry in the behaviour journal can be tied to each
+            // other without asking anybody what was built that day.
+            GUILayout.Label($"AI behaviour {AiBehaviorId.Value}", _labelStyle);
         }
 
         /// <summary>

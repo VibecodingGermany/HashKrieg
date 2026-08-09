@@ -37,7 +37,18 @@ namespace Nova.AI.Data
             harvesterQueueBatch: 2,
             targetArmySize: 12,
             attackSquadThreshold: 6,
-            infantryQueueBatch: 2);
+            infantryQueueBatch: 2,
+            // Target scoring (E7). These four are the first numbers here that
+            // are NOT a copy of a shipped constant — there was no scoring
+            // before, only "HQ, else the first visible building, else the
+            // first visible unit". They come from the plan's sketch
+            // (AiSimulationEnvironment.md section 4.6) and the four
+            // determinism baselines go red because of them; that is the
+            // change, not a defect.
+            targetDamageWeight: 10,
+            targetThreatWeight: 6,
+            targetFinishWeight: 3,
+            targetDistanceWeight: 4);
 
         /// <summary>
         /// The old <c>AiFactionProfile</c> constructor defaults (power margin
@@ -55,6 +66,12 @@ namespace Nova.AI.Data
             harvesterQueueBatch: 2,
             targetArmySize: 15,
             attackSquadThreshold: 8,
-            infantryQueueBatch: 2);
+            infantryQueueBatch: 2,
+            // Same weights as the shipped profile: there is no "legacy" value
+            // to preserve here, target scoring did not exist before E7.
+            targetDamageWeight: 10,
+            targetThreatWeight: 6,
+            targetFinishWeight: 3,
+            targetDistanceWeight: 4);
     }
 }
