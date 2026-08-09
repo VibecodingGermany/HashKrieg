@@ -4,7 +4,8 @@ namespace Nova.Presentation.UI
 {
     /// <summary>
     /// Shared runtime visual of the graybox HUD ground markers (selection
-    /// markers, placement ghost, rally flags): ONE generated 64x64 box
+    /// markers, placement ghost, rally flags, construction-site frames): ONE
+    /// generated 64x64 box
     /// texture (opaque border, translucent fill), ONE unlit transparent
     /// material and a factory for flat ground quads. Sharing keeps every
     /// marker in the scene on a single material/texture pair — the whole
@@ -17,14 +18,20 @@ namespace Nova.Presentation.UI
     /// HideAndDontSave and destroyed via <see cref="DestroyShared"/> from the
     /// owning components' OnDestroy — the project forbids hand-made material
     /// assets in this slice, and the lazy getters simply rebuild after a
-    /// teardown, so destruction order between the three consumers cannot
+    /// teardown, so destruction order between the four consumers cannot
     /// break anything.
     /// </para>
     /// </summary>
     internal static class GroundMarkerVisuals
     {
         private const int TextureSize = 64;
-        private const int BorderPixels = 6;
+        // Beta issue #49: 6 of 64 made the frame ~19% of the marker width —
+        // a bulky band that hid the unit body it was framing. 2 of 64 reads
+        // as a crisp outline at every zoom. This is texture-relative, not a
+        // screen-pixel promise: the on-screen thickness scales with the quad,
+        // and the ONE texture serves four consumers (selection, placement
+        // ghost, rally flag/line, construction-site frame).
+        private const int BorderPixels = 2;
 
         private static Texture2D _texture;
         private static Material _material;
@@ -94,7 +101,11 @@ namespace Nova.Presentation.UI
                 wrapMode = TextureWrapMode.Clamp
             };
             var border = new Color(1f, 1f, 1f, 0.95f);
-            var fill = new Color(1f, 1f, 1f, 0.28f);
+            // Beta issue #49 / half of #50: a 0.28 fill stacked into an opaque
+            // green carpet when selected units clumped. 0.10 keeps a faint
+            // footing tint (and the rally LINE, which is borderless at its
+            // width and reads through the fill alone) without burying bodies.
+            var fill = new Color(1f, 1f, 1f, 0.10f);
             for (int y = 0; y < TextureSize; y++)
             {
                 for (int x = 0; x < TextureSize; x++)
