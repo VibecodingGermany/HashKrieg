@@ -369,7 +369,7 @@ namespace Nova.SimRunner
             var economy = new EconomySystem(entities);
             var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new Nova.Simulation.Production.ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
+            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
             var combat = new CombatSystem(entities, fogOfWar, economy);
 
             // Canonical tick order (SimulationCore.md section 2): economy

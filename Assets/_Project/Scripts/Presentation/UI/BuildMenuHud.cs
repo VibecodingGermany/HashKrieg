@@ -114,6 +114,7 @@ namespace Nova.Presentation.UI
         private bool _siteLacksBuilder;
         private int _siteLacksBuilderFrame = -1;
         private string _hoveredBlockerReason;
+        private string _hoveredRadarHint;
         private string _transientNotice;
         private float _transientNoticeUntil;
 
@@ -287,17 +288,26 @@ namespace Nova.Presentation.UI
             float scale = Mathf.Max(1f, _uiScale);
             Vector2 guiMouse = HudLayout.RawMouseToGui(Input.mousePosition, scale);
             _hoveredBlockerReason = null;
+            _hoveredRadarHint = null;
             for (int i = 0; i < BuildableRoles.Length; i++)
             {
                 UnitRole role = BuildableRoles[i];
                 if (!SimDefinitions.TryGetBuilding(faction, role, out SimBuildingDefinition def)) continue;
-                if (IsAvailable(in def, slot, credits, construction)) continue;
 
                 var rect = new Rect(
                     buttonsRect.x + i * (buttonWidth + ButtonSpacing), buttonsRect.y, buttonWidth, _buttonHeight);
-                if (rect.Contains(guiMouse))
+                if (!rect.Contains(guiMouse)) continue;
+
+                if (!IsAvailable(in def, slot, credits, construction))
                 {
                     _hoveredBlockerReason = BlockerReason(role, in def, slot, credits, construction);
+                }
+                else if (role == UnitRole.Radar)
+                {
+                    // 16.5 (#54, C3): the button says in plain text what it
+                    // unlocks — the minimap is a Radar function now, and
+                    // losing the building takes the map away again.
+                    _hoveredRadarHint = "Radar: schaltet die Minimap frei — ohne Radar keine Karte";
                 }
             }
 
@@ -361,6 +371,7 @@ namespace Nova.Presentation.UI
         private string ResolveStatusLineText()
         {
             if (_hoveredBlockerReason != null) return _hoveredBlockerReason;
+            if (_hoveredRadarHint != null) return _hoveredRadarHint;
             if (_transientNotice != null && Time.unscaledTime < _transientNoticeUntil) return _transientNotice;
             if (_siteLacksBuilder) return ConstructionSiteStatus.NoBuilderWarning;
             if (!_hintDismissed && _runner.IsRunning) return HintText;

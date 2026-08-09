@@ -318,10 +318,12 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(64);
                 var pathfinding = new PathfindingSystem(64, 64);
                 var movement = new MovementSystem(entities, pathfinding);
-                var fog = new FogOfWarSystem(entities, teamCount: 2, 64, 64);
                 // Faction source for the combat weapon table: an unregistered
-                // economy state (all slots default to Alliance).
+                // economy state (all slots default to Alliance). 16.5: the
+                // FoW radar read also requires the placement register.
                 var factions = new EconomySystem(entities);
+                var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, factions);
+                var fog = new FogOfWarSystem(entities, construction, teamCount: 2, 64, 64);
                 var combat = new CombatSystem(entities, fog, factions);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));

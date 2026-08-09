@@ -18,6 +18,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
+  Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
+  solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im
+  Klartext („Radar: schaltet die Minimap frei — ohne Radar keine Karte"). Die
+  Radar-Abdeckung kommt vom Gebäude statt von jeder Einheit: nur ein fertiges
+  Radargebäude strahlt (Sichtweite × 2), `FogOfWarSystem` bekommt das
+  Bau-Register dafür als Pflicht-Abhängigkeit, und `GetRadarSignatures` wird
+  erstmals von der Präsentation konsumiert (signal-orange Pings: ein Zeichen,
+  kein Ziel). `GetTeamView` unverändert — Vertragsfläche des Einheitenstrangs.
+  Kein Baseline-Eingriff: die Pings sind eine abgeleitete Ansicht, kein
+  autorisierter Zustand
 - **#43: Der erste Sammler erntet von allein** — der Gratis-Sammler einer fertig
   gebauten Raffinerie bekommt seinen Ernteauftrag bei der Geburt: das nächstgelegene
   Feld mit Restreserve (deterministisch nach Index bei Gleichstand). Die Schenkung
@@ -100,6 +111,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
+  (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
+  Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei
+  jeder Änderung an der Simulation, in der die KI spielt — im ersten
+  Wirtschaftssprint riss das jedes Paket, ohne dass eine Zeile KI-Code berührt
+  war, und die im Test hinterlegte Prozedur schickte den falschen Strang ins
+  Verhaltensjournal. Entscheidungstick und Endzustand liegen jetzt in
+  `CanonicalAiOutcomeTests` beim Maintainer-Strang, die Kennung bleibt beim
+  Einheitenstrang. Die Diagnose bleibt erhalten: der neue Test liest die Kennung
+  mit und unterscheidet im Fehlertext zwischen KI- und Simulationsänderung. Neu
+  ist eine Zusicherung, die es vorher nicht gab — eine **unentschiedene** Partie
+  gilt als Defekt und nicht als verschobener Pin. Dazu bekommt
+  `tools/Nova.SimRunner.Tests/` erstmals eine Eigentümerzeile in der
+  Schreibhoheitstabelle: geteilt je Datei, fremde Testdateien nur nach Ansage.
 - **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
   Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
   zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8
