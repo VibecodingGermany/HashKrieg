@@ -43,8 +43,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   die **Kennung der Simulation** (Hash der Definitionstabelle plus die fünf
   Schemaversionen) — die Werte, an denen ungleiche Testbuilds auseinandergehen.
   Ohne Anzeige im Spiel ist die Forderung nach einer gesehenen Runde schwer zu
-  erfüllen. 562/562 SimRunner-Tests, Baseline-Dateien unberührt. **Im laufenden
-  Spiel nicht geprüft.**
+  erfüllen. 562/562 SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt — und
+  die Regel war dabei nicht erkennbar:** „Zielwahl nicht eindeutig erkennbar bis
+  dato". Wer in einer Schlacht mit zwölf Einheiten auf welches Ziel schiesst, ist
+  mit blossem Auge kaum auseinanderzuhalten. Sie ist gemessen und getestet, aber
+  nicht gesehen.
 - **KI-Profile als Datenschicht (`Nova.AI.Data`, Einheitenstrang):** Die
   Stellschrauben der Skirmish-KI lagen an zwei Orten — als Konstruktor-Defaults
   auf `AiFactionProfile` und als `const`-Felder in `SkirmishAiSystem`. Tunen
