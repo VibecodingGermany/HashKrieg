@@ -38,6 +38,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   kein Ziel). `GetTeamView` unverändert — Vertragsfläche des Einheitenstrangs.
   Kein Baseline-Eingriff: die Pings sind eine abgeleitete Ansicht, kein
   autorisierter Zustand
+- **#43: Der erste Sammler erntet von allein** — der Gratis-Sammler einer fertig
+  gebauten Raffinerie bekommt seinen Ernteauftrag bei der Geburt: das nächstgelegene
+  Feld mit Restreserve (deterministisch nach Index bei Gleichstand). Die Schenkung
+  greift jetzt nur noch, solange kein eigener Sammler lebt — vorher schenkte jede
+  zweite Raffinerie und jeder Wiederaufbau erneut. Der Latch wird aus dem
+  Einheitenbestand abgeleitet statt gespeichert (kein Formatbruch im
+  Wirtschaftsblock), und alle Fehlerwege der Schenkung — voller Entitätenspeicher,
+  fehlende Fraktionsdefinition, keine freie Zelle in acht Ringen — werden
+  protokolliert statt still verschluckt. Die Fahrt zum Feld übernehmen die
+  bestehenden Eskorten (Client `UpdateHarvesterEscort`, KI `SkirmishAiSystem`):
+  kein neuer Befehlstyp, kein neues Zustandsfeld
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
@@ -109,6 +120,20 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
+  (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
+  Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei
+  jeder Änderung an der Simulation, in der die KI spielt — im ersten
+  Wirtschaftssprint riss das jedes Paket, ohne dass eine Zeile KI-Code berührt
+  war, und die im Test hinterlegte Prozedur schickte den falschen Strang ins
+  Verhaltensjournal. Entscheidungstick und Endzustand liegen jetzt in
+  `CanonicalAiOutcomeTests` beim Maintainer-Strang, die Kennung bleibt beim
+  Einheitenstrang. Die Diagnose bleibt erhalten: der neue Test liest die Kennung
+  mit und unterscheidet im Fehlertext zwischen KI- und Simulationsänderung. Neu
+  ist eine Zusicherung, die es vorher nicht gab — eine **unentschiedene** Partie
+  gilt als Defekt und nicht als verschobener Pin. Dazu bekommt
+  `tools/Nova.SimRunner.Tests/` erstmals eine Eigentümerzeile in der
+  Schreibhoheitstabelle: geteilt je Datei, fremde Testdateien nur nach Ansage.
 - **Angeschlagene KI-Einheiten drehen ab (Einheitenstrang, KI-Verhalten `r4`):**
   Wer die KI angriff, merkte nichts davon — angeschlagene Einheiten kämpften bis
   zum letzten Lebenspunkt. Eine Einheit unter 60 % Leben, in deren Nähe (8

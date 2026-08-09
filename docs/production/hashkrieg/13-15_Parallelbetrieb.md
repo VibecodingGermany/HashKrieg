@@ -1,6 +1,6 @@
 # Parallelbetrieb Sprint 13–18 — zwei Stränge, eine Simulation
 
-**Version:** 1.3.0 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers und Strangverantwortliche | **Sprint:** 13–18 | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md), [16](16_Sprint_Wirtschaft.md), [18](18_Sprint_Befehl_und_Auswahl.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
+**Version:** 1.4.0 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers und Strangverantwortliche | **Sprint:** 13–18 | **Gilt für:** [13](13_Sprint_Netzpartie.md), [13B](13B_Sprint_Einheitenverhalten.md), [14](14_Sprint_Lobby.md), [15](15_Sprint_Netzstabilitaet.md), [16](16_Sprint_Wirtschaft.md), [18](18_Sprint_Befehl_und_Auswahl.md) | **Leitsatz:** getrennte Ordner sind billig, getrennte Determinismus-Zustände nicht
 
 ## Warum es dieses Dokument gibt
 
@@ -85,6 +85,7 @@ Freiraum.
 | `Scripts/Simulation/Replays/`, `Snapshots/` | **niemand ohne D-ID** | Speicherformat und Fingerprint — Änderung ist eine Inhaberentscheidung |
 | `Scripts/Simulation/State/` — **Layout und Serialisierung** | **niemand ohne D-ID** | Feldbestand, Feldreihenfolge, `StateVersion`, Blockformat. Das ist der Teil, der Snapshots und Replays unlesbar macht |
 | `Scripts/Simulation/State/` — **Befehlsanwendung** (`UnitCommandStateView`) | **Netzstrang** | mit D-095 aus dem Frost gelöst: *was* ein bestehender `CommandKind` in den Zustand schreibt, ist Verhalten, nicht Format. **Kein neuer `CommandKind`** — das Register bleibt eingefroren |
+| `tools/Nova.SimRunner.Tests/` | **geteilt — je Datei** | jeder Strang besitzt die Testdateien zu seinem Gegenstand. Änderungen an einer fremden Testdatei werden **vorher angesagt**. Zwei Pins sind namentlich zugeordnet: `SkirmishAiTests.AiBehaviorId_TracksWhichAiThisIs` gehört dem Einheitenstrang, `CanonicalAiOutcomeTests` dem Netzstrang (D-101) |
 | `CHANGELOG.md` | **serialisiert** | ein Eintrag pro PR, Konflikte löst der Mergende |
 | `docs/production/hashkrieg/` | **Maintainer** | Planungsstand; Befunde kommen per Mail oder Issue, nicht per PR |
 
@@ -107,7 +108,7 @@ D-095 schreibt diese bereits gelebte Linie nur auf.
 
 ### Vertragsflächen in fremdem Besitz
 
-Vier Flächen gehören einem Strang, werden aber vom anderen konsumiert. Dort gilt
+Fünf Flächen gehören einem Strang, werden aber vom anderen konsumiert. Dort gilt
 zusätzlich: **Verhalten ändern ja, Vertrag ändern nur nach Absprache.**
 
 | Fläche | Eigentümer | Konsument | Was ohne Absprache nicht geht |
@@ -115,6 +116,7 @@ zusätzlich: **Verhalten ändern ja, Vertrag ändern nur nach Absprache.**
 | `Pathfinding.CostField` | Einheitenstrang | `ConstructionSystem` (Platzierungsprüfung, Sprint 16) | Signatur oder Begehbarkeits-Semantik von `IsWalkable` ändern. Flow-Field-Erzeugung und Pathfinding-Interna sind frei |
 | `FogOfWarSystem.GetTeamView` | Netzstrang | `CombatSystem` (Zielerlaubnis) | Rückgabeform oder Sichtbarkeitsregel ändern, ohne den Einheitenstrang zu informieren |
 | `WeaponProfiles`-Slot `UnitRole.Unit` | Einheitenstrang | `ConstructionSystem` (Baustellen tragen heute diese Rolle) | Sprint 16 löst die Kopplung auf, indem die Baustelle `def.Role` statt `UnitRole.Unit` bekommt. Bis dahin gilt: der Fallback-Schaden von 15 ist **keine** Baustellenregel, sondern ein Nebeneffekt. Wer den Slot umwidmet, sagt es an |
+| `SkirmishAiTests.AiHost` / `BuildMatch` | Einheitenstrang | `CanonicalAiOutcomeTests` (Netzstrang) | Umbenennen oder Signatur ändern, ohne es anzusagen — der Ausgangspin baut darauf auf. Der Inhalt des Harness ist frei |
 | `UnitState.AttackTarget` | Einheitenstrang (`CombatSystem`) | `UnitCommandStateView` (`Stop` löscht es, Sprint 16) | das Feld **löschen** darf der Netzstrang. Eine Regel, *wann automatisch neu erfasst wird* (D-087, Auto-Zielerfassung), gehört dem Einheitenstrang. Ein „Feuer einstellen" ist deshalb kein Netzstrang-Paket |
 
 ## Neue Systeme — wer die Tick-Reihenfolge setzt
@@ -255,7 +257,8 @@ in Ordnung und ausdrücklich gewollt — es verlangt nur ein sauberes Modell.
 
 | | |
 |---|---|
-| **Zugang** | **Fork.** Kein Collaborator-Eintrag, kein Push auf dieses Repository, keine Mitgliedschaft in `trusted-coders` |
+| **Zugang** | **Fork** für den Code. Zusätzlich seit 2026-08-09 ein Collaborator-Eintrag auf der Stufe **Triage** — sie erlaubt ausschliesslich Issue-Verwaltung (zuweisen, labeln, schliessen) und **kein** Schreibrecht am Code. Kein Push auf dieses Repository, keine Mitgliedschaft in `trusted-coders` |
+| **Warum Triage** | Ohne Collaborator-Eintrag lässt GitHub niemanden als Assignee zu — Befunde, die ihn betreffen, waren nur per Erwähnung zuzustellen. Triage schliesst diese Lücke, ohne die Merge-Sperre zu berühren: die Branch Protection auf `main` beschränkt Pushes auf `@cubetribe` und `@travelhawk`, und Triage trägt ohnehin kein Schreibrecht |
 | **Beitrag** | ausschliesslich Pull Request vom Fork nach `main` |
 | **Merge** | nur `@cubetribe` (Dennis Westermann) und `@travelhawk` (Michael Falk). Die Push-Restriktion auf `main` erzwingt das strukturell |
 | **Review** | jeder PR braucht eine `APPROVED`-Review des jeweils anderen Maintainers auf dem aktuellen Head-Commit; bei Fremd-PRs prüft `external-contributor-review` zusätzlich CLA und explizite Maintainer-Freigabe und wird nach seinem ersten erfolgreichen Folge-PR-Lauf als Required Check geschaltet |
@@ -290,6 +293,8 @@ zusammen gespielt wurden, sind zwei Behauptungen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.4.0 | 2026-08-09 | **D-101:** `tools/Nova.SimRunner.Tests/` bekommt eine Eigentümerzeile — geteilt je Datei, fremde Testdateien nur nach Ansage. Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt: `CanonicalAiOutcomeTests` (Netzstrang) hält Entscheidungstick und Endzustand, `SkirmishAiTests` die Kennung. Der KI-Harness ist damit Vertragsfläche | Orchestrator |
+| 1.3.1 | 2026-08-09 | Zugangsmodell nachgezogen: der externe Beitragende erhält einen Collaborator-Eintrag auf der Stufe **Triage**, damit ihn Issues erreichen können. Der Code-Weg bleibt Fork-only, die Merge-Sperre unberührt | Orchestrator |
 | 1.3.0 | 2026-08-09 | **D-095:** Trennung von „Verhaltensraum" auf „Dateihoheit" umgestellt — Sprint 16 läuft parallel zu 13B statt dahinter. `Simulation/State/` in Layout (weiter eingefroren) und Befehlsanwendung (Eigentümer des jeweiligen Befehls) getrennt. Zwei Vertragsflächen ergänzt (`WeaponProfiles`-Slot `UnitRole.Unit`, `UnitState.AttackTarget`). Merge-Fenster auf einen Strang je Fenster verschärft. Abschnitte „Definitions-Hash" und „kanonische Startaufstellung an vier Stellen" ergänzt. Plattform-Abschnitt berichtigt: der Linux-Build existiert seit `e15f5e6`, die offene Bringschuld ist stattdessen ein `NovaBuildCommit`-Leser im Spiel | Orchestrator |
 | 1.2.2 | 2026-08-09 | Zwei Pfade nachgetragen, die der Einheitenstrang in der Praxis braucht und die die Tabelle nicht kannte: `tools/Nova.AiLab/` samt Tests (Messwerkzeug, kein Spielcode) und `Presentation/UI/DebugHud.cs` als ausdrückliche Ausnahme aus `Presentation/`. Beide Lücken lagen im Dokument, nicht im Verhalten des Beitragenden | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | Nach Prüfbefund des Einheitenstrangs: Schreibhoheitstabelle auf **vollständig** gezogen (zwölf bis dahin unzugeordnete Pfade ergänzt), `Simulation/Pathfinding/` dem Einheitenstrang zugewiesen, Abschnitt „Vertragsflächen in fremdem Besitz" (`CostField`, `GetTeamView`) und Abschnitt „Neue Systeme" ergänzt, der den Widerspruch zwischen Einordnungsregel und Schreibhoheit an `MatchRunner` auflöst; Linux-Build als Bringschuld des Netzstrangs festgehalten | Producer / Agent (Umsetzung) |
