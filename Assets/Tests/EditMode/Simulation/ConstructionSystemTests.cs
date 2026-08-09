@@ -461,6 +461,174 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Construction.IsT2Unlocked(0), Is.True);
         }
 
+        private static int CountUnits(Fixture f, byte slot, UnitRole role)
+        {
+            UnitState[] units = f.Entities.RawUnits;
+            int count = 0;
+            for (int i = 0; i < f.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role) count++;
+            }
+            return count;
+        }
+
+        [Test]
+        public void RefineryCompletion_GrantsTheFirstHarvesterFree()
+        {
+            // The dead end this closes: the Harvester costs 700 AE and the
+            // Refinery is its only producer since D-077. A player who spends
+            // down below 700 before the Refinery finishes can never earn
+            // again — no Harvester, no Aetherium, no money for a Harvester.
+            var f = new Fixture(startingCredits: 1000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "HQ provides the 30 power the Refinery draws from");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1); // commit the balance
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4 (Alliance, 700 AE, 200 ticks)");
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0), "none before completion");
+
+            f.Step(150);
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0), "not while the site is still running");
+            long creditsBefore = f.Economy.GetPlayerEconomy(0).AetheriumCredits;
+
+            f.Step(100); // past the 200-tick build time
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "a finished Refinery hands out its first Harvester");
+            Assert.That(CountUnits(f, 1, UnitRole.Harvester), Is.EqualTo(0),
+                "the grant belongs to the building's owner alone");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(creditsBefore),
+                "the grant is free: nothing is charged at completion");
+        }
+
+        [Test]
+        public void RefineryCompletion_GrantedHarvester_StartsWithNearestFieldOrder()
+        {
+            // #43: the granted Harvester is born with a standing harvest
+            // order on the NEAREST field with reserve left — measured from
+            // the Refinery's footprint centre, ties resolved by index.
+            var f = new Fixture(startingCredits: 1000, configure: eco =>
+            {
+                Assert.That(eco.TryAddField(1, new GridPos2D(30, 30), 9000), Is.True);
+                Assert.That(eco.TryAddField(2, new GridPos2D(60, 60), 9000), Is.True);
+            });
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ power");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4");
+            f.Step(250);
+
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True, "the grant happened");
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(1),
+                "field 1 at (30,30) is closer to the footprint centre (21,21) than field 2 at (60,60)");
+
+            f.Step(50);
+            Assert.That(TryFindHarvester(f, 0, out harvester), Is.True);
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(1),
+                "the standing order is held, not dropped, while the field is out of reach");
+        }
+
+        [Test]
+        public void RefineryCompletion_WithoutFields_GrantedHarvesterCarriesNoOrder()
+        {
+            var f = new Fixture(startingCredits: 1000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True);
+            f.Step(250);
+
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True);
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(0),
+                "no field registered: the grant still happens, only the order is skipped");
+        }
+
+        [Test]
+        public void RefineryCompletion_SecondRefinery_GrantsNothingWhileAHarvesterLives()
+        {
+            // #43 latch: the grant is derived from the unit store — a second
+            // Refinery (or a rebuild) grants nothing while any own Harvester
+            // lives. Before 16.1 EVERY completed Refinery handed one out.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True,
+                "power plant: two Refineries overdraw the HQ's 30 alone");
+            EntityId builderOne = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "first Refinery");
+            f.Step(250);
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1), "the first grant");
+
+            // The site auto-assigns the lowest-index own Builder, so the
+            // second site needs the only living builder in ITS reach.
+            Assert.That(f.Entities.DespawnUnit(builderOne), Is.True);
+            f.SpawnBuilder(0, 25, 20);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 26, 20), Is.True, "second Refinery");
+            f.Step(250);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "latched: the second Refinery grants nothing while the first Harvester lives");
+        }
+
+        [Test]
+        public void RefineryCompletion_AfterLosingEveryHarvester_TheGrantReArms()
+        {
+            // The latch is the dead-end insurance, not a once-per-match
+            // counter: with every Harvester lost the next completed Refinery
+            // grants again.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True);
+            EntityId builderOne = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True);
+            f.Step(250);
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True);
+
+            Assert.That(f.Entities.DespawnUnit(harvester.Id), Is.True, "every Harvester lost");
+            Assert.That(f.Entities.DespawnUnit(builderOne), Is.True);
+            f.SpawnBuilder(0, 25, 20);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 26, 20), Is.True, "second Refinery");
+            f.Step(250);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "no living Harvester: the grant fires again");
+        }
+
+        private static bool TryFindHarvester(Fixture f, byte slot, out UnitState harvester)
+        {
+            UnitState[] units = f.Entities.RawUnits;
+            for (int i = 0; i < f.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.Harvester)
+                {
+                    harvester = units[i];
+                    return true;
+                }
+            }
+            harvester = default;
+            return false;
+        }
+
+        [Test]
+        public void PlaceCompletedBuilding_Refinery_GrantsNothing_MatchStartIsUnchanged()
+        {
+            // PlaceCompletedBuilding is the match-start path (starting HQ plus
+            // Refinery). The grant deliberately hangs on finishing a site, not
+            // on instant placement — otherwise every match would begin with a
+            // free Harvester, which is a balance change nobody asked for.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 4, 20, 20).IsValid, Is.True);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0),
+                "an instantly placed Refinery grants nothing");
+        }
+
         [Test]
         public void CancelConstruction_Refunds75Percent_AndFreesFootprint()
         {

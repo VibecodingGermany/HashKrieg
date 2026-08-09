@@ -190,6 +190,7 @@ namespace Nova.Simulation.Construction
         private readonly PlacementState[] _buildings;
         private readonly RepairOrderState[] _repairs;
         private readonly bool[] _t2Unlocked;
+        private INovaLogger _logger = NullNovaLogger.Instance;
 
         // Derived occupancy cache (rebuilt from the placements on restore).
         private readonly byte[] _occupied;
@@ -217,7 +218,8 @@ namespace Nova.Simulation.Construction
 
         public void Initialize(SimulationKernel kernel)
         {
-            kernel?.Logger.LogInfo(
+            _logger = kernel?.Logger ?? NullNovaLogger.Instance;
+            _logger.LogInfo(
                 $"[{Name}] Initialized canonical construction ({GridSize}x{GridSize} grid, {MaxSites} sites, {MaxBuildings} placements).");
         }
 
@@ -671,7 +673,8 @@ namespace Nova.Simulation.Construction
         }
 
         /// <summary>
-        /// A finished Refinery hands out its first Harvester for free.
+        /// A finished Refinery hands out a Harvester for free — once per
+        /// living Harvester, not per Refinery.
         /// <para>
         /// Without it the opening can dead-end: the Harvester costs 700 AE and
         /// the Refinery is its only producer, so a player who spends down below
@@ -681,20 +684,50 @@ namespace Nova.Simulation.Construction
         /// that keeps the economy reachable from every spend order.
         /// </para>
         /// <para>
+        /// Sprint 16.1 (#43) changed two things. First, the LATCH: the grant
+        /// fires only while the owner has NO living Harvester — derived by an
+        /// ascending-index scan over the unit store, never stored (a counter
+        /// field would break the economy block's fixed per-slot layout). A
+        /// second Refinery or a rebuild grants nothing while any own Harvester
+        /// lives; losing every Harvester re-arms the grant, which is exactly
+        /// the dead-end insurance it exists for. Second, the ORDER: the
+        /// granted Harvester is born with a standing harvest order on the
+        /// nearest field with reserve left (measured from the footprint
+        /// centre), so the loop starts on its own — the economy holds the
+        /// order and the client/AI escort drives the legs. Same class of
+        /// direct state write as the push-out's <c>SetTarget</c>: no command
+        /// record, no new command kind.
+        /// </para>
+        /// <para>
         /// Deterministic by construction: it runs inside the construction phase
         /// in ascending site order, picks its cell with the same ring search as
         /// the push-out, and keeps no state of its own — the spawn either
         /// happens now or not at all. Nothing here survives a tick boundary, so
-        /// the snapshot layout is untouched.
+        /// the snapshot layout is untouched. Every failure path logs instead of
+        /// returning silently (the pre-16.1 behaviour that made a full entity
+        /// store or a walled-in Refinery indistinguishable from success).
         /// </para>
         /// </summary>
         private void GrantFoundingHarvester(byte ownerSlot, int originX, int originY)
         {
-            if (_entityManager.ActiveCount >= _entityManager.Capacity) return;
+            if (HasLivingHarvester(ownerSlot))
+            {
+                _logger.LogInfo(
+                    $"[{Name}] Refinery completed for slot {ownerSlot}: founding Harvester grant latched off (an own Harvester is alive).");
+                return;
+            }
+            if (_entityManager.ActiveCount >= _entityManager.Capacity)
+            {
+                _logger.LogWarn(
+                    $"[{Name}] Founding Harvester grant for slot {ownerSlot} FAILED: entity store is full ({_entityManager.Capacity}).");
+                return;
+            }
             if (!SimDefinitions.TryGetUnit(
                     _economy.GetSlotFaction(ownerSlot), UnitRole.Harvester,
                     out SimUnitDefinition harvester))
             {
+                _logger.LogWarn(
+                    $"[{Name}] Founding Harvester grant for slot {ownerSlot} FAILED: no Harvester definition for faction {_economy.GetSlotFaction(ownerSlot)}.");
                 return;
             }
 
@@ -704,15 +737,43 @@ namespace Nova.Simulation.Construction
             int centre = SimDefinitions.BuildingFootprintCells / 2;
             if (!TryFindPushOutCell(originX + centre, originY + centre, out int cellX, out int cellY))
             {
-                return; // hemmed in: the player buys the Harvester the normal way
+                _logger.LogWarn(
+                    $"[{Name}] Founding Harvester grant for slot {ownerSlot} FAILED: no free cell within {PushOutMaxRing} rings of the Refinery — the player buys the Harvester the normal way.");
+                return;
             }
 
-            _entityManager.SpawnUnit(
+            EntityId id = _entityManager.SpawnUnit(
                 ownerSlot,
                 new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
                 harvester.MoveSpeed,
                 maxHealth: harvester.MaxHealth,
                 role: harvester.Role);
+
+            if (_economy.TryFindNearestField(originX + centre, originY + centre, out ushort fieldId))
+            {
+                _entityManager.GetUnitRef(id).HarvestFieldId = fieldId;
+            }
+            else
+            {
+                _logger.LogInfo(
+                    $"[{Name}] Founding Harvester spawned for slot {ownerSlot} WITHOUT a field order: no field with reserve is registered.");
+            }
+        }
+
+        /// <summary>True while any own living Harvester exists (ascending-index scan, same pattern as <see cref="FindLowestIndexBuilder"/>).</summary>
+        private bool HasLivingHarvester(byte playerSlot)
+        {
+            UnitState[] units = _entityManager.RawUnits;
+            int capacity = _entityManager.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (unit.IsActive && unit.Role == UnitRole.Harvester && unit.PlayerId == playerSlot)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void ProcessRepairOrders()

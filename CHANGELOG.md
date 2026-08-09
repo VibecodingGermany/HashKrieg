@@ -18,6 +18,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Behoben
+- **#43: Der erste Sammler erntet von allein** — der Gratis-Sammler einer fertig
+  gebauten Raffinerie bekommt seinen Ernteauftrag bei der Geburt: das nächstgelegene
+  Feld mit Restreserve (deterministisch nach Index bei Gleichstand). Die Schenkung
+  greift jetzt nur noch, solange kein eigener Sammler lebt — vorher schenkte jede
+  zweite Raffinerie und jeder Wiederaufbau erneut. Der Latch wird aus dem
+  Einheitenbestand abgeleitet statt gespeichert (kein Formatbruch im
+  Wirtschaftsblock), und alle Fehlerwege der Schenkung — voller Entitätenspeicher,
+  fehlende Fraktionsdefinition, keine freie Zelle in acht Ringen — werden
+  protokolliert statt still verschluckt. Die Fahrt zum Feld übernehmen die
+  bestehenden Eskorten (Client `UpdateHarvesterEscort`, KI `SkirmishAiSystem`):
+  kein neuer Befehlstyp, kein neues Zustandsfeld
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
