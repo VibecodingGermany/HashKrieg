@@ -17,6 +17,41 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Hinzugefügt
+- **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
+  (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als
+  `Schaden × Leben / Feuerintervall` — ganzzahlig, eine Division, eine
+  festgeschriebene Abschneidung, unbewaffnet ergibt 0 ohne Sonderfall. Das neue
+  Profilfeld `waveStrengthPoints` (ausgeliefert 1200, **0 schaltet die Regel
+  aus**) ersetzt damit das Abzählen am Sammelpunkt. Der Anlass ist eine
+  Asymmetrie, die eine Kopfzahl nicht sehen kann: zwölf Allianz-Schützen wiegen
+  1.200 Punkte, zwölf Legions-Rekruten 528 — die Legion marschiert also mit
+  44 % der Angriffsstärke los, die dieselbe Regel der Allianz gibt, und das
+  steht in der Verlustspalte (51 gegen 23). Die r5-Regel wandert in Punkten
+  mit: der Schwellwert wird weiterhin gegen das gekappt, was die Produktion
+  noch liefern kann, damit ein Überlebender außerhalb des Rings die nächste
+  Welle nicht blockiert. **Mit der ausgelieferten Armeeobergrenze 12 ändert das
+  noch nichts** — die Punktklausel kann nur entscheiden, solange ein Kopf der
+  Obergrenze frei ist, also bei elf Schützen mit 1.100 Punkten gegen eine
+  Schwelle von 1.200. Der gepinnte Endzustand der kanonischen Partie in
+  `SkirmishAiTests` steht dadurch unverändert bei Tick 2.548 und
+  `0x14472B2B943ED2BB`; im KI-gegen-KI-Lauf des Labors ist die Partie
+  ebenfalls byteidentisch (Tick 5.773, `0x2B34B4E194257940`).
+  Das ist der Zweck dieses Schritts: Wellengröße und
+  Produktionsobergrenze hängen nicht mehr an derselben Zahl, bevor an dieser
+  Zahl gedreht wird. Im Labor einseitig gemessen: die Obergrenze **allein**
+  anzuheben macht die Legion schlechter (Verluste 51 → 64, Austausch 45 → 34),
+  mit dem Tor und Obergrenze 30 gewinnt derselbe Sitz und entscheidet schneller
+  als heute (Tick 5.005 gegen 5.773, 23 statt 51 eigene Verluste, Austausch 139
+  gegen 45). Das ist ausdrücklich keine Änderung dieses Eintrags — die
+  Obergrenze liegt als Literal in `MatchRunner` — und vor ihr gehört eine
+  Abbruchregel: die Aussetzzeit am Sammelpunkt steigt dabei von 3.502 auf
+  12.326 Einheit-Ticks je 1.000.
+  **Im laufenden Spiel gespielt:** kein sichtbarer Unterschied zum bisherigen
+  Verhalten, wie erwartet — bei der ausgelieferten Armeeobergrenze entscheidet
+  das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
+  sie belegt keine Verbesserung.
+
 ### Behoben
 - **Low Power ist eine Waffe (C4/D-030, Sprint 16.6)** — bei Energiedefizit
   fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
@@ -49,6 +84,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   protokolliert statt still verschluckt. Die Fahrt zum Feld übernehmen die
   bestehenden Eskorten (Client `UpdateHarvesterEscort`, KI `SkirmishAiSystem`):
   kein neuer Befehlstyp, kein neues Zustandsfeld
+- **#46: Produzierte Einheiten verlassen das Gebäude** — die Spawn-Suche des
+  `ProductionSystem` verankert am Footprint-Zentrum des Produktionsgebäudes
+  statt am Sammelpunkt; die fertige Einheit bekommt einen stehenden
+  Bewegungsbefehl auf den Sammelpunkt (direkter `SetTarget`-Schreibzugriff,
+  gleiche Klasse wie der Push-out — kein neuer Befehlstyp). Der Sammelpunkt
+  ist wieder ein Ziel statt eines Teleporters; Einheiten fahren aus dem
+  Gebäude heraus. Macht #57 (hohle Gebäude-Assets) sichtbarer — Art-Befund
+  für den GrayboxLog, kein Code-Eingriff
 - **#49: Auswahlrahmen und Füllung entschärft** — `GroundMarkerVisuals`: Rand von 6/64 auf 2/64 der Quad-Kante, Füll-Alpha von 0.28 auf 0.10; wirkt auf Auswahl-, Platzierungs-, Sammelpunkt- und Baustellenmarker zugleich und nimmt #50 (Einheit im Pulk nicht auffindbar) die verdeckende Füllung ab
 - **Die drei Laborschalter greifen nicht mehr in einer Netzpartie und nicht mehr
   im ausgelieferten Build:** `FogRevealDebug` und `MatchSpeedDebug` kamen aus dem
