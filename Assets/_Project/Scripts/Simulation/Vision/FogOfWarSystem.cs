@@ -25,8 +25,12 @@ namespace Nova.Simulation.Vision
     /// MS-1 sight model: pure radii — no blockers, heights, weather,
     /// stealth/detection or special per-unit sight logic. Radar produces
     /// minimap <see cref="RadarSignature"/> pings WITHOUT targeting
-    /// permission. MS-1 simplification: team index equals the player slot
-    /// (D-058 activates exactly two slots; allied shared sight is post-MS-1).
+    /// permission, and only from a COMPLETED Radar building (16.5, #54, C3):
+    /// the building is the radiator, its own sight radius times
+    /// <see cref="RadarRadiusMultiplier"/> is the coverage — no finished
+    /// Radar, no coverage. MS-1 simplification: team index equals the player
+    /// slot (D-058 activates exactly two slots; allied shared sight is
+    /// post-MS-1).
     /// </para>
     /// <para>
     /// Determinism (FogOfWar.md section 5): integer distance tests in stable
@@ -48,14 +52,16 @@ namespace Nova.Simulation.Vision
         public const int RecomputeIntervalTicks = 2;
 
         /// <summary>
-        /// Provisional radar coverage factor over the sight radius (Q-040
-        /// candidate: the MS-1 spec mandates radar pings but defines no radar
-        /// radius source; until ratification every unit radiates radar at
-        /// twice its sight radius).
+        /// Radar coverage factor over the building's sight radius (16.5,
+        /// #54, C3: only a COMPLETED Radar building radiates — the finished
+        /// building's own sight radius times this factor is the coverage.
+        /// The pre-16.5 rule, every unit radiating at twice its sight, is
+        /// gone together with its last caller contract).
         /// </summary>
         public const int RadarRadiusMultiplier = 2;
 
         private readonly EntityManager _entityManager;
+        private readonly Construction.ConstructionSystem _construction;
         private readonly byte[][] _masks;
         private readonly HashSet<int> _radarSeenCells = new HashSet<int>();
 
@@ -73,9 +79,16 @@ namespace Nova.Simulation.Vision
         /// <summary>False until the first recompute committed a view (all cells Unexplored).</summary>
         public bool HasCommittedView { get; private set; }
 
-        public FogOfWarSystem(EntityManager entityManager, int teamCount = 2, ushort width = 128, ushort height = 128)
+        /// <summary>
+        /// The construction system is a REQUIRED dependency since 16.5 (#54):
+        /// radar coverage derives from COMPLETED Radar placements, which only
+        /// its register can tell from sites and corpses. It is read-only here
+        /// (placement queries) and never ticked through this system.
+        /// </summary>
+        public FogOfWarSystem(EntityManager entityManager, Construction.ConstructionSystem construction, int teamCount = 2, ushort width = 128, ushort height = 128)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
+            _construction = construction ?? throw new ArgumentNullException(nameof(construction));
             if (teamCount < 1 || teamCount > MaxTeams)
             {
                 throw new ArgumentOutOfRangeException(nameof(teamCount), teamCount, $"Team count must be in [1, {MaxTeams}].");
@@ -191,6 +204,13 @@ namespace Nova.Simulation.Vision
         /// index, one ping per cell. Derived view over committed sight and
         /// current positions; not part of the authoritative state.
         /// <para>
+        /// Coverage (16.5, #54, C3): only a COMPLETED Radar building of the
+        /// team radiates, over the building's own sight radius times
+        /// <see cref="RadarRadiusMultiplier"/>. A Radar site, a destroyed one
+        /// and every other entity radiate nothing — without a finished Radar
+        /// the team has no coverage at all (and MinimapHud draws no map).
+        /// </para>
+        /// <para>
         /// Cadence (Q-040(j), provisional): pings derive from live 10 Hz
         /// positions and can fire before the first committed view — FogOfWar.md
         /// section 6.3 pins only the <see cref="VisionState.Visible"/> cadence
@@ -224,12 +244,15 @@ namespace Nova.Simulation.Vision
                 if (mask[cell] == (byte)VisionState.Visible) continue; // a target, not a ping
                 if (!_radarSeenCells.Add(cell)) continue; // one signature per cell
 
-                // Radar coverage: any own unit whose radar radius reaches the
-                // target's cell center (same cell-center rule as sight).
+                // Radar coverage: any own COMPLETED Radar building whose
+                // radar radius reaches the target's cell center (same
+                // cell-center rule as sight).
                 for (int j = 0; j < capacity; j++)
                 {
                     ref readonly UnitState observer = ref units[j];
                     if (!observer.IsActive || observer.PlayerId != team) continue;
+                    if (observer.Role != UnitRole.Radar) continue;
+                    if (!_construction.IsCompletedPlacement(UnitCommandStateView.ToRawEntityId(observer.Id))) continue;
 
                     SimFixed radarRadius = observer.SightRadius * SimFixed.FromInt(RadarRadiusMultiplier);
                     int ox = GridXOf(in observer);

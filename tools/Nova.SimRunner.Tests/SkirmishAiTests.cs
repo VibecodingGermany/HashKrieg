@@ -40,7 +40,8 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class SkirmishAiTests
     {
-        private const ulong Seed = 0xA17E57DE57UL;
+        /// <summary>Seed of the canonical AI match. Internal since D-101: CanonicalAiOutcomeTests pins its outcome.</summary>
+        internal const ulong Seed = 0xA17E57DE57UL;
         private const byte HumanSlot = 0;
         private const byte AiSlot = 1;
         private const ushort MapWidth = 128;
@@ -53,13 +54,13 @@ namespace Nova.SimRunner.Tests
         /// at tick 2242, so 6.000 ticks is a ~2.7x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
-        private const int EndToEndBudgetTicks = 6000;
+        internal const int EndToEndBudgetTicks = 6000;
 
         // ----------------------------------------------------------------
         // The AI host (mirror of MatchRunner's skirmish wiring)
         // ----------------------------------------------------------------
 
-        private sealed class AiHost
+        internal sealed class AiHost
         {
             public SimulationKernel Kernel;
             public EntityManager Entities;
@@ -164,7 +165,7 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
+            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
             var combat = new CombatSystem(entities, fogOfWar, economy);
             var victory = new VictorySystem(entities, construction);
 
@@ -253,7 +254,7 @@ namespace Nova.SimRunner.Tests
             }
         }
 
-        private static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
+        internal static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
         {
             AiHost host = BuildAiHost(seed, profile);
             ApplyOpeningPosition(host);
@@ -420,22 +421,29 @@ namespace Nova.SimRunner.Tests
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// Pins <see cref="AiBehaviorId"/> TOGETHER with what the AI actually
-        /// does. Either half alone is useless: the identifier's profile hash
-        /// catches changed numbers but never a changed rule, and the end state
-        /// catches a changed rule but does not know the identifier exists.
+        /// Pins <see cref="AiBehaviorId"/> — the identifier that says WHICH AI
+        /// this is. It carries the profile hash and the revision, so it catches
+        /// changed numbers, and the revision catches a changed rule that the
+        /// author declared.
         /// <para>
-        /// WHEN THIS GOES RED — and only then read on, because the failure
-        /// message is the procedure:
-        /// </para>
-        /// <list type="number">
-        /// <item>Was the behaviour change intended? If not, fix the code. The
-        /// test just told you the AI plays differently than you thought.</item>
-        /// <item>If it was: bump <c>AiBehaviorId.Revision</c>, add its line to
-        /// the history in that file, write the journal entry in
+        /// WHEN THIS GOES RED: the AI's profile numbers or its revision moved.
+        /// Bump <c>AiBehaviorId.Revision</c>, add its line to the history in
+        /// that file, write the journal entry in
         /// <c>tools/Nova.AiLab/reports/behavior-log.md</c> — measured values,
-        /// better AND worse — and only then update the numbers below.</item>
-        /// </list>
+        /// better AND worse — and only then update the string below.
+        /// </para>
+        /// <para>
+        /// THE OTHER HALF LIVES ELSEWHERE (D-101, 2026-08-09). This pin used to
+        /// also assert the decided tick and the end-state hash of the canonical
+        /// AI match. Those two numbers move on ANY simulation change, not only
+        /// on an AI change — every package of Sprint 16 tripped them — and the
+        /// procedure above then pointed the wrong strand at the wrong journal.
+        /// They now live in <c>CanonicalAiOutcomeTests</c>, which the maintainer
+        /// strand owns. The diagnosis stays intact because that test reads this
+        /// identifier: outcome moved AND identifier moved means the AI changed;
+        /// outcome moved and identifier unchanged means the simulation under it
+        /// changed.
+        /// </para>
         /// <para>
         /// This is NOT one of the four determinism baselines and must not be
         /// treated as one: those live in their own files and separate a
@@ -444,31 +452,24 @@ namespace Nova.SimRunner.Tests
         /// </para>
         /// </summary>
         [Test]
-        public void AiBehaviorId_TracksWhatTheAiActuallyDoes()
+        public void AiBehaviorId_TracksWhichAiThisIs()
         {
-            AiHost host = BuildMatch(Seed);
-            uint decided = host.RunUntilDecided(EndToEndBudgetTicks);
-            ulong endState = host.Kernel.CalculateStateHash();
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
-                    "the AI identifier changed — bump the revision and write the journal entry");
-
-                // r6 MOVED THE IDENTIFIER AND NOT THE MATCH, and that is worth
-                // one sentence rather than a shrug. The strength gate replaces
-                // the head count, but its threshold is capped at what
-                // production can still deliver — and with the shipped army cap
-                // at twelve that ceiling binds first on both seats (twelve
-                // Alliance riflemen ARE 1.200 points; twelve Legion recruits
-                // are 528 and the cap allows no thirteenth). So the gate ships
-                // decoupled and dormant, and the number it unblocks is a later
-                // PR's business. The day the cap rises, these two lines move.
-                Assert.That(decided, Is.EqualTo(2548u),
-                    "the AI decides the canonical match on a different tick than the pinned one");
-                Assert.That($"0x{endState:X16}", Is.EqualTo("0x14472B2B943ED2BB"),
-                    "same identifier, different end state: behaviour moved without the revision moving");
-            });
+            // r6 MOVED THE IDENTIFIER AND NOT THE MATCH, and that is worth one
+            // sentence rather than a shrug. The strength gate replaces the head
+            // count, but its threshold is capped at what production can still
+            // deliver — and with the shipped army cap at twelve that ceiling
+            // binds first on both seats (twelve Alliance riflemen ARE 1.200
+            // points; twelve Legion recruits are 528 and the cap allows no
+            // thirteenth). So the gate ships decoupled and dormant, and the
+            // number it unblocks is a later PR's business.
+            //
+            // That this is visible at all is what D-101 bought: the match
+            // numbers live in CanonicalAiOutcomeTests now. Identifier moved and
+            // outcome unmoved is exactly the "declared change, no effect yet"
+            // case — under the old coupled pin it was indistinguishable from a
+            // simulation change.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
+                "the AI identifier changed — bump the revision and write the journal entry");
         }
 
         // ----------------------------------------------------------------
