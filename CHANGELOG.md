@@ -18,6 +18,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Geändert
+- **KI-Profile als Datenschicht (`Nova.AI.Data`, Einheitenstrang):** Die
+  Stellschrauben der Skirmish-KI lagen an zwei Orten — als Konstruktor-Defaults
+  auf `AiFactionProfile` und als `const`-Felder in `SkirmishAiSystem`. Tunen
+  hiess damit Verhaltenscode editieren, und vier Werte (Kadenz, Suchradius,
+  beide Queue-Batches) waren von aussen gar nicht erreichbar. Sie liegen jetzt
+  vollständig in einem `AiProfile`. **Verhaltensneutral, und das ist der
+  Nachweis, nicht die Absicht:** Das ausgelieferte Profil `ms1-canonical` trägt
+  die bisherigen acht Zahlen wertgleich (Strommarge 0, Armee 12,
+  Angriffsschwelle 6, Harvester 2, Kadenz 20, Suchradius 8, Batches 2), die vier
+  Determinismus-Baselines bleiben grün, 561/561 SimRunner-Tests. Die Signatur
+  von `AiFactionProfile` und `SkirmishAiSystem` ist unverändert, damit
+  `MatchRunner` nicht angefasst werden muss. Zwei Vorarbeiten sind mit erledigt:
+  `AiFactionProfile` verglich bisher **nur den Fraktionsnamen**, sodass zwei
+  Profile mit gleichem Namen und verschiedenen Zahlen als gleich galten — was
+  erst beim Tunen auffällt, wo genau das der Regelfall ist; und `Nova.AI.Data`
+  steht auf `noEngineReferences: true`, ist also strukturell enginefrei statt
+  zufällig. Dazu zwei veraltete Behauptungen in der Klassendoku von
+  `SkirmishAiSystem`: GB-002 „kein Auto-Acquire" gilt seit D-087 nicht mehr, und
+  `SetRallyPoint` wird sehr wohl akzeptiert. Der Code galt, die Doku nicht.
 - **Die fertige Raffinerie stellt ihren ersten Sammler kostenlos hin.** Der
   Sammler kostet 700 AE und die Raffinerie ist seit D-077 sein einziger
   Produzent. Wer sich vor ihrer Fertigstellung unter 700 AE herunterbaut, hatte
