@@ -85,8 +85,9 @@ namespace Nova.Gameplay.Match
     /// quality/content/mvp-v1.json startStatePerPlayer): per slot ONLY a
     /// completed HQ, ONE Builder and 3.000 AE starting credits
     /// (EconomySystem.CanonicalMatchStartingCreditsAE, plumbed in by
-    /// <see cref="MatchRunner.InitializeMatch"/>'s default) —
-    /// plus one Aetherium field per slot. The Refinery is NO longer
+    /// <see cref="MatchRunner.InitializeMatch"/>'s default) — plus the five
+    /// finite canonical Aetherium fields (two starts, two expansions and the
+    /// contested centre). The Refinery is NO longer
     /// pre-placed: the player builds it (it has no Power-plant prerequisite
     /// since D-077), and the completed Refinery — not the HQ — produces the
     /// Harvesters.
@@ -94,9 +95,10 @@ namespace Nova.Gameplay.Match
     /// <para>
     /// It MIRRORS <c>Determinism10000Scenario.SetupMatch</c>
     /// (tools/Nova.SimRunner/Determinism10000Scenario.cs): identical seed,
-    /// identical map size, identical entity capacity, identical per-slot
-    /// layout AND identical spawn ORDER — field, HQ, Builder; slot 0 first,
-    /// then slot 1.
+    /// identical map size, identical entity capacity, identical field and
+    /// per-slot layout AND identical entity spawn order — HQ, Builder; slot 0
+    /// first, then slot 1. Fields register first in canonical id order but do
+    /// not allocate entity ids.
     /// The order is load-bearing: the <see cref="EntityManager"/> hands out
     /// entity ids from a deterministic free list, so any reordering shifts
     /// every id and therefore every state hash. An EditMode test asserts that
@@ -139,8 +141,32 @@ namespace Nova.Gameplay.Match
         /// <summary>Canonical scenario seed (DeterminismOptions.Seed). Required for InitialStateHash parity: the PRNG words are hashed into the kernel state block.</summary>
         public const ulong CanonicalSeed = 0xDE7E000000010271UL;
 
-        /// <summary>Aetherium reserve per field, in AE (Determinism10000Scenario.FieldReserveAE).</summary>
-        private const long FieldReserveAE = 2000000L;
+        /// <summary>One Aetherium field of the canonical map (16.7, C1).</summary>
+        private struct FieldLayout
+        {
+            public ushort Id;
+            public int X, Y;
+            public long ReserveAE;
+        }
+
+        /// <summary>
+        /// The five canonical fields (16.7, C1 — MVPContentManifest section 5,
+        /// mirror of Determinism10000Scenario.FieldLayouts): two start fields
+        /// and two natural expansions at 9.000 AE each, one contested centre
+        /// at 15.000. Symmetry is binding: every slot-1 coordinate is the
+        /// point mirror of slot 0 through the map centre ((x, y) -&gt;
+        /// (124 - x, 124 - y), the same mirror that maps HQ (4,4) to HQ
+        /// (120,120)), so both starts are equally far from their expansion
+        /// (36 cells) and from the centre (58).
+        /// </summary>
+        private static readonly FieldLayout[] FieldLayouts =
+        {
+            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+        };
 
         /// <summary>maxHealth stamped by SpawnUnit when no definition stats are applied.</summary>
         private const int SpawnDefaultMaxHealth = 100;
@@ -224,8 +250,26 @@ namespace Nova.Gameplay.Match
         /// <summary>Aetherium field cell of the human player (7, 7).</summary>
         public Vector2Int LocalFieldCell => new Vector2Int(LocalPlayerLayout.FieldX, LocalPlayerLayout.FieldY);
 
-        /// <summary>Aetherium field cell of the opponent (119, 119).</summary>
+        /// <summary>Aetherium field cell of the opponent (117, 117 since 16.7 — the exact centre mirror).</summary>
         public Vector2Int EnemyFieldCell => new Vector2Int(EnemyPlayerLayout.FieldX, EnemyPlayerLayout.FieldY);
+
+        /// <summary>
+        /// All five registered field cells in canonical id order: start 0/1,
+        /// expansion 0/1, contested centre. Presentation iterates this list so
+        /// marker and scatter geometry cannot silently omit a field.
+        /// </summary>
+        public Vector2Int[] AllFieldCells
+        {
+            get
+            {
+                var cells = new Vector2Int[FieldLayouts.Length];
+                for (int i = 0; i < FieldLayouts.Length; i++)
+                {
+                    cells[i] = new Vector2Int(FieldLayouts[i].X, FieldLayouts[i].Y);
+                }
+                return cells;
+            }
+        }
 
         /// <summary>Lower-left footprint origin of the human HQ (4, 4).</summary>
         public Vector2Int LocalHqOrigin => new Vector2Int(LocalPlayerLayout.HqOriginX, LocalPlayerLayout.HqOriginY);
@@ -655,7 +699,10 @@ namespace Nova.Gameplay.Match
 
             // Global slot order is load-bearing for entity ids and snapshots:
             // BOTH clients build slot 0 first, then slot 1, regardless of
-            // which one the relay assigned locally.
+            // which one the relay assigned locally. Field registration
+            // spawns nothing and therefore does not shift ids, but it is part
+            // of the hashed initial state and must happen in one fixed order.
+            SetupFields();
             SetupSlot(LocalLayout);
             SetupSlot(EnemyLayout);
         }
@@ -865,17 +912,29 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// One slot's D-077 start state: an Aetherium field, a completed HQ
-        /// and one Builder near it — nothing else. Spawn order mirrors
-        /// SetupMatch exactly (field, HQ, Builder).
+        /// Registers all five canonical fields in ascending id order. This is
+        /// the exact field pass mirrored by Determinism10000Scenario and both
+        /// CanonicalMatchSetupTests lanes.
+        /// </summary>
+        private void SetupFields()
+        {
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                FieldLayout field = FieldLayouts[i];
+                if (!Runner.Economy.TryAddField(field.Id, new GridPos2D(field.X, field.Y), field.ReserveAE))
+                {
+                    throw new InvalidOperationException($"[MatchBootstrap] field {field.Id} could not be registered");
+                }
+            }
+        }
+
+        /// <summary>
+        /// One slot's D-077 start state: a completed HQ and one Builder near
+        /// it — nothing else. Fields are registered globally by
+        /// <see cref="SetupFields"/>; entity spawn order remains HQ, Builder.
         /// </summary>
         private void SetupSlot(SlotLayout c)
         {
-            if (!Runner.Economy.TryAddField(c.FieldId, new GridPos2D(c.FieldX, c.FieldY), FieldReserveAE))
-            {
-                throw new InvalidOperationException($"[MatchBootstrap] field {c.FieldId} could not be registered");
-            }
-
             FactionId faction = Runner.Economy.GetSlotFaction(c.Slot);
             ushort hqDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.HQ);
 
@@ -933,13 +992,13 @@ namespace Nova.Gameplay.Match
             BuilderX = 13, BuilderY = 7,
         };
 
-        /// <summary>Opponent base, top-right: the 180-degree mirror of <see cref="LocalLayout"/>.</summary>
+        /// <summary>Opponent base, top-right: the exact centre mirror of <see cref="LocalLayout"/>.</summary>
         private static readonly SlotLayout EnemyLayout = new SlotLayout
         {
             Slot = EnemySlot,
-            FieldId = 2, FieldX = 119, FieldY = 119,
+            FieldId = 2, FieldX = 117, FieldY = 117,
             HqOriginX = 120, HqOriginY = 120,
-            BuilderX = 113, BuilderY = 119,
+            BuilderX = 111, BuilderY = 117,
         };
     }
 }

@@ -113,7 +113,11 @@ namespace Nova.Simulation.Economy
         /// <summary>Format capacity for Aetherium fields (map content: 5 fields in mvp-v1).</summary>
         public const int MaxFields = 64;
 
-        /// <summary>Provisional harvest rate in AE per tick per harvester (Q-040 candidate).</summary>
+        /// <summary>
+        /// Harvest rate in AE per tick per Harvester. D-102 deliberately keeps
+        /// the provisional value at 2 for 16.7 and defers calibration until a
+        /// played timing curve provides evidence.
+        /// </summary>
         public const int HarvestRateAE = 2;
 
         /// <summary>

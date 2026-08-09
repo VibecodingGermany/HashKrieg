@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.33.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.34.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -2992,6 +2992,52 @@ die Zusicherung dort schrumpft auf eine Zeile, der erklärende Kommentar
 verweist auf die neue Datei. Der Einheitenstrang ist zu informieren (Issue #75).
 Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
 
+---
+
+### D-102 | verbindlich | Sprint 16 (fünf endliche Aetheriumfelder; Ernterate getrennt kalibrieren)
+
+**Status:** Inhaberfreigabe vom 2026-08-09.
+
+**Kontext:** Die kanonische Glutrinne registriert bislang zwei Felder mit je
+2.000.000 AE. Ein Sammler könnte daran rund 28 Stunden ununterbrochen ernten;
+Expansion und Kartenmitte haben damit keinen wirtschaftlichen Zweck. Das
+MVP-Manifest nennt fünf Felder mit 9.000 beziehungsweise 15.000 AE, während
+`EconomySystem.HarvestRateAE = 2` ausdrücklich nur provisorisch ist. Für eine
+neue Ernterate existiert weder ein verbindlicher Zielwert noch gespielte
+Messung.
+
+**Alternativen:** (a) Feldlayout und Ernterate gleichzeitig nach Gefühl
+ändern; (b) die endlichen Manifestfelder liefern und die Rate unverändert
+lassen, bis eine gespielte Kurve kalibriert werden kann; (c) Knappheit bis zur
+vollständigen Balance-Runde vertagen und die praktisch endlosen Felder
+behalten.
+
+**Entscheidung:** (b). Die kanonische Karte registriert in dieser Reihenfolge:
+
+1. Start Slot 0 `(7,7)`, 9.000 AE;
+2. Start Slot 1 `(117,117)`, 9.000 AE;
+3. Expansion Slot 0 `(24,40)`, 9.000 AE;
+4. Expansion Slot 1 `(100,84)`, 9.000 AE;
+5. Zentrum `(62,62)`, 15.000 AE.
+
+Die Paarpositionen sind durch `(x,y) → (124-x,124-y)` punktgespiegelt. Felder
+werden vor den HQ-/Builder-Entitäten in aufsteigender ID-Reihenfolge
+registriert. `HarvestRateAE` bleibt für Paket 16.7 bei **2 AE/Tick**; ihre
+Kalibrierung ist sichtbar vertagt und nicht als erledigt zu melden.
+
+**Begründung:** Die Manifestreserven beheben den belegten
+Knappheitsdefekt, ohne eine unbelegte zweite Balancevariable zu verändern.
+Symmetrie verhindert einen Startvorteil, die feste Reihenfolge hält beide
+Lockstep-Hosts und den Headless-Harness identisch.
+
+**Konsequenzen:** Alle fünf Spiegel der Startaufstellung müssen gemeinsam
+ziehen; die Präsentation markiert und schützt alle fünf Felder vor
+Steinstreuung. Der Definitions-Hash und das Zustandsformat ändern sich nicht,
+der gehashte Initialzustand aber schon. Geschützte Determinismus-Baselines
+werden nur in einem getrennten Baseline-PR bewegt, falls der Guard dies
+verlangt. Die Ernteraten-Kalibrierung braucht eine gespielte Runde mit
+Zeitkurve und bleibt bis dahin offen.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3072,6 +3118,7 @@ Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.34.0 | 2026-08-09 | D-102 aufgenommen: fünf symmetrische endliche Aetheriumfelder werden geliefert, die mangels belastbarer Zielkurve unveränderte Ernterate von 2 AE/Tick wird ausdrücklich getrennt kalibriert | Project Owner / Agent |
 | 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
 | 1.1.0 | 2026-07-21 | D-006 (Unity 6.3 LTS + URP bestätigt) aus Sprint-1-Validierung | Lead Technical Director |

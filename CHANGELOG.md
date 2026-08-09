@@ -52,6 +52,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
   sie belegt keine Verbesserung.
 
+### Geändert
+- **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
+  zwei praktisch endlosen Startfelder werden durch zwei symmetrische
+  Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes
+  Zentrum mit 15.000 AE ersetzt. Alle fünf Startaufstellungs-Spiegel und die
+  Kartenmarker folgen derselben Reihenfolge; `HarvestRateAE` bleibt bewusst
+  bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
+
 ### Behoben
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,

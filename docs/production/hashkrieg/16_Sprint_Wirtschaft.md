@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.0.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.1.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -197,14 +197,16 @@ und erst damit wird 16.5 spürbar, weil ein Stromausfall die Minimap mitnimmt.
 |---|---|---|
 | Feldreserve | 2.000.000 AE (≈ 28 h ununterbrochene Ernte eines Sammlers) | Manifestwerte **9.000 / 15.000 AE** |
 | Feldanzahl | 2 (je Slot eins) | **5** — 2 Start, 2 Expansion, 1 umkämpftes Zentrum |
-| Ernterate | 2 AE/Tick, als Provisorium markiert | gegen die Zielkurve kalibriert |
+| Ernterate | 2 AE/Tick, als Provisorium markiert | **bleibt in 16.7 bei 2 AE/Tick**; gespielte Kalibrierung bewusst vertagt (D-102) |
 
 **Symmetrie ist Pflicht.** Beide Startpositionen müssen gleich weit zu Expansion
 und Zentrum liegen — sonst entscheidet die Karte das erste Mensch-gegen-Mensch-Match.
 
-Keiner der drei Zielwerte liegt in `SimDefinitions`: `FieldReserveAE` und die
-Feldpositionen stehen in `MatchBootstrap`, `HarvestRateAE` in `EconomySystem`.
-Der Definitions-Hash bewegt sich hier **nicht** — das tut nur 16.8.
+Feldreserven und Feldpositionen liegen nicht in `SimDefinitions`, sondern in
+der kanonischen Startaufstellung. D-102 trennt diese belegte
+Knappheitskorrektur ausdrücklich von der noch unbelegten Ernteraten-Kalibrierung;
+`HarvestRateAE` bleibt unverändert. Der Definitions-Hash bewegt sich hier
+**nicht** — das tut erst 16.8.
 
 **Fünf synchrone Stellen** (siehe Regelwerk, „kanonische Startaufstellung"):
 
@@ -329,8 +331,9 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 |---|---|---|
 | D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
+| D-102 | Fünf endliche, punktgespiegelte Aetheriumfelder; `HarvestRateAE` bleibt bis zur gespielten Kalibrierung bei 2 AE/Tick | Inhaber / Agent |
 
-D-096 und D-097 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
+D-096, D-097 und D-102 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
 (Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
 D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
 [Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
@@ -354,4 +357,5 @@ Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-09 | D-102 ergänzt: fünf endliche symmetrische Felder sind Paket 16.7; die Ernterate bleibt mangels gespielter Zielkurve ausdrücklich bei 2 AE/Tick und wird getrennt kalibriert | Project Owner / Agent |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |
