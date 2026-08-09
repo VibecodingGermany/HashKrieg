@@ -214,9 +214,10 @@ namespace Nova.Simulation.Construction
             _t2Unlocked = new bool[EconomySystem.MaxPlayers];
             _occupied = new byte[GridSize * GridSize];
             _costField = costField;
-            // 16.3 (#44): a site carries its definition role, so the power
-            // recompute can no longer skip sites by role — it skips them via
-            // this register instead. Bound here so no host can forget it.
+            // Bind the authoritative site register once so capacity scans
+            // exclude unfinished sites today and remain correct when #44
+            // changes sites from Unit to their definition role. Keeping the
+            // binding here means hosts cannot forget the dependency.
             _economy.BindSiteLookup(IsActiveSite);
         }
 
@@ -294,11 +295,12 @@ namespace Nova.Simulation.Construction
         }
 
         /// <summary>
-        /// True while the entity is an unfinished site (16.3, #44: sites now
-        /// carry their definition role, so role alone no longer tells a site
-        /// apart). Bound into the economy's power recompute via
-        /// <see cref="EconomySystem.BindSiteLookup"/>; also the read the
-        /// presentation layer needs to keep the site look until completion.
+        /// True while the entity is an unfinished site. Bound into the
+        /// economy's capacity scan via <see cref="EconomySystem.BindSiteLookup"/>
+        /// so sites never provide storage, including after #44 changes them
+        /// from <see cref="UnitRole.Unit"/> to their definition role. It is
+        /// also the read the presentation layer needs to keep the site look
+        /// until completion.
         /// </summary>
         public bool IsActiveSite(EntityId id)
         {

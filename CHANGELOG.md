@@ -64,7 +64,10 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   ist der „25 % Verlust bei Zerstörung" ohne Ereignis getragen — ein
   zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
   Verlust. Ausformung der Zerstörungsregel durch Inhaberentscheidung
-  (Zerfall statt Slot-gebundenem Einmalverlust)
+  (Zerfall statt Slot-gebundenem Einmalverlust). Der kanonische KI-Endzustand
+  bleibt bei Tick 2.546 entschieden und bewegt sich durch diese Wirtschaftsregel
+  von `0x9F93097AD526B6F7` auf `0xE784E6184AD16081`; die KI-Kennung bleibt
+  unverändert `r6.E34435F9`
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
   solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im

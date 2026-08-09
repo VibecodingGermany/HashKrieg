@@ -117,6 +117,11 @@ namespace Nova.SimRunner.Tests
                     new Transform2D(SimFixed.FromInt(11), SimFixed.FromInt(10)),
                     SimFixed.Zero,
                     role: UnitRole.Refinery);
+                Entities.SpawnUnit(
+                    owner,
+                    new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)),
+                    SimFixed.Zero,
+                    role: UnitRole.HQ);
                 return (UnitCommandStateView.ToRawEntityId(harvester), harvester);
             }
 

@@ -182,10 +182,10 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Construction-site lookup bound by the ConstructionSystem
-        /// constructor (16.3, #44): a site entity carries its definition role
-        /// now, so the power recompute needs the site's own register to tell
-        /// "unfinished" from "completed". Null in a rig without construction
-        /// — every building-role entity then counts, the pre-16.3 behaviour.
+        /// constructor. It keeps the capacity scan authoritative today and
+        /// after #44 changes site entities from Unit to their definition role.
+        /// Null in a rig without construction — every building-role entity
+        /// then counts.
         /// </summary>
         private Func<EntityId, bool> _isSiteLookup;
 
@@ -222,10 +222,10 @@ namespace Nova.Simulation.Economy
 
         /// <summary>
         /// Binds the construction site's own register as the "is this entity
-        /// an unfinished site" lookup (16.3, #44). Called ONCE by the
-        /// ConstructionSystem constructor — hosts never wire this themselves.
-        /// The lookup is read-only against the site table and moves no state
-        /// into the economy, so the snapshot layout is untouched.
+        /// an unfinished site" lookup. Called once by the ConstructionSystem
+        /// constructor — hosts never wire this themselves. The lookup is
+        /// read-only against the site table and moves no state into the
+        /// economy, so the snapshot layout is untouched.
         /// </summary>
         public void BindSiteLookup(Func<EntityId, bool> isSiteLookup)
         {
@@ -585,8 +585,9 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
-        /// One return order: deposits the full cargo at an own refinery in
-        /// reach (credits rise by exactly the cargo); holds out of reach.
+        /// One return order: empties the full cargo at an own refinery in
+        /// reach; credits rise only by the amount that fits below the derived
+        /// storage ceiling and overflow is forfeit. Holds out of reach.
         /// Clearing the returning flag alone resumes an auto-cycle, because
         /// the retained <see cref="UnitState.HarvestFieldId"/> is picked up by
         /// the harvest branch on the next tick. A command-issued return

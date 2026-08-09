@@ -192,6 +192,33 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void HarvesterDeposit_OverflowIsForfeitAtTheStorageCeiling()
+        {
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: 1995);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)), SimFixed.Zero,
+                role: UnitRole.HQ);
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(11), SimFixed.FromInt(10)), SimFixed.Zero,
+                role: UnitRole.Refinery);
+            EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
+            ref UnitState unit = ref entities.GetUnitRef(harvester);
+            unit.CargoAE = 10;
+            unit.IsReturningCargo = true;
+
+            kernel.StepTick();
+
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "only 5 of the 10 AE cargo fit below the HQ ceiling");
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0),
+                "overflow is forfeit, so the full cargo leaves the Harvester");
+            Assert.That(entities.GetUnitRef(harvester).IsReturningCargo, Is.False);
+        }
+
+        [Test]
         public void ReturnOrder_RefineryFootprintEdgeInReach_DepositsWithCentreTwoCellsAway()
         {
             // Regression for the GB-004 deposit fix: the construction path

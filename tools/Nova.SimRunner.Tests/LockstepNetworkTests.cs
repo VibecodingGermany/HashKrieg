@@ -1964,8 +1964,9 @@ namespace Nova.SimRunner.Tests
             // drive helper permits the normal input-delay pipeline lead, so
             // aiming at 49 could already have crossed tick 50 on one end.
             Drive(server, clientA, clientB, hostA, hostB, 25);
-            ref PlayerEconomyState divergentEconomy = ref hostB.Economy.GetPlayerEconomy(0);
-            divergentEconomy.AddCredits(1);
+            ref UnitState divergentBuilder = ref hostB.Entities.GetUnitRef(
+                UnitCommandStateView.ToEntityId(hostB.BuilderRaw));
+            divergentBuilder.CurrentHealth -= 1;
             Drive(server, clientA, clientB, hostA, hostB, 50);
             PumpUntil(server, clientA, clientB,
                 () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
