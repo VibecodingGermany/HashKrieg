@@ -20,9 +20,44 @@ Ergebnisse:
 - Windows x64: `Builds/dist/ProjectNova-win-x64-<commit>.zip`
 - Linux x64: `Builds/dist/ProjectNova-linux-x64-<commit>.tar.gz`
 
-Wer die Pakete an Testende gibt, schickt die
-[Betatest-Anleitung](../../docs/production/Betatest.md) mit. Sie erklärt
-Installation, Commit-Prüfung, bewusste Lücken und den Rückmeldeweg.
+## Das Testpaket — eine Datei für Testende
+
+Für Menschen, die keinen Bock auf Plattformwahl haben, schnürt ein viertes
+Skript aus dem macOS- und dem Windows-Ergebnis **ein** Paket samt Anleitung:
+
+```bash
+tools/packaging/build-mac.sh
+tools/packaging/build-windows.sh
+tools/packaging/build-testpaket.sh
+```
+
+Ergebnis: `Builds/dist/Hashkrieg-Test-<commit>.zip` (~336 MB)
+
+```text
+Hashkrieg-Test-<commit>/
+  ANLEITUNG - ZUERST LESEN.txt
+  PROMPT FUER CHATGPT.txt
+  BUILD.txt
+  macOS/ProjectNova-<commit>.dmg
+  Windows/ProjectNova.exe + Daten
+```
+
+Die beiden Textdateien liegen unter `tools/packaging/testpaket/` und werden
+beim Schnüren hineinkopiert. Wer die Anleitung ändert, ändert sie **dort** —
+nicht in einem verschickten ZIP.
+
+Zwei Eigenheiten, die im Skript stecken:
+
+- **Der Commit kommt aus dem Artefakt, nicht aus `HEAD`.** Sonst verlangt eine
+  geänderte Textdatei einen Neubau des ganzen Spiels. Weicht `HEAD` ab, sagt
+  das Skript es — als Hinweis, nicht als Abbruch.
+- **Der macOS-Stempel wird aus dem gemounteten DMG gelesen**, nicht aus dem
+  Dateinamen. Ein umbenanntes DMG fällt sonst nicht auf. Die Notarisierung
+  übersteht das äußere ZIP unbeschadet; das Ticket liegt in der Datei, nicht
+  in einem erweiterten Attribut.
+
+Der ausführliche Rahmen — Verteilkreis, Rückmeldeweg, Kadenz — steht in der
+[Betatest-Anleitung](../../docs/production/Betatest.md).
 
 ## Optionen
 
@@ -144,6 +179,7 @@ protokolliert werden. Die Skripte liefern nur das zuordenbare Artefakt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 3.1.0 | 2026-08-09 | `build-testpaket.sh` ergänzt: macOS und Windows in einem ZIP samt Anleitung und ChatGPT-Prompt, Commit aus dem Artefakt statt aus `HEAD`, DMG-Stempel aus dem gemounteten Abbild geprüft | Project Nova Team |
 | 3.0.0 | 2026-08-09 | Windows-x64-Build als `zip` mit Commit-Stempel und LIESMICH ergänzt; fehlendes Hub-Modul und SmartScreen-Warnung benannt; Verweis auf die Betatest-Anleitung | Project Nova Team |
 | 2.0.0 | 2026-08-08 | Linux-x64-Build, Commit-Stempel und `tar.gz`-Verteilung ergänzt; offene Netzabnahmen ehrlich benannt | Project Nova Team |
 | 1.0.0 | 2026-08-08 | macOS-Build-, Signatur-, Notarisierungs- und DMG-Weg dokumentiert | Project Nova Team |

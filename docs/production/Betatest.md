@@ -132,21 +132,39 @@ Nicht „das Spiel ist gut". Sondern das hier:
 „Ich hab dreimal auf die Kaserne geklickt und nichts passierte" ist Gold.
 „Ihr solltet das UI überarbeiten" können wir nicht nachbauen.
 
-## Wie du zurückmeldest
+## Wie du zurückmeldest — laut denken, ChatGPT sortiert
 
-**Sprachnachricht ist ausdrücklich erwünscht** — so lang du willst, ungeschnitten,
-gerne beim Spielen mitgesprochen. Wir transkribieren das hier.
+Du sollst nichts aufschreiben und nichts sortieren. Du sollst reden.
 
-Sag am Anfang einmal:
+1. **Handy neben die Tastatur.** ChatGPT öffnen, **neuen** Chat starten.
+2. Den Text aus `PROMPT FUER CHATGPT.txt` einmal komplett hineinkopieren und
+   abschicken. ChatGPT bestätigt kurz und wartet dann.
+3. **Spielen und dabei reden.** Alles, was dir auffällt, als Sprachnachricht in
+   genau diesen Chat. Ruhig zehn Minuten am Stück, halbe Sätze, Flüche,
+   Gemurmel — der Prompt ist darauf ausgelegt.
+4. Wenn du fertig bist: **FERTIG** in den Chat schreiben.
+5. ChatGPT baut daraus einen sortierten Bericht. Den **komplett kopieren** und
+   uns schicken.
 
-- Welchen Build (siehe oben) und welches Betriebssystem
-- Ob es die erste Runde war oder die dritte
+Der Prompt hält ChatGPT dabei an drei Dinge, die uns die Arbeit abnehmen: Es
+trennt, was du **gesehen** hast, von dem, was du **vermutest**; es erfindet
+nichts dazu; und es schreibt am Ende ausdrücklich hin, wozu **nichts** kam,
+statt die Lücke stillschweigend wegzulassen.
 
-Danach einfach erzählen. Wenn du lieber tippst: ein GitHub-Issue über
-**Fehler melden** tut es genauso.
+Wer lieber tippt, benutzt denselben Prompt mit getippten Nachrichten. Wer gar
+kein ChatGPT will, schickt die rohe Sprachnachricht — wir transkribieren hier.
 
-Screenshots und kurze Videos helfen enorm — vor allem bei allem, was mit
-„das sah komisch aus" anfängt.
+### Screenshots
+
+| | Windows | macOS |
+|---|---|---|
+| Ganzer Bildschirm | `Win` + `Druck` → `Bilder\Screenshots` | `Cmd`+`Shift`+`3` → Schreibtisch |
+| Ausschnitt | `Win`+`Umschalt`+`S` | `Cmd`+`Shift`+`4` |
+| Video | `Win`+`Alt`+`R` → `Videos\Captures` | `Cmd`+`Shift`+`5` |
+
+**Sag im selben Moment laut, worum es geht** — „Screenshot: hier hängt die
+Bauleiste". Sonst liegen am Ende vierzig Bilder da, und bei der Hälfte weiß
+niemand mehr, warum.
 
 ## Wenn es abstürzt
 
@@ -177,7 +195,9 @@ im Umlauf jede Fehlermeldung wertlos macht.
 
 | | |
 |---|---|
-| **Kanal** | Paket über den Drive-Ordner, Anleitung als Kopie von Teil A dazu |
+| **Was** | `Builds/dist/Hashkrieg-Test-<commit>.zip` — beide Plattformen, Anleitung und Prompt liegen darin. Eine Datei, keine Plattformfrage an den Empfänger |
+| **Gebaut mit** | `build-mac.sh` → `build-windows.sh` → `build-testpaket.sh`, siehe [tools/packaging/README.md](../../tools/packaging/README.md) |
+| **Kanal** | Drive-Ordner |
 | **Empfängerkreis** | namentlich bekannt, ein bis zwei Personen. Kein offener Link |
 | **Kein CLA nötig** | Testende tragen keinen Code bei. Schickt jemand später Code, greift der normale Weg aus [CONTRIBUTING.md](../../CONTRIBUTING.md) |
 | **Kein Repo-Zugang** | Ein Tester braucht weder Fork noch Collaborator-Eintrag. Das Zugangsmodell aus [13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md) bleibt unberührt |
@@ -215,28 +235,36 @@ Mit Testenden im Umlauf bekommt diese Regel Kosten. Zwei Konsequenzen:
 
 ## Wohin die Befunde gehen
 
-| Art des Befunds | Ziel |
+Der ChatGPT-Bericht kommt bereits sortiert an. Seine Abschnitte bilden auf
+unsere Ablage ab:
+
+| Abschnitt im Bericht | Ziel |
 |---|---|
-| Reproduzierbarer Fehler | GitHub-Issue (`Fehler melden`) |
-| Gefühl, Fluss, Balance, „fühlte sich falsch an" | [GrayboxLog](GrayboxLog.md) als Sitzungseintrag mit Commit |
-| Fehlender Umfang | [ScopeLedger](ScopeLedger.md), nicht als Bug |
-| Alles aus Sprachnachrichten | erst transkribieren, dann auf die drei Zeilen oben verteilen. Die Rohtranskription ist kein Ablageort |
+| 3 · Fehler und Merkwürdigkeiten | GitHub-Issue (`Fehler melden`), eine Zeile = ein Issue |
+| 1, 2, 4, 5 · Einstieg, Hänger, Gefühl, Erwartung | [GrayboxLog](GrayboxLog.md) als Sitzungseintrag mit Commit |
+| 6 · Technik | Issue, wenn reproduzierbar; sonst GrayboxLog |
+| 7 · Vermutungen und Wünsche | [ScopeLedger](ScopeLedger.md), nicht als Bug. **Nie ungeprüft in ein Issue** |
+| 9 · Wozu nichts kam | Hinweis für die nächste Runde, welche Frage offen blieb |
+
+Abschnitt 7 ist der, an dem Disziplin nötig ist: Wünsche eines Testenden lesen
+sich wie Befunde, sind aber Deutung. Genau dafür trennt der Prompt sie.
 
 Ein Befund ohne Commit ist eine Anekdote. Das gilt für Testende genauso wie für
 uns.
 
 ## Offene Punkte
 
-- Windows-Build-Modul (`windows-mono`) ist auf der Arbeitsmaschine **nicht
-  installiert** — ohne das gibt es kein Windows-Paket. Siehe
-  [tools/packaging/README.md](../../tools/packaging/README.md).
 - Der Windows-Player wurde nie gestartet. Der erste Testende ist gleichzeitig
   der erste Beweis, dass er läuft.
 - Ob das Betatest-Programm eine eigene D-ID braucht, ist offen. Es verteilt
   Binaries an Externe, berührt aber weder Verträge noch Simulation.
+- Das Rückmeldeverfahren ist ungetestet. Ob eine zehnminütige Sprachnachricht
+  in ChatGPT sauber durchläuft und der Prompt hält, was er verspricht, weiß
+  erst der erste Durchgang.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-09 | Rückmeldeweg auf das ChatGPT-Verfahren umgestellt (Prompt zuerst, Sprachnachrichten beim Spielen, `FERTIG` löst den Bericht aus), Screenshot-Tastenkürzel für beide Systeme ergänzt, Befund-Ablage auf die Abschnitte des Berichts abgebildet; Verteilung auf das kombinierte Testpaket umgestellt | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-09 | Erstfassung: Anleitung für Testende, Verteil- und Rückmeldeweg, Kadenzregel mit Testenden im Umlauf | Producer / Agent (Umsetzung) |
