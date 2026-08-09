@@ -449,11 +449,11 @@ namespace Nova.SimRunner.Tests
 
             Assert.Multiple(() =>
             {
-                Assert.That(AiBehaviorId.Value, Is.EqualTo("r4.779A1B5B"),
+                Assert.That(AiBehaviorId.Value, Is.EqualTo("r5.779A1B5B"),
                     "the AI identifier changed — bump the revision and write the journal entry");
-                Assert.That(decided, Is.EqualTo(2709u),
+                Assert.That(decided, Is.EqualTo(2548u),
                     "the AI decides the canonical match on a different tick than the pinned one");
-                Assert.That($"0x{endState:X16}", Is.EqualTo("0xDDE44F64DC295EB6"),
+                Assert.That($"0x{endState:X16}", Is.EqualTo("0x14472B2B943ED2BB"),
                     "same identifier, different end state: behaviour moved without the revision moving");
             });
         }
@@ -679,6 +679,146 @@ namespace Nova.SimRunner.Tests
             Assert.That(goingTo, Is.LessThan(startedAt),
                 "a unit under the retreat threshold with an armed enemy beside it is still walking " +
                 "away from its own base — that is the behaviour this rule exists to end");
+        }
+
+        /// <summary>
+        /// The wave has to launch with what production can still deliver.
+        /// <para>
+        /// The probe profile is the whole test: army cap 4, wave 3. The first
+        /// three gather and march, and they never come back inside the ring —
+        /// the cap counts them, so the barracks refills to exactly one unit at
+        /// home. A wave size of three can never be reached again.
+        /// </para>
+        /// <para>
+        /// NEGATIVE CONTROL BY CONSTRUCTION: on the previous rule
+        /// (<c>gathered &gt;= waveSize</c>) the fourth unit stands at the
+        /// staging cell until the time limit and the count outside the ring
+        /// stays at three forever, so this assertion fails. The shipped profile
+        /// hides the defect because <c>waveSize == targetArmySize == 12</c>
+        /// only stalls once a wave has taken losses — which the passive
+        /// opponent of the pinned end-to-end run never inflicts.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_LaunchesTheNextWave_WhenTheArmyCapCannotRefillIt()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var probe = new AiProfile(
+                profileId: "wave-refill-probe",
+                decisionTickInterval: shipped.DecisionTickInterval,
+                placementSearchRadius: shipped.PlacementSearchRadius,
+                powerReserve: shipped.PowerReserve,
+                targetHarvesters: shipped.TargetHarvesters,
+                harvesterQueueBatch: shipped.HarvesterQueueBatch,
+                targetArmySize: 4,
+                attackSquadThreshold: 1,
+                infantryQueueBatch: shipped.InfantryQueueBatch,
+                targetDamageWeight: shipped.TargetDamageWeight,
+                targetThreatWeight: shipped.TargetThreatWeight,
+                targetFinishWeight: shipped.TargetFinishWeight,
+                targetDistanceWeight: shipped.TargetDistanceWeight,
+                waveSize: 3,
+                stagingDistanceCells: shipped.StagingDistanceCells,
+                stagingToleranceCells: shipped.StagingToleranceCells,
+                retreatHealthPercent: 0,
+                retreatDangerCells: shipped.RetreatDangerCells);
+
+            AiHost host = BuildMatch(Seed, probe);
+            int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True,
+                "without the AI's HQ there is no staging ring to measure against");
+
+            int outsideAtBest = 0;
+            for (int i = 0; i < EndToEndBudgetTicks && !host.Victory.IsDecided; i++)
+            {
+                host.Step();
+                int outside = CountCombatUnitsOutsideRing(host, AiSlot, hqX, hqY, ring);
+                if (outside > outsideAtBest) outsideAtBest = outside;
+                if (outsideAtBest > probe.WaveSize) break;
+            }
+
+            Assert.That(outsideAtBest, Is.GreaterThan(probe.WaveSize),
+                $"never more than {probe.WaveSize} units left the staging ring. The wave that already " +
+                "marched can never come back, so a wave threshold fixed at the wave size can never be " +
+                "met again — the reinforcement stands at the staging cell until the time limit while " +
+                "the units that did march hold the front alone");
+        }
+
+        /// <summary>
+        /// A retreating unit has to carry a target it can actually act on.
+        /// <para>
+        /// Same scene as <see cref="SkirmishAi_PullsWoundedUnitsBackTowardTheirOwnBase"/>,
+        /// a different question: not WHERE the wounded unit walks but WHAT it
+        /// is aimed at while it walks. It marched with the army's target — a
+        /// building on the far side of the map — and the retreat branch used to
+        /// submit no attack intent at all. Submitting nothing does not release
+        /// a standing order: <c>UnitState.Stop()</c> leaves <c>AttackTarget</c>
+        /// alone, <c>ApplyMove</c> only calls <c>SetTarget</c>, and
+        /// <c>CombatSystem</c> releases a target only when it dies. The unit
+        /// therefore walked home still aimed at something unreachable, and the
+        /// D-087 auto-acquisition skipped it for holding a valid target.
+        /// </para>
+        /// <para>
+        /// NEGATIVE CONTROL: on the previous rule the assertion below reads the
+        /// army's march target, not the tank standing next to the unit.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_AimsARetreatingUnitAtItsPursuer_NotAtWhatItWalkedAwayFrom()
+        {
+            AiHost host = BuildMatch(Seed);
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            int ring = shipped.StagingDistanceCells + shipped.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True);
+
+            int budget = EndToEndBudgetTicks;
+            while (budget-- > 0 && FarthestCombatDistance(host, AiSlot, hqX, hqY) <= ring)
+            {
+                host.Step();
+            }
+            Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.GreaterThan(ring),
+                "the army never marched, so nothing could turn back");
+
+            Assert.That(TryFirstCombatUnit(host, AiSlot, out EntityId woundedId, out int armyX, out int armyY),
+                Is.True);
+            Assert.That(host.Entities.TryGetUnit(woundedId, out UnitState marching), Is.True);
+            Assert.That(marching.TargetGridPos.IsValid, Is.True, "the subject has to be marching somewhere");
+
+            int aheadX = armyX + System.Math.Sign(marching.TargetGridPos.X - armyX) * shipped.RetreatDangerCells;
+            int aheadY = armyY + System.Math.Sign(marching.TargetGridPos.Y - armyY) * shipped.RetreatDangerCells;
+            EntityId pursuer = SpawnEnemyUnit(host, UnitRole.BasicInfantry, aheadX, aheadY);
+
+            ref UnitState target = ref host.Entities.GetUnitRef(woundedId);
+            target.CurrentHealth = target.MaxHealth * (shipped.RetreatHealthPercent - 20) / 100;
+
+            RunToNextDecision(host);
+
+            Assert.That(host.Entities.TryGetUnit(woundedId, out UnitState after), Is.True,
+                "the wounded unit vanished, so there is nothing to read");
+            Assert.That(after.AttackTarget, Is.EqualTo(pursuer),
+                "a retreating unit is still aimed at the target it marched away from. It cannot reach it, " +
+                "and holding a valid target is exactly what makes the D-087 auto-acquisition skip the unit — " +
+                "so it fires at nothing the whole way home and defends nothing once there");
+        }
+
+        /// <summary>The slot's combat units standing outside the staging ring around the given cell.</summary>
+        private static int CountCombatUnitsOutsideRing(AiHost host, byte slot, int cellX, int cellY, int ring)
+        {
+            int count = 0;
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                int distance = ChebyshevTo(
+                    SimFixed.WorldToGrid(u.Transform.PositionX),
+                    SimFixed.WorldToGrid(u.Transform.PositionY), cellX, cellY);
+                if (distance > ring) count++;
+            }
+            return count;
         }
 
         /// <summary>Steps to just past the next decision tick, so the sealed intent has been applied.</summary>

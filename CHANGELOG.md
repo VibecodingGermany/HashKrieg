@@ -39,6 +39,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   öffentlichen Build fliegen sie raus, die Entfernungsnotiz steht in
   `FogRevealDebug`.
 
+### Behoben
+- **Zwei Defekte im KI-Verhalten aus dem Review von `r3`/`r4` (Verhaltensrevision
+  `r5`):** Erstens blieb die Angriffswelle dauerhaft stehen, sobald eine Einheit
+  einer früheren Welle ausserhalb des Sammelrings überlebte. Die Wellenschwelle
+  war fest auf die Armeeobergrenze gesetzt, die Obergrenze zählt aber auch die
+  Überlebenden mit — die Kaserne füllte also auf „Obergrenze minus Überlebende"
+  auf, und die Zahl im Ring konnte die Schwelle nie wieder erreichen. Eine
+  einzelne Einheit, die in eine leere Feindstartzone läuft und dort nicht stirbt,
+  genügte: elf Einheiten warteten bis zum Zeitlimit am Sammelpunkt, während eine
+  allein an der Front stand. Die Welle wartet jetzt auf das, was die Produktion
+  noch liefern kann. Zweitens trug eine sich zurückziehende Einheit ihr altes
+  Marschziel weiter mit. Der Rückzug reichte kein Angriffskommando ein, und genau
+  das löscht ein stehendes Ziel nicht — `UnitState.Stop()` fasst `AttackTarget`
+  nicht an, `ApplyMove` setzt nur das Wegziel, und `CombatSystem` gibt ein Ziel
+  erst bei dessen Tod frei. Die D-087-Automatik überspringt jede Einheit mit
+  gültigem Ziel, also feuerte die verwundete Einheit auf dem ganzen Rückweg auf
+  nichts und verteidigte zu Hause nichts. Sie wird jetzt auf ihren Verfolger
+  gerichtet — das, was die Dokumentation die ganze Zeit versprochen hatte.
+  **Offen bleibt die Ursache:** das Kommandoschema kennt kein „Ziel löschen", eine
+  rohe 0 wird als `InvalidEntityId` abgewiesen. Ein sauberes Freigeben braucht
+  eine Schemaentscheidung und damit eine D-ID. Messbarer Nebeneffekt: die
+  kanonische Testpartie entscheidet jetzt auf Tick 2548 statt 2709 — die KI
+  gewinnt 161 Ticks früher, weil nachrückende Einheiten nicht mehr zu Hause
+  festhängen. Der Bezeichner steht auf `r5`, der gepinnte Endzustand ist
+  mitgeführt.
+
 ### Hinzugefügt
 - **Drei Werkzeuge zum Zusehen im F3-Panel (Einheitenstrang, optional):** Ein
   Gegner, den man nur durch den eigenen Sichtradius beobachten kann, lässt sich

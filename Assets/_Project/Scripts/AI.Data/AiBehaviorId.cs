@@ -62,8 +62,16 @@ namespace Nova.AI.Data
         /// threshold WOULD have bumped it and was measured back out again —
         /// behaviour journal V003.
         /// </para>
+        /// <para>
+        /// r5 fixes two defects found in the review of r3/r4, both of which
+        /// change decisions and therefore the end state: the wave now waits for
+        /// what production can still deliver instead of a fixed cap (a single
+        /// survivor outside the ring used to stall it for the rest of the
+        /// match), and a retreating unit is pointed at its pursuer instead of
+        /// carrying a march target it can no longer reach.
+        /// </para>
         /// </summary>
-        public const int Revision = 4;
+        public const int Revision = 5;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
