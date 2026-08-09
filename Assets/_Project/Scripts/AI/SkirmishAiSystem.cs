@@ -8,6 +8,7 @@ using Nova.Simulation.Combat;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Production;
 using Nova.Simulation.State;
 using Nova.Simulation.Victory;
@@ -67,15 +68,18 @@ namespace Nova.AI
     /// (4) once the
     /// Barracks stands, infantry is queued up to
     /// <see cref="AiFactionProfile.TargetArmySize"/> as funds allow;
-    /// (5) at <see cref="AiFactionProfile.AttackSquadThreshold"/> living
-    /// combat units the army is sent toward the enemy start area, and every
-    /// enemy visible in the committed team view receives an EXPLICIT
-    /// AttackTarget intent. There is no attack-move (GB-002), but D-087 DID
-    /// add auto-acquisition to <see cref="CombatSystem"/>: an idle armed unit
-    /// picks the nearest visible hostile in range by itself. Explicit orders
-    /// are never retargeted, so an AI order always wins over the automatic
-    /// pick — and therefore has to be at least as good as it. The enemy HQ is
-    /// preferred once visible (D-077: its loss defeats the slot).
+    /// (5) the army resolves a POSTURE (does it act at all, which target,
+    /// which destination), then ONE ASSIGNMENT PER UNIT, then submission that
+    /// groups units sharing an order into a single intent: at
+    /// <see cref="AiFactionProfile.AttackSquadThreshold"/> living combat units
+    /// the army is sent toward the enemy start area, and the best scored
+    /// visible enemy receives an EXPLICIT AttackTarget intent from every unit.
+    /// There is no attack-move (GB-002), but D-087 DID add auto-acquisition to
+    /// <see cref="CombatSystem"/>: an idle armed unit picks the nearest
+    /// visible hostile in range by itself. Explicit orders are never
+    /// retargeted, so an AI order always wins over the automatic pick — and
+    /// therefore has to be at least as good as it. The enemy HQ is preferred
+    /// once visible (D-077: its loss defeats the slot).
     /// </para>
     /// <para>
     /// Rejection tolerance: affordability, the power rule and placement
@@ -99,8 +103,9 @@ namespace Nova.AI
         // THE NUMBERS LIVE IN Nova.AI.Data. What used to be four const fields
         // here are profile values now — behaviour in C#, numbers in one place
         // (AIArchitecture.md section 3). The shipped profile carries exactly
-        // the constants that stood here, so this move changes nothing;
-        // that the baselines stay green is the proof it was clean.
+        // the constants that stood here, so this move changes nothing; the
+        // proof is the unchanged end-state pin in SkirmishAiTests, not the
+        // four determinism baselines — those never run this system.
 
         /// <summary>Decision cadence in ticks: 20 ticks = 2.0 s on the canonical 10 Hz clock.</summary>
         public ushort DecisionTickInterval => _profile.Profile.DecisionTickInterval;
@@ -460,59 +465,415 @@ namespace Nova.AI
                 }
             }
 
-            // ---- (6) Attack: at the squad threshold, march on the enemy
-            // start area; visible enemies get explicit AttackTarget intents.
-            // No attack-move exists (GB-002), but auto-acquisition does since
-            // D-087 — an explicit order simply outranks it and is never
-            // retargeted. Committed-view targets only: fog-hidden entities
-            // are never addressed. ----
-            if (combatCount >= _profile.AttackSquadThreshold && _aiPlayerId < _fogOfWar.TeamCount)
+            // ---- (6) Army: resolve one posture for the army, one assignment
+            // per unit, then submit the assignments grouped. See the three
+            // steps below; the rules are exactly the ones the previous
+            // whole-army block applied. ----
+            ArmyPosture posture = ResolveArmyPosture(combatCount, combatUnits, hqCellX, hqCellY);
+            if (posture.Engages)
             {
-                uint targetRaw = FindBestVisibleEnemyByScore(combatUnits, out int targetCellX, out int targetCellY);
-                int moveX, moveY;
-                if (targetRaw != 0)
-                {
-                    moveX = targetCellX;
-                    moveY = targetCellY;
-
-                    EntityId targetId = UnitCommandStateView.ToEntityId(targetRaw);
-                    var needsAttack = new List<uint>();
-                    for (int i = 0; i < combatUnits.Count; i++)
-                    {
-                        if (combatUnits[i].AttackTarget != targetId)
-                        {
-                            needsAttack.Add(combatRaws[i]);
-                        }
-                    }
-                    if (needsAttack.Count > 0)
-                    {
-                        needsAttack.Sort();
-                        SubmitEntityList(needsAttack,
-                            ids => CommandIntent.Create(new AttackTargetPayload(ids, targetRaw)));
-                    }
-                }
-                else
-                {
-                    GetEnemyStartAreaCell(hqCellX, hqCellY, out moveX, out moveY);
-                }
-
-                var needsMove = new List<uint>();
+                var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
-                    UnitState u = combatUnits[i];
-                    bool ordered = u.TargetGridPos.IsValid && u.TargetGridPos.X == moveX && u.TargetGridPos.Y == moveY;
-                    if (!ordered)
-                    {
-                        needsMove.Add(combatRaws[i]);
-                    }
+                    UnitState unit = combatUnits[i];
+                    assignments.Add(ResolveUnitAssignment(combatRaws[i], in unit, in posture, hqCellX, hqCellY));
                 }
-                if (needsMove.Count > 0)
-                {
-                    needsMove.Sort();
-                    SubmitEntityList(needsMove,
-                        ids => CommandIntent.Create(new MovePayload(ids, SimFixed.FromInt(moveX), SimFixed.FromInt(moveY))));
-                }
+                SubmitAssignments(assignments, combatUnits);
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Army: posture -> per-unit assignment -> grouped submission
+        //
+        // THREE STEPS, because one whole-army order cannot express what the
+        // army has to do. The previous shape computed a single target and a
+        // single destination for every living combat unit, which is why
+        // "this one wounded unit turns back", "reinforcements wait at a
+        // staging cell" and "aim before the squad threshold is reached"
+        // could not be written down at all — and why a defence branch that
+        // switched the WHOLE army's destination every cadence produced 23 %
+        // more intents and a worse match (behaviour journal V002).
+        //
+        // The split is: what the army does (posture, derived from the
+        // committed state, never stored), what each unit does (assignment),
+        // and how that reaches the ingress (grouping, so N units sharing an
+        // order still cost ONE intent). The rules themselves are unchanged
+        // here: this shape reproduces the canonical match tick for tick.
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// What the army as a whole is doing this decision. Derived fresh
+        /// every cadence from the committed state — the system stays
+        /// stateless, so there is nothing here to serialize.
+        /// </summary>
+        private struct ArmyPosture
+        {
+            /// <summary>
+            /// False when the army does not act at all: below the squad
+            /// threshold, or the own slot has no committed team view (only
+            /// slots below <see cref="FogOfWarSystem.TeamCount"/> do).
+            /// </summary>
+            public bool Engages;
+
+            /// <summary>The scored target the army shoots at; 0 when nothing enemy is visible.</summary>
+            public uint TargetRaw;
+
+            /// <summary>Where the army walks: the target's cell, else the enemy start area; -1 while the army does not act.</summary>
+            public int MoveCellX;
+
+            /// <summary>See <see cref="MoveCellX"/>.</summary>
+            public int MoveCellY;
+
+            /// <summary>
+            /// Where reinforcements gather before they march; -1 when waves are
+            /// off (<see cref="AiProfile.WaveSize"/> 1) or the army does not act.
+            /// <para>
+            /// Derived from the own HQ and the ENEMY START AREA, never from the
+            /// current target cell. That is deliberate: the target moves every
+            /// cadence, so a staging point derived from it would move too, and
+            /// every unit waiting there would be re-ordered on every decision.
+            /// That is precisely the churn that sank <c>DefendBase</c> (journal
+            /// V002, +23 % intents), and the intents-per-1000-ticks column is
+            /// the first number to look at here.
+            /// </para>
+            /// </summary>
+            public int StagingCellX;
+
+            /// <summary>See <see cref="StagingCellX"/>.</summary>
+            public int StagingCellY;
+
+            /// <summary>
+            /// True when enough units are gathered AT the staging cell for the
+            /// wave to march — or when waves are off, in which case every unit
+            /// is its own wave and this is always true.
+            /// </summary>
+            public bool WaveReady;
+        }
+
+        /// <summary>
+        /// One unit's orders for this decision. The two slots are
+        /// INDEPENDENT on purpose — a unit can be told to shoot at one thing
+        /// and to stand somewhere else, and either half can be "no explicit
+        /// order, leave the standing one alone" (<see cref="AttackTargetRaw"/>
+        /// 0 hands the pick to the D-087 auto-acquisition,
+        /// <see cref="MoveCellX"/> &lt; 0 leaves the unit where it walks).
+        /// </summary>
+        private struct UnitAssignment
+        {
+            public uint EntityRaw;
+            public uint AttackTargetRaw;
+            public int MoveCellX;
+            public int MoveCellY;
+        }
+
+        /// <summary>
+        /// The army's posture: at
+        /// <see cref="AiFactionProfile.AttackSquadThreshold"/> living combat
+        /// units the army marches on the enemy start area, and the best
+        /// visible enemy (integer score, committed view only) becomes the
+        /// shared target and the destination. No attack-move exists (GB-002),
+        /// but auto-acquisition does since D-087 — an explicit order simply
+        /// outranks it and is never retargeted.
+        /// </summary>
+        private ArmyPosture ResolveArmyPosture(int combatCount, List<UnitState> combatUnits, int hqCellX, int hqCellY)
+        {
+            var posture = new ArmyPosture
+            {
+                Engages = combatCount >= _profile.AttackSquadThreshold && _aiPlayerId < _fogOfWar.TeamCount,
+                MoveCellX = -1,
+                MoveCellY = -1,
+                StagingCellX = -1,
+                StagingCellY = -1,
+                WaveReady = true,
+            };
+            if (!posture.Engages) return posture;
+
+            posture.TargetRaw = FindBestVisibleEnemyByScore(combatUnits, out int targetCellX, out int targetCellY);
+            if (posture.TargetRaw != 0)
+            {
+                posture.MoveCellX = targetCellX;
+                posture.MoveCellY = targetCellY;
+            }
+            else
+            {
+                GetEnemyStartAreaCell(hqCellX, hqCellY, out posture.MoveCellX, out posture.MoveCellY);
+            }
+
+            // ---- waves, and the off setting that keeps this reproducible ----
+            //
+            // waveSize 1 leaves BEFORE anything below runs, so the shipped
+            // behaviour is not "the same result through new code" but the same
+            // code path it always took. That is what makes the comparison run
+            // one-sided (finding M001): identical binary, one profile value
+            // apart.
+            int waveSize = EffectiveWaveSize();
+            if (waveSize <= 1) return posture;
+
+            GetStagingCell(hqCellX, hqCellY, out posture.StagingCellX, out posture.StagingCellY);
+
+            int gathered = 0;
+            for (int i = 0; i < combatUnits.Count; i++)
+            {
+                UnitState unit = combatUnits[i];
+                if (!IsCommittedToTheWave(in unit, hqCellX, hqCellY)) gathered++;
+            }
+            posture.WaveReady = gathered >= waveSize;
+            return posture;
+        }
+
+        /// <summary>
+        /// The wave size actually used, clamped to the army cap.
+        /// <para>
+        /// Without the clamp a profile with <c>waveSize</c> above
+        /// <see cref="AiFactionProfile.TargetArmySize"/> would wait for a wave
+        /// production can never deliver, and the army would stand at the
+        /// staging cell until the time limit. The clamp is not a tuning
+        /// decision, it is the guard against a profile that cannot work.
+        /// </para>
+        /// </summary>
+        private int EffectiveWaveSize()
+        {
+            int waveSize = _profile.Profile.WaveSize;
+            return waveSize > _profile.TargetArmySize ? _profile.TargetArmySize : waveSize;
+        }
+
+        /// <summary>
+        /// The staging cell: <see cref="AiProfile.StagingDistanceCells"/> cells
+        /// from the own HQ along the straight line toward the enemy start area,
+        /// clamped into the grid. Static map knowledge on both ends, so this
+        /// cell is the SAME for the whole match — a unit ordered there is not
+        /// re-ordered on the next cadence.
+        /// <para>
+        /// Integer division truncates, which is deterministic and identical on
+        /// both machines; that is the only property that matters here.
+        /// </para>
+        /// </summary>
+        private void GetStagingCell(int hqCellX, int hqCellY, out int cellX, out int cellY)
+        {
+            GetEnemyStartAreaCell(hqCellX, hqCellY, out int enemyX, out int enemyY);
+
+            int distance = _profile.Profile.StagingDistanceCells;
+            int dx = enemyX - hqCellX;
+            int dy = enemyY - hqCellY;
+            int span = Math.Max(Math.Abs(dx), Math.Abs(dy));
+            if (span <= distance)
+            {
+                // The enemy start area is nearer than the staging distance:
+                // there is nothing between base and target to gather at.
+                cellX = enemyX;
+                cellY = enemyY;
+                return;
+            }
+
+            cellX = ClampToGrid(hqCellX + (dx * distance / span));
+            cellY = ClampToGrid(hqCellY + (dy * distance / span));
+        }
+
+        /// <summary>
+        /// True when this unit already stands at the staging cell — within
+        /// <see cref="AiProfile.StagingToleranceCells"/> of it, because the
+        /// formation distribution spreads an arriving group over several
+        /// cells. Used ONLY to keep quiet about a unit that is where it
+        /// belongs, never to decide whether the wave is full.
+        /// </summary>
+        private bool IsAtTheStagingCell(in UnitState unit, in ArmyPosture posture)
+        {
+            int dx = Math.Abs(GridCellOf(unit.Transform.PositionX) - posture.StagingCellX);
+            int dy = Math.Abs(GridCellOf(unit.Transform.PositionY) - posture.StagingCellY);
+            return Math.Max(dx, dy) <= _profile.Profile.StagingToleranceCells;
+        }
+
+        /// <summary>
+        /// True when this unit has left the staging ring around the own HQ —
+        /// it belongs to a wave that already marched and is not called back.
+        /// Everything INSIDE the ring is the wave that has not left yet, and
+        /// that count is what the wave size is compared against.
+        /// <para>
+        /// Measured against the OWN HQ, not against the target: the HQ does not
+        /// move, so a unit does not flip between "out" and "waiting" because
+        /// the enemy walked a few cells. Turning back a wave that is already
+        /// out is the V002 failure mode, and this predicate is the place it
+        /// would come back in.
+        /// </para>
+        /// <para>
+        /// MEASURED, NOT ASSUMED: the first version of this rule counted only
+        /// units standing within <see cref="AiProfile.StagingToleranceCells"/>
+        /// OF THE STAGING CELL. That never worked, and the recorded run showed
+        /// why in one screen — the formation distribution spreads a group of
+        /// twelve over more than four cells, so the count stayed under the wave
+        /// size forever and the army oscillated between the base and the
+        /// staging point for 11.000 ticks while a single enemy unit ground
+        /// down its HQ. The ring is the whole area inside
+        /// <c>StagingDistanceCells + StagingToleranceCells</c>, so where
+        /// exactly a unit stands while it waits does not matter.
+        /// </para>
+        /// </summary>
+        private bool IsCommittedToTheWave(in UnitState unit, int hqCellX, int hqCellY)
+        {
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+            int dx = Math.Abs(cellX - hqCellX);
+            int dy = Math.Abs(cellY - hqCellY);
+            int ring = _profile.Profile.StagingDistanceCells + _profile.Profile.StagingToleranceCells;
+            return Math.Max(dx, dy) > ring;
+        }
+
+        /// <summary>
+        /// One unit's orders under the given posture. Today every combat unit
+        /// gets the same two — that IS the current behaviour, and this is the
+        /// one place a later rule (retreat below a health threshold, waiting
+        /// at a staging cell) has to change to break the uniformity.
+        /// <para>
+        /// Aiming BELOW the squad threshold was built here and measured back
+        /// out again — behaviour journal V003 carries the four variants and
+        /// the reason: an explicit order cannot be handed back to the D-087
+        /// auto-acquisition, because <c>AttackTarget</c> is released only by
+        /// the target's death (<c>UnitState.Stop()</c> leaves it untouched).
+        /// A standing unit that stops closing the distance therefore holds a
+        /// stale order, and holding beats aiming only while the unit walks
+        /// toward what it aims at.
+        /// </para>
+        /// </summary>
+        private UnitAssignment ResolveUnitAssignment(
+            uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY)
+        {
+            bool marches = posture.StagingCellX < 0          // waves off
+                || posture.WaveReady                          // the wave launches this decision
+                || IsCommittedToTheWave(in unit, hqCellX, hqCellY); // already out with an earlier wave
+
+            if (marches)
+            {
+                return new UnitAssignment
+                {
+                    EntityRaw = entityRaw,
+                    AttackTargetRaw = posture.TargetRaw,
+                    MoveCellX = posture.MoveCellX,
+                    MoveCellY = posture.MoveCellY,
+                };
+            }
+
+            // Reinforcement that has ARRIVED: no order at all.
+            //
+            // This is not an optimisation, it is the difference between a wave
+            // and a stutter. Arrival clears TargetGridPos through Stop(), so
+            // the re-issue suppression in SubmitAssignments stops matching and
+            // the same move order goes out again every single cadence. Measured
+            // before this branch existed: 40 actions per minute against 23 for
+            // the shipped AI, for units that were standing still. Intent churn
+            // without a change of behaviour is exactly what sank DefendBase
+            // (journal V002), and the fix is to say nothing when there is
+            // nothing to say.
+            // "Arrived" means standing there, not merely being there. A unit
+            // that is inside the tolerance but still WALKING is walking
+            // somewhere else — saying nothing to it lets it carry on out of
+            // the ring, which is the opposite of what the rule wants.
+            if (!unit.IsMoving && IsAtTheStagingCell(in unit, in posture))
+            {
+                return new UnitAssignment
+                {
+                    EntityRaw = entityRaw,
+                    AttackTargetRaw = 0,
+                    MoveCellX = -1,
+                    MoveCellY = -1,
+                };
+            }
+
+            // Reinforcement still on its way: walk to the staging cell.
+            //
+            // NO EXPLICIT ATTACK TARGET while waiting, and that is a
+            // consequence of finding F001, not an oversight. An AttackTarget
+            // is released only by the target's death — Stop() leaves it
+            // standing — so a unit that is NOT closing the distance holds a
+            // stale order and stops firing, while the D-087 auto-acquisition
+            // would have shot at whatever came into range. Aiming is right
+            // while a unit walks toward what it aims at (journal V003), and a
+            // waiting unit does not.
+            return new UnitAssignment
+            {
+                EntityRaw = entityRaw,
+                AttackTargetRaw = 0,
+                MoveCellX = posture.StagingCellX,
+                MoveCellY = posture.StagingCellY,
+            };
+        }
+
+        /// <summary>
+        /// Turns assignments into intents: units sharing an order are
+        /// collected into ONE entity-list command, and an assignment that
+        /// merely repeats what the unit is already doing is dropped (the same
+        /// re-issue suppression the economy steps use — comparing the
+        /// standing order is the AI's only memory).
+        /// <para>
+        /// Attack orders go out before move orders, and groups are walked in
+        /// ascending key order (target id, then destination cell), so the
+        /// sealed batch never depends on the entity scan or a dictionary.
+        /// </para>
+        /// </summary>
+        private void SubmitAssignments(List<UnitAssignment> assignments, List<UnitState> units)
+        {
+            var keys = new List<long>();
+            var members = new List<uint>();
+
+            // ---- attack orders, grouped by target ----
+            CollectKeys(assignments, keys, a => a.AttackTargetRaw != 0 ? a.AttackTargetRaw : -1L);
+            for (int k = 0; k < keys.Count; k++)
+            {
+                uint targetRaw = (uint)keys[k];
+                EntityId targetId = UnitCommandStateView.ToEntityId(targetRaw);
+                members.Clear();
+                for (int i = 0; i < assignments.Count; i++)
+                {
+                    if (assignments[i].AttackTargetRaw != targetRaw) continue;
+                    if (units[i].AttackTarget == targetId) continue; // already ordered
+                    members.Add(assignments[i].EntityRaw);
+                }
+                if (members.Count == 0) continue;
+                members.Sort();
+                uint target = targetRaw;
+                SubmitEntityList(members, ids => CommandIntent.Create(new AttackTargetPayload(ids, target)));
+            }
+
+            // ---- move orders, grouped by destination cell ----
+            CollectKeys(assignments, keys, a => a.MoveCellX >= 0 && a.MoveCellY >= 0
+                ? ((long)a.MoveCellY << 32) | (uint)a.MoveCellX
+                : -1L);
+            for (int k = 0; k < keys.Count; k++)
+            {
+                int cellX = (int)(uint)keys[k];
+                int cellY = (int)(keys[k] >> 32);
+                members.Clear();
+                for (int i = 0; i < assignments.Count; i++)
+                {
+                    if (assignments[i].MoveCellX != cellX || assignments[i].MoveCellY != cellY) continue;
+                    GridPos2D standing = units[i].TargetGridPos;
+                    if (standing.IsValid && standing.X == cellX && standing.Y == cellY) continue; // already walking there
+                    members.Add(assignments[i].EntityRaw);
+                }
+                if (members.Count == 0) continue;
+                members.Sort();
+                int x = cellX, y = cellY;
+                SubmitEntityList(members,
+                    ids => CommandIntent.Create(new MovePayload(ids, SimFixed.FromInt(x), SimFixed.FromInt(y))));
+            }
+        }
+
+        /// <summary>
+        /// The distinct group keys of an assignment list in ascending order;
+        /// a key of -1 means "this assignment carries no order of that kind"
+        /// and forms no group. Linear scans over a handful of keys — no hash
+        /// container, because iteration order of one would leak into the
+        /// sealed batch.
+        /// </summary>
+        private static void CollectKeys(List<UnitAssignment> assignments, List<long> keys, Func<UnitAssignment, long> keyOf)
+        {
+            keys.Clear();
+            for (int i = 0; i < assignments.Count; i++)
+            {
+                long key = keyOf(assignments[i]);
+                if (key < 0 || keys.Contains(key)) continue;
+                keys.Add(key);
+            }
+            keys.Sort();
         }
 
         // ------------------------------------------------------------------
@@ -884,6 +1245,12 @@ namespace Nova.AI
         private static int GridCellOf(SimFixed position)
         {
             return Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, SimFixed.WorldToGrid(position)));
+        }
+
+        /// <summary>A computed cell, held inside the construction grid.</summary>
+        private static int ClampToGrid(int cell)
+        {
+            return Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, cell));
         }
 
         /// <summary>Chebyshev distance of a cell to a building footprint rectangle (0 = inside).</summary>

@@ -24,8 +24,17 @@ namespace Nova.AI.Data
         /// threshold 6, harvesters 2) and four from <c>const</c> fields inside
         /// <c>SkirmishAiSystem</c> (cadence 20, placement radius 8, both queue
         /// batches 2). Nothing was rounded, retuned or "improved" on the way
-        /// across. If any of them changes, the four baseline files go red — and
-        /// that is the check, not an accident.
+        /// across, and <c>AiProfileTests</c> asserts every one of them value
+        /// for value.
+        /// </para>
+        /// <para>
+        /// WHAT DOES NOT CHECK THIS: the four determinism baselines. Not one
+        /// of them runs the skirmish AI — <c>Determinism10000Scenario</c>
+        /// registers Economy, Construction, Production, Pathfinding, Movement,
+        /// FogOfWar, Combat and Victory, and the other three pin snapshot
+        /// bytes, command serialisation and the RNG. Every number here can
+        /// move without turning any of them red. The guard against that is the
+        /// end-state pin in <c>SkirmishAiTests</c>.
         /// </para>
         /// </summary>
         public static readonly AiProfile Ms1Canonical = new AiProfile(
@@ -42,13 +51,30 @@ namespace Nova.AI.Data
             // are NOT a copy of a shipped constant — there was no scoring
             // before, only "HQ, else the first visible building, else the
             // first visible unit". They come from the plan's sketch
-            // (AiSimulationEnvironment.md section 4.6) and the four
-            // determinism baselines go red because of them; that is the
-            // change, not a defect.
+            // (AiSimulationEnvironment.md section 4.6). They change how the AI
+            // plays and therefore move the end-state pin in SkirmishAiTests;
+            // the four determinism baselines do not see this system and stay
+            // green either way.
             targetDamageWeight: 10,
             targetThreatWeight: 6,
             targetFinishWeight: 3,
-            targetDistanceWeight: 4);
+            targetDistanceWeight: 4,
+            // Waves. 12 IS the army cap above, and that is the rule in one
+            // number: attack at full strength, never reinforce piecemeal. A
+            // reinforcement waits at the staging cell until the wave is full
+            // again — which, with the cap at 12, means until the previous wave
+            // is gone. Units already out are never called back.
+            //
+            // Measured one-sided against waveSize 1 over five sizes (4, 6, 8,
+            // 10, 12) and both faction seatings; every column improves
+            // monotonically with the size, which is why the value sits at the
+            // cap and not somewhere in the middle. waveSize 1 turns the rule
+            // off and reproduces the previous behaviour exactly — the lab
+            // keeps that as the candidate `wave-off`, because a behaviour
+            // without an off setting cannot be measured one-sided (M001).
+            waveSize: 12,
+            stagingDistanceCells: 12,
+            stagingToleranceCells: 4);
 
         /// <summary>
         /// The old <c>AiFactionProfile</c> constructor defaults (power margin
@@ -72,6 +98,11 @@ namespace Nova.AI.Data
             targetDamageWeight: 10,
             targetThreatWeight: 6,
             targetFinishWeight: 3,
-            targetDistanceWeight: 4);
+            targetDistanceWeight: 4,
+            // Same reasoning as above: there is no "legacy" wave value to
+            // preserve, waves did not exist.
+            waveSize: 1,
+            stagingDistanceCells: 12,
+            stagingToleranceCells: 4);
     }
 }

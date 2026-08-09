@@ -21,9 +21,10 @@ namespace Nova.AI.Data
     /// simulation, and <c>NoFloatInSimulationTests</c> checks. Every field
     /// here is an integer, and any weighting introduced later has to be too.</item>
     /// <item><b>The shipped profile keeps today's values exactly.</b> Moving
-    /// the numbers out of the code therefore changes NO behaviour, the four
-    /// baseline files stay green, and that is precisely the proof the move was
-    /// clean.</item>
+    /// the numbers out of the code therefore changes NO behaviour. What proves
+    /// it is <c>AiProfileTests</c> (every field asserted value for value) and
+    /// the unchanged end-state pin in <c>SkirmishAiTests</c> — NOT the four
+    /// determinism baselines, which never run the skirmish AI.</item>
     /// </list>
     /// <para>
     /// ENGINE-FREE AND SIMULATION-FREE. This assembly references Nova.Core and
@@ -80,6 +81,36 @@ namespace Nova.AI.Data
         /// <summary>Infantry queued per decision tick while below the army cap.</summary>
         public int InfantryQueueBatch { get; }
 
+        // ---- waves ----
+        //
+        // EVERY NEW BEHAVIOUR CARRIES AN OFF SETTING, and these three are the
+        // first to do it (methodology finding M001). A rule that lives only in
+        // C# reaches BOTH sides of a self-play match, so "later decided, more
+        // losses" cannot be told from "two stronger armies". With an off value
+        // the same binary plays with against without, one-sided, in a single
+        // comparison run. The off value here is WaveSize 1.
+
+        /// <summary>
+        /// Combat units that have to be waiting at the staging cell before the
+        /// wave marches. <b>1 means off</b>: every unit is its own wave, which
+        /// is the shipped behaviour of "march the moment you exist".
+        /// </summary>
+        public int WaveSize { get; }
+
+        /// <summary>
+        /// Cells from the own HQ toward the march destination at which the
+        /// staging cell sits. Read only while <see cref="WaveSize"/> &gt; 1.
+        /// </summary>
+        public int StagingDistanceCells { get; }
+
+        /// <summary>
+        /// Chebyshev slack around the staging cell that still counts as
+        /// "waiting here". Without it the formation spread would push arriving
+        /// units past the staging point and they would count as already
+        /// committed to the attack.
+        /// </summary>
+        public int StagingToleranceCells { get; }
+
         // ---- target scoring ----
         //
         // Four weights over ONE integer score, no scalar quality function:
@@ -117,7 +148,10 @@ namespace Nova.AI.Data
             int targetDamageWeight,
             int targetThreatWeight,
             int targetFinishWeight,
-            int targetDistanceWeight)
+            int targetDistanceWeight,
+            int waveSize,
+            int stagingDistanceCells,
+            int stagingToleranceCells)
         {
             ProfileId = profileId ?? string.Empty;
             DecisionTickInterval = decisionTickInterval;
@@ -132,6 +166,9 @@ namespace Nova.AI.Data
             TargetThreatWeight = targetThreatWeight;
             TargetFinishWeight = targetFinishWeight;
             TargetDistanceWeight = targetDistanceWeight;
+            WaveSize = waveSize;
+            StagingDistanceCells = stagingDistanceCells;
+            StagingToleranceCells = stagingToleranceCells;
         }
 
         /// <summary>
@@ -158,7 +195,10 @@ namespace Nova.AI.Data
             && TargetDamageWeight == other.TargetDamageWeight
             && TargetThreatWeight == other.TargetThreatWeight
             && TargetFinishWeight == other.TargetFinishWeight
-            && TargetDistanceWeight == other.TargetDistanceWeight;
+            && TargetDistanceWeight == other.TargetDistanceWeight
+            && WaveSize == other.WaveSize
+            && StagingDistanceCells == other.StagingDistanceCells
+            && StagingToleranceCells == other.StagingToleranceCells;
 
         public override bool Equals(object obj) => obj is AiProfile other && Equals(other);
 
@@ -179,6 +219,9 @@ namespace Nova.AI.Data
                 hash = (hash * 397) ^ TargetThreatWeight;
                 hash = (hash * 397) ^ TargetFinishWeight;
                 hash = (hash * 397) ^ TargetDistanceWeight;
+                hash = (hash * 397) ^ WaveSize;
+                hash = (hash * 397) ^ StagingDistanceCells;
+                hash = (hash * 397) ^ StagingToleranceCells;
                 return hash;
             }
         }

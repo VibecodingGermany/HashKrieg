@@ -18,6 +18,56 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Geändert
+- **Die KI greift in Wellen an, statt einzeln nachzutröpfeln (Einheitenstrang,
+  KI-Verhalten `r3`):** Bisher lief jede fertige Einheit sofort allein quer über
+  die Karte — kein Angriff, sondern ein Förderband; man konnte sich mit drei
+  Einheiten an den Weg stellen und die halbe Partie lang einen nach dem anderen
+  abräumen. Nachschub sammelt sich jetzt an einem Sammelpunkt zwischen eigener
+  Basis und Feindgebiet, und die Armee marschiert erst bei voller Stärke. Wer
+  schon draussen ist, wird nie zurückgerufen: „draussen" heisst ausserhalb eines
+  Rings von 16 Zellen um das eigene HQ, gemessen am **HQ** und nicht am Ziel,
+  damit eine Einheit nicht zwischen draussen und wartend kippt, weil der Gegner
+  ein paar Zellen gelaufen ist. Der Sammelpunkt ist für die ganze Partie
+  derselbe — statisches Kartenwissen auf beiden Seiten, also kein
+  Befehlsrauschen. Eine wartende Einheit bekommt bewusst **kein** Angriffsziel
+  (ein `AttackTarget` wird nur vom Tod des Ziels frei, eine stehende Einheit
+  hielte also ein veraltetes und feuerte nicht mehr, während die
+  D-087-Automatik geschossen hätte); eine angekommene bekommt gar keinen Befehl,
+  sonst geht derselbe Marschbefehl jede Kadenz neu hinaus.
+  **Einseitig gemessen**, weil anders nicht messbar: Eine Coderegel steckt im
+  Binary und erreicht im Selbstspiel beide KIs zugleich, wo „später entschieden,
+  mehr Verluste" nicht von „zwei stärkeren Armeen" zu unterscheiden ist. Deshalb
+  trägt die Regel einen Profilwert mit **Aus-Stellung** — `waveSize: 1`
+  reproduziert das bisherige Verhalten bitgenau — und gemessen wurde dasselbe
+  Binary mit gegen ohne, in beiden Fraktionsrollen: Verluste 62 statt 143,
+  Austauschverhältnis 131 statt 84, Intervalle mit Verlusten 18 statt 59. Aus
+  dem Tröpfeln werden wenige Zusammenstösse.
+  `waveSize: 12` ist die Armeeobergrenze, und der Wert gehört dorthin oder auf
+  1, **nicht dazwischen**: Eine halbvolle Welle ist schlechter als gar keine
+  (`waveSize 6` liegt im Austausch bei 74 gegen 84 ohne Wellen) — sechs
+  Einheiten warten lange genug, um den Nachschub zu bremsen, und sind zu wenige,
+  um die Schlacht zu entscheiden.
+  **Das ist ausdrücklich kein Endzustand.** Heute ist „Welle oder Tröpfeln" eine
+  Einstellung, die für die ganze Partie gilt — und beide Verhaltensweisen haben
+  Lagen, in denen sie richtig sind: Nachschub einzeln nachschieben ist richtig,
+  wenn die eigene Armee im Gefecht steht und jede Einheit sofort zählt, oder
+  wenn der Gegner bereits vor der eigenen Basis steht. Sammeln ist richtig vor
+  dem ersten Vorstoss und nach einer verlorenen Welle. Ziel ist, dass die KI
+  **situationsabhängig entscheidet**, statt dass ein Profilwert es vorgibt; die
+  gemessene Kurve oben ist die Begründung dafür, dass es überhaupt eine
+  Entscheidung ist und keine Geschmacksfrage. Der Profilwert bleibt danach als
+  Aus-Stellung erhalten, weil ohne ihn keine einseitige Messung möglich wäre.
+  Voraus geht eine **verhaltensneutrale Formänderung**: Schritt (6) erteilt
+  keinen Armeebefehl mehr, sondern löst in Haltung, Zuweisung je Einheit und
+  gruppiertes Einreichen auf. Ohne sie ist „diese eine Einheit wartet" nicht
+  schwer zu formulieren, sondern nicht formulierbar. Nachweis ist keine
+  Testzusage, sondern eine Zahl: Entscheidungstick und Endzustand bleiben
+  identisch, der Bezeichner-Pin geht ohne Änderung durch. 564/564
+  SimRunner-Tests, Baseline-Dateien unberührt. **Gespielt und bestätigt:** „Kam
+  in Welle." Kein Fall, in dem etwas kaputt aussah. Die Fortsetzung hat der
+  Spieler dabei selbst benannt — automatischer Wechsel zum Tröpfeln, wenn die
+  Armee bereits auf dem Angriffsweg ist, als Unterstützung; das kommt in einem
+  eigenen PR.
 - **Die KI zielt nach Wirkung statt nach Listenreihenfolge (Einheitenstrang,
   KI-Verhalten `r2`):** Die Zielwahl lautete „HQ, sonst das ERSTE sichtbare
   Gebäude, sonst die ERSTE sichtbare Einheit". Diese Reihenfolge ist die des
