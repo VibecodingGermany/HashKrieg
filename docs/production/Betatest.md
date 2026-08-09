@@ -144,7 +144,8 @@ Du sollst nichts aufschreiben und nichts sortieren. Du sollst reden.
    Gemurmel — der Prompt ist darauf ausgelegt.
 4. Wenn du fertig bist: **FERTIG** in den Chat schreiben.
 5. ChatGPT baut daraus einen sortierten Bericht. Den **komplett kopieren** und
-   uns schicken.
+   unten auf der Beta-Seite unter „Bericht abgeben" einfügen — Name dazu,
+   absenden. Fertig.
 
 Der Prompt hält ChatGPT dabei an drei Dinge, die uns die Arbeit abnehmen: Es
 trennt, was du **gesehen** hast, von dem, was du **vermutest**; es erfindet
@@ -256,7 +257,40 @@ Mit Testenden im Umlauf bekommt diese Regel Kosten. Zwei Konsequenzen:
   gemeinsame Partie müssen alle Seiten exakt gleich sein — dort ist der Rebuild
   Pflicht, nicht Komfort.
 
-## Wohin die Befunde gehen
+## Wo die Berichte landen
+
+**Nicht in einem Postfach, sondern in einer Tabelle.** Das Formular auf der
+Beta-Seite schreibt jeden Bericht nach Supabase, Projekt `hashkrieg-lobby`,
+Tabelle `public.testberichte`. Ein Bericht ist eine Zeile mit Name, Build,
+Plattform, Rohtext und `status`.
+
+| | |
+|---|---|
+| **Warum eine Tabelle** | Sonst liegen später fünfzehn lange Freitexte in fünfzehn Nachrichten, und niemand weiß mehr, was daraus geworden ist. Der `status` beantwortet genau das |
+| **Zugriff von der Seite** | ausschließlich `insert`, über den öffentlichen `publishable key`. Es gibt bewusst **keine** `select`-, `update`- oder `delete`-Policy — von außen geprüft: Lesen liefert `[]`, Löschen ändert nichts |
+| **Zugriff von uns** | über die `service_role`, die RLS umgeht — in dieser Sitzung über den Supabase-MCP |
+| **Missbrauchsschutz** | Längengrenzen als `check`-Constraints und ein eindeutiger Index auf `(tester, md5(bericht))`, damit ein Doppelklick keinen zweiten Bericht erzeugt |
+| **Kein Bild** | Die Tabelle nimmt reinen Text. Screenshots kommen weiterhin direkt und werden über die Textstelle zugeordnet |
+
+`status` läuft: `neu` → `gesichtet` → `zerlegt`, dazu `verworfen` für alles,
+was keinen Handlungsbedarf erzeugt.
+
+### Aus Berichten Issues machen
+
+Der Ablauf ist bewusst ein Zuruf und kein Automatismus — das Zerlegen ist
+Urteil, nicht Mechanik:
+
+1. „Schau in die Datenbank" — offene Berichte holen:
+   `select * from testberichte where status = 'neu' order by eingegangen_am`
+2. Bericht lesen, Abschnitt für Abschnitt nach der Tabelle unten zuordnen.
+3. Je Befund ein Issue, mit Build-Kennung und wörtlichem Zitat aus dem Bericht.
+4. Danach `status = 'zerlegt'`, `issues_erstellt_am = now()` und in `notiz`
+   die Issue-Nummern.
+
+Ein Bericht wird **nie** als Ganzes zu einem Issue. Genau das wollten wir
+loswerden.
+
+## Wohin die einzelnen Abschnitte gehen
 
 Der ChatGPT-Bericht kommt bereits sortiert an. Seine Abschnitte bilden auf
 unsere Ablage ab:
@@ -285,15 +319,56 @@ uns.
   in ChatGPT sauber durchläuft und der Prompt hält, was er verspricht, weiß
   erst der erste Durchgang.
 - Die Seite kennt keine Zugangskontrolle. Wer die Adresse weitergibt, gibt die
-  Downloads weiter. Für zwei bekannte Personen ist das entschieden und in
-  Ordnung; für einen größeren Kreis wäre es eine neue Entscheidung.
+  Downloads weiter — und kann Berichte einreichen. Für zwei bekannte Personen
+  ist das entschieden und in Ordnung; für einen größeren Kreis wäre es eine
+  neue Entscheidung. Lesen kann von außen nach wie vor niemand.
+- Das Einreichen hat keine Ratenbegrenzung. Längengrenzen und der
+  Doppel-Index fangen Versehen ab, nicht Absicht. Fällt das je auf, ist der
+  Hebel eine Edge Function mit Prüfung statt der direkten Tabelle.
 - Der Blob-Store hat noch keine Aufräumroutine. Solange es einen Stand gibt,
   ist das kein Problem — ab dem dritten wird es eins.
+
+## Anhang — das Schema
+
+Angelegt als Supabase-Migration `testberichte_anlegen` im Projekt
+`hashkrieg-lobby`. Hier steht es, damit es ohne Zugriff auf die Konsole
+nachvollziehbar und wiederherstellbar ist. Das Repo führt (noch) keine
+Migrationsdateien; kommt eine Konvention, zieht dieser Block dorthin um.
+
+```sql
+create table public.testberichte (
+  id                 uuid        primary key default gen_random_uuid(),
+  eingegangen_am     timestamptz not null default now(),
+  tester             text        not null,
+  build              text,
+  plattform          text,
+  bericht            text        not null,
+  status             text        not null default 'neu',
+  issues_erstellt_am timestamptz,
+  notiz              text,
+  constraint testberichte_tester_laenge  check (char_length(tester) between 2 and 80),
+  constraint testberichte_bericht_laenge check (char_length(bericht) between 80 and 200000),
+  constraint testberichte_status_bekannt check (status in ('neu','gesichtet','zerlegt','verworfen'))
+);
+
+create unique index testberichte_kein_doppel on public.testberichte (tester, md5(bericht));
+
+alter table public.testberichte enable row level security;
+
+-- Einreichen ja, alles andere nein. Keine select/update/delete-Policy.
+create policy "bericht einreichen" on public.testberichte
+  for insert to anon, authenticated
+  with check (status = 'neu' and issues_erstellt_am is null and notiz is null);
+```
+
+Die Längen- und `build`/`plattform`-Constraints sind im Original ausführlicher;
+maßgeblich ist die Migration.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.3.0 | 2026-08-09 | Rückmeldung von „schick uns den Text" auf ein Formular auf der Beta-Seite umgestellt; Berichte landen in `public.testberichte` (Supabase `hashkrieg-lobby`) mit einreichen-nur-RLS; Ablauf vom Bericht zum Issue und der `status`-Lebenszyklus festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-09 | Verteilung auf eine Beta-Seite umgestellt (`/beta` im Investorenpapier-Projekt) statt Einzelversand; Downloads liegen im Vercel-Blob-Store, Begründung gegen VPS und Supabase festgehalten; Ablauf für den nächsten Build und die Aufräumpflicht ergänzt | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-09 | Rückmeldeweg auf das ChatGPT-Verfahren umgestellt (Prompt zuerst, Sprachnachrichten beim Spielen, `FERTIG` löst den Bericht aus), Screenshot-Tastenkürzel für beide Systeme ergänzt, Befund-Ablage auf die Abschnitte des Berichts abgebildet; Verteilung auf das kombinierte Testpaket umgestellt | Producer / Agent (Umsetzung) |
 | 1.0.0 | 2026-08-09 | Erstfassung: Anleitung für Testende, Verteil- und Rückmeldeweg, Kadenzregel mit Testenden im Umlauf | Producer / Agent (Umsetzung) |
