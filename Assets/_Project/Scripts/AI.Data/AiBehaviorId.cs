@@ -48,6 +48,12 @@ namespace Nova.AI.Data
         /// enemy start area instead of walking to the front one at a time.
         /// Units already out are never called back. Off setting:
         /// <c>waveSize</c> 1.</item>
+        /// <item><b>4</b> — retreat. A unit under a health percentage with an
+        /// armed enemy nearby walks back to the staging cell instead of
+        /// fighting to the last point, and rejoins with the next wave. No
+        /// health hysteresis: MS-1 units never heal, so an exit percentage
+        /// would never be reached. Off setting:
+        /// <c>retreatHealthPercent</c> 0.</item>
         /// </list>
         /// <para>
         /// NOT bumped for the posture/assignment refactor of the army step:
@@ -57,7 +63,7 @@ namespace Nova.AI.Data
         /// behaviour journal V003.
         /// </para>
         /// </summary>
-        public const int Revision = 3;
+        public const int Revision = 4;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
@@ -105,6 +111,8 @@ namespace Nova.AI.Data
             writer.WriteInt32(profile.WaveSize);
             writer.WriteInt32(profile.StagingDistanceCells);
             writer.WriteInt32(profile.StagingToleranceCells);
+            writer.WriteInt32(profile.RetreatHealthPercent);
+            writer.WriteInt32(profile.RetreatDangerCells);
             return writer.Digest();
         }
     }

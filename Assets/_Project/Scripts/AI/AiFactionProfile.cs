@@ -77,7 +77,9 @@ namespace Nova.AI
                 targetDistanceWeight: shipped.TargetDistanceWeight,
                 waveSize: shipped.WaveSize,
                 stagingDistanceCells: shipped.StagingDistanceCells,
-                stagingToleranceCells: shipped.StagingToleranceCells);
+                stagingToleranceCells: shipped.StagingToleranceCells,
+                retreatHealthPercent: shipped.RetreatHealthPercent,
+                retreatDangerCells: shipped.RetreatDangerCells);
         }
 
         /// <summary>Binds a faction name to a fully specified profile — the tuning path.</summary>

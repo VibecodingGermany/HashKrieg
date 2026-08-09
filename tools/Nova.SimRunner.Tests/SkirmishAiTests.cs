@@ -145,7 +145,9 @@ namespace Nova.SimRunner.Tests
                 targetDistanceWeight: shipped.TargetDistanceWeight,
                 waveSize: 1,
                 stagingDistanceCells: shipped.StagingDistanceCells,
-                stagingToleranceCells: shipped.StagingToleranceCells);
+                stagingToleranceCells: shipped.StagingToleranceCells,
+                retreatHealthPercent: shipped.RetreatHealthPercent,
+                retreatDangerCells: shipped.RetreatDangerCells);
         }
 
         private static AiHost BuildAiHost(ulong seed, AiProfile? profile = null)
@@ -447,7 +449,7 @@ namespace Nova.SimRunner.Tests
 
             Assert.Multiple(() =>
             {
-                Assert.That(AiBehaviorId.Value, Is.EqualTo("r3.1D8DA20F"),
+                Assert.That(AiBehaviorId.Value, Is.EqualTo("r4.779A1B5B"),
                     "the AI identifier changed — bump the revision and write the journal entry");
                 Assert.That(decided, Is.EqualTo(2709u),
                     "the AI decides the canonical match on a different tick than the pinned one");
@@ -583,6 +585,141 @@ namespace Nova.SimRunner.Tests
             }
             Assert.That(marched, Is.True,
                 "the wave was full and the army still did not leave — waiting without marching is a deadlock");
+        }
+
+        // ----------------------------------------------------------------
+        // (h) Retreat: a wounded unit turns back instead of dying in place
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// A battle tank appears beside the AI's army and starts shooting.
+        /// Every unit it wounds below the retreat threshold has to be walking
+        /// TOWARD its own base — not still walking at the tank.
+        /// <para>
+        /// The assertion is on the committed positions and the standing move
+        /// order, never on submitted intents: what a player sees is where the
+        /// units go. And it is deliberately phrased as "closer to the own HQ
+        /// than the unit itself stands", not as the exact staging cell —
+        /// the cell is an implementation detail, turning back is the
+        /// behaviour.
+        /// </para>
+        /// <para>
+        /// This test exists because <see cref="AiBehaviorId_TracksWhatTheAiActuallyDoes"/>
+        /// CANNOT see this rule: its opponent slot is passive and owns no
+        /// armed unit, so no threat is ever visible and no unit ever retreats.
+        /// The pinned end state stayed byte-identical across the change, which
+        /// is a pin doing its job and an argument for a second test, not
+        /// against one.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SkirmishAi_PullsWoundedUnitsBackTowardTheirOwnBase()
+        {
+            AiHost host = BuildMatch(Seed);
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            int ring = shipped.StagingDistanceCells + shipped.StagingToleranceCells;
+
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True);
+
+            // The wave has to be OUT for this to be observable at all: a unit
+            // wounded while it still waits at home is already where a retreat
+            // would send it, and "turned back" has no meaning there.
+            int budget = EndToEndBudgetTicks;
+            while (budget-- > 0 && FarthestCombatDistance(host, AiSlot, hqX, hqY) <= ring)
+            {
+                host.Step();
+            }
+            Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.GreaterThan(ring),
+                "the army never marched, so nothing could turn back");
+
+            Assert.That(TryFirstCombatUnit(host, AiSlot, out EntityId woundedId, out int armyX, out int armyY),
+                Is.True);
+            Assert.That(host.Entities.TryGetUnit(woundedId, out UnitState marching), Is.True);
+            Assert.That(marching.TargetGridPos.IsValid, Is.True, "the subject has to be marching somewhere");
+
+            // An armed enemy inside the danger radius — the DANGER half of
+            // the rule. A harvester here would (correctly) trigger nothing.
+            //
+            // Placed AHEAD of the unit, in its direction of travel, and two
+            // failures paid for that detail. Behind it, the unit outruns the
+            // radius before the next decision and the rule correctly does
+            // nothing. Beside it as a tank, a 55-hitpoint infantryman does not
+            // survive a 60-damage shell and there is nobody left to decide
+            // about. Ahead at exactly retreatDangerCells the enemy is inside
+            // the AI's danger radius (8) and outside its own rifle's reach
+            // (7 tiles) at the moment of spawning.
+            int aheadX = armyX + System.Math.Sign(marching.TargetGridPos.X - armyX) * shipped.RetreatDangerCells;
+            int aheadY = armyY + System.Math.Sign(marching.TargetGridPos.Y - armyY) * shipped.RetreatDangerCells;
+            SpawnEnemyUnit(host, UnitRole.BasicInfantry, aheadX, aheadY);
+
+            // And the WOUND, written straight into the state instead of shot
+            // in. That is deliberate: this test asks what the AI decides about
+            // a wounded unit, not whether a tank can hit one. Letting the tank
+            // do it made the test depend on cooldowns, armour classes and how
+            // long the army stays in range — three things it is not about, and
+            // the first version failed on exactly that without saying so.
+            ref UnitState target = ref host.Entities.GetUnitRef(woundedId);
+            target.CurrentHealth = target.MaxHealth * (shipped.RetreatHealthPercent - 20) / 100;
+            int startedAt = ChebyshevTo(
+                SimFixed.WorldToGrid(target.Transform.PositionX),
+                SimFixed.WorldToGrid(target.Transform.PositionY), hqX, hqY);
+
+            // To the next decision and two ticks further, so the sealed
+            // intent has landed. Not further: the unit keeps walking, and a
+            // long window would let it leave the danger radius on its own and
+            // turn a real answer into a coin toss.
+            RunToNextDecision(host);
+
+            Assert.That(host.Entities.TryGetUnit(woundedId, out UnitState after), Is.True,
+                "the wounded unit vanished, so there is nothing to read");
+            Assert.That(after.TargetGridPos.IsValid, Is.True,
+                "the wounded unit carries no move order at all — it was neither sent home nor sent on");
+
+            int goingTo = ChebyshevTo(after.TargetGridPos.X, after.TargetGridPos.Y, hqX, hqY);
+            Assert.That(goingTo, Is.LessThan(startedAt),
+                "a unit under the retreat threshold with an armed enemy beside it is still walking " +
+                "away from its own base — that is the behaviour this rule exists to end");
+        }
+
+        /// <summary>Steps to just past the next decision tick, so the sealed intent has been applied.</summary>
+        private static void RunToNextDecision(AiHost host)
+        {
+            ushort cadence = host.Ai.DecisionTickInterval;
+            for (int i = 0; i < cadence; i++)
+            {
+                host.Step();
+                if ((host.Kernel.CurrentTick.Value % cadence) != 0) continue;
+                host.Run(2);
+                return;
+            }
+            Assert.Fail("no decision tick inside one cadence — the cadence is not what it says it is");
+        }
+
+        /// <summary>The slot's first combat unit (ascending index) with its id and cell.</summary>
+        private static bool TryFirstCombatUnit(AiHost host, byte slot, out EntityId id, out int cellX, out int cellY)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot) continue;
+                if (u.Role < UnitRole.BasicInfantry || u.Role > UnitRole.Artillery) continue;
+                id = u.Id;
+                cellX = SimFixed.WorldToGrid(u.Transform.PositionX);
+                cellY = SimFixed.WorldToGrid(u.Transform.PositionY);
+                return true;
+            }
+            id = EntityId.Invalid;
+            cellX = 0;
+            cellY = 0;
+            return false;
+        }
+
+        private static int ChebyshevTo(int fromX, int fromY, int toX, int toY)
+        {
+            int dx = System.Math.Abs(fromX - toX);
+            int dy = System.Math.Abs(fromY - toY);
+            return dx > dy ? dx : dy;
         }
 
         /// <summary>Chebyshev distance of the combat unit standing farthest from <paramref name="cellX"/>/<paramref name="cellY"/>; -1 without any.</summary>
