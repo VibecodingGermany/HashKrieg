@@ -1,6 +1,7 @@
 name: Quality Gate
 
-# D-066 two-phase quality gate. DORMANT until governance tier 3 (D-076, D-091).
+# D-066 two-phase quality gate. DORMANT until governance tier 3
+# (D-076, D-091, D-105).
 #
 # The gate chain G0-G5 no longer blocks milestone progress; see GOVERNANCE.md
 # and quality/README.md. Nothing here is deleted - this workflow is the
@@ -13,8 +14,9 @@ name: Quality Gate
 # Job "gate-evidence-authorize" implements the protected authorize path of
 # the two-phase GateAuthorization receipt contract (D-066, G0-A2). It runs
 # only via manual workflow_dispatch on main behind the protected
-# "quality-gate" environment (a maintainer must create that environment with
-# required reviewers once before the first authorize run can start).
+# "quality-gate" environment (the project owner must create it with at least
+# one required reviewer independent from the authorize execution before the
+# first run; that approval attests evidence, not project governance).
 #
 # IMPORTANT for dispatchers: the validator binds the run to GITHUB_SHA and
 # requires it to equal the trusted tool checkout HEAD. Dispatch this workflow

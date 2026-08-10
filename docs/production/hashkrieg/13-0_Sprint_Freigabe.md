@@ -1,6 +1,13 @@
 # Sprint 13.0: Freigabe für den Parallelbetrieb
 
-**Version:** 1.1.1 | **Status:** in Umsetzung – lokaler Schutz vorbereitet, Remote-Rollout und Negativkontrolle offen | **Verantwortungsbereich:** Maintainers | **Sprint:** 13.0 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | **Blockiert:** externe PR-Negativkontrolle | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** skip | **Leitsatz:** eine Regel, die nur in einem Dokument steht, ist keine Regel
+**Version:** 1.2.0 | **Status:** historischer Sprint-13.0-Rolloutstand; Maintainer-/Reviewmodell durch D-105 ersetzt, Negativkontrolle offen | **Verantwortungsbereich:** Project Owner | **Sprint:** 13.0 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | **Blockiert:** externe PR-Negativkontrolle | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** skip | **Leitsatz:** eine Regel, die nur in einem Dokument steht, ist keine Regel
+
+> **Historischer Stand:** Dieses Dokument konserviert den D-091-Rollout mit zwei
+> Maintainern. Seit D-105 führt `@cubetribe` das Projekt allein; aktuelle Merge-,
+> Review- und Abnahmeregeln stehen in
+> [GOVERNANCE.md](../../../GOVERNANCE.md) und im
+> [Parallelbetriebsvertrag](13-15_Parallelbetrieb.md). Alte Tatsachen und
+> Abnahmelücken bleiben unten unverändert sichtbar.
 
 ## Ziel
 
@@ -229,3 +236,4 @@ selbst ist keine Versionsfrage, aber sie gehört in die Changelog-Zeile.
 | 1.0.0 | 2026-08-08 | Erstfassung: Freigabesprint vor Sprint 13, weil der Einheitenstrang bereits arbeitet und das Repository seinen ersten fremden PR noch nicht annehmen kann | Producer / Agent (Umsetzung) |
 | 1.1.0 | 2026-08-08 | In Umsetzung überführt: PolyForm Noncommercial plus CLA gewählt, D-091 und lokale CI-/Dokuregeln ergänzt; Required Checks, Maintainer-Peer-Review und echte Negativkontrolle ausdrücklich als Remote-Rollout offen gehalten | Producer / Agent (Umsetzung) |
 | 1.1.1 | 2026-08-08 | CLA-Wirkung nicht rückwirkend präzisiert, Metadatenchecks auf vertrauenswürdigen Zielbranch-Kontext gehärtet und D-ID-Pflicht vereinheitlicht | Producer / Agent (Umsetzung) |
+| 1.2.0 | 2026-08-10 | D-105-Fortschreibung ergänzt: Zwei-Maintainer-Rollout als historischen Stand markiert und auf die aktuelle alleinige Projektleitung verwiesen; historische Tatsachen und offene Negativkontrolle unverändert gelassen | Project Owner / Orchestrator |

@@ -1,7 +1,9 @@
 <!-- Danke für deinen Beitrag zu Project Nova! Kurz halten ist erwünscht. -->
 
 ## Was & Warum
-<!-- 1–3 Sätze. Bei Änderungen am Spielverhalten: was hast du im laufenden Spiel gesehen? -->
+<!-- 1–3 Sätze. Bei Änderungen am Spielverhalten: Was war im laufenden Spiel
+     zu sehen? Falls zurückgestellt: "nicht gespielt", Grund, automatisierte
+     Ersatznachweise und Restrisiko nennen. -->
 
 ## Checkliste
 - [ ] `dotnet test tools/Nova.SimRunner.Tests` lokal grün
@@ -11,8 +13,8 @@
 
 ## Externe Beiträge
 
-<!-- Für @cubetribe und @travelhawk nicht erforderlich. Alle anderen PRs werden
-     erst nach der bestätigten Maintainer-Prüfung und dem folgenden Häkchen grün. -->
+<!-- Für @cubetribe nicht erforderlich. Alle anderen PRs werden erst nach der
+     bestätigten Inhaberprüfung und dem folgenden Häkchen grün. -->
 - [ ] I agree to the Contributor License Agreement
 
 <!-- Governance-Tier 2: D-IDs für echte Entscheidungen und Versionen für
