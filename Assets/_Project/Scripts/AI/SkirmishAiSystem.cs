@@ -70,8 +70,10 @@ namespace Nova.AI
     /// Barracks stands, infantry is queued up to
     /// <see cref="AiFactionProfile.TargetArmySize"/> as funds allow;
     /// (5) the army resolves a POSTURE (does it act at all, which target,
-    /// which destination), then ONE ASSIGNMENT PER UNIT, then submission that
-    /// groups units sharing an order into a single intent: at
+    /// which destination), then ONE GOAL PER UNIT out of the fixed priority
+    /// list in <see cref="GoalKind"/> — <c>Retreat</c>, <c>Attack</c>,
+    /// <c>Hold</c>, <c>Advance</c> — whose effect is the unit's orders, then
+    /// submission that groups units sharing an order into a single intent: at
     /// <see cref="AiFactionProfile.AttackSquadThreshold"/> living combat units
     /// the army is sent toward the enemy start area, and the best scored
     /// visible enemy receives an EXPLICIT AttackTarget intent from every unit.
@@ -473,8 +475,8 @@ namespace Nova.AI
                 }
             }
 
-            // ---- (6) Army: resolve one posture for the army, one assignment
-            // per unit, then submit the assignments grouped. See the three
+            // ---- (6) Army: resolve one posture for the army, one GOAL per
+            // unit, then submit the resulting orders grouped. See the three
             // steps below; the rules are exactly the ones the previous
             // whole-army block applied. ----
             ArmyPosture posture = ResolveArmyPosture(
@@ -959,109 +961,173 @@ namespace Nova.AI
         }
 
         /// <summary>
-        /// One unit's orders under the given posture. Today every combat unit
-        /// gets the same two — that IS the current behaviour, and this is the
-        /// one place a later rule (retreat below a health threshold, waiting
-        /// at a staging cell) has to change to break the uniformity.
+        /// One unit's orders under the given posture: pick the goal, apply it.
         /// <para>
-        /// Aiming BELOW the squad threshold was built here and measured back
-        /// out again — behaviour journal V003 carries the four variants and
-        /// the reason: an explicit order cannot be handed back to the D-087
-        /// auto-acquisition, because <c>AttackTarget</c> is released only by
-        /// the target's death (<c>UnitState.Stop()</c> leaves it untouched).
-        /// A standing unit that stops closing the distance therefore holds a
-        /// stale order, and holding beats aiming only while the unit walks
-        /// toward what it aims at.
+        /// THE TWO HALVES ARE SEPARATE ON PURPOSE. Picking is a chain of
+        /// conditions; applying is a table of effects. Kept together they read
+        /// as one if-cascade in which no branch has a name — and a rule without
+        /// a name can neither be switched off, nor tested on its own, nor drawn
+        /// in a panel. Split, the goal is a value: it can be recorded, forced
+        /// from outside, and told apart from the order it produced.
+        /// </para>
+        /// <para>
+        /// NOTHING ABOUT THE DECISION CHANGED when the names went in. The
+        /// conditions below are the same four the if-cascade tested, in the
+        /// order it tested them, and the canonical match runs tick for tick as
+        /// it did — which is the only acceptable proof for a refactor of a rule
+        /// engine, and the reason this step ships without a revision bump.
         /// </para>
         /// </summary>
         private UnitAssignment ResolveUnitAssignment(
             uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
             List<long> threatCells, List<uint> threatRaws)
         {
-            // A wounded unit walks home, whatever the wave is doing. This test
-            // comes FIRST on purpose: retreat has to outrank "you are out with
-            // the wave, keep going", or it can never pull anybody back.
+            // The two facts every module below reads, worked out once. Both are
+            // pure functions of the committed state — "already walking home" is
+            // read off the standing order, which is the AI's only memory and one
+            // that survives save/restore because it is part of the world.
             bool retreats = IsRetreating(in unit, in posture, threatCells);
+            bool arrived = HasArrivedAtTheStagingCell(in unit, in posture);
 
-            bool marches = !retreats
-                && (posture.StagingCellX < 0                      // no staging cell resolved
-                || posture.WaveReady                              // the wave launches this decision
-                || IsCommittedToTheWave(in unit, hqCellX, hqCellY)); // already out with an earlier wave
+            GoalKind goal = ResolveGoal(in unit, in posture, hqCellX, hqCellY, retreats, arrived);
 
-            // The one order a retreating unit still needs: its pursuer.
-            // Zero does not clear the march target it is carrying — see
-            // NearestThreatRaw for why leaving it stale silenced the unit for
-            // the whole way home. A WAITING reinforcement keeps getting zero:
-            // it holds no stale order to overwrite (it never marched), and
-            // finding F001 is explicit that aiming while standing still is
-            // worse than letting D-087 acquire.
-            uint retreatTargetRaw = retreats
+            // The pursuer, and only for the goals that carry one.
+            //
+            // Zero does not CLEAR a march target a unit is carrying — see
+            // NearestThreatRaw for why leaving it stale silenced a retreating
+            // unit for the whole way home. So Retreat overwrites the stale order
+            // with the thing chasing it, and Hold does the same for a unit that
+            // ran home and is still under the rule. A fresh reinforcement gets
+            // zero and should: it holds no stale order to overwrite, and aiming
+            // while standing still is worse than letting D-087 acquire (F001).
+            uint pursuerRaw = goal == GoalKind.Retreat || (goal == GoalKind.Hold && retreats)
                 ? NearestThreatRaw(in unit, threatCells, threatRaws)
                 : 0u;
 
-            if (marches)
-            {
-                return new UnitAssignment
-                {
-                    EntityRaw = entityRaw,
-                    AttackTargetRaw = posture.TargetRaw,
-                    MoveCellX = posture.MoveCellX,
-                    MoveCellY = posture.MoveCellY,
-                };
-            }
+            return ApplyGoal(goal, entityRaw, in posture, pursuerRaw);
+        }
 
-            // Reinforcement that has ARRIVED: no order at all.
-            //
-            // This is not an optimisation, it is the difference between a wave
-            // and a stutter. Arrival clears TargetGridPos through Stop(), so
-            // the re-issue suppression in SubmitAssignments stops matching and
-            // the same move order goes out again every single cadence. Measured
-            // before this branch existed: 40 actions per minute against 23 for
-            // the shipped AI, for units that were standing still. Intent churn
-            // without a change of behaviour is exactly what sank DefendBase
-            // (journal V002), and the fix is to say nothing when there is
-            // nothing to say.
-            // "Arrived" means standing there, not merely being there. A unit
-            // that is inside the tolerance but still WALKING is walking
-            // somewhere else — saying nothing to it lets it carry on out of
-            // the ring, which is the opposite of what both rules want. A test
-            // found this: a wounded unit twelve cells from its HQ kept its
-            // march order and walked on toward the enemy, because it happened
-            // to pass within four cells of the staging cell.
-            if (!unit.IsMoving && IsAtTheStagingCell(in unit, in posture))
-            {
-                return new UnitAssignment
-                {
-                    EntityRaw = entityRaw,
-                    AttackTargetRaw = retreatTargetRaw,
-                    MoveCellX = -1,
-                    MoveCellY = -1,
-                };
-            }
+        /// <summary>
+        /// WHICH GOAL THIS UNIT IS UNDER — the four conditions, in priority
+        /// order, exactly as <see cref="GoalKind"/> numbers them.
+        /// <para>
+        /// TWO CLAUSES ARE NOT OBVIOUS AND BOTH ARE LOAD-BEARING.
+        /// </para>
+        /// <list type="number">
+        /// <item><b><c>Retreat</c> steps aside for a unit that has arrived.</b>
+        /// Getting home ENDS the retreat: from there it is an ordinary waiting
+        /// unit that leaves with the next wave, wounded or not. MS-1 units never
+        /// heal (<c>Repair</c> validates its target as a completed BUILDING), so
+        /// a rule that kept them under <c>Retreat</c> until they recovered would
+        /// pile the wounded up at home, occupy the army cap with them, and never
+        /// fill another wave. This clause is that rule, written where it can be
+        /// read.</item>
+        /// <item><b><c>Attack</c> asks not to be retreating.</b> A wounded unit
+        /// that is already outside the staging ring satisfies every other half
+        /// of the march test, so without this the pull-back could never reach
+        /// the one unit it exists for. Retreat has to outrank "you are out with
+        /// the wave, keep going".</item>
+        /// </list>
+        /// </summary>
+        private GoalKind ResolveGoal(
+            in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
+            bool retreats, bool arrived)
+        {
+            if (retreats && !arrived) return GoalKind.Retreat;
+            if (!retreats && IsFitToMarch(in unit, in posture, hqCellX, hqCellY)) return GoalKind.Attack;
+            if (arrived) return GoalKind.Hold;
+            return GoalKind.Advance;
+        }
 
-            // Reinforcement still on its way: walk to the staging cell.
-            //
-            // NO EXPLICIT ATTACK TARGET while waiting, and that is a
-            // consequence of finding F001, not an oversight. An AttackTarget
-            // is released only by the target's death — Stop() leaves it
-            // standing — so a unit that is NOT closing the distance holds a
-            // stale order and stops firing, while the D-087 auto-acquisition
-            // would have shot at whatever came into range. Aiming is right
-            // while a unit walks toward what it aims at (journal V003), and a
-            // waiting unit does not.
-            //
-            // A RETREATING unit is the exception, and for the same reason
-            // rather than against it: it is not a fresh reinforcement, it is
-            // already carrying a march target it can no longer reach. Silence
-            // does not release that order, so silence is what kept it from
-            // firing. It gets its pursuer instead (retreatTargetRaw).
-            return new UnitAssignment
+        /// <summary>
+        /// Whether the wave carries this unit forward: no staging cell was
+        /// resolved at all, or the wave launches this decision, or the unit is
+        /// already out with an earlier one and is not called back.
+        /// </summary>
+        private bool IsFitToMarch(in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY)
+        {
+            return posture.StagingCellX < 0
+                || posture.WaveReady
+                || IsCommittedToTheWave(in unit, hqCellX, hqCellY);
+        }
+
+        /// <summary>
+        /// True when the unit is STANDING at the staging cell — not merely
+        /// standing near it while walking somewhere else.
+        /// <para>
+        /// The distinction was found by a test, not reasoned out: a wounded unit
+        /// twelve cells from its HQ kept its march order and walked on toward
+        /// the enemy, because its route happened to pass within four cells of
+        /// the staging point. "Is there" and "has arrived" are different
+        /// questions, and only the second one may buy silence.
+        /// </para>
+        /// </summary>
+        private bool HasArrivedAtTheStagingCell(in UnitState unit, in ArmyPosture posture)
+        {
+            return posture.StagingCellX >= 0 && !unit.IsMoving && IsAtTheStagingCell(in unit, in posture);
+        }
+
+        /// <summary>
+        /// THE EFFECT OF A GOAL — one table, four rows, no conditions.
+        /// <para>
+        /// Every row is a pure function of the goal, the posture and the pursuer
+        /// the caller worked out, which is what makes a forced goal safe: a
+        /// panel that names <c>Retreat</c> for a healthy unit gets the orders
+        /// <c>Retreat</c> always produces, not a state the AI has no code for.
+        /// </para>
+        /// <para>
+        /// The two "no order" values are a real part of the vocabulary and not
+        /// a missing case: attack target 0 submits no attack intent and leaves
+        /// the D-087 auto-acquisition its pick, move cell -1 leaves the unit
+        /// walking wherever it already was. <c>Hold</c> is built out of both,
+        /// and its silence is the whole reason a wave looks like a wave instead
+        /// of a stutter.
+        /// </para>
+        /// </summary>
+        private static UnitAssignment ApplyGoal(
+            GoalKind goal, uint entityRaw, in ArmyPosture posture, uint pursuerRaw)
+        {
+            switch (goal)
             {
-                EntityRaw = entityRaw,
-                AttackTargetRaw = retreatTargetRaw,
-                MoveCellX = posture.StagingCellX,
-                MoveCellY = posture.StagingCellY,
-            };
+                case GoalKind.Retreat:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = posture.StagingCellX,
+                        MoveCellY = posture.StagingCellY,
+                    };
+
+                case GoalKind.Attack:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = posture.TargetRaw,
+                        MoveCellX = posture.MoveCellX,
+                        MoveCellY = posture.MoveCellY,
+                    };
+
+                case GoalKind.Hold:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = -1,
+                        MoveCellY = -1,
+                    };
+
+                default:
+                    // Advance — and GoalKind.None with it. A mask that names
+                    // None never reaches here (it means "leave it to the AI"),
+                    // so the fall-through is the walk to the staging cell.
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = 0u,
+                        MoveCellX = posture.StagingCellX,
+                        MoveCellY = posture.StagingCellY,
+                    };
+            }
         }
 
         /// <summary>

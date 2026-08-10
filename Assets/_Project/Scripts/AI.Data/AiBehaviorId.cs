@@ -63,6 +63,17 @@ namespace Nova.AI.Data
         /// behaviour journal V003.
         /// </para>
         /// <para>
+        /// NOT bumped either for naming those branches <see cref="GoalKind"/>.
+        /// Same four conditions, same order, same orders out; the canonical
+        /// match decides on the same tick with the same end state and a lab
+        /// run's artifacts came out byte-identical bar the measured runtime.
+        /// The refactor deliberately adds NO profile field — priorities in the
+        /// profile would move <see cref="ProfileHash"/>, and with it this very
+        /// identifier, which would have made the neutrality unprovable in the
+        /// artifacts it is printed into. A goal module that earns an off switch
+        /// brings one in the pull request that gives it a rule.
+        /// </para>
+        /// <para>
         /// r5 fixes two defects found in the review of r3/r4, both of which
         /// change decisions and therefore the end state: the wave now waits for
         /// what production can still deliver instead of a fixed cap (a single
