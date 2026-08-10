@@ -226,6 +226,27 @@ statt eines toten Knopfes.
 kompletter Satz sind rund 660 MB; ohne Aufräumen wächst der Store mit jedem
 Build um denselben Betrag.
 
+### Die zwei Textstellen, die mit jedem Build veralten
+
+Beim zweiten Paket ist genau das passiert: Die Seite behauptete noch, Rohstoff
+sei endlos und Lager und Radar täten nichts — zu dem Zeitpunkt war Strang C
+längst umgesetzt. **Eine falsche Lückenliste ist schlimmer als keine:** Sie
+lenkt den Testenden auf Dinge, die es nicht mehr gibt, und lässt ihn genau das
+übersehen, was neu und ungeprüft ist.
+
+Vor jedem Rollout deshalb gegen die Wirklichkeit lesen, nicht aus dem
+Gedächtnis:
+
+| Abschnitt auf der Seite | Quelle |
+|---|---|
+| „Was bewusst noch fehlt" | die Liste **„Läuft noch nicht"** in der [README](../../README.md) — sie ist die gepflegte Wahrheit, die Seite ist die Kopie |
+| „Neu in diesem Stand" | der `[Unreleased]`-Abschnitt im [CHANGELOG](../../CHANGELOG.md), übersetzt in das, was ein Spieler merkt |
+
+Was für den Testenden zählt, ist nicht das Paket, sondern der Unterschied zum
+vorigen. Und der wertvollste Satz auf der Seite ist der, der sagt, was zwar
+gebaut, aber noch nie von einem Menschen gespielt wurde — genau dort liegt der
+Grund, warum jemand diese Runde überhaupt spielen soll.
+
 ## Vor dem Verschicken — vier Prüfungen
 
 1. **Sauberer Arbeitsbaum.** Ein `-dirty`-Paket wird nicht verschickt. Die
@@ -434,6 +455,7 @@ Die Edge Function heißt `bericht-einreichen`, läuft mit `verify_jwt = false`
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.5.0 | 2026-08-10 | Zweites Paket (`4053c15`) verteilt; Abschnitt „Neu in diesem Stand" auf der Seite eingeführt und festgehalten, welche zwei Textstellen mit jedem Build veralten und gegen welche Quelle sie zu prüfen sind | Producer / Agent (Umsetzung) |
 | 1.4.0 | 2026-08-09 | Einreichen läuft über die Edge Function `bericht-einreichen` statt direkt in die Tabelle; sie stempelt IP, User-Agent, Browserkennung, Sprache, Zeitzone, Bildschirm und den Token aus dem persönlichen Link. Direkter Schreibweg geschlossen. Festgehalten, dass MAC- und Hardware-Kennungen im Browser nicht existieren, und dass der persönliche Link die belastbarere Zuordnung ist als die IP; Löschabfrage für die Herkunftsfelder ergänzt | Producer / Agent (Umsetzung) |
 | 1.3.0 | 2026-08-09 | Rückmeldung von „schick uns den Text" auf ein Formular auf der Beta-Seite umgestellt; Berichte landen in `public.testberichte` (Supabase `hashkrieg-lobby`) mit einreichen-nur-RLS; Ablauf vom Bericht zum Issue und der `status`-Lebenszyklus festgehalten | Producer / Agent (Umsetzung) |
 | 1.2.0 | 2026-08-09 | Verteilung auf eine Beta-Seite umgestellt (`/beta` im Investorenpapier-Projekt) statt Einzelversand; Downloads liegen im Vercel-Blob-Store, Begründung gegen VPS und Supabase festgehalten; Ablauf für den nächsten Build und die Aufräumpflicht ergänzt | Producer / Agent (Umsetzung) |
