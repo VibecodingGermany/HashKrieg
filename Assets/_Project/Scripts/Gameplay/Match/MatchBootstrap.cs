@@ -730,7 +730,7 @@ namespace Nova.Gameplay.Match
 
             byte[] snapshot = Runner.Kernel.SaveSnapshot();
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 SimDefinitions.ComputeDefinitionsHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 occupancy,

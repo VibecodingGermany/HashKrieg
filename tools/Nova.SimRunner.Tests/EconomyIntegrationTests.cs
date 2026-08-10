@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -36,16 +37,18 @@ namespace Nova.SimRunner.Tests
             public SimulationKernel Kernel { get; }
             public EntityManager Entities { get; }
             public EconomySystem Economy { get; }
+            public ConstructionSystem Construction { get; }
             public MatchSession Session { get; }
             public CommandIngress Ingress { get; }
 
             private EcoHost(
-                SimulationKernel kernel, EntityManager entities, EconomySystem economy,
+                SimulationKernel kernel, EntityManager entities, EconomySystem economy, ConstructionSystem construction,
                 MatchSession session, CommandIngress ingress)
             {
                 Kernel = kernel;
                 Entities = entities;
                 Economy = economy;
+                Construction = construction;
                 Session = session;
                 Ingress = ingress;
             }
@@ -58,8 +61,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities);
                 // 16.5: the FoW radar read requires the placement register.
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, width, height);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, width, height);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -77,7 +80,7 @@ namespace Nova.SimRunner.Tests
                 kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
 
                 kernel.Start();
-                return new EcoHost(kernel, entities, economy, session, ingress);
+                return new EcoHost(kernel, entities, economy, construction, session, ingress);
             }
 
             /// <summary>One host lockstep iteration: seal the due batch, submit it, step, advance the session.</summary>
@@ -117,6 +120,11 @@ namespace Nova.SimRunner.Tests
                     new Transform2D(SimFixed.FromInt(11), SimFixed.FromInt(10)),
                     SimFixed.Zero,
                     role: UnitRole.Refinery);
+                Entities.SpawnUnit(
+                    owner,
+                    new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)),
+                    SimFixed.Zero,
+                    role: UnitRole.HQ);
                 return (UnitCommandStateView.ToRawEntityId(harvester), harvester);
             }
 
@@ -162,6 +170,58 @@ namespace Nova.SimRunner.Tests
             Assert.That(host.Entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0));
             Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1020L),
                 "credits rise by exactly the delivered cargo");
+        }
+
+        [Test]
+        public void ReturnCargo_HoldsAtRefinerySite_ThenDepositsAtCompletedRefinery()
+        {
+            var host = EcoHost.Create(Seed);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "the completed HQ supplies the placement power budget");
+            host.StepTick();
+            Assert.That(host.Construction.TryPlaceBuilding(0, 4, 10, 10), Is.True,
+                "the nearby definition-role Refinery is still only a site");
+
+            EntityId site = EntityId.Invalid;
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].Role == UnitRole.Refinery
+                    && host.Construction.IsActiveSite(units[i].Id))
+                {
+                    site = units[i].Id;
+                    break;
+                }
+            }
+            Assert.That(site.IsValid, Is.True);
+
+            EntityId harvester = host.Entities.SpawnUnit(
+                0,
+                new Transform2D(SimFixed.FromInt(13), SimFixed.FromInt(11)),
+                SimFixed.FromInt(4),
+                role: UnitRole.Harvester);
+            ref UnitState returning = ref host.Entities.GetUnitRef(harvester);
+            returning.CargoAE = 20;
+            returning.IsReturningCargo = true;
+            long creditsBefore = host.Economy.GetPlayerEconomy(0).AetheriumCredits;
+
+            host.StepTick();
+            Assert.That(host.Entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(20),
+                "a definition-role site is not a cargo drop-off");
+            Assert.That(host.Entities.GetUnitRef(harvester).IsReturningCargo, Is.True,
+                "the return order is held until a completed Refinery is reachable");
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(creditsBefore));
+
+            uint siteRaw = UnitCommandStateView.ToRawEntityId(site);
+            Assert.That(host.Construction.CancelConstruction(siteRaw), Is.True);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 4, 10, 10).IsValid, Is.True);
+            host.StepTick();
+
+            Assert.That(host.Entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0));
+            Assert.That(host.Entities.GetUnitRef(harvester).IsReturningCargo, Is.False);
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits,
+                Is.EqualTo(creditsBefore + 525 + 20),
+                "cancellation refunds 75 percent and the now-legal drop-off adds the held cargo");
         }
 
         [Test]
@@ -263,7 +323,7 @@ namespace Nova.SimRunner.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
@@ -428,7 +488,7 @@ namespace Nova.SimRunner.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,

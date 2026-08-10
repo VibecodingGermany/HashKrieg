@@ -178,6 +178,52 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void FingerprintMismatch_LegacyEmptyRules_RefusesPlaybackBeforeTickOne()
+        {
+            ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
+            MatchFingerprint legacyRules = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
+                live.Fingerprint.StartSeed, live.Fingerprint.InitialStateHash,
+                live.Fingerprint.InputDelayTicks);
+
+            ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
+            Assert.That(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, legacyRules, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.False);
+            Assert.That(error, Is.EqualTo(ReplayPlaybackError.FingerprintMismatch));
+            Assert.That(detail, Does.Contain("RulesHash64"));
+            Assert.That(playback.Kernel.CurrentTick.Value, Is.EqualTo(0u),
+                "an old/new rules mismatch must be refused before execution");
+        }
+
+        [Test]
+        public void FingerprintMismatch_RevisionOneRules_RefusesPlaybackBeforeTickOne()
+        {
+            ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();
+            MatchFingerprint revisionOne = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1),
+                live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
+                live.Fingerprint.StartSeed, live.Fingerprint.InitialStateHash,
+                live.Fingerprint.InputDelayTicks);
+
+            ReplayTestUtil.TestHost playback = ReplayTestUtil.CreatePlaybackHost();
+            Assert.That(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, revisionOne, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.False);
+            Assert.That(error, Is.EqualTo(ReplayPlaybackError.FingerprintMismatch));
+            Assert.That(detail, Does.Contain("RulesHash64"));
+            Assert.That(playback.Kernel.CurrentTick.Value, Is.EqualTo(0u),
+                "revision-1 rules must be refused before execution");
+        }
+
+        [Test]
         public void FingerprintMismatch_DifferentSlotOccupancy_RefusesPlayback()
         {
             ReplayTestUtil.LiveMatch live = ReplayTestUtil.RunLiveMatch();

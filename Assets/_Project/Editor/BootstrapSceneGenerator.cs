@@ -269,8 +269,8 @@ namespace Nova.Editor
         /// <summary>
         /// The data-layer map asset. It records exactly the graybox-accurate
         /// subset of the Glutrinne manifest layout — the two spawn points and
-        /// the two aetherium fields the canonical match actually registers.
-        /// The full five-field layout with both primary routes is G4 scope
+        /// the five aetherium fields the canonical match registers since
+        /// Sprint 16.7. Primary-route dressing remains G4 scope
         /// (docs/production/ScopeLedger.md) and is deliberately not invented here.
         /// </summary>
         private static void EnsureGlutrinneMapAsset()
@@ -292,8 +292,15 @@ namespace Nova.Editor
                 128,
                 // HQ footprint centres of the canonical opening (4,4)+(3x3) and its 180° mirror.
                 new[] { new Vector2(5f, 5f), new Vector2(121f, 121f) },
-                // The two fields MatchBootstrap registers: local (7,7), enemy (119,119).
-                new[] { new Vector2(7f, 7f), new Vector2(119f, 119f) });
+                // The five fields MatchBootstrap registers, in canonical id order.
+                new[]
+                {
+                    new Vector2(7f, 7f),
+                    new Vector2(117f, 117f),
+                    new Vector2(24f, 40f),
+                    new Vector2(100f, 84f),
+                    new Vector2(62f, 62f),
+                });
             EditorUtility.SetDirty(map);
         }
 

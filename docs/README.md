@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.18.0 | **Status:** unveröffentlichter Arbeitsstand – Lobby (Sprint 14) client- und relay-seitig implementiert und getestet; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 14
+**Version:** 0.20.0 | **Status:** unveröffentlichter Arbeitsstand – Lobby (Sprint 14) client- und relay-seitig implementiert und getestet; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -24,7 +24,7 @@ Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 
 | Stufe | Status |
 |---|---|
-| Governance | **Tier 2** – externe Beitragende, zwei Maintainer (D-091) |
+| Governance | **Tier 2** – externe Beitragende, ein Projektinhaber (`@cubetribe`, D-105) |
 | Sprint 12 | Strang A A1–A7 umgesetzt, A8 Stufe 1 nachgewiesen und Stufen 2–4 offen (D-089); Strang B technisch umgesetzt, 60-Einheiten-Gegenhör-/Sichtabnahme offen (D-090) |
 | Spielbar | lokales 1v1 auf der Glutrinne-Graybox (Ablauf: `production/DemoRunbook.md`) |
 | MS-0 | offen – Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
@@ -183,7 +183,7 @@ gelisteten Kernverträge.
 - [RiskAnalysis](production/RiskAnalysis.md)
 - [GrayboxLog](production/GrayboxLog.md) – Sitzungsprotokoll der Graybox-Spur (D-067, Entwurf)
 - [ScopeLedger](production/ScopeLedger.md) – Zurückstellungen der Graybox-Spur, verweist auf Manifest-Schlüsselpfade
-- [DemoRunbook](production/DemoRunbook.md) (0.1.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, bekannte Grenzen, Asset-Ablage
+- [DemoRunbook](production/DemoRunbook.md) (0.6.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, fünf endliche Aetheriumfelder, bekannte Grenzen und Asset-Ablage
 - [StatusSnapshot 2026-08-05](production/StatusSnapshot_2026-08-05.md) (0.1.0) – datierter Projektstand vor dem Eintreffen der ersten 3D-Assets
 - [Hashkrieg-Planungsmappe](production/hashkrieg/README.md) und
   [Sprint 12 „Zu zweit"](production/hashkrieg/12_Sprint_Zu_Zweit.md) –
@@ -272,3 +272,5 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.16.0 | 2026-08-07 | D-089-Netzprofil, RelayServer-Runbook und Sprint-12-Strang-A-Stand indexiert; manuelle Netzwerkabnahme ausdrücklich offen | Technical Writer |
 | 0.17.0 | 2026-08-08 | D-091 und Sprint 13.0 indexiert: Tier-2-Beitragsmodell, Lizenz- und Merge-Schutz vorbereitet | Technical Writer |
 | 0.18.0 | 2026-08-09 | Sprint-14-Lobby indexiert: LobbySupabase.md (Vertrag, Schema, Edge-Function-Referenzen, Betriebspfad) und RelayServer.md 1.1.0 (kurzlebige Lobby-Tokens) aufgenommen, D-092 bis D-094; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme ausdrücklich offen | Agent (Umsetzung) |
+| 0.19.0 | 2026-08-10 | D-105 indexiert: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 und die externen CLA-/Review-Regeln bleiben aktiv | Technical Writer |
+| 0.20.0 | 2026-08-10 | DemoRunbook 0.6.0 indexiert: D-102/Sprint 16.7 ersetzt die alte Zwei-Feld-Demo durch fünf endliche, sichtbare Aetheriumfelder | Codex / Dennis Westermann |

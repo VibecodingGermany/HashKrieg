@@ -76,8 +76,8 @@ namespace Nova.Simulation.Combat
     /// scores at exactly 1.00, so a generic-on-generic engagement still
     /// applies its 15 damage unscaled. This is deliberate and load-bearing:
     /// <see cref="UnitRole.Unit"/> is the fallback role of a directly spawned
-    /// entity and of an unfinished construction site, it carries no content
-    /// definition of its own, and the canonical combat suites exercise combat
+    /// roleless entity; sites carry their definition role since 16.3 (#44).
+    /// The generic role has no content definition of its own, and the canonical combat suites exercise combat
     /// through exactly such roleless units. Every entity that comes out of
     /// production or construction carries a real role and is therefore
     /// governed by the real table — nothing on the content path resolves to
