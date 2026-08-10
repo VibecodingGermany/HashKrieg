@@ -65,6 +65,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Behoben
+- **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
+  fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
+  (Economy als Pflicht-Abhängigkeit), und die Minimap geht mit aus (dieselbe
+  Bilanz, dieselbe Abfrage). Produktion und Bau behalten den exakten
+  Tempo-Malus (0.5 in Q16.16), und die Reparatur halbiert jetzt exakt
+  (10 → 5 HP/Tick, Economy.md-Reparaturregel). Die Regelidentität steigt auf
+  Revision 2 und bindet beide Reparaturraten; Revision-1-Replays und -Peers
+  werden gegenüber Revision-2-Hosts beziehungsweise -Peers vor Tick 1 mit
+  `RulesHash64`-Mismatch abgelehnt. Erst damit
+  ist der Angriff aufs Kraftwerk ein taktischer Zug. **Nicht dabei:** die Verteidigungs-
+  abschaltung — ob ein Turm feuert, entscheidet `CombatSystem` (Einheiten-
+  strang), das einen Strombegriff nicht kennt; Befund geht an 13B
 - **#53: Das Lager begrenzt das Konto (D-024/D-096/D-106)** — das Aetherium-Konto hat
   jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
   gespeichert (kein Zustandsfeld, kein Formatbruch): ein oder mehrere fertige

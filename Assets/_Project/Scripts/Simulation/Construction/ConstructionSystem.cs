@@ -110,7 +110,8 @@ namespace Nova.Simulation.Construction
     /// damaged building: in reach (same Chebyshev rule) the target gains
     /// <see cref="RepairRateHpPerTick"/> HP per tick up to its MaxHealth,
     /// where the order resolves; out of reach the order is HELD, never
-    /// dropped; Stop clears it. Repair is unaffected by low power.
+    /// dropped; Stop clears it. Under LOW POWER the rate halves exactly
+    /// (16.6, C4 — Economy.md repair rule; 10/2 is exact, no rounding).
     /// </para>
     /// <para>
     /// State (snapshot block <see cref="SnapshotBlockIds.Construction"/>,
@@ -164,6 +165,9 @@ namespace Nova.Simulation.Construction
 
         /// <summary>Provisional repair rate in HP per tick per repairing Builder (Q-040 candidate).</summary>
         public const int RepairRateHpPerTick = 10;
+
+        /// <summary>Repair rate in HP per tick while the owner's grid is in LOW POWER (C4, Sprint 16.6).</summary>
+        public const int LowPowerRepairRateHpPerTick = 5;
 
         private struct SiteState
         {
@@ -841,7 +845,17 @@ namespace Nova.Simulation.Construction
                     continue; // held, not dropped
                 }
 
-                int repaired = target.CurrentHealth + RepairRateHpPerTick;
+                // 16.6 (C4, Economy.md repair rule): LOW POWER halves the
+                // repair rate — 10/2 is exact, no rounding. The last stage of
+                // the shutdown order still repairs; it just repairs slower.
+                int rate = RepairRateHpPerTick;
+                ref readonly PlayerEconomyState repairEco = ref _economy.GetPlayerEconomy(target.PlayerId);
+                if (repairEco.IsLowPower)
+                {
+                    rate = LowPowerRepairRateHpPerTick;
+                }
+
+                int repaired = target.CurrentHealth + rate;
                 target.CurrentHealth = repaired > target.MaxHealth ? target.MaxHealth : repaired;
             }
         }

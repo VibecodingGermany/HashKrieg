@@ -35,13 +35,15 @@ namespace Nova.SimRunner.Tests
         {
             public SimulationKernel Kernel { get; }
             public EntityManager Entities { get; }
+            public EconomySystem Economy { get; }
             public ConstructionSystem Construction { get; }
             public FogOfWarSystem Fog { get; }
 
-            private TestHost(SimulationKernel kernel, EntityManager entities, ConstructionSystem construction, FogOfWarSystem fog)
+            private TestHost(SimulationKernel kernel, EntityManager entities, EconomySystem economy, ConstructionSystem construction, FogOfWarSystem fog)
             {
                 Kernel = kernel;
                 Entities = entities;
+                Economy = economy;
                 Construction = construction;
                 Fog = fog;
             }
@@ -51,19 +53,19 @@ namespace Nova.SimRunner.Tests
                 var entities = new EntityManager(capacity);
                 var pathfinding = new PathfindingSystem(width, height);
                 var movement = new MovementSystem(entities, pathfinding);
-                // 16.5: the FoW radar read requires the placement register —
-                // an unregistered economy/construction pair answers placement
-                // queries without ever ticking.
+                // 16.5/16.6: the FoW radar read requires the placement register
+                // and the power balance — an unregistered economy/construction
+                // pair answers both queries without ever ticking.
                 var economy = new EconomySystem(entities);
                 var construction = new ConstructionSystem(entities, economy);
-                var fog = new FogOfWarSystem(entities, construction, teamCount: 2, width, height);
+                var fog = new FogOfWarSystem(entities, construction, economy, teamCount: 2, width, height);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(pathfinding);
                 kernel.RegisterSystem(movement);
                 kernel.RegisterSystem(fog);
                 kernel.Start();
-                return new TestHost(kernel, entities, construction, fog);
+                return new TestHost(kernel, entities, economy, construction, fog);
             }
 
             public void Step() => Kernel.StepTick();
@@ -284,6 +286,31 @@ namespace Nova.SimRunner.Tests
             var pings = new List<RadarSignature>();
             host.Fog.GetRadarSignatures(0, pings);
             Assert.That(pings.Count, Is.EqualTo(0), "no finished Radar building, no coverage at all");
+        }
+
+        [Test]
+        public void RadarSignatures_StopAtPowerDeficit_AndResumeWhenBalanceRecovers()
+        {
+            // 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar is the FIRST
+            // system to fall — no coverage, no pings. The deficit here is set
+            // directly on the balance (the rig's economy never recomputes).
+            var host = TestHost.Create(Seed);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 10, 9, 14).IsValid, Is.True);
+            SpawnAt(host, 1, 24, 10, sightRadius: 5); // radar-covered, hidden
+            host.Step(2);
+
+            var pings = new List<RadarSignature>();
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(1), "coverage with a finished Radar and a balanced grid");
+
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 1; // deficit: 1 required > 0 provided
+            pings.Clear();
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(0), "LOW POWER takes the radar offline");
+
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 0;
+            host.Fog.GetRadarSignatures(0, pings);
+            Assert.That(pings.Count, Is.EqualTo(1), "the radar comes back with the balance");
         }
 
         [Test]

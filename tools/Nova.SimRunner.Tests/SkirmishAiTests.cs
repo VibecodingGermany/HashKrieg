@@ -165,7 +165,7 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
+            var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
             var combat = new CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new VictorySystem(entities, construction);
 

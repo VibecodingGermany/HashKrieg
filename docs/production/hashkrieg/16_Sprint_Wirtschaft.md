@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.2.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.3.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -224,6 +224,12 @@ Reparatur** in dieser Ordnung fallen. Heute existiert nur der Tempo-Malus über
 Erst damit wird ein Angriff auf das gegnerische Kraftwerk ein taktischer Zug —
 und erst damit wird 16.5 spürbar, weil ein Stromausfall die Minimap mitnimmt.
 
+Die Reparaturhalbierung verändert autoritativen Simulationszustand, obwohl kein
+Snapshot- oder Replay-Formatfeld hinzukommt. Deshalb bindet `RulesHash64` ab
+diesem Paket **Revision 2** sowie die Reparaturraten 10/5 HP pro Tick. Ein
+Revision-1-Replay oder -Peer bleibt strukturell lesbar, wird gegenüber einem
+aktuellen Host aber vor Tick 1 mit `RulesHash64`-Mismatch abgelehnt.
+
 ### 16.7 · Knappheit (C1) — **fasst die Startaufstellung an**, nicht `SimDefinitions`
 
 | Was | Heute | Ziel |
@@ -381,13 +387,16 @@ den zutreffenden Grund.
 
 ## Versionsrelevanz
 
-`minor` — neue spielbare Fähigkeiten und Verhaltensänderungen, kein Vertragsbruch.
-Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
+`minor` — neue spielbare Fähigkeiten und Verhaltensänderungen; kein Zustands-,
+Schema- oder Wireformatbruch. Die `RulesHash64`-Kompatibilitätsgrenze zwischen
+Revision 1 und 2 ist beabsichtigt. Die Baseline-Neusetzung ist Zweck der Tests,
+kein Bruch.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.3.0 | 2026-08-10 | C4-Kompatibilitätsgrenze dokumentiert: Low-Power-Reparatur bindet Rules-Revision 2 und 10/5 HP pro Tick, ohne Zustands- oder Schema-Bump | Codex / Dennis Westermann |
 | 1.2.0 | 2026-08-10 | D-106 für 16.4 festgeschrieben: einmalige HQ-Kontobasis, periodischer 25-%-Abbau des aktuellen Überhangs und Rules-Hash-Kompatibilitätsgrenze | Codex / Dennis Westermann |
 | 1.1.0 | 2026-08-10 | D-105-Integrationsausnahme für 16.3 dokumentiert: aktive Sites sind keine Kampfteilnehmer oder fertigen KI-Produzenten | Codex / Dennis Westermann |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |

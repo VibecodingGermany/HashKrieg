@@ -61,7 +61,7 @@ namespace Nova.Simulation.Tests
                 var economy = new EconomySystem(entities);
                 // 16.5: the FoW radar read requires the placement register.
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, width, height);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, width, height);
                 var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));

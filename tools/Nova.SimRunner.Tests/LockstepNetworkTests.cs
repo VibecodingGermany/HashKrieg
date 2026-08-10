@@ -332,7 +332,7 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
                 var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
@@ -407,7 +407,7 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
                 var combat = new CombatSystem(entities, fogOfWar, economy, construction);
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
@@ -1167,6 +1167,39 @@ namespace Nova.SimRunner.Tests
             PumpUntil(server, clientA, clientB,
                 () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
                 "the relay refused the old/new rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
+            server.Stop();
+        }
+
+        [Test]
+        public void RevisionOneRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint revisionOne = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(revisionOne.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the revision-1/current rules mismatch");
 
             Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
             Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));

@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Construction;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Snapshots;
 
@@ -104,12 +105,19 @@ namespace Nova.Simulation.Replays
         public const string PrngIdV1 = "XorShift128PlusV1";
 
         /// <summary>
-        /// Current deterministic rules revision. Revision 1 is the first
-        /// non-stub rules identity and binds the D-106 storage-cap behavior.
-        /// Behavior changes covered by <see cref="ComputeCurrentRulesHash64"/>
-        /// must bump this value or change one of the bound constants.
+        /// First non-stub deterministic rules revision; binds the D-106
+        /// storage-cap behavior.
         /// </summary>
         public const ushort RulesRevisionV1 = 1;
+
+        /// <summary>
+        /// Current deterministic rules revision; adds the Sprint-16.6 C4 low-power
+        /// radar and repair behavior to revision 1.
+        /// </summary>
+        public const ushort RulesRevisionV2 = 2;
+
+        /// <summary>The rules revision emitted by current hosts.</summary>
+        public const ushort CurrentRulesRevision = RulesRevisionV2;
 
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
         public const int MaxIdentifierBytes = 64;
@@ -249,20 +257,24 @@ namespace Nova.Simulation.Replays
         }
 
         /// <summary>
-        /// Canonical rules identity for the current simulation. Unlike the
-        /// legacy empty Rules stub, this binds the D-106 economy behavior that
-        /// can diverge without changing snapshot bytes or definition rows.
-        /// Old/new peers and replays therefore fail the exact-fingerprint gate
-        /// before executing tick 1 instead of desynchronizing at the first
-        /// excess-decay tick.
+        /// Canonical rules identity for one supported simulation revision.
+        /// This compatibility entry point exists so replay and relay tests can
+        /// represent prior rules exactly; hosts must use
+        /// <see cref="ComputeCurrentRulesHash64"/>. Unknown revisions are
+        /// rejected rather than guessed.
         /// </summary>
-        public static ulong ComputeCurrentRulesHash64()
+        public static ulong ComputeRulesHash64(ushort rulesRevision)
         {
+            if (rulesRevision != RulesRevisionV1 && rulesRevision != RulesRevisionV2)
+            {
+                throw new ArgumentOutOfRangeException(nameof(rulesRevision), rulesRevision, "Unknown rules revision.");
+            }
+
             var hash = SimHashWriter.ForDefinitions();
             hash.WriteFieldTag((uint)MatchContentStub.Rules);
-            hash.WriteUInt32(5); // ordered rule fields below
+            hash.WriteUInt32(rulesRevision == RulesRevisionV1 ? 5u : 7u); // ordered rule fields below
             hash.WriteFieldTag(1);
-            hash.WriteUInt16(RulesRevisionV1);
+            hash.WriteUInt16(rulesRevision);
             hash.WriteFieldTag(2);
             hash.WriteInt64(EconomySystem.HqBaseCapacityAE);
             hash.WriteFieldTag(3);
@@ -271,7 +283,26 @@ namespace Nova.Simulation.Replays
             hash.WriteInt32(EconomySystem.ExcessDecayPercent);
             hash.WriteFieldTag(5);
             hash.WriteInt32(EconomySystem.ExcessDecayIntervalTicks);
+            if (rulesRevision >= RulesRevisionV2)
+            {
+                hash.WriteFieldTag(6);
+                hash.WriteInt32(ConstructionSystem.RepairRateHpPerTick);
+                hash.WriteFieldTag(7);
+                hash.WriteInt32(ConstructionSystem.LowPowerRepairRateHpPerTick);
+            }
             return hash.Digest();
+        }
+
+        /// <summary>
+        /// Canonical rules identity for the current simulation. Revision 2
+        /// binds both D-106 economy behavior and the Sprint-16.6 C4 low-power radar
+        /// and repair behavior that can diverge without changing snapshot
+        /// bytes or definition rows. Old/new peers and replays therefore fail
+        /// the exact-fingerprint gate before executing tick 1.
+        /// </summary>
+        public static ulong ComputeCurrentRulesHash64()
+        {
+            return ComputeRulesHash64(CurrentRulesRevision);
         }
 
         /// <summary>Occupancy of one reserved slot (index 0..7).</summary>

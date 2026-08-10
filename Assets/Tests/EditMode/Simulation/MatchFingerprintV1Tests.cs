@@ -79,6 +79,18 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void CurrentRulesHash_MovesPastRevisionOne_ForLowPowerRepair()
+        {
+            ulong revisionOne = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1);
+            ulong current = MatchFingerprint.ComputeCurrentRulesHash64();
+
+            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV2));
+            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2)));
+            Assert.That(current, Is.Not.EqualTo(revisionOne),
+                "Sprint-16.6 C4 repair behavior must not share D-106's revision-1 rules identity");
+        }
+
+        [Test]
         public void ComputeHash_AndEquality_AreSensitiveToEveryField()
         {
             MatchFingerprint standard = CreateStandard();
