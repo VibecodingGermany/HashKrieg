@@ -65,28 +65,69 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
-- **Die Skirmish-KI benennt, was eine Einheit vorhat (`GoalKind`)** — der
-  Armeeschritt entschied bisher in einer if-Kette, in der keine Verzweigung
-  einen Namen hatte. Er wählt jetzt je Einheit und Kadenz **ein** Goal aus
-  einer festen Prioritätsliste — `Retreat`, `Attack`, `Hold`, `Advance` — und
-  wendet dessen Wirkung aus einer Tabelle an. **Es ist keine
-  Verhaltensänderung, und das ist der ganze Zweck des Schritts:** dieselben
-  vier Bedingungen in derselben Reihenfolge, dieselben Befehle. Der Nachweis
-  ist kein Test, sondern eine Zahl — die kanonische Partie entscheidet auf
-  demselben Tick mit demselben Endzustand, und die Artefakte eines
-  Laborlaufs sind byte-identisch bis auf die gemessene Laufzeit. Deshalb
-  kein `AiBehaviorId.Revision`-Bump und kein Profilfeld: Prioritäten im
-  Profil würden `ProfileHash` und damit den in jedes Artefakt gedruckten
-  Verhaltensbezeichner bewegen. Ein Goal ist **kein Zustand** — es wird je
-  Kadenz neu abgeleitet und nirgends gespeichert, die KI bleibt eine reine
-  Funktion des committeten Zustands, und es entsteht kein Sidecar-Block.
-  Dazu zwei optionale Nähte, die der ausgelieferte Pfad nie füllt und die
-  deshalb nichts kosten: `IAiGoalObserver` lässt einen Beobachter mitlesen,
-  welches Goal eine Einheit bekommen hat und mit welchen Zahlen die
-  Bedingung entschieden hat, `IAiGoalOverride` erlaubt es, einem Goal von
-  aussen vorzugreifen — als **Eingabe** der Entscheidung, nicht als
-  gespeicherter Zustand. Beide sind Werkzeug für die Diagnose im Labor;
-  `MatchRunner` übergibt keine von beiden
+- **Die Skirmish-KI benennt, was eine Einheit vorhat — und verteidigt damit
+  ihre Basis (`GoalKind`, `r7` → `r8`)** — zwei Schritte, die zusammengehören
+  und deshalb zusammen kommen: erst bekommt die Entscheidung eine **Form**,
+  dann bekommt die Form ihre erste eigene **Regel**. Die Reihenfolge ist der
+  Punkt — wer zuerst eine Regel und dabei die Form ändert, kann hinterher
+  nicht sagen, welche der beiden gewirkt hat.
+
+  **Die Form, verhaltensneutral.** Der Armeeschritt entschied in einer
+  if-Kette, in der keine Verzweigung einen Namen hatte. Er wählt jetzt je
+  Einheit und Kadenz **ein** Goal aus einer festen Prioritätsliste und wendet
+  dessen Wirkung aus einer Tabelle an. Dieser Schritt für sich ist **keine**
+  Verhaltensänderung, und der Nachweis ist kein Test, sondern eine Zahl: die
+  kanonische Partie entscheidet auf demselben Tick mit demselben Endzustand,
+  die Artefakte eines Laborlaufs sind byte-identisch bis auf die gemessene
+  Laufzeit. Ein Goal ist **kein Zustand** — es wird je Kadenz neu abgeleitet
+  und nirgends gespeichert, die KI bleibt eine reine Funktion des committeten
+  Zustands, es entsteht kein Sidecar-Block. Dazu zwei optionale Nähte, die der
+  ausgelieferte Pfad nie füllt und die deshalb nichts kosten:
+  `IAiGoalObserver` lässt mitlesen, welches Goal eine Einheit bekommen hat und
+  mit welchen Zahlen die Bedingung entschieden hat, `IAiGoalOverride` erlaubt
+  es, einem Goal von aussen vorzugreifen — als **Eingabe** der Entscheidung,
+  nicht als gespeicherter Zustand. `MatchRunner` übergibt keine von beiden.
+
+  **Die Regel: `DefendHome`.** Eine Einheit, die am Sammelpunkt angekommen
+  ist, bekommt absichtlich **keinen** Befehl und hängt damit allein an der
+  D-087-Auto-Acquisition. Die reicht so weit wie die Waffe: sechs Zellen bei
+  der Legions-Infanterie, sieben beim Allianz-Schützen. Der Sammelpunkt liegt
+  **zwölf** Zellen vom eigenen HQ. Ein Angreifer an der Basis war damit
+  ausserhalb jeder Reichweite — die Wartenden haben ihn nicht ignoriert,
+  **sie haben ihn nicht gesehen**. Gemessen in der kanonischen Partie: das
+  Legions-HQ nimmt über **766 Ticks 327 Treffer**, während die eigenen
+  Einheiten im Median **13 Zellen** entfernt unter `Hold` stehen und **keine
+  einzige** angreift. Der Defekt ist so alt wie der Sammelpunkt (`r3`).
+  Neues Goal `DefendHome` mit dem Profilfeld `defendHomeCells` (ausgeliefert
+  **10**, **0 = aus**): wer noch **im Sammelring** steht und nicht gerade
+  zurückzieht, marschiert zum eigenen HQ und zielt auf den nächsten
+  sichtbaren bewaffneten Gegner. Wer **draussen** ist, marschiert weiter —
+  die `r3`-Regel „Einheiten draussen werden nie zurückgerufen" bleibt, und
+  die Welle wird **unterbrochen, nicht freigegeben**. Das Ziel ist die
+  **statische** HQ-Zelle und ausdrücklich nicht der Gegner: genau daran ist
+  `DefendBase` gescheitert (+23 % Intents, schlechteres Spiel), weil ein
+  bewegliches Ziel jede Kadenz einen neuen Befehl für jede Einheit erzeugt.
+  Gemessen kostet die Regel **31 Beurteilungen 25 Befehle** auf **eine**
+  Zielzelle, und bei bedrohter Basis steht **keine** Einheit im Ring mehr
+  unter `Hold`.
+
+  **Was die Regel bringt und was sie kostet.** Die Wehrlosigkeit im
+  Beschussfenster fällt von **96 % auf 60 %**, die Partie der Legion dauert
+  **3.213 → 6.490** Ticks. **Sie gewinnt sie trotzdem nicht**, und die eigenen
+  Verluste steigen von 18 auf 60 — die Regel verschiebt die Niederlage, sie
+  wendet sie nicht ab. Der Verhaltensbezeichner bewegt beide Hälften:
+  die Revision, weil Entscheidungen sich ändern, und `ProfileHash`, weil die
+  Regel mit ihrer Aus-Stellung ausgeliefert wird. `defendHomeCells: 0` auf
+  beiden Sitzen ergibt **bitgenau** die Partie von `r7` (Tick 3.213,
+  `0xE002DD893916967B`).
+
+  **Am Player angesehen:** die Regel ist in der Laboraufnahme
+  `Nova.AiLab-goal-base-defense-r8-20260810` in Bewegung zu sehen — die
+  Wartenden lösen sich vom Sammelpunkt und marschieren zum eigenen HQ. Das ist
+  die Gegenaufnahme zu der, in der genau diese Einheiten weitersammeln, während
+  ihr Hauptquartier fällt.
+  **Im laufenden Spiel gesehen: nein.** Eine Aufzeichnung des Labors ist keine
+  gespielte Partie; alles oben ist gemessen, nicht gespielt.
 - **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
   zwei praktisch endlosen Startfelder werden durch zwei symmetrische
   Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes

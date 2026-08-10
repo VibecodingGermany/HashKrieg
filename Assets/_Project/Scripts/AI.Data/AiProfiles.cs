@@ -139,7 +139,31 @@ namespace Nova.AI.Data
             // 0 switches the rule off and restores the head count exactly
             // (finding M001: a behaviour without an off setting cannot be
             // measured one-sided).
-            waveStrengthPoints: 1200);
+            waveStrengthPoints: 1200,
+            // Defend home (r8). Ten cells around the own headquarters: inside
+            // the base, and short of the staging ring at sixteen, so a skirmish
+            // at the gathering point does not summon anybody.
+            //
+            // THE RULE EXISTS BECAUSE OF A MEASURED HOLE, not a hunch. A unit
+            // that has arrived at the staging cell is given no order at all —
+            // on purpose, an order per cadence to a standing unit is churn — so
+            // it depends entirely on the D-087 auto-acquisition, and that
+            // reaches six cells for Legion infantry and seven for an Alliance
+            // rifleman. The staging cell sits twelve cells from the base. An
+            // attacker at the headquarters is outside all of it. In the
+            // canonical match the Legion headquarters takes 327 hits over 766
+            // ticks while its own units stand a median of thirteen cells away
+            // under Hold, and not one of them attacks.
+            //
+            // The wave is INTERRUPTED, not released: the destination is the own
+            // headquarters, a static cell, so the defenders walk toward the
+            // fight rather than away from it and the re-issue suppression
+            // swallows every repeat. That is the correction over the discarded
+            // DefendBase (V002), which handed the whole army a moving target
+            // every cadence and paid 23 % more intents for it.
+            //
+            // 0 switches the rule off and restores r7 exactly (M001).
+            defendHomeCells: 10);
 
         /// <summary>
         /// The old <c>AiFactionProfile</c> constructor defaults (power margin
@@ -173,6 +197,8 @@ namespace Nova.AI.Data
             retreatDangerCells: 8,
             // Same reasoning again: there is no "legacy" strength value, the
             // wave counted heads. 0 is the off setting.
-            waveStrengthPoints: 0);
+            waveStrengthPoints: 0,
+            // And no legacy defence value either — there was no defence rule.
+            defendHomeCells: 0);
     }
 }

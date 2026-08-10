@@ -74,6 +74,20 @@ namespace Nova.AI.Data
         /// brings one in the pull request that gives it a rule.
         /// </para>
         /// <para>
+        /// r8 IS THAT PULL REQUEST, and the identifier moves twice over: the
+        /// revision here because decisions change, and
+        /// <see cref="ProfileHash"/> because the rule ships with the off switch
+        /// that makes it measurable one-sided at all (finding M001).
+        /// <c>DefendHome</c> is the first goal to carry a rule of its own — the
+        /// units still waiting in the staging ring break off and walk home when
+        /// a visible armed enemy comes within
+        /// <see cref="AiProfile.DefendHomeCells"/> of their headquarters. What
+        /// it fixes is a defect as old as the staging cell itself (r3), not one
+        /// r6 introduced: a unit that has arrived is deliberately given no
+        /// order, so it hangs entirely on an auto-acquisition that reaches six
+        /// or seven cells while the staging cell sits twelve from the base.
+        /// </para>
+        /// <para>
         /// r5 fixes two defects found in the review of r3/r4, both of which
         /// change decisions and therefore the end state: the wave now waits for
         /// what production can still deliver instead of a fixed cap (a single
@@ -127,7 +141,7 @@ namespace Nova.AI.Data
         /// retried an illegal placement forever once the all-of gate shipped.
         /// </para>
         /// </summary>
-        public const int Revision = 7;
+        public const int Revision = 8;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
@@ -178,6 +192,7 @@ namespace Nova.AI.Data
             writer.WriteInt32(profile.RetreatHealthPercent);
             writer.WriteInt32(profile.RetreatDangerCells);
             writer.WriteInt32(profile.WaveStrengthPoints);
+            writer.WriteInt32(profile.DefendHomeCells);
             return writer.Digest();
         }
     }

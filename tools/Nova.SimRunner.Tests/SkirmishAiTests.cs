@@ -83,12 +83,26 @@ namespace Nova.SimRunner.Tests
             /// clock to the tick about to execute (its intents then target
             /// T+1), step, and advance the human session.
             /// </summary>
+            /// <summary>
+            /// How many intents the AI has put on the wire since the host was
+            /// built — the first number any behaviour change is judged by.
+            /// <para>
+            /// <c>DefendBase</c> was measured back out again over 23 % more
+            /// intents and nothing else (journal V002), and no test could see
+            /// that at the time because nothing counted. This does. It is a
+            /// TEST-SIDE tally over the sealed batches, not a field on the AI:
+            /// counting inside the simulation would be state the AI could read.
+            /// </para>
+            /// </summary>
+            public int IntentsSubmitted;
+
             public void Step()
             {
                 uint nextTick = Kernel.CurrentTick.Value + 1;
                 CommandBatch batch = Ingress.SealTickBatch(nextTick);
                 if (batch.Count > 0)
                 {
+                    IntentsSubmitted += batch.Count;
                     Assert.That(Kernel.SubmitBatch(batch), Is.True,
                         $"kernel refused the sealed batch of tick {nextTick}");
                 }
@@ -151,7 +165,11 @@ namespace Nova.SimRunner.Tests
                 retreatDangerCells: shipped.RetreatDangerCells,
                 // Waves off means waves off: the strength gate is the same
                 // rule and switches off with them.
-                waveStrengthPoints: 0);
+                waveStrengthPoints: 0,
+                // And the defence with them. This profile exists to reproduce
+                // the behaviour from BEFORE the wave rules, and a defence that
+                // pulls gatherers home is a rule of the same generation.
+                defendHomeCells: 0);
         }
 
         private static AiHost BuildAiHost(
@@ -528,7 +546,15 @@ namespace Nova.SimRunner.Tests
             // outcome unmoved is exactly the "declared change, no effect yet"
             // case — under the old coupled pin it was indistinguishable from a
             // simulation change.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r7.E34435F9"),
+            //
+            // r8 moves BOTH halves at once, and that combination is itself the
+            // statement: the revision because decisions change (DefendHome
+            // breaks the gatherers off when the base is under attack), and the
+            // profile hash because the rule ships with the off switch that
+            // makes it measurable one-sided (defendHomeCells, 0 = off, M001).
+            // A revision bump with an unmoved profile hash would have meant a
+            // rule nobody can switch off.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r8.1E6E7AE3"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 
@@ -829,7 +855,11 @@ namespace Nova.SimRunner.Tests
                 retreatDangerCells: shipped.RetreatDangerCells,
                 // The COUNT path on purpose — this test pins the r5 rule, and
                 // the strength path has its own test.
-                waveStrengthPoints: 0);
+                waveStrengthPoints: 0,
+                // Defence off for the same reason: this test is about a wave
+                // that must launch, and a rule that can hold units at home is
+                // a second explanation for a wave that does not.
+                defendHomeCells: 0);
 
             AiHost host = BuildMatch(Seed, probe);
             int ring = probe.StagingDistanceCells + probe.StagingToleranceCells;
@@ -949,7 +979,11 @@ namespace Nova.SimRunner.Tests
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: 0,
                 retreatDangerCells: shipped.RetreatDangerCells,
-                waveStrengthPoints: waveStrengthPoints);
+                waveStrengthPoints: waveStrengthPoints,
+                // One variable per probe. The gate is what this measures; a
+                // defence that can pull gatherers home would be a second
+                // reason for a wave to launch later than it did.
+                defendHomeCells: 0);
         }
 
         /// <summary>

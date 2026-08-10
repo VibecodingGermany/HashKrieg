@@ -18,14 +18,35 @@ namespace Nova.AI.Data
     /// can name a goal without pulling the simulation in behind it.
     /// </para>
     /// <para>
-    /// THE ORDER OF THE VALUES IS THE PRIORITY, highest first: when more than
-    /// one condition holds, the lower number wins. It is a fixed order and not a
-    /// profile value on purpose — priorities in the profile would move
-    /// <c>AiProfile.ProfileHash</c> and with it the behaviour identifier printed
-    /// into every lab artifact, and the first step of this strand has to be
-    /// provably behaviour-neutral (ROADMAP.md point 2). A module that needs an
-    /// off setting brings one with it, in the pull request that gives it a rule
-    /// worth switching off.
+    /// THE PRIORITY IS FIXED AND IT IS NOT THE NUMBER. When more than one
+    /// condition holds, the winner is decided by the order the tests are
+    /// written in <c>SkirmishAiSystem.ResolveGoal</c>, which is:
+    /// </para>
+    /// <list type="number">
+    /// <item><see cref="Retreat"/> — a wounded unit outranks everything, or the
+    /// pull-back could never reach the one unit it exists for</item>
+    /// <item><see cref="DefendHome"/> — the base burning outranks gathering for
+    /// a wave that will leave it burning</item>
+    /// <item><see cref="Attack"/></item>
+    /// <item><see cref="Hold"/></item>
+    /// <item><see cref="Advance"/></item>
+    /// </list>
+    /// <para>
+    /// THE NUMBERS ARE APPENDED, NEVER RENUMBERED, and that is why the two came
+    /// apart. A value is written into <c>goals.ndjson</c> as a bare integer;
+    /// renumbering to keep value order equal to priority order would silently
+    /// re-label every recorded run — the panel would print <c>attack</c> where
+    /// the file means <c>hold</c>, which is precisely the display error a
+    /// diagnostic tool must not have. Columns are appended in the artifacts for
+    /// the same reason, and a goal is a column.
+    /// </para>
+    /// <para>
+    /// The priority is fixed in code and not a profile value: priorities in the
+    /// profile would have moved <c>AiProfile.ProfileHash</c> while the first
+    /// step of this strand still had to be provably behaviour-neutral
+    /// (ROADMAP.md point 2). A module that needs an off setting brings one with
+    /// it, in the pull request that gives it a rule worth switching off —
+    /// <see cref="DefendHome"/> is the first that did.
     /// </para>
     /// </summary>
     public enum GoalKind : byte
@@ -67,5 +88,28 @@ namespace Nova.AI.Data
         /// arming it (finding F001, journal V003).
         /// </summary>
         Advance = 4,
+
+        /// <summary>
+        /// The base is under attack and this unit was waiting to leave it:
+        /// break off, walk to the own headquarters, shoot at whoever is nearest.
+        /// Outranks <see cref="Attack"/> — gathering for a wave that marches
+        /// away from a burning base is the defect this goal exists for — and
+        /// gives way to <see cref="Retreat"/>, because a unit too wounded to
+        /// fight is no defender.
+        /// <para>
+        /// ONLY UNITS STILL INSIDE THE STAGING RING. A wave that is already out
+        /// keeps marching: "units that are out are never called back" is the r3
+        /// rule that made a wave a wave, and recalling them is the V002 failure
+        /// mode with a new name.
+        /// </para>
+        /// <para>
+        /// THE DESTINATION IS A STATIC CELL — the headquarters, which does not
+        /// move all match — and not the enemy. That is the whole difference to
+        /// the discarded <c>DefendBase</c>: a moving destination meant a fresh
+        /// order every cadence for every unit, 23 % more intents and a worse
+        /// match (journal V002).
+        /// </para>
+        /// </summary>
+        DefendHome = 5,
     }
 }

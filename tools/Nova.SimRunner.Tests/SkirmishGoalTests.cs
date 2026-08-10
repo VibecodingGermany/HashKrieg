@@ -443,9 +443,263 @@ namespace Nova.SimRunner.Tests
                 "the shipped profile measures the wave in strength, and no such decision was reported");
         }
 
+        // ================================================================
+        // DefendHome (r8) — breaking off the gathering when the base burns
+        //
+        // The five checks VERTEIDIGUNG.md asks for, and the reason each of
+        // them exists is a way the rule could pass while being wrong. Test 2
+        // in particular: without it, "breaks off" and "attacks early" are
+        // both green, and only one of them is the rule.
+        // ================================================================
+
+        /// <summary>
+        /// AN ARMED ENEMY AT THE BASE PUTS THE GATHERERS UNDER
+        /// <see cref="GoalKind.DefendHome"/>, and their orders point home.
+        /// <para>
+        /// Asserted over the ORDER THAT WENT OUT and not only over the reported
+        /// goal: a name in the recording that no unit acts on would be the
+        /// panel lying in a new place.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void AnArmedEnemyAtTheBaseTurnsTheGatherersIntoDefenders()
+        {
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = GatheringHost(AiProfiles.Ms1Canonical, observer, out int hqX, out int hqY);
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            int defenders = 0;
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                if (goal.Goal != GoalKind.DefendHome) continue;
+                defenders++;
+                Assert.That(goal.MoveCellX, Is.EqualTo(hqX), "a defender was not sent to the headquarters");
+                Assert.That(goal.MoveCellY, Is.EqualTo(hqY), "a defender was not sent to the headquarters");
+                Assert.That(goal.AttackTargetRaw, Is.Not.Zero,
+                    "a defender walks home carrying no target — finding F001, it would fire at nothing");
+            }
+            Assert.That(defenders, Is.GreaterThan(0),
+                "the headquarters is under attack and not one waiting unit broke off");
+
+            // And the standing order really is the one the goal names.
+            Assert.That(AnyCombatUnitOrderedTo(host, AiSlot, hqX, hqY), Is.True,
+                "no unit actually carries the march order the recording claims");
+        }
+
+        /// <summary>
+        /// THE WAVE IS INTERRUPTED, NOT RELEASED. No gatherer is sent toward
+        /// the army's target.
+        /// <para>
+        /// WITHOUT THIS TEST BOTH BEHAVIOURS ARE GREEN. "Everyone marches out
+        /// early" also empties the staging ring and also ends with units
+        /// fighting, and it is the opposite of the rule: it takes the defenders
+        /// AWAY from the base that is being shot.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TheDefenceDoesNotSendTheWaveOffEarly()
+        {
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = GatheringHost(AiProfiles.Ms1Canonical, observer, out int hqX, out int hqY);
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                if (goal.Goal != GoalKind.DefendHome) continue;
+
+                // Every step toward the enemy start area is a step away from
+                // the fight at home, so the only acceptable destination is the
+                // headquarters itself.
+                Assert.That(Math.Max(Math.Abs(goal.MoveCellX - hqX), Math.Abs(goal.MoveCellY - hqY)),
+                    Is.Zero,
+                    $"unit {goal.EntityRaw} is under DefendHome and walking to " +
+                    $"{goal.MoveCellX},{goal.MoveCellY} instead of home at {hqX},{hqY}");
+            }
+        }
+
+        /// <summary>
+        /// COMMITTED STAYS COMMITTED. A wave that is already out is not called
+        /// back — the r3 rule that made a wave a wave, and the V002 failure
+        /// mode if it fell through the back door.
+        /// </summary>
+        [Test]
+        public void AWaveThatIsAlreadyOutIsNotCalledBack()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            int ring = shipped.StagingDistanceCells + shipped.StagingToleranceCells;
+
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = SkirmishAiTests.BuildMatch(SkirmishAiTests.Seed, goalObserver: observer);
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True);
+
+            int budget = SkirmishAiTests.EndToEndBudgetTicks;
+            while (budget-- > 0 && FarthestCombatDistance(host, AiSlot, hqX, hqY) <= ring) host.Step();
+            Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.GreaterThan(ring),
+                "the army never marched, so nothing could be called back");
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            bool judgedSomebodyOutside = false;
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                if (goal.HomeDistanceCells <= ring) continue;
+                judgedSomebodyOutside = true;
+                Assert.That(goal.Goal, Is.Not.EqualTo(GoalKind.DefendHome),
+                    $"unit {goal.EntityRaw} is {goal.HomeDistanceCells} cells out, past the ring at " +
+                    $"{ring}, and the defence called it back");
+            }
+            Assert.That(judgedSomebodyOutside, Is.True, "no unit was outside the ring when the enemy arrived");
+        }
+
+        /// <summary>
+        /// THE OFF SETTING IS OFF. With <c>defendHomeCells: 0</c> the same scene
+        /// produces no defender at all.
+        /// <para>
+        /// That the off path is bit-identical to r7 is a claim about two
+        /// BUILDS and cannot be asserted from inside one — it is measured in
+        /// the lab (`compare` against `defend-off`, and the hash chain of the
+        /// canonical match). What belongs here is the half that is checkable:
+        /// zero means the rule cannot fire, which is what makes the one-sided
+        /// measurement mean anything at all (finding M001).
+        /// </para>
+        /// </summary>
+        [Test]
+        public void WithTheRuleOffNobodyDefends()
+        {
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = GatheringHost(DefenceOff(), observer, out int hqX, out int hqY);
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                Assert.That(observer.Units[i].Goal.Goal, Is.Not.EqualTo(GoalKind.DefendHome),
+                    "defendHomeCells is 0 and a unit was still put under DefendHome");
+            }
+            for (int i = before; i < observer.Army.Count; i++)
+            {
+                Assert.That(observer.Army[i].Goal.HomeThreatened, Is.False,
+                    "defendHomeCells is 0 and the posture still reports the base as threatened");
+            }
+        }
+
+        /// <summary>
+        /// NO COMMAND STREAM — the test V002 did not have.
+        /// <para>
+        /// An unchanged situation over several cadences must not produce a
+        /// second order. That is the whole reason the destination is the
+        /// headquarters, a cell that does not move: <c>DefendBase</c> aimed at
+        /// the enemy, handed every unit a fresh destination every cadence, and
+        /// died of 23 % more intents. The enemy here is deliberately left
+        /// standing so the trigger holds while the defenders arrive.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void AHeldDefenceDoesNotProduceAnOrderEveryCadence()
+        {
+            SkirmishAiTests.AiHost host = GatheringHost(AiProfiles.Ms1Canonical, null, out int hqX, out int hqY);
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            RunToNextDecision(host);              // the decision that turns them around
+
+            int cadence = host.Ai.DecisionTickInterval;
+            int afterTurn = host.IntentsSubmitted;
+            for (int i = 0; i < 5; i++) RunToNextDecision(host);
+
+            int perCadence = (host.IntentsSubmitted - afterTurn) / 5;
+            Assert.That(perCadence, Is.LessThanOrEqualTo(2),
+                $"five cadences of an unchanged defence cost {host.IntentsSubmitted - afterTurn} intents " +
+                $"({perCadence} per cadence of {cadence} ticks) — a static destination must be suppressed " +
+                "after the first order, and this is the shape DefendBase died of (journal V002)");
+        }
+
         // ----------------------------------------------------------------
         // Deterministic read helpers (ascending entity index)
         // ----------------------------------------------------------------
+
+        /// <summary>The shipped profile with the defence switched off, and nothing else changed.</summary>
+        private static AiProfile DefenceOff()
+        {
+            AiProfile s = AiProfiles.Ms1Canonical;
+            return new AiProfile(
+                profileId: "defence-off-probe",
+                decisionTickInterval: s.DecisionTickInterval,
+                placementSearchRadius: s.PlacementSearchRadius,
+                powerReserve: s.PowerReserve,
+                targetHarvesters: s.TargetHarvesters,
+                harvesterQueueBatch: s.HarvesterQueueBatch,
+                targetArmySize: s.TargetArmySize,
+                attackSquadThreshold: s.AttackSquadThreshold,
+                infantryQueueBatch: s.InfantryQueueBatch,
+                targetDamageWeight: s.TargetDamageWeight,
+                targetThreatWeight: s.TargetThreatWeight,
+                targetFinishWeight: s.TargetFinishWeight,
+                targetDistanceWeight: s.TargetDistanceWeight,
+                waveSize: s.WaveSize,
+                stagingDistanceCells: s.StagingDistanceCells,
+                stagingToleranceCells: s.StagingToleranceCells,
+                retreatHealthPercent: s.RetreatHealthPercent,
+                retreatDangerCells: s.RetreatDangerCells,
+                waveStrengthPoints: s.WaveStrengthPoints,
+                defendHomeCells: 0);
+        }
+
+        /// <summary>
+        /// A host run forward to the point where the army is GATHERING: it acts
+        /// (so the army step judges anybody at all) and its units are still
+        /// inside the staging ring (so there is something to break off).
+        /// </summary>
+        private static SkirmishAiTests.AiHost GatheringHost(
+            AiProfile profile, RecordingObserver observer, out int hqX, out int hqY)
+        {
+            int ring = profile.StagingDistanceCells + profile.StagingToleranceCells;
+            SkirmishAiTests.AiHost host =
+                SkirmishAiTests.BuildMatch(SkirmishAiTests.Seed, profile, goalObserver: observer);
+
+            Assert.That(TryHqCell(host, AiSlot, out hqX, out hqY), Is.True);
+
+            int budget = SkirmishAiTests.EndToEndBudgetTicks;
+            while (budget-- > 0
+                   && (CountCombatUnits(host, AiSlot) < profile.AttackSquadThreshold
+                       || FarthestCombatDistance(host, AiSlot, hqX, hqY) > ring))
+            {
+                host.Step();
+            }
+
+            Assert.That(CountCombatUnits(host, AiSlot), Is.GreaterThanOrEqualTo(profile.AttackSquadThreshold),
+                "the army never reached its squad threshold, so no goal is handed out at all");
+            Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.LessThanOrEqualTo(ring),
+                "no unit is gathering inside the ring, so there is nothing to break off");
+            return host;
+        }
+
+        /// <summary>Whether any combat unit of the seat carries a march order to this cell.</summary>
+        private static bool AnyCombatUnitOrderedTo(
+            SkirmishAiTests.AiHost host, byte slot, int cellX, int cellY)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < units.Length; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot || !IsCombat(u.Role)) continue;
+                if (!u.TargetGridPos.IsValid) continue;
+                if (u.TargetGridPos.X == cellX && u.TargetGridPos.Y == cellY) return true;
+            }
+            return false;
+        }
 
         private static bool TryHqCell(SkirmishAiTests.AiHost host, byte slot, out int cellX, out int cellY)
         {

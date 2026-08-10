@@ -258,7 +258,8 @@ namespace Nova.SimRunner.Tests
                 targetFinishWeight: 2, targetDistanceWeight: 5,
                 waveSize: 5, stagingDistanceCells: 20, stagingToleranceCells: 3,
                 retreatHealthPercent: 30, retreatDangerCells: 6,
-                waveStrengthPoints: 900);
+                waveStrengthPoints: 900,
+                defendHomeCells: 14);
 
             var bound = new AiFactionProfile("Legion", tuned);
 

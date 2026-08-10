@@ -66,11 +66,24 @@ namespace Nova.AI.Data
         /// </summary>
         public readonly long WaveThreshold;
 
+        /// <summary>
+        /// A visible armed enemy stands within <c>AiProfile.DefendHomeCells</c>
+        /// of the headquarters, so everyone still in the ring breaks off and
+        /// defends (r8). Always false while the rule is off.
+        /// <para>
+        /// APPENDED, like every column before it — a reader of an older file
+        /// keeps reading the columns it has.
+        /// </para>
+        /// </summary>
+        public readonly bool HomeThreatened;
+
         public AiArmyGoal(
             bool engages, uint targetRaw, int moveCellX, int moveCellY,
             int stagingCellX, int stagingCellY, bool waveReady, WaveGateMode waveMode,
-            int gathered, int committed, long gatheredStrength, long waveThreshold)
+            int gathered, int committed, long gatheredStrength, long waveThreshold,
+            bool homeThreatened)
         {
+            HomeThreatened = homeThreatened;
             Engages = engages;
             TargetRaw = targetRaw;
             MoveCellX = moveCellX;

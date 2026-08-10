@@ -502,28 +502,39 @@ namespace Nova.AI
                 }
             }
 
+            // Cells of the visible ARMED enemies, collected once per decision.
+            // A local list, not a field: the system stays a pure function of
+            // the committed state, and nothing survives the decision.
+            //
+            // IT IS COLLECTED BEFORE THE POSTURE, and it has to be. The posture
+            // now answers "is the base under attack", which is a question about
+            // this list — and gathering it inside the per-unit loop below, where
+            // it used to live, would have meant asking after the answer was
+            // needed.
+            //
+            // TWO RULES SHARE IT, SO TWO RULES OPEN IT. The gate used to read
+            // RetreatHealthPercent alone; leaving it that way would have let
+            // retreat-off switch the defence off in silence, and the lab's
+            // `retreat-off` candidate would then measure something other than
+            // its name.
+            List<long> threatCells = null;
+            List<uint> threatRaws = null;
+            if (_profile.Profile.RetreatHealthPercent > 0 || _profile.Profile.DefendHomeCells > 0)
+            {
+                threatCells = new List<long>();
+                threatRaws = new List<uint>();
+                CollectVisibleThreats(threatCells, threatRaws);
+            }
+
             // ---- (6) Army: resolve one posture for the army, one GOAL per
             // unit, then submit the resulting orders grouped. See the three
-            // steps below; the rules are exactly the ones the previous
-            // whole-army block applied. ----
+            // steps below; the rules are the ones the previous whole-army
+            // block applied, plus the defence r8 adds to the catalogue. ----
             ArmyPosture posture = ResolveArmyPosture(
-                faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY);
+                faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY, threatCells);
             if (_goalObserver != null) ReportArmyGoal(tick, in posture);
             if (posture.Engages)
             {
-                // Cells of the visible ARMED enemies, collected once per
-                // decision and only while the retreat rule is on. A local
-                // list, not a field: the system stays a pure function of the
-                // committed state, and nothing survives the decision.
-                List<long> threatCells = null;
-                List<uint> threatRaws = null;
-                if (_profile.Profile.RetreatHealthPercent > 0)
-                {
-                    threatCells = new List<long>();
-                    threatRaws = new List<uint>();
-                    CollectVisibleThreats(threatCells, threatRaws);
-                }
-
                 var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
@@ -605,6 +616,25 @@ namespace Nova.AI
             /// </summary>
             public bool WaveReady;
 
+            /// <summary>
+            /// The own headquarters cell — where a defender walks. Static for
+            /// the whole match, which is the property the rule is built on: a
+            /// destination that does not move produces ONE order and not a
+            /// stream of them.
+            /// </summary>
+            public int HomeCellX;
+
+            /// <summary>See <see cref="HomeCellX"/>.</summary>
+            public int HomeCellY;
+
+            /// <summary>
+            /// A visible ARMED enemy stands within
+            /// <see cref="AiProfile.DefendHomeCells"/> of the headquarters, so
+            /// the units still waiting in the ring break off (r8). Always false
+            /// while the rule is off, which is what keeps that path identical.
+            /// </summary>
+            public bool HomeThreatened;
+
             // ---- what the verdict above was reached FROM ----
             //
             // Not inputs to any rule: every one of these is already worked out
@@ -656,7 +686,7 @@ namespace Nova.AI
         /// </summary>
         private ArmyPosture ResolveArmyPosture(
             FactionId faction, uint barracksRaw, int combatCount, List<UnitState> combatUnits,
-            int hqCellX, int hqCellY)
+            int hqCellX, int hqCellY, List<long> threatCells)
         {
             var posture = new ArmyPosture
             {
@@ -666,6 +696,9 @@ namespace Nova.AI
                 StagingCellX = -1,
                 StagingCellY = -1,
                 WaveReady = true,
+                HomeCellX = hqCellX,
+                HomeCellY = hqCellY,
+                HomeThreatened = IsHomeThreatened(hqCellX, hqCellY, threatCells),
             };
             if (!posture.Engages) return posture;
 
@@ -890,6 +923,42 @@ namespace Nova.AI
         }
 
         /// <summary>
+        /// Whether a visible ARMED enemy stands within
+        /// <see cref="AiProfile.DefendHomeCells"/> of the own headquarters — the
+        /// whole trigger of <see cref="GoalKind.DefendHome"/> (r8).
+        /// <para>
+        /// THREE PROPERTIES, EACH WITH A REASON. <b>Armed</b>, because a
+        /// harvester at the fence is not an attack, and reacting to anything
+        /// that moves is exactly what sank <c>DefendBase</c> (journal V002) —
+        /// <see cref="CollectVisibleThreats"/> filters that way already.
+        /// <b>Visible</b>, because anything else is a look through the fog.
+        /// <b>Around the headquarters</b>, not around any building: the entity
+        /// scan has that cell in hand, the observed and measured case is the one
+        /// at the headquarters, and "every building" would need a reason as well
+        /// as a wider scan. If the measurement later shows attacks on the
+        /// refinery going through the same way, that arrives as its own number.
+        /// </para>
+        /// <para>
+        /// A cheap ANY question, deliberately: which enemy is nearest is the
+        /// pursuer's business (<see cref="NearestThreatRaw"/>), and the trigger
+        /// does not need it.
+        /// </para>
+        /// </summary>
+        private bool IsHomeThreatened(int hqCellX, int hqCellY, List<long> threatCells)
+        {
+            int radius = _profile.Profile.DefendHomeCells;
+            if (radius <= 0 || threatCells == null) return false;
+
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int threatX = (int)(uint)threatCells[i];
+                int threatY = (int)(threatCells[i] >> 32);
+                if (Math.Abs(hqCellX - threatX) <= radius && Math.Abs(hqCellY - threatY) <= radius) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// The cells of every ARMED enemy in the team's committed view, packed
         /// as <c>(y &lt;&lt; 32) | x</c>. Unarmed entities are left out: a
         /// harvester at the fence is not a reason to run, and treating it as
@@ -1074,7 +1143,8 @@ namespace Nova.AI
             // ran home and is still under the rule. A fresh reinforcement gets
             // zero and should: it holds no stale order to overwrite, and aiming
             // while standing still is worse than letting D-087 acquire (F001).
-            uint pursuerRaw = goal == GoalKind.Retreat || (goal == GoalKind.Hold && retreats)
+            uint pursuerRaw = goal == GoalKind.Retreat || goal == GoalKind.DefendHome
+                    || (goal == GoalKind.Hold && retreats)
                 ? NearestThreatRaw(in unit, threatCells, threatRaws)
                 : 0u;
 
@@ -1108,6 +1178,14 @@ namespace Nova.AI
         /// of the march test, so without this the pull-back could never reach
         /// the one unit it exists for. Retreat has to outrank "you are out with
         /// the wave, keep going".</item>
+        /// <item><b><c>DefendHome</c> sits between the two, and both sides of
+        /// that are load-bearing.</b> It gives way to <c>Retreat</c> because a
+        /// unit too wounded to fight is no defender — and it outranks
+        /// <c>Attack</c> because the units it is for would otherwise gather for
+        /// a wave that marches away from their burning base. It asks only about
+        /// units still INSIDE the ring: a wave that is already out keeps going,
+        /// which is the r3 rule that made a wave a wave and the V002 failure
+        /// mode if it were dropped.</item>
         /// </list>
         /// </summary>
         private GoalKind ResolveGoal(
@@ -1115,7 +1193,13 @@ namespace Nova.AI
             bool retreats, bool arrived)
         {
             if (retreats && !arrived) return GoalKind.Retreat;
-            if (!retreats && IsFitToMarch(in unit, in posture, hqCellX, hqCellY)) return GoalKind.Attack;
+
+            // Asked once and read twice — the defence needs to know that the
+            // unit is still gathering, and the march test needs the same fact.
+            bool committed = IsCommittedToTheWave(in unit, hqCellX, hqCellY);
+
+            if (!retreats && posture.HomeThreatened && !committed) return GoalKind.DefendHome;
+            if (!retreats && IsFitToMarch(in posture, committed)) return GoalKind.Attack;
             if (arrived) return GoalKind.Hold;
             return GoalKind.Advance;
         }
@@ -1125,11 +1209,11 @@ namespace Nova.AI
         /// resolved at all, or the wave launches this decision, or the unit is
         /// already out with an earlier one and is not called back.
         /// </summary>
-        private bool IsFitToMarch(in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY)
+        private static bool IsFitToMarch(in ArmyPosture posture, bool committed)
         {
             return posture.StagingCellX < 0
                 || posture.WaveReady
-                || IsCommittedToTheWave(in unit, hqCellX, hqCellY);
+                || committed;
         }
 
         /// <summary>
@@ -1197,6 +1281,23 @@ namespace Nova.AI
                         MoveCellY = -1,
                     };
 
+                case GoalKind.DefendHome:
+                    // The same shape Retreat has, aimed at the other static
+                    // cell: walk to the headquarters, shoot the nearest armed
+                    // enemy on the way. Static is the operative word — the
+                    // headquarters does not move all match, so the re-issue
+                    // suppression in SubmitAssignments swallows every repeat
+                    // and a defence that lasts twenty cadences costs one order.
+                    // DefendBase aimed at the ENEMY, which moves, and paid a
+                    // fresh order per unit per cadence for it (journal V002).
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = posture.HomeCellX,
+                        MoveCellY = posture.HomeCellY,
+                    };
+
                 default:
                     // Advance — and GoalKind.None with it. A mask that names
                     // None never reaches here (it means "leave it to the AI"),
@@ -1223,7 +1324,8 @@ namespace Nova.AI
             _goalObserver.OnArmyGoal(_aiPlayerId, tick, new AiArmyGoal(
                 posture.Engages, posture.TargetRaw, posture.MoveCellX, posture.MoveCellY,
                 posture.StagingCellX, posture.StagingCellY, posture.WaveReady, posture.WaveMode,
-                posture.Gathered, posture.Committed, posture.GatheredStrength, posture.WaveThreshold));
+                posture.Gathered, posture.Committed, posture.GatheredStrength, posture.WaveThreshold,
+                posture.HomeThreatened));
         }
 
         /// <summary>

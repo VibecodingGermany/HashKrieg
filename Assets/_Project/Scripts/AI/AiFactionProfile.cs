@@ -80,7 +80,8 @@ namespace Nova.AI
                 stagingToleranceCells: shipped.StagingToleranceCells,
                 retreatHealthPercent: shipped.RetreatHealthPercent,
                 retreatDangerCells: shipped.RetreatDangerCells,
-                waveStrengthPoints: shipped.WaveStrengthPoints);
+                waveStrengthPoints: shipped.WaveStrengthPoints,
+                defendHomeCells: shipped.DefendHomeCells);
         }
 
         /// <summary>Binds a faction name to a fully specified profile — the tuning path.</summary>
