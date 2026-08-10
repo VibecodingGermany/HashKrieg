@@ -60,8 +60,11 @@ namespace Nova.AI
     /// Builder is queued at the HQ when none is alive; (3) once the Refinery
     /// stands, harvesters are queued up to
     /// <see cref="AiFactionProfile.TargetHarvesterCount"/>, every idle own
-    /// harvester receives a Harvest intent on the own field, and harvesters
-    /// held out of reach are WALKED into the economy's reach rule with
+    /// harvester receives a Harvest intent on the nearest field THAT STILL
+    /// HOLDS RESERVE (an exhausted one is skipped — without that test the step
+    /// re-issues an order the economy clears again on the same tick, forever;
+    /// issue #85), and harvesters held out of reach are WALKED into the
+    /// economy's reach rule with
     /// explicit Move intents (gather leg toward a field-and-footprint
     /// dual-reach cell, return leg toward the footprint — this slice does not
     /// use the Refinery's rally point at all, it micro-manages like a human;
@@ -379,10 +382,26 @@ namespace Nova.AI
             // instead of a hardcoded list, precisely so the producer move
             // could not strand it. Using the rally point here would change
             // behavior and belongs in its own PR. ----
-            if (refineryRaw != 0
-                && TryGetOwnFieldCell(hqCellX, hqCellY, out ushort ownFieldId, out int fieldX, out int fieldY))
+            if (refineryRaw != 0)
             {
-                if (SimDefinitions.TryGetUnit(faction, UnitRole.Harvester, out SimUnitDefinition harvesterDef))
+                // A field that can still be mined — see TryGetOwnFieldCell for
+                // what happens without the reserve test (issue #85).
+                bool haveField = TryGetOwnFieldCell(
+                    hqCellX, hqCellY, mustHaveReserve: true,
+                    out ushort ownFieldId, out int fieldX, out int fieldY);
+
+                // NOTHING LEFT TO MINE IS NOT THE SAME AS NOTHING LEFT TO DO,
+                // and the difference is the whole reason this gate sits inside
+                // the step instead of on it. Everything that needs a field —
+                // ordering more harvesters, sending idle ones out, walking them
+                // to the gather spot — stops. The RETURN leg does not: a
+                // harvester holding its last load has somewhere to take it, and
+                // an out-of-reach return order is HELD rather than dropped, so
+                // closing that distance stays the AI's job. Skipping the whole
+                // step would have stranded the final loads at the moment the
+                // map runs dry — a smaller defect than #85, and a new one.
+                if (haveField
+                    && SimDefinitions.TryGetUnit(faction, UnitRole.Harvester, out SimUnitDefinition harvesterDef))
                 {
                     int have = harvesters + CountQueuedAt(refineryRaw, harvesterDef.DefinitionId);
                     int batch = Math.Min(HarvesterQueueBatch, _profile.TargetHarvesterCount - have);
@@ -392,7 +411,7 @@ namespace Nova.AI
                     }
                 }
 
-                if (idleHarvesterRaws.Count > 0)
+                if (haveField && idleHarvesterRaws.Count > 0)
                 {
                     idleHarvesterRaws.Sort();
                     SubmitEntityList(idleHarvesterRaws,
@@ -407,13 +426,16 @@ namespace Nova.AI
                 // footprint. Deterministic ascending picks.
                 int refineryOriginX = refineryCellX - 1;
                 int refineryOriginY = refineryCellY - 1;
-                bool haveGatherSpot = TryFindDualReachCell(fieldX, fieldY, refineryOriginX, refineryOriginY,
-                    out int gatherX, out int gatherY);
-                if (!haveGatherSpot)
+                int gatherX = 0, gatherY = 0;
+                if (haveField)
                 {
-                    // The field cell itself always satisfies harvest reach.
-                    gatherX = fieldX;
-                    gatherY = fieldY;
+                    if (!TryFindDualReachCell(fieldX, fieldY, refineryOriginX, refineryOriginY,
+                            out gatherX, out gatherY))
+                    {
+                        // The field cell itself always satisfies harvest reach.
+                        gatherX = fieldX;
+                        gatherY = fieldY;
+                    }
                 }
                 int returnX, returnY;
                 bool haveReturnSpot = TryFindFootprintAdjacentCell(refineryOriginX, refineryOriginY,
@@ -441,7 +463,11 @@ namespace Nova.AI
                     {
                         // Out-of-reach harvest orders are HELD, never dropped
                         // (EconomySystem) — closing the distance is the AI's
-                        // job, exactly like a human's move click.
+                        // job, exactly like a human's move click. With no
+                        // mineable field there is nothing to close a distance
+                        // to, and walking them to the empty one is the loop
+                        // this whole change exists to end.
+                        if (!haveField) continue;
                         if (IsInFieldReach(cellX, cellY, fieldX, fieldY)) continue;
                         if (AlreadyHeadingTo(in harvester, gatherX, gatherY)) continue;
                         gatherEscort.Add(harvesterRaws[i]);
@@ -1158,8 +1184,13 @@ namespace Nova.AI
         {
             if (!SimDefinitions.TryGetBuilding(faction, role, out SimBuildingDefinition def)) return;
             if (credits < def.CostAE) return;
+            // The anchor answers "where is my base", not "where can I mine", so
+            // an exhausted field is still the right answer here — see
+            // TryGetOwnFieldCell. Filtering here as well would put a rebuilt
+            // Refinery next to whatever field still has reserve, which on the
+            // canonical map is across the board.
             int anchorX = hqCellX, anchorY = hqCellY;
-            if (TryGetOwnFieldCell(hqCellX, hqCellY, out _, out int fieldX, out int fieldY))
+            if (TryGetOwnFieldCell(hqCellX, hqCellY, mustHaveReserve: false, out _, out int fieldX, out int fieldY))
             {
                 anchorX = fieldX;
                 anchorY = fieldY;
@@ -1264,8 +1295,49 @@ namespace Nova.AI
         /// id) — the demo map seats every base beside its field. Field ids are
         /// host-assigned and nonzero; the registry is probed over its format
         /// capacity in ascending id order.
+        /// <para>
+        /// WITHOUT <paramref name="mustHaveReserve"/> THE ECONOMY LIVELOCKS, and
+        /// a beta test found it (issue #85): <see cref="EconomySystem"/> clears
+        /// <c>HarvestFieldId</c> the moment a field is empty, that clearing is
+        /// exactly what puts the harvester back into the idle list of the
+        /// economy step, and the idle list is sent straight back to the same
+        /// empty field. Every decision tick, for the rest of the match, at an
+        /// income of zero. The AI was not slow after its field ran out, it was
+        /// economically dead — while the three fields away from the two start
+        /// positions (9.000, 9.000 and 15.000 AE) stood open.
+        /// </para>
+        /// <para>
+        /// THE FLAG IS THE DIFFERENCE BETWEEN THE TWO CALLERS, and it is not a
+        /// detail. The economy step needs a field it can still mine. The
+        /// placement step needs to know WHERE THE OWN BASE IS and uses the
+        /// nearest field as that anchor — skipping exhausted fields there too
+        /// would move a rebuilt Refinery to whatever field still has reserve, on
+        /// the canonical map the contested centre or the far corner, sixty cells
+        /// from home. Where a Refinery belongs once the home field runs dry is a
+        /// real question and a strategic one; answering it here by accident
+        /// would be worse than not answering it.
+        /// </para>
+        /// <para>
+        /// THIS IS NOT NEW INFORMATION FOR AN AI TO READ. The human path has
+        /// filtered exhausted fields all along (<c>RtsDeviceInput</c>); the two
+        /// were meant to share the rule from the moment the fields became
+        /// finite, and only one of them was carried over. A field's remaining
+        /// reserve is committed state and no more fog-hidden than its position,
+        /// so the READ BOUNDARY in the class remarks is untouched.
+        /// </para>
+        /// <para>
+        /// Determinism unchanged: ascending ids, <c>long</c> distances, strict
+        /// <c>&lt;</c> so a tie keeps the LOWER id. No float, no hash container,
+        /// no dependency on iteration order.
+        /// </para>
         /// </summary>
-        private bool TryGetOwnFieldCell(int hqCellX, int hqCellY, out ushort fieldId, out int cellX, out int cellY)
+        private bool TryGetOwnFieldCell(
+            int hqCellX,
+            int hqCellY,
+            bool mustHaveReserve,
+            out ushort fieldId,
+            out int cellX,
+            out int cellY)
         {
             fieldId = 0;
             cellX = 0;
@@ -1274,6 +1346,7 @@ namespace Nova.AI
             for (ushort id = 1; id <= EconomySystem.MaxFields; id++)
             {
                 if (!_economy.TryGetField(id, out AetheriumField field)) continue;
+                if (mustHaveReserve && field.IsExhausted) continue;
                 long dx = field.GridPos.X - hqCellX;
                 long dy = field.GridPos.Y - hqCellY;
                 long distanceSquared = dx * dx + dy * dy;
