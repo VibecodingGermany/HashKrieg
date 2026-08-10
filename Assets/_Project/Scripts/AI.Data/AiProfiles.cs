@@ -157,10 +157,13 @@ namespace Nova.AI.Data
             //
             // The wave is INTERRUPTED, not released: the destination is the own
             // headquarters, a static cell, so the defenders walk toward the
-            // fight rather than away from it and the re-issue suppression
-            // swallows every repeat. That is the correction over the discarded
-            // DefendBase (V002), which handed the whole army a moving target
-            // every cadence and paid 23 % more intents for it.
+            // fight rather than away from it, the re-issue suppression swallows
+            // the repeats on the way, and a defender that has arrived is not
+            // ordered any more at all (the suppression alone cannot carry that
+            // — arriving clears the standing order it compares against). That is
+            // the correction over the discarded DefendBase (V002), which handed
+            // the whole army a moving target every cadence and paid 23 % more
+            // intents for it.
             //
             // 0 switches the rule off and restores r7 exactly (M001).
             defendHomeCells: 10);

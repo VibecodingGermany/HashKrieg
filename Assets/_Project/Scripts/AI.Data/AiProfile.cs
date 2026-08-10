@@ -203,12 +203,21 @@ namespace Nova.AI.Data
         /// <para>
         /// THERE IS NO SECOND RADIUS. A hysteresis value — "stay home until the
         /// enemy is fourteen cells out" — is the obvious second number and is
-        /// deliberately absent: both destinations are STATIC cells and the
-        /// re-issue suppression already swallows an unchanged order, so whether
-        /// the trigger flutters is a question for the intent column and not for
-        /// a precaution. That is the correction over the discarded
-        /// <c>DefendBase</c> (journal V002), which handed the WHOLE army a new
-        /// destination every cadence and paid 23 % more intents for it.
+        /// deliberately absent: both destinations are STATIC cells, a defender
+        /// that has arrived stops being ordered at all, and the re-issue
+        /// suppression swallows the rest, so whether the trigger flutters is a
+        /// question for the intent column and not for a precaution. That is the
+        /// correction over the discarded <c>DefendBase</c> (journal V002), which
+        /// handed the WHOLE army a new destination every cadence and paid 23 %
+        /// more intents for it.
+        /// </para>
+        /// <para>
+        /// THE STATIC CELL IS NOT ENOUGH ON ITS OWN, and the first version of
+        /// this rule assumed it was. The suppression compares the STANDING
+        /// order, and arriving clears it — so the silence a defender needs once
+        /// it is home is written out in <c>SkirmishAiSystem.HasArrivedAtHome</c>
+        /// rather than falling out of the geometry. Measured before that
+        /// existed: one move intent per cadence for as long as the siege ran.
         /// </para>
         /// </summary>
         public int DefendHomeCells { get; }

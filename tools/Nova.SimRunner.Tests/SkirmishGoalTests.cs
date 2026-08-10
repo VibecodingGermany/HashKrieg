@@ -115,13 +115,14 @@ namespace Nova.SimRunner.Tests
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// Every judged unit is under exactly one of the four goals, and the
+        /// Every judged unit is under exactly one of the five goals, and the
         /// three the canonical match has to contain all show up.
         /// <para>
-        /// <c>Retreat</c> is NOT among them and cannot be: the opponent of this
-        /// match is passive and owns no armed unit, so no threat is ever visible
-        /// and nothing ever turns back. It has its own test below with the
-        /// wound written in — the same reason
+        /// <c>Retreat</c> and <c>DefendHome</c> are NOT among them and cannot
+        /// be: the opponent of this match is passive and owns no armed unit, so
+        /// no threat is ever visible — nothing turns back and nothing comes
+        /// home. Both have their own tests below with a threat spawned in — the
+        /// same reason
         /// <c>SkirmishAi_PullsWoundedUnitsBackTowardTheirOwnBase</c> exists
         /// beside the pinned end-to-end run.
         /// </para>
@@ -627,6 +628,165 @@ namespace Nova.SimRunner.Tests
                 "after the first order, and this is the shape DefendBase died of (journal V002)");
         }
 
+        /// <summary>
+        /// A DEFENDER THAT HAS ARRIVED IS NOT SENT HOME AGAIN. Over ten cadences
+        /// of an unchanged siege, a unit standing at the base with no march
+        /// order still has none afterwards.
+        /// <para>
+        /// THE INTENT COUNT COULD NOT SEE THIS, which is why the test beside it
+        /// was not enough. Every defender shares one destination, so the repeat
+        /// costs ONE grouped intent per cadence — inside the tolerance the count
+        /// test allows, and invisible next to the economy's own traffic. The
+        /// defect is only visible on the unit: <c>MovementSystem</c> calls
+        /// <c>UnitState.Stop()</c> on arrival, which clears the very field the
+        /// re-issue suppression compares, so "the destination is static" stops
+        /// protecting anything the moment somebody gets there. Measured before
+        /// the fix: eight standing units re-ordered every cadence, for as long
+        /// as the siege lasted.
+        /// </para>
+        /// <para>
+        /// Asserted on the STANDING ORDER and not on a goal report: the goal is
+        /// still <c>DefendHome</c> either way — a defender at the base IS
+        /// defending — and what changed is the order it produces.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void AnArrivedDefenderIsNotSentHomeAgain()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = GatheringHost(shipped, observer, out int hqX, out int hqY);
+
+            // The trigger has to survive TWO cadences — one to turn the army
+            // around, one to judge the subject — and twelve defenders kill a
+            // shipped-health intruder inside the first.
+            SpawnEnemyInfantry(host, hqX + 2, hqY, maxHealth: 100_000_000);
+            RunToNextDecision(host);   // the defence fires and the gatherers turn around
+
+            // The subject is now PUT where a defender is two cadences later:
+            // at the headquarters, stopped. Placed rather than walked there on
+            // purpose — a real siege kills units, the army drops under its
+            // squad threshold, the whole army step stops running, and then
+            // everything stands still for a reason that has nothing to do with
+            // this rule. That scene passes while the defect is fully present.
+            //
+            // It is placed AFTER a decision has landed, not before: an intent
+            // sealed at the previous cadence arrives a tick later and would put
+            // the standing order straight back.
+            Assert.That(TryFirstCombatUnit(host, AiSlot, out EntityId subjectId, out _, out _), Is.True);
+            ref UnitState parked = ref host.Entities.GetUnitRef(subjectId);
+            parked.Transform = new Transform2D(SimFixed.FromInt(hqX), SimFixed.FromInt(hqY));
+            parked.Stop();
+
+            uint subjectRaw = UnitCommandStateView.ToRawEntityId(subjectId);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            bool seen = false;
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                if (goal.EntityRaw != subjectRaw) continue;
+                seen = true;
+
+                Assert.That(goal.Goal, Is.EqualTo(GoalKind.DefendHome),
+                    "the subject stands at a headquarters under attack and is not defending it");
+                Assert.That(goal.MoveCellX, Is.LessThan(0),
+                    "a defender that is already home was sent home AGAIN. The march order is suppressed "
+                    + "by comparing UnitState.TargetGridPos, and MovementSystem CLEARS that field on "
+                    + "arrival — so 'the destination is static' stops protecting anything the moment "
+                    + "somebody gets there, and the headquarters cell goes out every cadence for the "
+                    + "whole siege (journal V002 is this shape, one size down). DefendHome has to fall "
+                    + "silent itself, the way Hold does at the staging cell");
+                Assert.That(goal.AttackTargetRaw, Is.Not.Zero,
+                    "silence about WALKING must not become silence about SHOOTING — a defender at the "
+                    + "base still needs a target");
+                break;
+            }
+            Assert.That(seen, Is.True, "the subject was never judged");
+
+            // And the silence is about being home, not about the goal being
+            // inert: the gatherers twelve cells out are still ordered in.
+            Assert.That(AnyCombatUnitOrderedTo(host, AiSlot, hqX, hqY), Is.True,
+                "no unit at all was ordered home, so the scene never exercised the rule");
+
+            // Finally the world, not the report: nothing was submitted for it.
+            Assert.That(host.Entities.TryGetUnit(subjectId, out UnitState after), Is.True);
+            Assert.That(after.TargetGridPos.IsValid, Is.False,
+                "the subject carries a march order again, so an intent went out for a unit that was "
+                + "already standing where it was being sent");
+        }
+
+        /// <summary>
+        /// A WOUNDED UNIT THAT IS ALREADY HOME DEFENDS LIKE ANYBODY ELSE.
+        /// <para>
+        /// The rule used to ask not to be retreating, and that clause could only
+        /// ever catch a unit that had ARRIVED — one still running is taken by
+        /// <c>Retreat</c> one line earlier. But arriving ENDS the retreat by the
+        /// AI's own rule (MS-1 units never heal, so a unit that stayed under
+        /// <c>Retreat</c> until it recovered would occupy the army cap forever).
+        /// So the clause did nothing except hand the units who were already back
+        /// at the gathering point to <c>Hold</c>: standing twelve cells out,
+        /// aiming at a pursuer they could not reach, while the base they had run
+        /// to was being shot.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void AWoundedUnitThatIsAlreadyHomeDefendsInsteadOfHolding()
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = GatheringHost(shipped, observer, out int hqX, out int hqY);
+
+            Assert.That(observer.Army.Count, Is.GreaterThan(0), "the army never reported a posture");
+            AiArmyGoal army = observer.Army[observer.Army.Count - 1].Goal;
+            Assert.That(army.StagingCellX, Is.GreaterThanOrEqualTo(0), "no staging cell was resolved");
+
+            // The subject: parked AT the staging cell and standing, so it counts
+            // as arrived and its retreat is over.
+            Assert.That(TryFirstCombatUnit(host, AiSlot, out EntityId subjectId, out _, out _), Is.True);
+            ref UnitState subject = ref host.Entities.GetUnitRef(subjectId);
+            subject.Transform = new Transform2D(
+                SimFixed.FromInt(army.StagingCellX), SimFixed.FromInt(army.StagingCellY));
+            subject.Stop();
+            subject.CurrentHealth = subject.MaxHealth * (shipped.RetreatHealthPercent - 20) / 100;
+
+            // One enemy that satisfies BOTH halves at once: inside the defence
+            // radius of the headquarters, and inside the danger radius of the
+            // subject — which is what makes it a wounded unit that is home AND
+            // under the retreat rule, the only case the dropped clause touched.
+            int enemyX = (hqX + army.StagingCellX) / 2;
+            int enemyY = (hqY + army.StagingCellY) / 2;
+            Assert.That(Math.Max(Math.Abs(enemyX - hqX), Math.Abs(enemyY - hqY)),
+                Is.LessThanOrEqualTo(shipped.DefendHomeCells), "the enemy does not threaten the base");
+            Assert.That(
+                Math.Max(Math.Abs(enemyX - army.StagingCellX), Math.Abs(enemyY - army.StagingCellY)),
+                Is.LessThanOrEqualTo(shipped.RetreatDangerCells), "the enemy does not endanger the subject");
+            SpawnEnemyInfantry(host, enemyX, enemyY, maxHealth: 100_000_000);
+
+            uint subjectRaw = UnitCommandStateView.ToRawEntityId(subjectId);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            bool seen = false;
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                if (goal.EntityRaw != subjectRaw) continue;
+                seen = true;
+
+                Assert.That(goal.Goal, Is.EqualTo(GoalKind.DefendHome),
+                    $"a wounded unit that is already home was reported as {goal.Goal} while the base is "
+                    + "under attack — arriving ends the retreat, so it is an ordinary defender");
+                Assert.That(goal.MoveCellX, Is.EqualTo(hqX), "the defender was not sent to the headquarters");
+                Assert.That(goal.MoveCellY, Is.EqualTo(hqY), "the defender was not sent to the headquarters");
+                Assert.That(goal.HealthPercent, Is.LessThan(shipped.RetreatHealthPercent),
+                    "the subject is not actually under the retreat threshold, so it proves nothing");
+                break;
+            }
+            Assert.That(seen, Is.True, "the subject was never judged");
+        }
+
         // ----------------------------------------------------------------
         // Deterministic read helpers (ascending entity index)
         // ----------------------------------------------------------------
@@ -766,7 +926,20 @@ namespace Nova.SimRunner.Tests
             return false;
         }
 
-        private static void SpawnEnemyInfantry(SkirmishAiTests.AiHost host, int cellX, int cellY)
+        /// <summary>
+        /// An armed enemy of the passive seat at a cell.
+        /// <para>
+        /// <paramref name="maxHealth"/> exists for the tests that need the
+        /// TRIGGER TO HOLD over many cadences: with the shipped health the
+        /// defenders kill the intruder within two or three of them, and a test
+        /// about what a standing defence costs would then be measuring the quiet
+        /// after the fight. An enemy that cannot be killed is not a claim about
+        /// the game, it is a way to keep one condition true while another is
+        /// counted.
+        /// </para>
+        /// </summary>
+        private static void SpawnEnemyInfantry(
+            SkirmishAiTests.AiHost host, int cellX, int cellY, int maxHealth = 0)
         {
             const byte enemySlot = 0;
             FactionId faction = host.Economy.GetSlotFaction(enemySlot);
@@ -775,9 +948,10 @@ namespace Nova.SimRunner.Tests
                 enemySlot,
                 new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
                 def.MoveSpeed,
-                maxHealth: def.MaxHealth,
+                maxHealth: maxHealth > 0 ? maxHealth : def.MaxHealth,
                 role: UnitRole.BasicInfantry);
         }
+
 
         /// <summary>
         /// To the next decision cadence and two ticks further, so the sealed

@@ -71,8 +71,9 @@ namespace Nova.AI
     /// <see cref="AiFactionProfile.TargetArmySize"/> as funds allow;
     /// (5) the army resolves a POSTURE (does it act at all, which target,
     /// which destination), then ONE GOAL PER UNIT out of the fixed priority
-    /// list in <see cref="GoalKind"/> — <c>Retreat</c>, <c>Attack</c>,
-    /// <c>Hold</c>, <c>Advance</c> — whose effect is the unit's orders, then
+    /// list in <see cref="GoalKind"/> — <c>Retreat</c>, <c>DefendHome</c>,
+    /// <c>Attack</c>, <c>Hold</c>, <c>Advance</c> — whose effect is the unit's
+    /// orders, then
     /// submission that groups units sharing an order into a single intent: at
     /// <see cref="AiFactionProfile.AttackSquadThreshold"/> living combat units
     /// the army is sent toward the enemy start area, and the best scored
@@ -978,10 +979,19 @@ namespace Nova.AI
                 if (_construction.IsActiveSite(u.Id)) continue;
                 if (WeaponProfiles.Get(_economy.GetSlotFaction(u.PlayerId), u.Role).AttackDamage <= 0) continue;
 
+                // A handle the wire format cannot express is dropped here, the
+                // same way the own scan drops it. Zero is not a spare value in
+                // this list: it wins the tie-break on the lowest raw id in
+                // NearestThreatRaw, and an assignment carrying it submits NO
+                // attack intent — the threat would silence the pursuer instead
+                // of aiming it.
+                uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
+                if (raw == 0) continue;
+
                 long x = GridCellOf(u.Transform.PositionX);
                 long y = GridCellOf(u.Transform.PositionY);
                 cells.Add((y << 32) | x);
-                raws.Add(UnitCommandStateView.ToRawEntityId(u.Id));
+                raws.Add(raw);
             }
         }
 
@@ -1148,7 +1158,14 @@ namespace Nova.AI
                 ? NearestThreatRaw(in unit, threatCells, threatRaws)
                 : 0u;
 
-            UnitAssignment assignment = ApplyGoal(goal, entityRaw, in posture, pursuerRaw);
+            // Whether the defender is already standing at the base — the second
+            // caller-computed fact the table reads, for the same reason the
+            // pursuer is one: a defender that has arrived must fall silent, or
+            // the headquarters cell goes out again every cadence. See
+            // HasArrivedAtHome.
+            bool atHome = HasArrivedAtHome(in unit, in posture);
+
+            UnitAssignment assignment = ApplyGoal(goal, entityRaw, in posture, pursuerRaw, atHome);
 
             if (_goalObserver != null)
             {
@@ -1159,10 +1176,10 @@ namespace Nova.AI
         }
 
         /// <summary>
-        /// WHICH GOAL THIS UNIT IS UNDER — the four conditions, in priority
-        /// order, exactly as <see cref="GoalKind"/> numbers them.
+        /// WHICH GOAL THIS UNIT IS UNDER — the five conditions, in priority
+        /// order, exactly as <see cref="GoalKind"/> lists them.
         /// <para>
-        /// TWO CLAUSES ARE NOT OBVIOUS AND BOTH ARE LOAD-BEARING.
+        /// THREE CLAUSES ARE NOT OBVIOUS AND ALL THREE ARE LOAD-BEARING.
         /// </para>
         /// <list type="number">
         /// <item><b><c>Retreat</c> steps aside for a unit that has arrived.</b>
@@ -1186,6 +1203,16 @@ namespace Nova.AI
         /// units still INSIDE the ring: a wave that is already out keeps going,
         /// which is the r3 rule that made a wave a wave and the V002 failure
         /// mode if it were dropped.</item>
+        /// <item><b>It does NOT ask whether the unit is wounded.</b> It cannot,
+        /// and the first version that did was wrong: <c>Retreat</c> has already
+        /// returned above for every unit still running, so the only wounded unit
+        /// that reaches this line is one that HAS ARRIVED — and arriving ends
+        /// the retreat by the rule two clauses up. Asking again handed exactly
+        /// those units to <c>Hold</c>, so under siege the ones who were already
+        /// home stood twelve cells out at the staging cell, aiming at a pursuer
+        /// they could not reach, while the base they had run back to burned.
+        /// A unit that is home enough to leave with the next wave is home enough
+        /// to defend.</item>
         /// </list>
         /// </summary>
         private GoalKind ResolveGoal(
@@ -1198,7 +1225,7 @@ namespace Nova.AI
             // unit is still gathering, and the march test needs the same fact.
             bool committed = IsCommittedToTheWave(in unit, hqCellX, hqCellY);
 
-            if (!retreats && posture.HomeThreatened && !committed) return GoalKind.DefendHome;
+            if (posture.HomeThreatened && !committed) return GoalKind.DefendHome;
             if (!retreats && IsFitToMarch(in posture, committed)) return GoalKind.Attack;
             if (arrived) return GoalKind.Hold;
             return GoalKind.Advance;
@@ -1233,11 +1260,50 @@ namespace Nova.AI
         }
 
         /// <summary>
-        /// THE EFFECT OF A GOAL — one table, four rows, no conditions.
+        /// True when a defender is HOME and standing — within
+        /// <see cref="AiProfile.StagingToleranceCells"/> of the headquarters and
+        /// not walking. <see cref="GoalKind.DefendHome"/> falls silent for it,
+        /// the way <see cref="GoalKind.Hold"/> is silent at the staging cell.
         /// <para>
-        /// Every row is a pure function of the goal, the posture and the pursuer
-        /// the caller worked out, which is what makes a forced goal safe: a
-        /// panel that names <c>Retreat</c> for a healthy unit gets the orders
+        /// WITHOUT THIS THE STATIC DESTINATION DOES NOT HELP, and the argument
+        /// the rule was built on is only half true. The re-issue suppression in
+        /// <see cref="SubmitAssignments"/> compares the STANDING ORDER
+        /// (<c>UnitState.TargetGridPos</c>) — and <c>MovementSystem</c> calls
+        /// <c>UnitState.Stop()</c> on arrival, which invalidates exactly that
+        /// field. So a defender that has arrived has nothing left to compare
+        /// against, the suppression stops recognising the repeat, and the
+        /// headquarters cell goes out again every single cadence: measured, one
+        /// move intent per cadence for as long as the siege lasts, with eight
+        /// standing units flipped back into <c>IsMoving</c> each time. Static
+        /// destinations survive the suppression only WHILE THEY ARE BEING
+        /// WALKED TO; standing still needs the same silence <c>Hold</c> has.
+        /// </para>
+        /// <para>
+        /// The tolerance is the staging one and deliberately not a new profile
+        /// value: it is the same phenomenon (a group arriving spreads over
+        /// several cells, and the headquarters footprint is impassable, so ring
+        /// 0 is never claimed), and a new number would move
+        /// <c>AiProfile.ProfileHash</c> for a correction that changes no rule.
+        /// Four cells around the headquarters cannot collide with the staging
+        /// cell either — that one sits twelve cells out.
+        /// </para>
+        /// </summary>
+        private bool HasArrivedAtHome(in UnitState unit, in ArmyPosture posture)
+        {
+            if (unit.IsMoving) return false;
+            int distance = Chebyshev(
+                GridCellOf(unit.Transform.PositionX), GridCellOf(unit.Transform.PositionY),
+                posture.HomeCellX, posture.HomeCellY);
+            return distance <= _profile.Profile.StagingToleranceCells;
+        }
+
+        /// <summary>
+        /// THE EFFECT OF A GOAL — one table, five rows, no conditions.
+        /// <para>
+        /// Every row is a pure function of the goal, the posture and the two
+        /// facts the caller worked out (the pursuer, and whether a defender is
+        /// already home), which is what makes a forced goal safe: a panel that
+        /// names <c>Retreat</c> for a healthy unit gets the orders
         /// <c>Retreat</c> always produces, not a state the AI has no code for.
         /// </para>
         /// <para>
@@ -1250,7 +1316,7 @@ namespace Nova.AI
         /// </para>
         /// </summary>
         private static UnitAssignment ApplyGoal(
-            GoalKind goal, uint entityRaw, in ArmyPosture posture, uint pursuerRaw)
+            GoalKind goal, uint entityRaw, in ArmyPosture posture, uint pursuerRaw, bool atHome)
         {
             switch (goal)
             {
@@ -1285,17 +1351,27 @@ namespace Nova.AI
                     // The same shape Retreat has, aimed at the other static
                     // cell: walk to the headquarters, shoot the nearest armed
                     // enemy on the way. Static is the operative word — the
-                    // headquarters does not move all match, so the re-issue
-                    // suppression in SubmitAssignments swallows every repeat
-                    // and a defence that lasts twenty cadences costs one order.
-                    // DefendBase aimed at the ENEMY, which moves, and paid a
-                    // fresh order per unit per cadence for it (journal V002).
+                    // headquarters does not move all match, so while a defender
+                    // is WALKING the re-issue suppression in SubmitAssignments
+                    // swallows every repeat. DefendBase aimed at the ENEMY,
+                    // which moves, and paid a fresh order per unit per cadence
+                    // for it (journal V002).
+                    //
+                    // ONCE HOME IT FALLS SILENT, and that is not a nicety. The
+                    // suppression compares the standing order, MovementSystem
+                    // clears the standing order on arrival, and a defender that
+                    // has arrived would therefore be sent home AGAIN every
+                    // cadence — measured before this row existed: one move
+                    // intent per cadence for the whole siege and eight standing
+                    // units flipped back into IsMoving each time, which is the
+                    // V002 shape at a smaller size. Hold's silence, for the
+                    // other static cell. See HasArrivedAtHome.
                     return new UnitAssignment
                     {
                         EntityRaw = entityRaw,
                         AttackTargetRaw = pursuerRaw,
-                        MoveCellX = posture.HomeCellX,
-                        MoveCellY = posture.HomeCellY,
+                        MoveCellX = atHome ? -1 : posture.HomeCellX,
+                        MoveCellY = atHome ? -1 : posture.HomeCellY,
                     };
 
                 default:

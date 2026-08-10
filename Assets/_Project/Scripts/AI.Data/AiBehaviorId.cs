@@ -88,6 +88,22 @@ namespace Nova.AI.Data
         /// or seven cells while the staging cell sits twelve from the base.
         /// </para>
         /// <para>
+        /// TWO CORRECTIONS WENT INTO r8 BEFORE IT SHIPPED, both found by
+        /// reviewing the claim rather than the code, and neither moves
+        /// <see cref="ProfileHash"/> because neither adds a number. First: the
+        /// argument "the destination is static, so the suppression swallows
+        /// every repeat" only holds WHILE the defender walks — arriving clears
+        /// the standing order the suppression compares against, so the
+        /// headquarters cell went out again every cadence, one intent per
+        /// cadence for the whole siege, with the standing defenders flipped back
+        /// into movement each time. <c>DefendHome</c> now falls silent once
+        /// home, the way <c>Hold</c> does at the staging cell. Second: the goal
+        /// asked not to be retreating, which could only ever exclude a wounded
+        /// unit that had ALREADY ARRIVED — and arriving ends the retreat by the
+        /// rule right above it. Those units fell to <c>Hold</c> and stood twelve
+        /// cells out while the base they had run to burned.
+        /// </para>
+        /// <para>
         /// r5 fixes two defects found in the review of r3/r4, both of which
         /// change decisions and therefore the end state: the wave now waits for
         /// what production can still deliver instead of a fixed cap (a single

@@ -23,8 +23,9 @@ namespace Nova.AI.Data
     /// written in <c>SkirmishAiSystem.ResolveGoal</c>, which is:
     /// </para>
     /// <list type="number">
-    /// <item><see cref="Retreat"/> — a wounded unit outranks everything, or the
-    /// pull-back could never reach the one unit it exists for</item>
+    /// <item><see cref="Retreat"/> — a wounded unit STILL RUNNING outranks
+    /// everything, or the pull-back could never reach the one unit it exists
+    /// for; one that has arrived is an ordinary waiting unit again</item>
     /// <item><see cref="DefendHome"/> — the base burning outranks gathering for
     /// a wave that will leave it burning</item>
     /// <item><see cref="Attack"/></item>
@@ -55,7 +56,7 @@ namespace Nova.AI.Data
         /// No goal — the unit was not judged at all this decision, and for the
         /// goal mask (<c>Nova.AI.IAiGoalOverride</c>) it means "leave this one to
         /// the AI". Never the answer of the resolver: every combat unit the army
-        /// step looks at gets one of the four below.
+        /// step looks at gets one of the five below.
         /// </summary>
         None = 0,
 
@@ -95,7 +96,18 @@ namespace Nova.AI.Data
         /// Outranks <see cref="Attack"/> — gathering for a wave that marches
         /// away from a burning base is the defect this goal exists for — and
         /// gives way to <see cref="Retreat"/>, because a unit too wounded to
-        /// fight is no defender.
+        /// fight and still running is no defender. One that has already made it
+        /// home is: arriving ends the retreat, so it defends like anybody else
+        /// standing in the ring.
+        /// <para>
+        /// AND ONCE HOME IT SAYS NOTHING FURTHER. The destination is a static
+        /// cell, but that alone does not stop the order repeating — the re-issue
+        /// suppression reads the standing order, and arriving CLEARS the
+        /// standing order. A defender that has arrived therefore falls silent
+        /// explicitly, exactly the way <see cref="Hold"/> is silent at the
+        /// staging cell; without it the headquarters cell went out again every
+        /// cadence for the whole siege.
+        /// </para>
         /// <para>
         /// ONLY UNITS STILL INSIDE THE STAGING RING. A wave that is already out
         /// keeps marching: "units that are out are never called back" is the r3
