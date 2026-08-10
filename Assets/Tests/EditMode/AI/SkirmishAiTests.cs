@@ -126,7 +126,7 @@ namespace Nova.AI.Tests
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
-            var combat = new CombatSystem(entities, fogOfWar, economy);
+            var combat = new CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new VictorySystem(entities, construction);
 
             var session = new MatchSession(HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
@@ -288,6 +288,35 @@ namespace Nova.AI.Tests
             // the host ingress sealed slot-1 records.
             Assert.That(host.Ingress.DedupeState.SealedWatermark(AiSlot), Is.GreaterThan(0u),
                 "AI orders must enter through the canonical session/ingress intent path, not direct system calls");
+        }
+
+        [Test]
+        public void SkirmishAi_DefinitionRoleSite_DoesNotCountAsCompletedOrAdvanceBuildOrder()
+        {
+            AiHost host = BuildMatch(Seed);
+
+            // The tick-20 decision submits the Refinery, tick 21 creates its
+            // site, and tick 40 is the first decision that must classify that
+            // definition-role entity through the site register. A bare role
+            // check queues a second (Barracks) site for tick 41.
+            host.Run(41);
+
+            Assert.That(host.Construction.SiteCount, Is.EqualTo(1),
+                "an unfinished Refinery is the active build, not a completed producer that unlocks Barracks");
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.False);
+
+            UnitState[] units = host.Entities.RawUnits;
+            int definitionRoleSites = 0;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != AiSlot || !host.Construction.IsActiveSite(unit.Id)) continue;
+                definitionRoleSites++;
+                Assert.That(unit.Role, Is.EqualTo(UnitRole.Refinery),
+                    "the sole site carries the Refinery role without becoming a finished Refinery");
+            }
+            Assert.That(definitionRoleSites, Is.EqualTo(1));
         }
 
         // ----------------------------------------------------------------

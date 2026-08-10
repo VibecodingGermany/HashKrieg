@@ -63,7 +63,7 @@ namespace Nova.Simulation.Tests
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -470,7 +470,7 @@ namespace Nova.Simulation.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,

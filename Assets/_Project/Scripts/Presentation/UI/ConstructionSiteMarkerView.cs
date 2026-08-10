@@ -105,7 +105,7 @@ namespace Nova.Presentation.UI
             for (int i = 0; i < capacity; i++)
             {
                 ref readonly UnitState unit = ref units[i];
-                if (!unit.IsActive || unit.PlayerId != slot || unit.Role != UnitRole.Unit) continue;
+                if (!unit.IsActive || unit.PlayerId != slot) continue;
                 uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
                 if (raw == 0) continue;
                 if (!construction.TryGetSite(raw, out _, out _, out uint assignedBuilderRaw)) continue;

@@ -1,5 +1,6 @@
 using System;
 using Nova.Core;
+using Nova.Simulation.Construction;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 
@@ -16,7 +17,8 @@ namespace Nova.Simulation.Combat
     /// (1) every living unit's weapon cooldown decrements by one tick;
     /// (2) AUTO-ACQUISITION (D-087): every armed entity without a valid
     /// attack order picks the nearest hostile, visible, in-range target —
-    /// buildings included; explicit orders are never retargeted;
+    /// completed buildings included, active construction sites excluded;
+    /// explicit orders are never retargeted;
     /// (3) every unit with an <see cref="UnitState.AttackTarget"/> validates
     /// its target — a dead/despawned target is cleared from the order; a
     /// living target must be in range AND <see cref="VisionState.Visible"/>
@@ -38,8 +40,10 @@ namespace Nova.Simulation.Combat
     /// targetProfile.ArmorClass)</c> — an integer percent multiplier, no
     /// floats, no fixed-point multiply. A role with base damage 0 is unarmed
     /// and never fires at all: Builder, Harvester and the eight non-defensive
-    /// buildings hold their attack order forever, while the DefensePlatform
-    /// shoots like any unit because buildings CAN shoot.
+    /// buildings hold their attack order forever, while a completed
+    /// DefensePlatform shoots like any unit because buildings CAN shoot.
+    /// Active construction sites are neither attackers nor targets, even
+    /// when they already carry the DefensePlatform role (16.3, #44).
     /// </para>
     /// <para>
     /// Duel asymmetry (review finding): because engagements run in ascending
@@ -126,6 +130,7 @@ namespace Nova.Simulation.Combat
         private readonly EntityManager _entityManager;
         private readonly FogOfWarSystem _fogOfWar;
         private readonly ISlotFactionLookup _factions;
+        private readonly ConstructionSystem _construction;
 
         public string Name => "CombatSystem";
 
@@ -136,11 +141,16 @@ namespace Nova.Simulation.Combat
         /// The lookup is the economy state — the single home of the faction
         /// assignment — injected at construction like the FoW reference.
         /// </summary>
-        public CombatSystem(EntityManager entityManager, FogOfWarSystem fogOfWar, ISlotFactionLookup factions)
+        public CombatSystem(
+            EntityManager entityManager,
+            FogOfWarSystem fogOfWar,
+            ISlotFactionLookup factions,
+            ConstructionSystem construction)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _fogOfWar = fogOfWar ?? throw new ArgumentNullException(nameof(fogOfWar));
             _factions = factions ?? throw new ArgumentNullException(nameof(factions));
+            _construction = construction ?? throw new ArgumentNullException(nameof(construction));
         }
 
         public void Initialize(SimulationKernel kernel)
@@ -166,9 +176,10 @@ namespace Nova.Simulation.Combat
 
             // Phase 2 (D-087): auto-acquisition. Every active entity WITHOUT
             // a valid attack order picks the NEAREST hostile, visible,
-            // in-range target — buildings included, so the DefensePlatform
-            // finally fires (it is armed by definition but could never
-            // receive an explicit order). Unarmed roles (damage 0) skip.
+            // in-range target — completed buildings included, so the
+            // DefensePlatform finally fires (it is armed by definition but
+            // could never receive an explicit order). Active sites are
+            // excluded on both sides; unarmed roles (damage 0) skip.
             // Deterministic: strict ascending scans, squared fixed-point
             // distances in widened long arithmetic, lowest entity index wins
             // ties (strict less-than keeps the earliest candidate). A unit
@@ -177,7 +188,8 @@ namespace Nova.Simulation.Combat
             for (int i = 0; i < capacity; i++)
             {
                 ref UnitState attacker = ref units[i];
-                if (!attacker.IsActive || attacker.AttackTarget.IsValid) continue;
+                if (!attacker.IsActive || attacker.AttackTarget.IsValid
+                    || _construction.IsActiveSite(attacker.Id)) continue;
 
                 WeaponProfile weapon = WeaponProfiles.Get(_factions.GetSlotFaction(attacker.PlayerId), attacker.Role);
                 if (!weapon.IsArmed) continue;
@@ -190,6 +202,7 @@ namespace Nova.Simulation.Combat
                 {
                     ref readonly UnitState candidate = ref units[c];
                     if (!candidate.IsActive || candidate.PlayerId == attacker.PlayerId) continue;
+                    if (_construction.IsActiveSite(candidate.Id)) continue;
                     if (!IsInRange(in attacker, in candidate, weapon.AttackRange)) continue;
                     if (!IsVisibleToAttacker(view, in candidate)) continue;
 
@@ -214,10 +227,28 @@ namespace Nova.Simulation.Combat
                 ref UnitState attacker = ref units[i];
                 if (!attacker.IsActive || !attacker.AttackTarget.IsValid) continue;
 
+                // A site may carry an armed building role, but construction
+                // progress is not a combatant. Clear stale/explicit orders so
+                // it cannot fire while unfinished.
+                if (_construction.IsActiveSite(attacker.Id))
+                {
+                    attacker.AttackTarget = EntityId.Invalid;
+                    continue;
+                }
+
                 EntityId targetId = attacker.AttackTarget;
 
                 // A dead/despawned target drops out of the order immediately.
                 if (!_entityManager.IsValid(targetId))
+                {
+                    attacker.AttackTarget = EntityId.Invalid;
+                    continue;
+                }
+
+                // Sites are not legal combat targets in this slice. A held
+                // order would otherwise let an explicit command destroy the
+                // 1-HP placeholder or auto-acquisition lock onto it.
+                if (_construction.IsActiveSite(targetId))
                 {
                     attacker.AttackTarget = EntityId.Invalid;
                     continue;

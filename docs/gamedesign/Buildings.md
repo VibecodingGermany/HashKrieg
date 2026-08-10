@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Spielbare Spezifikation aller 12 Gebäudetypen (D-008) für die drei Fraktionen 
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung), D-077 (MS-1-Startzustand), D-096/D-106 (abgeleitete AE-Grenze und Überhang)
 - [./Factions.md](./Factions.md) – Fraktionsidentitäten
 - [./Economy.md](./Economy.md) – AE-Währung, Energie, Low-Power-Regel, Harvester-Werte, Lager-Kapazität (D-024)
 - [./ResearchTree.md](./ResearchTree.md) – Tech-Tiers 1–3
@@ -38,10 +38,10 @@ Abschnitt den nachfolgenden Vollspielentwurf.
 - **Führende Quelle für Gebäudewerte (Review F-03, Grundsatzregel D-047):** Dieses Dokument ist die alleinige Quelle für Gebäudekosten, Energiewerte (Erzeugung/Verbrauch) und Bauzeiten. [./Economy.md](./Economy.md) verweist hierher und enthält nur Systemlogik (Einkommensraten, Low-Power-Regel, Lager-Kapazität); doppelte Zahlenpflege ist unzulässig.
 - **12 Typen pro Fraktion, identische Rollen, eigene Namen und Werte-Deltas** (D-008, D-011). Die Rolle ist fraktionsübergreifend balancierbar; Kosten/TP/Bauzeit tragen die Fraktionsidentität (Allianz teuer/präzise, Legion günstig/massig, Evolvierte regenerativ/wachsend).
 - **Energiebilanz:** Kraftwerke produzieren, fast alles andere verbraucht. Defizit löst die Low-Power-Regel aus: Produktions-, Bau- und Forschungsgeschwindigkeit −50 % (D-030), Radar und Verteidigungsplattformen offline, Superwaffen-Ladung pausiert (D-030) (Zahlengerüst).
-- **Lagerkapazität (D-024):** HQ-Basiskapazität 2.000 AE, +2.000 AE je Lager-Gebäude; Überschuss über der Kapazität verfällt; bei Lager-Zerstörung geht ein anteiliger AE-Bestand (25 %) verloren.
+- **Lagerkapazität (D-024/D-096/D-106):** Genau eine HQ-Basiskapazität von 2.000 AE je Konto, sobald mindestens ein fertiges HQ lebt; +2.000 AE je fertigem Lager. Neue Einzahlungen werden hart gedeckelt. Vorhandener Überhang verliert unabhängig von seiner Ursache einmal pro Sekunde 25 % des aktuellen Überhangs (Abrundung, mindestens 1 AE) bis zur Grenze.
 - **Eroberung (D-022):** Feindliche Gebäude sind eroberbar – eine Capture-Einheit kanalisiert 5 s am Ziel (Abbruch bei Schaden) und wird bei Erfolg verbraucht. Capture-Einheiten: Engineer (Allianz), Saboteur (Legion), Tunnelgräber (Evolvierte). Regelwerk und Details in [./Infantry.md](./Infantry.md) und [./NeutralUnits.md](./NeutralUnits.md); gilt ebenso für neutrale Geschütztürme (D-016).
 - **Trefferpunkt-Klassen:** Leicht (400–800 TP), Mittel (900–1.500 TP), Schwer (1.600–2.500 TP). Klasse statt Pseudo-Präzision; exakte Werte entstehen im Balancing-Pass.
-- **Währung:** AE (Aetherium-Einheiten). Referenz: Startressourcen 1.000 AE, Harvester-Ladung ~300 AE, Ziel-Matchdauer 20–35 min (D-010).
+- **Währung:** AE (Aetherium-Einheiten). MS-1-Referenz: Startressourcen 3.000 AE (D-077), Harvester-Ladung ~300 AE, Ziel-Matchdauer 20–35 min (D-010).
 
 ## 2. Gebäudeübersicht (12 Typen × 3 Fraktionen)
 
@@ -55,7 +55,7 @@ Voraussetzungsschlüssel: HQ = Hauptquartier, KW = Kraftwerk, Raff = Raffinerie,
 | Legion | Gefechtsstand | 2.000 AE | 50 s | +30 / −0 | Schwer |
 | Evolvierte | Herzkristall | 2.300 AE | 55 s (Reifung) | +30 / −0 | Schwer |
 
-- Rolle: Startgebäude, produziert Baufahrzeuge (Allianz/Legion) bzw. Keimträger (Evolvierte), einzige Bauwarteschlange für Gebäude; Niederlage-Bedingung zusammen mit allen Produktionsgebäuden; AE-Basiskapazität 2.000 AE (D-024, siehe §2.4).
+- Rolle: Startgebäude, produziert Baufahrzeuge (Allianz/Legion) bzw. Keimträger (Evolvierte), einzige Bauwarteschlange für Gebäude; Niederlage-Bedingung zusammen mit allen Produktionsgebäuden; mindestens ein fertiges HQ aktiviert die einmalige AE-Kontobasis von 2.000 AE, weitere HQs stapeln sie nicht (D-106, siehe §2.4).
 - Voraussetzung: keine (Start); Neuaufbau nach Verlust möglich, erst ab T2 über FL-Forschung "Basis-Neugründung" (`SPC_REBASE`, bestätigt im Korrekturlauf Sprint 2). **Ausführungsmechanik (D-031.1):** Nach abgeschlossener Forschung errichtet ein Builder-Fahrzeug (Allianz/Legion) bzw. das Evolvierte-Builder-Äquivalent das neue HQ **eigenständig vor Ort** – außerhalb der HQ-Bau-Queue (§8); die Queue-Regel (Gebäudebau nur über das HQ) bleibt für alle anderen Gebäude unverändert.
 - Besonderheit: definiert den Bau-Einflussradius (siehe §6); begrenzte Grundenergie (+30, führend gemäß D-032) damit die Frühphase ohne sofortiges Kraftwerk spielbar ist.
 
@@ -91,9 +91,9 @@ Voraussetzungsschlüssel: HQ = Hauptquartier, KW = Kraftwerk, Raff = Raffinerie,
 | Legion | Bunkerdepot | 250 AE | 8 s | −5 | Leicht |
 | Evolvierte | Speicherkammer | 275 AE | 9 s (Reifung) | −5 | Leicht |
 
-- Rolle: erhöht AE-Lagerkapazität (+2.000 AE je Lager, D-024); Basiskapazität des HQ: 2.000 AE; Überschuss ohne Kapazität verfällt.
+- Rolle: erhöht die abgeleitete AE-Lagerkapazität um +2.000 AE je fertigem, lebendem Lager (D-106); die HQ-Kontobasis beträgt einmalig 2.000 AE. Baustellen geben keine Kapazität.
 - Voraussetzung: Raff.
-- Besonderheit: bei Zerstörung geht ein anteiliger AE-Bestand (25 %) verloren (D-024; Angriffsziel mit wirtschaftlichem Effekt).
+- Besonderheit: Zerstörung oder Verkauf senkt die Grenze sofort. Der dadurch entstehende Überhang verliert einmal pro Sekunde 25 % seines jeweils aktuellen Werts bis zur neuen Grenze; es gibt keinen zusätzlichen Einmalverlust (D-106; Angriffsziel mit wirtschaftlichem Effekt).
 
 ### 2.5 Kaserne
 
@@ -267,3 +267,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.4.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): als führende Quelle für Gebäudekosten/-energie/-bauzeiten festgelegt (Review F-03, D-047-Grundsatzregel); Offene Punkte bereinigt | Lead Gameplay Designer |
 | 0.4.1 | 2026-07-21 | Offener Punkt "Flak-DPS-Korridor" geschlossen: veralteter Querverweis auf Aircraft.md (90 DPS) entfernt, auf Weapons.md als einzige Werte-Quelle (25–40 Schaden/1,5 s, ×2,0 vs. Luft ≈ 33–53 DPS, D-047) umformuliert | Lead Gameplay Designer |
 | 0.5.0 | 2026-07-24 | Neun Gebäuderollen, Start-Ausnahme, T2-Freischaltung und MG-/Raketenmodule für MS-1 gemäß D-056 abgegrenzt | Lead Gameplay Designer |
+| 0.6.0 | 2026-08-10 | MS-1-Startwert (D-077) und Lagervertrag (D-106) nachgezogen: eine 2.000-AE-HQ-Basis je Konto, +2.000 je fertigem Lager und periodischer 25-%-Abbau des aktuellen Überhangs statt separatem Zerstörungsabzug | Codex / Dennis Westermann |

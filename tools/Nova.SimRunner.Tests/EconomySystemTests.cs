@@ -468,7 +468,7 @@ namespace Nova.SimRunner.Tests
         }
 
         // ------------------------------------------------------------------
-        // 16.4 (#53, D-024/D-096): the derived AE ceiling
+        // 16.4 (#53, D-024/D-096/D-106): the derived AE ceiling
         // ------------------------------------------------------------------
 
         [Test]
@@ -522,7 +522,46 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void DecayExcessBalance_QuarterPerSecond_ConvergesBelowTheCeiling()
+        public void CapacityFor_MultipleCompletedHqs_ProvideOneAccountBase()
+        {
+            EntityManager entities = CreateEntities();
+            var economy = new EconomySystem(entities);
+            var construction = new ConstructionSystem(entities, economy);
+
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 20, 20).IsValid, Is.True);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 50, 50).IsValid, Is.True);
+
+            Assert.That(economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "the HQ capacity is one account base, not a bonus per HQ");
+        }
+
+        [Test]
+        public void CapacityFor_HqSiteAlone_ProvidesNoAccountBase()
+        {
+            EntityManager entities = CreateEntities();
+            var economy = new EconomySystem(entities, startingCredits: 3000);
+            var construction = new ConstructionSystem(entities, economy);
+
+            Assert.That(construction.TryPlaceBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 20, 20), Is.True);
+            Assert.That(economy.CapacityFor(0), Is.EqualTo(0L),
+                "an unfinished HQ-role site is not a completed HQ");
+        }
+
+        [Test]
+        public void CapacityAndDeposit_InvalidSlot_ReturnZeroWithoutMutation()
+        {
+            var economy = new EconomySystem(CreateEntities());
+
+            Assert.That(economy.CapacityFor(byte.MaxValue), Is.EqualTo(0L));
+            Assert.That(economy.DepositCapped(byte.MaxValue, 500L), Is.EqualTo(0L));
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L));
+        }
+
+        [Test]
+        public void DecayExcessBalance_QuarterPerSecond_ConvergesToTheCeiling()
         {
             EntityManager entities = CreateEntities();
             var kernel = new SimulationKernel(new SimRandom(42UL));
@@ -566,7 +605,7 @@ namespace Nova.SimRunner.Tests
                 "1.000 under the 2.000 ceiling: the decay never runs");
 
             // Without any building the ceiling is zero and even the start
-            // stock decays — the destruction path of D-024.
+            // stock decays — the no-HQ path defined by D-106.
             var lone = new EconomySystem(CreateEntities());
             var loneKernel = new SimulationKernel(new SimRandom(42UL));
             loneKernel.RegisterSystem(lone);
@@ -575,6 +614,51 @@ namespace Nova.SimRunner.Tests
             for (int i = 0; i < 10; i++) loneKernel.StepTick();
             Assert.That(lone.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(750L),
                 "no HQ and no storage: the 1.000 start decays (excess 1.000 over ceiling 0)");
+        }
+
+        [Test]
+        public void DestroyedStorage_LowersCapacity_AndStartsExcessDecay()
+        {
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: 3900);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+            EntityId storage = construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Storage), 20, 20);
+            Assert.That(storage.IsValid, Is.True);
+            Assert.That(economy.CapacityFor(0),
+                Is.EqualTo(EconomySystem.HqBaseCapacityAE + EconomySystem.StorageCapacityBonusAE));
+
+            Assert.That(entities.DespawnUnit(storage), Is.True, "combat destruction despawns the Storage entity");
+            Assert.That(economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE));
+            for (int i = 0; i < EconomySystem.ExcessDecayIntervalTicks; i++) kernel.StepTick();
+
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3425L),
+                "25% of the new 1.900 AE excess decays at tick 10");
+        }
+
+        [Test]
+        public void DecayExcessBalance_LongMaxValue_DoesNotOverflow()
+        {
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: long.MaxValue);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+
+            for (int i = 0; i < 10; i++) kernel.StepTick();
+
+            long excess = long.MaxValue - EconomySystem.HqBaseCapacityAE;
+            long expectedLoss = excess / 4L;
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits,
+                Is.EqualTo(long.MaxValue - expectedLoss));
         }
 
         private static byte[] SerializeBlock(EconomySystem economy)

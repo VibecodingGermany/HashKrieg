@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Snapshots;
 
 namespace Nova.Simulation.Replays
@@ -20,12 +21,14 @@ namespace Nova.Simulation.Replays
     }
 
     /// <summary>
-    /// Stub selector for the deterministic stand-in content hashes used until
-    /// canonical rules/definitions/map sources exist (Q-040 candidate).
+    /// Stub selector for deterministic stand-in content hashes. Rules now use
+    /// <see cref="MatchFingerprint.ComputeCurrentRulesHash64"/> in current
+    /// fingerprints; the Rules selector remains only to identify/refuse the
+    /// legacy empty stub and for compatibility tests.
     /// </summary>
     public enum MatchContentStub : uint
     {
-        /// <summary>Stub for RulesHash64.</summary>
+        /// <summary>Legacy empty stub for RulesHash64; not used by current hosts.</summary>
         Rules = 1,
 
         /// <summary>Stub for DefinitionsHash64.</summary>
@@ -99,6 +102,14 @@ namespace Nova.Simulation.Replays
 
         /// <summary>The only PRNG id of schema v1 (SimulationCore.md section 1).</summary>
         public const string PrngIdV1 = "XorShift128PlusV1";
+
+        /// <summary>
+        /// Current deterministic rules revision. Revision 1 is the first
+        /// non-stub rules identity and binds the D-106 storage-cap behavior.
+        /// Behavior changes covered by <see cref="ComputeCurrentRulesHash64"/>
+        /// must bump this value or change one of the bound constants.
+        /// </summary>
+        public const ushort RulesRevisionV1 = 1;
 
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
         public const int MaxIdentifierBytes = 64;
@@ -223,8 +234,8 @@ namespace Nova.Simulation.Replays
         }
 
         /// <summary>
-        /// Deterministic stand-in content hash until canonical
-        /// rules/definitions/map sources exist (Q-040 candidate): XXH64 seed 0
+        /// Deterministic empty stand-in content hash for legacy/test inputs and
+        /// content domains without a canonical source yet: XXH64 seed 0
         /// in the NOVA_DEFINITIONS_V1 domain over a stub field tag and an
         /// empty item list (u32 count = 0). Distinct tags keep the three
         /// stubs distinct; every host computes the identical value.
@@ -234,6 +245,32 @@ namespace Nova.Simulation.Replays
             var hash = SimHashWriter.ForDefinitions();
             hash.WriteFieldTag((uint)stub);
             hash.WriteUInt32(0); // empty canonical item list
+            return hash.Digest();
+        }
+
+        /// <summary>
+        /// Canonical rules identity for the current simulation. Unlike the
+        /// legacy empty Rules stub, this binds the D-106 economy behavior that
+        /// can diverge without changing snapshot bytes or definition rows.
+        /// Old/new peers and replays therefore fail the exact-fingerprint gate
+        /// before executing tick 1 instead of desynchronizing at the first
+        /// excess-decay tick.
+        /// </summary>
+        public static ulong ComputeCurrentRulesHash64()
+        {
+            var hash = SimHashWriter.ForDefinitions();
+            hash.WriteFieldTag((uint)MatchContentStub.Rules);
+            hash.WriteUInt32(5); // ordered rule fields below
+            hash.WriteFieldTag(1);
+            hash.WriteUInt16(RulesRevisionV1);
+            hash.WriteFieldTag(2);
+            hash.WriteInt64(EconomySystem.HqBaseCapacityAE);
+            hash.WriteFieldTag(3);
+            hash.WriteInt64(EconomySystem.StorageCapacityBonusAE);
+            hash.WriteFieldTag(4);
+            hash.WriteInt32(EconomySystem.ExcessDecayPercent);
+            hash.WriteFieldTag(5);
+            hash.WriteInt32(EconomySystem.ExcessDecayIntervalTicks);
             return hash.Digest();
         }
 
