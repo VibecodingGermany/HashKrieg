@@ -120,6 +120,11 @@ namespace Nova.SimRunner.Tests
                     new Transform2D(SimFixed.FromInt(11), SimFixed.FromInt(10)),
                     SimFixed.Zero,
                     role: UnitRole.Refinery);
+                Entities.SpawnUnit(
+                    owner,
+                    new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)),
+                    SimFixed.Zero,
+                    role: UnitRole.HQ);
                 return (UnitCommandStateView.ToRawEntityId(harvester), harvester);
             }
 
@@ -318,7 +323,7 @@ namespace Nova.SimRunner.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
@@ -483,7 +488,7 @@ namespace Nova.SimRunner.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,

@@ -65,6 +65,25 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Behoben
+- **#53: Das Lager begrenzt das Konto (D-024/D-096/D-106)** — das Aetherium-Konto hat
+  jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
+  gespeichert (kein Zustandsfeld, kein Formatbruch): ein oder mehrere fertige
+  HQs geben zusammen genau eine Basis von 2.000 AE, jedes fertige Lager
+  +2.000; Baustellen zählen nicht. Jede
+  Einzahlung (Ernte, Rückerstattungen bei Streichung, Abbruch, Verkauf) läuft
+  über `EconomySystem.DepositCapped` und deckelt hart — Überschuss verfällt.
+  Ein Bestand über der Grenze zerfällt einmal pro Sekunde um 25 % des
+  Überschusses (getaktet über den Sim-Tick, zustandslos, restore-sicher): das
+  ist der „25 % Verlust bei Zerstörung" ohne Ereignis getragen — ein
+  zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
+  Verlust. D-106 präzisiert die Zerstörungsregel als zustandslosen Zerfall
+  statt Slot-gebundenem Einmalverlust und bindet Revision sowie
+  2.000/2.000/25/10 erstmals in `RulesHash64`: alte Dateien bleiben lesbar,
+  eine Wiedergabe oder ein Lockstep-Start mit dem alten leeren Rules-Stub wird
+  vor Tick 1 abgelehnt. Der kanonische KI-Endzustand
+  bleibt bei Tick 2.546 entschieden und bewegt sich durch diese Wirtschaftsregel
+  von `0x9F93097AD526B6F7` auf `0xE784E6184AD16081`; die KI-Kennung bleibt
+  unverändert `r6.E34435F9`
 - **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
   Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
   Waffentabelle greift nicht mehr, und `CombatSystem` schliesst zusätzlich jede aktive

@@ -709,7 +709,7 @@ namespace Nova.SimRunner
 
         /// <summary>
         /// The standard match configuration fingerprint: slot 0
-        /// human/Alliance, slot 1 AI/Legion, stub rules/map hashes and the
+        /// human/Alliance, slot 1 AI/Legion, current rules hash, stub map hash and the
         /// REAL canonical definitions hash (SimDefinitions.ComputeDefinitionsHash64
         /// — a replay recorded against a different definition table refuses
         /// to start, SimulationCore.md section 6).
@@ -723,7 +723,7 @@ namespace Nova.SimRunner
             factions[HumanSlot] = (byte)FactionId.Alliance;
             factions[AiSlot] = (byte)FactionId.Legion;
             return MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 SimDefinitions.ComputeDefinitionsHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,

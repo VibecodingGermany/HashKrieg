@@ -51,7 +51,7 @@ namespace Nova.Simulation.State
         /// <summary>Power plant building; provides power to its owner's grid.</summary>
         Power = 5,
 
-        /// <summary>Storage building (MS-1 role; no canonical behavior beyond power draw yet).</summary>
+        /// <summary>Storage building; each completed placement adds 2,000 AE to its owner's derived account capacity (D-106).</summary>
         Storage = 6,
 
         /// <summary>Barracks building; produces the infantry unit roles.</summary>

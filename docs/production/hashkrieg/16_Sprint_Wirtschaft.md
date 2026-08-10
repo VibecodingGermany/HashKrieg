@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.1.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.2.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -158,8 +158,18 @@ Bauvoraussetzungen bleiben korrekt.
 
 ### 16.4 · Das Lager wird ein Gebäude (#53, C2)
 
-AE-Obergrenze im `EconomySystem`: **HQ 2.000 AE Basis, +2.000 je Lager,
-Überschuss verfällt, 25 % Verlust bei Zerstörung** (D-024).
+AE-Obergrenze im `EconomySystem`: **genau eine HQ-Kontobasis von 2.000 AE,
+sobald mindestens ein fertiges HQ lebt; +2.000 je fertigem Lager**
+(D-024/D-096/D-106). Baustellen zählen nicht. Jede neue Einzahlung und
+Rückerstattung wird sofort an der aktuellen Grenze gekappt; der Rest verfällt.
+
+Ein bereits vorhandener Bestand oberhalb der Grenze verliert alle 10
+Simulationsticks (1 s) **25 % des aktuellen Überhangs**, ganzzahlig abgerundet
+und mindestens 1 AE, bis die Grenze erreicht ist. Das gilt für den
+3.000-AE-Start, Restore sowie die Grenzsenkung durch Zerstörung oder Verkauf
+eines Lagers und den Verlust des letzten HQ. Es gibt keinen zusätzlichen
+Einmalverlust. Beim Verkauf wird die Rückerstattung noch gegen die vor dem
+Despawn geltende Kapazität gedeckelt; danach sinkt die Grenze.
 
 > **Die Kapazität wird aus dem Gebäudebestand abgeleitet, nicht gespeichert.**
 > Ein neues Feld im Wirtschaftszustand bumpt `EconomySystem.StateVersion`, und
@@ -168,9 +178,16 @@ AE-Obergrenze im `EconomySystem`: **HQ 2.000 AE Basis, +2.000 je Lager,
 > nachziehen muss, wäre eine eigene Inhaberentscheidung. Die abgeleitete Variante
 > kostet nichts davon.
 
-`AddCredits` hat genau vier Aufrufer, alle in diesem Sprintbereich: Abladen
-(`EconomySystem`), Streichung (`ProductionSystem`), Abbruch und Verkauf
-(`ConstructionSystem`).
+Die Zustandsbytes bleiben kompatibel; die **Regelidentität** ändert sich aber.
+`RulesHash64` bindet deshalb Revision 1 und die Werte 2.000/2.000/25/10. Alte
+Replay-/Snapshot-Dateien bleiben strukturell lesbar, doch eine Replay-Wiedergabe
+unter einem anderen Rules-Hash wird vor Tick 1 abgelehnt. So können alte und
+neue Peers nicht erst am ersten Zerfallstick desynchronisieren (D-106).
+
+`DepositCapped` bündelt genau vier produktive Gutschriftpfade in diesem
+Sprintbereich: Abladen (`EconomySystem`), Streichung (`ProductionSystem`),
+Abbruch und Verkauf (`ConstructionSystem`). Nur dieser Helfer ruft produktiv
+`PlayerEconomyState.AddCredits` auf.
 
 ### 16.5 · Das Radar wird ein Gebäude (#54, C3)
 
@@ -345,8 +362,9 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 |---|---|---|
 | D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
+| D-106 | AE-Kontobasis gilt einmalig je Slot; vorhandener Überhang zerfällt zustandslos pro Sekunde und die Regelrevision wird im Match-Fingerprint gebunden | Agent unter Inhaberdelegation |
 
-D-096 und D-097 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
+D-096, D-097 und D-106 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
 (Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
 D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
 [Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
@@ -370,5 +388,6 @@ Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-10 | D-106 für 16.4 festgeschrieben: einmalige HQ-Kontobasis, periodischer 25-%-Abbau des aktuellen Überhangs und Rules-Hash-Kompatibilitätsgrenze | Codex / Dennis Westermann |
 | 1.1.0 | 2026-08-10 | D-105-Integrationsausnahme für 16.3 dokumentiert: aktive Sites sind keine Kampfteilnehmer oder fertigen KI-Produzenten | Codex / Dennis Westermann |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |

@@ -585,6 +585,14 @@ namespace Nova.SimRunner.Tests
             Assert.That(TryFirstCombatCell(host, AiSlot, out int armyX, out int armyY), Is.True);
             List<EntityId> army = CombatUnitIds(host, AiSlot);
 
+            // 16.4: the passive slot has decayed to its 2.000-AE HQ ceiling,
+            // below the 2.500-AE HQ-site cost. A completed Storage raises the
+            // derived cap and the capped deposit funds this focused fixture.
+            ushort storageDefId = SimDefinitions.ToDefinitionId(
+                host.Economy.GetSlotFaction(HumanSlot), UnitRole.Storage);
+            Assert.That(host.Construction.PlaceCompletedBuilding(HumanSlot, storageDefId, 60, 60).IsValid, Is.True);
+            Assert.That(host.Economy.DepositCapped(HumanSlot, 1000), Is.EqualTo(1000));
+
             EntityId hqSite = PlaceEnemySiteNear(host, UnitRole.HQ, armyX + 3, armyY);
             EntityId legalTarget = SpawnEnemyUnit(host, UnitRole.BattleTank, armyX + 3, armyY + 1);
             RunToDecisionWithSquad(host, SquadThreshold);

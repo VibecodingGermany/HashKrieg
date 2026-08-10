@@ -670,7 +670,7 @@ namespace Nova.Simulation.Tests
                 slots[HumanSlot] = (byte)PlayerSlotOccupancy.Human;
                 slots[AiSlot] = (byte)PlayerSlotOccupancy.AI;
                 return MatchFingerprint.CreateCurrent(
-                    MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                    MatchFingerprint.ComputeCurrentRulesHash64(),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                     slots,

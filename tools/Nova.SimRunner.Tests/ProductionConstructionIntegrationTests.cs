@@ -470,7 +470,7 @@ namespace Nova.SimRunner.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,

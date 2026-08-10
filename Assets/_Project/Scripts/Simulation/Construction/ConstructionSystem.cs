@@ -223,8 +223,9 @@ namespace Nova.Simulation.Construction
             _occupied = new byte[GridSize * GridSize];
             _costField = costField;
             // 16.3 (#44): a site carries its definition role, so the power
-            // recompute can no longer skip sites by role — it skips them via
-            // this register instead. Bound here so no host can forget it.
+            // and capacity scans can no longer skip sites by role. Both use
+            // this authoritative register; binding here means no host can
+            // forget the dependency.
             _economy.BindSiteLookup(IsActiveSite);
         }
 
@@ -304,7 +305,7 @@ namespace Nova.Simulation.Construction
         /// <summary>
         /// True while the entity is an unfinished site (16.3, #44: sites now
         /// carry their definition role, so role alone no longer tells a site
-        /// apart). Bound into the economy's power recompute via
+        /// apart). Bound into the economy's power and capacity scans via
         /// <see cref="EconomySystem.BindSiteLookup"/>; also the read the
         /// presentation layer needs to keep the site look until completion.
         /// </summary>
@@ -518,7 +519,8 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * CancelRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * CancelRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(site.OriginX, site.OriginY);
@@ -542,7 +544,8 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * SellRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * SellRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(placement.OriginX, placement.OriginY);

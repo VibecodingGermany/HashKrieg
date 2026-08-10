@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.34.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.35.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -211,7 +211,7 @@ als Post-MVP-/Vollspiel-Zielbild bestehen.
 **Begründung:** Lesbarkeit und Endspiel-Dramaturgie; unbegrenzte Superwaffen degradieren sie zum Wirtschafts-Spam.
 **Konsequenzen:** Buildings.md/Weapons.md/GameLoop.md angeglichen.
 
-### D-024 | verbindlich | Sprint 2 (Lager & Raffinerie)
+### D-024 | teilweise ersetzt durch D-106 | Sprint 2 (Lager & Raffinerie)
 
 **Kontext:** Lager-Kapazitätsmechanik (+2.000 AE/Lager) war nicht im Zahlengerüst; Raffinerie-Packaging offen.
 **Alternativen:** (a) keine Lager-Kapazität (Lager nutzlos); (b) Kapazität mit hartem Erntestopp bei vollem Konto; (c) Kapazität +2.000 AE je Lager, Überschuss verfällt, anteiliger Verlust bei Lager-Zerstörung; Raffinerie wird mit 1 Harvester geliefert.
@@ -2650,7 +2650,7 @@ Entscheidung selbst ist unverändert — deshalb keine neue D-ID.
 
 ---
 
-### D-096 | verbindlich | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
+### D-096 | teilweise ersetzt durch D-106 | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
 
 **Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
 Paketen liegt beim Agenten. Umgesetzt in
@@ -2720,7 +2720,9 @@ einzige Variante, die das Gebäude für den Spieler spürbar macht, ohne eine ne
 Anzeige zu erfinden.
 
 **Konsequenzen:** `MatchFingerprint.StateSchemaVersionV1` bleibt unberührt,
-vorhandene Snapshots und Replays bleiben lesbar. `AddCredits` hat vier Aufrufer
+vorhandene Snapshots und Replays bleiben strukturell lesbar. D-106 präzisiert:
+Eine exakte Wiedergabe unter geänderten Regeln wird über `RulesHash64` vor dem
+Start abgelehnt. `AddCredits` hat vier Aufrufer
 — Abladen, Streichung, Abbruch und Verkauf —, alle im Schreibbereich des
 Netzstrangs. Erst zusammen mit der Low-Power-Abschaltreihenfolge (16.6) wird die
 Kopplung zur Waffe: ein zerstörtes Kraftwerk nimmt Radar, Verteidigung und damit
@@ -3096,6 +3098,92 @@ dokumentierte, begrenzte Integrationsreparatur. PRs mit zurückgestellter
 Spielabnahme müssen ihr Restrisiko offen tragen und dürfen nicht als vollständig
 gespielt gemeldet werden.
 
+---
+
+### D-106 | verbindlich | Sprint 16 (zustandsloser AE-Überhang und kanonische Regelidentität)
+
+**Status:** Agentenentscheidung vom 2026-08-10 unter der ausdrücklichen
+Delegation des alleinigen Inhabers; nach D-105 überstimmbar. Umgesetzt in
+[16_Sprint_Wirtschaft.md](hashkrieg/16_Sprint_Wirtschaft.md) 16.4.
+
+**Kontext:** D-024 und D-096 verlangen eine aus dem Gebäudebestand abgeleitete
+AE-Obergrenze sowie „25 % Verlust bei Zerstörung“, lassen aber drei für die
+Simulation entscheidende Punkte offen: ob mehrere HQs die Basis stapeln, ob
+25 % vom gesamten Kontostand oder nur vom neuen Überhang verloren gehen und
+wie Verkauf, HQ-Verlust oder ein bereits oberhalb der Grenze geladener
+Start-/Snapshot-Zustand behandelt werden.
+
+Der Sprint-16-Strang hat dafür einen zustandslosen Abbau implementiert. Das ist
+nicht gleichbedeutend mit einem einmaligen Zerstörungsereignis: Er wirkt auch
+ohne Lagerzerstörung und baut den Überhang über mehrere Sekunden vollständig
+bis zur Grenze ab. Diese Ausformung braucht deshalb einen eigenen, offen
+protokollierten Entscheid statt einer stillen Umdeutung von D-024/D-096.
+
+**Alternativen:**
+
+1. **Bei jeder Lagerzerstörung sofort 25 % des gesamten Kontostands abziehen.**
+   Verworfen: Verkauf, HQ-Verlust und oberhalb der Grenze geladene Zustände
+   blieben Sonderfälle; außerdem müsste der Economy-Pfad an jede
+   Zerstörungsursache gekoppelt werden.
+2. **Den Kontostand bei jeder Kapazitätssenkung sofort hart auf die neue Grenze
+   kappen.** Verworfen: Der vollständige Sofortverlust ist deutlich härter als
+   der beschlossene 25-%-Effekt und gibt kein Reaktionsfenster zum Ausgeben.
+3. **Vorhandenen Überhang dauerhaft behalten und nur neue Einzahlungen
+   blockieren.** Verworfen: Damit hätte die Zerstörungsregel keine
+   wirtschaftliche Wirkung; gespeicherte Überschüsse könnten unbegrenzt
+   konserviert werden.
+4. **Den aktuellen Überhang zustandslos und periodisch abbauen.** Angenommen:
+   ein einheitlicher, deterministischer Pfad deckt Startzustand, Restore,
+   Zerstörung und Verkauf ab, ohne ein neues Snapshot-Feld oder Ereignislog.
+
+**Entscheidung:**
+
+1. Ein Slot besitzt genau eine **HQ-Basiskapazität von 2.000 AE**, solange
+   mindestens ein lebendes, fertiggestelltes HQ existiert. Weitere HQs
+   stapeln diese Basis nicht.
+2. Jedes lebende, fertiggestellte Lager addiert 2.000 AE. Baustellen zählen
+   weder als HQ noch als Lager. Die Kapazität bleibt vollständig aus dem
+   Gebäudebestand abgeleitet; `EconomySystem.StateVersion` bleibt unverändert.
+3. Jede neue Einzahlung und Rückerstattung wird sofort an der aktuellen
+   Grenze gekappt; der nicht passende Anteil verfällt. Beim Verkauf wird die
+   Rückerstattung noch gegen die vor dem Despawn geltende Kapazität gebucht;
+   erst danach sinkt die abgeleitete Grenze und ein Überhang beginnt abzubauen.
+4. Ein bereits vorhandener Kontostand oberhalb der Grenze verliert auf jedem
+   zehnten Simulationstick (eine Sekunde bei 10 Hz) 25 % des **aktuellen
+   Überhangs**. Es gilt ganzzahlige Abrundung, mindestens 1 AE je Intervall,
+   bis der Kontostand die Grenze erreicht.
+5. Der Abbau gilt unabhängig von der Ursache des Überhangs: kanonischer
+   Startbestand, Snapshot-Restore, Zerstörung oder Verkauf eines Lagers sowie
+   Verlust des letzten HQ. Es gibt daneben keinen separaten Einmalverlust.
+6. Die Prozentrechnung muss für jeden gültigen nichtnegativen `long`-Kontostand
+   überlauffrei sein. `CapacityFor` liefert für einen ungültigen Slot 0;
+   `DepositCapped` verwirft dessen Einzahlung und liefert ebenfalls 0, damit
+   diese read-/deposit-Helfer keine Arraygrenze berühren.
+7. Die Regelidentität wird erstmals kanonisch in `RulesHash64` gebunden:
+   Revision 1 plus 2.000/2.000/25/10. Alter Rules-Stub und D-106-Regeln dürfen
+   niemals denselben Match-Fingerprint bilden. Alte Replay-Dateien und
+   Snapshots bleiben strukturell lesbar; exakte Replay-Wiedergabe unter einem
+   anderen Rules-Hash wird vor Tick 1 mit `RulesHash64`-Mismatch abgelehnt.
+8. D-106 präzisiert und ersetzt nur die Verlustausformung, HQ-Stapelungsfrage
+   und die weitergehende Replay-Zusage aus D-024/D-096. Die Radarentscheidung
+   aus D-096 bleibt unverändert.
+
+**Begründung:** Die eine Kontobasis hält zusätzliche HQs von der Lagerrolle
+frei. Der periodische Überhang ist für alle Ursachen identisch, deterministisch
+und restore-sicher; er braucht kein persistiertes Ereignis und gibt dem Spieler
+ein kurzes Ausgabenfenster, ohne Überschuss dauerhaft zu schützen. Die harte
+Kappung neuer Einnahmen bewahrt gleichzeitig den klassischen Silo-Druck. Der
+Rules-Hash verhindert, dass diese Verhaltensänderung als scheinbar kompatibler
+Lockstep- oder Replay-Start erst nach Tick 10 desynchronisiert.
+
+**Konsequenzen:** Der kanonische Start mit 3.000 AE (D-077) liegt ohne Lager
+zunächst 1.000 AE über der HQ-Basis und beginnt am Tick 10 zu zerfallen, sofern
+er nicht vorher ausgegeben wird. Zerstörung und Verkauf eines Lagers senken die
+Grenze sofort; 25 % des dadurch entstehenden aktuellen Überhangs fallen pro
+Sekunde. Mehrere HQs geben weiterhin nur 2.000 AE Basis. Spiegeltests in .NET
+und Unity sichern Mehrfach-HQ, HQ-Baustelle, echte Lagerzerstörung,
+Konvergenz, `long.MaxValue` und die Ablehnung des alten Rules-Stubs ab.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3155,11 +3243,11 @@ gespielt gemeldet werden.
   „Offene Punkte"-Zeile nennt noch den zu kurzen Bereich D-078 bis D-081 und
   begründet die Reservierung mit einem inzwischen erfolgten Eintrag (D-077).
   Beides ist in jener Datei nachzuziehen, nicht hier.
-- **D-095 bis D-097 stehen in derselben Delegationslage** wie D-074/D-083
+- **D-092 bis D-094 stehen in derselben Delegationslage** wie D-074/D-083
   (Lobby-Vermittlung über Supabase Edge Functions, kurzlebige
-  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-096 hat der
+  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-093 hat der
   Inhaber die Richtung (HMAC-Token) selbst vorgegeben, die Ausformung sowie
-  D-095/D-097 hat der Agent unter Delegation entschieden — gekennzeichnet und
+  D-092/D-094 hat der Agent unter Delegation entschieden — gekennzeichnet und
   überstimmbar. **Offen darin:** Das Supabase-Projekt ist noch nicht angelegt
   und die Function-Referenzen in
   [../tech/LobbySupabase.md](../tech/LobbySupabase.md) noch nicht gegen ein
@@ -3176,6 +3264,7 @@ gespielt gemeldet werden.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.35.0 | 2026-08-10 | D-106 aufgenommen: einmalige 2.000-AE-HQ-Basis, +2.000 je fertigem Lager, sofort gedeckelte Einzahlungen, zustandsloser 25-%-Abbau des aktuellen Überhangs je Sekunde und kanonischer Rules-Hash; D-024/D-096 in Verlustausformung, HQ-Stapelung und Replay-Kompatibilität teilweise ersetzt; Fehlverweise der Lobbyfamilie D-095–D-097 auf D-092–D-094 berichtigt | Agent (unter Delegation) / Dennis Westermann |
 | 1.34.0 | 2026-08-10 | D-105 aufgenommen: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 bleibt mit CLA und aktueller Inhaberfreigabe aktiv, Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Review selbst gemergt werden, und manuelle Spielabnahme darf ehrlich zurückgestellt, aber nicht als gelaufen behauptet werden | Project Owner / Orchestrator |
 | 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
@@ -3212,6 +3301,6 @@ gespielt gemeldet werden.
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
 | 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |
-| 1.30.0 | 2026-08-09 | D-095 bis D-097 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-096-Richtung vom Inhaber vorgegeben, Ausformung sowie D-095/D-097 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-096 Richtung: Dennis Westermann |
+| 1.30.0 | 2026-08-09 | D-092 bis D-094 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-093-Richtung vom Inhaber vorgegeben, Ausformung sowie D-092/D-094 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-093 Richtung: Dennis Westermann |
 | 1.30.0 | 2026-08-09 | D-095, D-096 und D-097 aufgenommen: Parallelbetrieb trennt über Dateihoheit statt Verhaltensraum (Sprint 16 parallel zu 13B, `Simulation/State/` in eingefrorenes Layout und strangeigene Befehlsanwendung geteilt, ein Strang je Merge-Fenster); Lager erhält eine aus dem Gebäudebestand **abgeleitete** AE-Obergrenze statt eines Zustandsfeldes und das Radar schaltet die Minimap frei; „Stoppen" löscht zusätzlich `UnitState.AttackTarget`, das Halte-Feuer bleibt beim Einheitenstrang | Project Owner / Orchestrator |
 | 1.31.0 | 2026-08-09 | D-098 bis D-100 nachgetragen, nachdem sie anderswo bereits als geltend zitiert wurden: Tier-3-Auslöser auf Veröffentlichung, Geld und Publikum präzisiert statt auf jede personenbezogene Verarbeitung; Identitätsmodell der geschlossenen Beta mit Klartext-IP plus gekürztem Netzpräfix und 30-Tage-Löschfrist statt `HMAC(pepper, ip)`, MAC-Adresse verworfen, IP- und Präfixsperren zwingend befristet; Lobby-Serverseite als Quelltext unter `tools/lobby/` statt nur im Supabase-Projekt (vom Agenten unter Delegation entschieden, überstimmbar, in den Offenen Punkten vermerkt). D-095 Punkt 3 im Wortlaut auf das Regelwerk nachgezogen — die Befehlsanwendung trennt zwischen Zielsetzung und Ausführung, nicht zwischen Befehlsarten; dieselbe Entscheidung, keine neue D-ID. Kopfzeile von Sprint 13.0 auf 16 berichtigt | Project Owner / Agent (unter Delegation) |

@@ -220,7 +220,7 @@ namespace Nova.SimRunner.Tests
                 "the same table must hash identically every time");
             Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions)),
                 "the real table hash replaces the empty-content stub");
-            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules)));
+            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeCurrentRulesHash64()));
             Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map)));
 
             // Row coverage: mutating ANY single row — first Alliance, first

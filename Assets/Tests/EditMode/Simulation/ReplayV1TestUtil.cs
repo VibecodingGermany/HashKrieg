@@ -180,7 +180,7 @@ namespace Nova.Simulation.Tests
         internal static MatchFingerprint CreateFingerprint(TestHost host, ulong seed, byte[] slots = null)
         {
             return MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots ?? StandardSlots(),

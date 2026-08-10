@@ -696,7 +696,8 @@ namespace Nova.SimRunner.Tests
         public void CancelConstruction_Refunds75Percent_AndFreesFootprint()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "HQ provides power and 2,000 AE capacity");
             f.SpawnBuilder(0, 19, 20);
             f.Step(1); // commit the balance
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True); // 500 spent
@@ -719,7 +720,8 @@ namespace Nova.SimRunner.Tests
         public void Sell_CompletedBuilding_Refunds50Percent_SiteIsNotSellable()
         {
             var f = new Fixture();
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True, "power provider");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "HQ provides power and 2,000 AE capacity");
             EntityId barracks = f.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
             uint raw = UnitCommandStateView.ToRawEntityId(barracks);
 
@@ -730,11 +732,49 @@ namespace Nova.SimRunner.Tests
             Assert.That(f.Construction.IsCellFree(20, 20), Is.True);
 
             f.SpawnBuilder(0, 19, 20);
-            f.Step(1); // commit the balance (100 provided, 0 required)
+            f.Step(1); // commit the balance (30 provided, 0 required)
             Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True);
             uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
             Assert.That(f.Construction.ValidateSell(0, siteRaw), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
                 "a site is cancelled, not sold");
+        }
+
+        [Test]
+        public void CancelConstruction_RefundIsCappedAtStorageCeiling()
+        {
+            var f = new Fixture(startingCredits: EconomySystem.HqBaseCapacityAE);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "HQ provides power and the 2,000 AE ceiling");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True); // 2.000 - 500 = 1.500
+            uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
+            f.Economy.GetPlayerEconomy(0).AddCredits(495); // raw fixture setup: 1.995
+
+            Assert.That(f.Construction.CancelConstruction(siteRaw), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits,
+                Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "only 5 of the 375 AE refund fit; the overflow is forfeit");
+        }
+
+        [Test]
+        public void SellStorage_CapsRefundThenLoweredCapacityDrivesExcessDecay()
+        {
+            var f = new Fixture(startingCredits: 3900);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            EntityId storage = f.Construction.PlaceCompletedBuilding(0, 6, 20, 20);
+            Assert.That(f.Economy.CapacityFor(0),
+                Is.EqualTo(EconomySystem.HqBaseCapacityAE + EconomySystem.StorageCapacityBonusAE));
+
+            Assert.That(f.Construction.SellBuilding(UnitCommandStateView.ToRawEntityId(storage)), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(4000L),
+                "only 100 of the 150 AE sale refund fit before the Storage leaves the stock");
+            Assert.That(f.Economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "selling the Storage immediately lowers the derived ceiling");
+
+            f.Step(EconomySystem.ExcessDecayIntervalTicks);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3500L),
+                "tick 10 removes 25% of the 2,000 AE excess");
         }
 
         [Test]
