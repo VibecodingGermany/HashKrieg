@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Nova.AI;
 using Nova.AI.Data;
 using Nova.Core;
 using Nova.Simulation.Definitions;

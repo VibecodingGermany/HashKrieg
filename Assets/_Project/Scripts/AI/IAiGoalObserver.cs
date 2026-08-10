@@ -1,4 +1,6 @@
-namespace Nova.AI.Data
+using Nova.AI.Data;
+
+namespace Nova.AI
 {
     /// <summary>Which rule the wave gate answered with this decision.</summary>
     public enum WaveGateMode : byte

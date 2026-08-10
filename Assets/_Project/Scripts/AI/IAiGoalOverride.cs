@@ -1,4 +1,6 @@
-namespace Nova.AI.Data
+using Nova.AI.Data;
+
+namespace Nova.AI
 {
     /// <summary>
     /// A goal forced onto single units from outside — the "override" half of the

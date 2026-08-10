@@ -53,7 +53,7 @@ namespace Nova.AI.Data
     {
         /// <summary>
         /// No goal — the unit was not judged at all this decision, and for the
-        /// goal mask (<see cref="IAiGoalOverride"/>) it means "leave this one to
+        /// goal mask (<c>Nova.AI.IAiGoalOverride</c>) it means "leave this one to
         /// the AI". Never the answer of the resolver: every combat unit the army
         /// step looks at gets one of the four below.
         /// </summary>
