@@ -154,7 +154,11 @@ namespace Nova.SimRunner.Tests
                 waveStrengthPoints: 0);
         }
 
-        private static AiHost BuildAiHost(ulong seed, AiProfile? profile = null)
+        private static AiHost BuildAiHost(
+            ulong seed,
+            AiProfile? profile = null,
+            IAiGoalObserver goalObserver = null,
+            IAiGoalOverride goalOverride = null)
         {
             // Mirror of MatchRunner.InitializeMatch(seed, ..., enableSkirmishAi: true).
             var kernel = new SimulationKernel(new SimRandom(seed));
@@ -182,7 +186,8 @@ namespace Nova.SimRunner.Tests
                     ? new AiFactionProfile("Legion", profile.Value)
                     : new AiFactionProfile("Legion",
                         targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2),
-                aiIngress, entities, economy, construction, production, fogOfWar, victory);
+                aiIngress, entities, economy, construction, production, fogOfWar, victory,
+                goalObserver, goalOverride);
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -254,9 +259,19 @@ namespace Nova.SimRunner.Tests
             }
         }
 
-        internal static AiHost BuildMatch(ulong seed, AiProfile? profile = null)
+        /// <summary>
+        /// The canonical match. The last two arguments are the admin panel's
+        /// two seams and the shipped game passes neither — a run that hands in
+        /// an observer has to reach the SAME end state as one that does not,
+        /// which is what <c>SkirmishGoalTests</c> asserts.
+        /// </summary>
+        internal static AiHost BuildMatch(
+            ulong seed,
+            AiProfile? profile = null,
+            IAiGoalObserver goalObserver = null,
+            IAiGoalOverride goalOverride = null)
         {
-            AiHost host = BuildAiHost(seed, profile);
+            AiHost host = BuildAiHost(seed, profile, goalObserver, goalOverride);
             ApplyOpeningPosition(host);
             return host;
         }

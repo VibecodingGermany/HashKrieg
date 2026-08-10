@@ -65,6 +65,28 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Die Skirmish-KI benennt, was eine Einheit vorhat (`GoalKind`)** — der
+  Armeeschritt entschied bisher in einer if-Kette, in der keine Verzweigung
+  einen Namen hatte. Er wählt jetzt je Einheit und Kadenz **ein** Goal aus
+  einer festen Prioritätsliste — `Retreat`, `Attack`, `Hold`, `Advance` — und
+  wendet dessen Wirkung aus einer Tabelle an. **Es ist keine
+  Verhaltensänderung, und das ist der ganze Zweck des Schritts:** dieselben
+  vier Bedingungen in derselben Reihenfolge, dieselben Befehle. Der Nachweis
+  ist kein Test, sondern eine Zahl — die kanonische Partie entscheidet auf
+  demselben Tick mit demselben Endzustand, und die Artefakte eines
+  Laborlaufs sind byte-identisch bis auf die gemessene Laufzeit. Deshalb
+  kein `AiBehaviorId.Revision`-Bump und kein Profilfeld: Prioritäten im
+  Profil würden `ProfileHash` und damit den in jedes Artefakt gedruckten
+  Verhaltensbezeichner bewegen. Ein Goal ist **kein Zustand** — es wird je
+  Kadenz neu abgeleitet und nirgends gespeichert, die KI bleibt eine reine
+  Funktion des committeten Zustands, und es entsteht kein Sidecar-Block.
+  Dazu zwei optionale Nähte, die der ausgelieferte Pfad nie füllt und die
+  deshalb nichts kosten: `IAiGoalObserver` lässt einen Beobachter mitlesen,
+  welches Goal eine Einheit bekommen hat und mit welchen Zahlen die
+  Bedingung entschieden hat, `IAiGoalOverride` erlaubt es, einem Goal von
+  aussen vorzugreifen — als **Eingabe** der Entscheidung, nicht als
+  gespeicherter Zustand. Beide sind Werkzeug für die Diagnose im Labor;
+  `MatchRunner` übergibt keine von beiden
 - **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
   zwei praktisch endlosen Startfelder werden durch zwei symmetrische
   Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes

@@ -140,6 +140,19 @@ namespace Nova.AI
         private readonly FogOfWarSystem _fogOfWar;
         private readonly VictorySystem _victory;
 
+        /// <summary>
+        /// Watches the decisions; null in the shipped game. Read-only from the
+        /// AI's side — an observer cannot change what is decided, and nothing it
+        /// is told is kept here.
+        /// </summary>
+        private readonly IAiGoalObserver _goalObserver;
+
+        /// <summary>
+        /// Goals forced from outside; null in the shipped game. An INPUT to the
+        /// decision, like the profile — never a memory of one.
+        /// </summary>
+        private readonly IAiGoalOverride _goalOverride;
+
         public string Name => $"SkirmishAi_{_profile.FactionName}_P{_aiPlayerId}";
         public byte AiPlayerId => _aiPlayerId;
 
@@ -149,6 +162,16 @@ namespace Nova.AI
         /// the human host ingress — that is what keeps the AI on the canonical
         /// intent path with an authority-assigned slot, sequence and target
         /// tick.
+        /// <para>
+        /// THE LAST TWO ARGUMENTS ARE OPTIONAL AND THE GAME PASSES NEITHER.
+        /// <paramref name="goalObserver"/> is told which goal each unit was
+        /// given, <paramref name="goalOverride"/> may name a goal for single
+        /// units before the decision is taken; both belong to the lab's admin
+        /// panel. They are constructor arguments rather than settable properties
+        /// so that neither can be swapped mid-match: the AI reads two references
+        /// that were fixed before the first tick, which is what lets the run
+        /// stay reproducible from its inputs.
+        /// </para>
         /// </summary>
         public SkirmishAiSystem(
             byte aiPlayerId,
@@ -159,8 +182,12 @@ namespace Nova.AI
             ConstructionSystem construction,
             ProductionSystem production,
             FogOfWarSystem fogOfWar,
-            VictorySystem victory)
+            VictorySystem victory,
+            IAiGoalObserver goalObserver = null,
+            IAiGoalOverride goalOverride = null)
         {
+            _goalObserver = goalObserver;
+            _goalOverride = goalOverride;
             _aiPlayerId = aiPlayerId;
             _profile = profile;
             _ingress = ingress ?? throw new ArgumentNullException(nameof(ingress));
@@ -188,7 +215,7 @@ namespace Nova.AI
         {
             if (tick.Value % DecisionTickInterval != 0) return;
             if (_victory.IsDecided) return;
-            Decide();
+            Decide(tick.Value);
         }
 
         public void Shutdown()
@@ -199,7 +226,7 @@ namespace Nova.AI
         // The decision loop (pure function of the committed state)
         // ------------------------------------------------------------------
 
-        private void Decide()
+        private void Decide(uint tick)
         {
             FactionId faction = _economy.GetSlotFaction(_aiPlayerId);
             ref readonly PlayerEconomyState eco = ref _economy.GetPlayerEconomy(_aiPlayerId);
@@ -481,6 +508,7 @@ namespace Nova.AI
             // whole-army block applied. ----
             ArmyPosture posture = ResolveArmyPosture(
                 faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY);
+            if (_goalObserver != null) ReportArmyGoal(tick, in posture);
             if (posture.Engages)
             {
                 // Cells of the visible ARMED enemies, collected once per
@@ -501,7 +529,7 @@ namespace Nova.AI
                 {
                     UnitState unit = combatUnits[i];
                     assignments.Add(ResolveUnitAssignment(
-                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells, threatRaws));
+                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells, threatRaws, tick));
                 }
                 SubmitAssignments(assignments, combatUnits);
             }
@@ -576,6 +604,29 @@ namespace Nova.AI
             /// own wave.
             /// </summary>
             public bool WaveReady;
+
+            // ---- what the verdict above was reached FROM ----
+            //
+            // Not inputs to any rule: every one of these is already worked out
+            // where the gate is asked, and carrying it out of that method is
+            // what lets an observer say "1.060 of 1.200" instead of "waits".
+            // Nothing below is read by a decision, which is why adding them
+            // cannot move a single tick.
+
+            /// <summary>Which rule the gate answered with — the unit of measure of <see cref="WaveThreshold"/>.</summary>
+            public WaveGateMode WaveMode;
+
+            /// <summary>Living combat units inside the staging ring; 0 while waves are off.</summary>
+            public int Gathered;
+
+            /// <summary>Living combat units outside the ring — out with an earlier wave.</summary>
+            public int Committed;
+
+            /// <summary>Summed combat points of the gathered units.</summary>
+            public long GatheredStrength;
+
+            /// <summary>What the ring has to hold before the wave marches, already capped by what production can still deliver.</summary>
+            public long WaveThreshold;
         }
 
         /// <summary>
@@ -646,6 +697,7 @@ namespace Nova.AI
             int waveSize = EffectiveWaveSize();
             if (waveSize <= 1) return posture;
 
+            posture.WaveMode = WaveGateMode.Count;
             int gathered = 0;
             int committed = 0;
             long gatheredStrength = 0;
@@ -686,11 +738,17 @@ namespace Nova.AI
             int producedStrength = wavePoints > 0
                 ? CombatStrength.OfFullHealth(faction, ProducedCombatRole)
                 : 0;
+            posture.Gathered = gathered;
+            posture.Committed = committed;
+            posture.GatheredStrength = gatheredStrength;
+
             if (wavePoints > 0 && producedStrength > 0)
             {
+                posture.WaveMode = WaveGateMode.Strength;
                 posture.WaveReady = WaveStrengthGate.IsReady(
                     wavePoints, gatheredStrength, gathered, committed, producedStrength,
-                    _profile.TargetArmySize, canProduce: barracksRaw != 0);
+                    _profile.TargetArmySize, canProduce: barracksRaw != 0,
+                    out posture.WaveThreshold);
                 return posture;
             }
 
@@ -715,6 +773,7 @@ namespace Nova.AI
             if (reachable < 1) reachable = 1;
             int threshold = waveSize < reachable ? waveSize : reachable;
 
+            posture.WaveThreshold = threshold;
             posture.WaveReady = gathered >= threshold;
             return posture;
         }
@@ -980,7 +1039,7 @@ namespace Nova.AI
         /// </summary>
         private UnitAssignment ResolveUnitAssignment(
             uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
-            List<long> threatCells, List<uint> threatRaws)
+            List<long> threatCells, List<uint> threatRaws, uint tick)
         {
             // The two facts every module below reads, worked out once. Both are
             // pure functions of the committed state — "already walking home" is
@@ -990,6 +1049,21 @@ namespace Nova.AI
             bool arrived = HasArrivedAtTheStagingCell(in unit, in posture);
 
             GoalKind goal = ResolveGoal(in unit, in posture, hqCellX, hqCellY, retreats, arrived);
+
+            // The mask, if anybody handed one in. It replaces the pick and never
+            // the effect: a forced goal produces exactly the orders that goal
+            // always produces, so a panel cannot invent a behaviour the AI has
+            // no code for.
+            bool forced = false;
+            if (_goalOverride != null)
+            {
+                GoalKind wanted = _goalOverride.ResolveGoal(entityRaw);
+                if (wanted != GoalKind.None)
+                {
+                    forced = true;
+                    goal = wanted;
+                }
+            }
 
             // The pursuer, and only for the goals that carry one.
             //
@@ -1004,7 +1078,14 @@ namespace Nova.AI
                 ? NearestThreatRaw(in unit, threatCells, threatRaws)
                 : 0u;
 
-            return ApplyGoal(goal, entityRaw, in posture, pursuerRaw);
+            UnitAssignment assignment = ApplyGoal(goal, entityRaw, in posture, pursuerRaw);
+
+            if (_goalObserver != null)
+            {
+                ReportUnitGoal(tick, in unit, in posture, in assignment,
+                    goal, forced, hqCellX, hqCellY, threatCells);
+            }
+            return assignment;
         }
 
         /// <summary>
@@ -1128,6 +1209,73 @@ namespace Nova.AI
                         MoveCellY = posture.StagingCellY,
                     };
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Reporting — reached only when somebody attached an observer, which
+        // the shipped game never does. Every measurement below is taken HERE
+        // and nowhere else on the decision path, so none of it can cost the
+        // delivered build anything.
+        // ------------------------------------------------------------------
+
+        private void ReportArmyGoal(uint tick, in ArmyPosture posture)
+        {
+            _goalObserver.OnArmyGoal(_aiPlayerId, tick, new AiArmyGoal(
+                posture.Engages, posture.TargetRaw, posture.MoveCellX, posture.MoveCellY,
+                posture.StagingCellX, posture.StagingCellY, posture.WaveReady, posture.WaveMode,
+                posture.Gathered, posture.Committed, posture.GatheredStrength, posture.WaveThreshold));
+        }
+
+        /// <summary>
+        /// The unit's goal together with the QUANTITIES its conditions weighed —
+        /// health against the retreat percentage, distances against the staging
+        /// tolerance and the ring. A reader with these four numbers and the
+        /// profile can work out how far the unit is from its next goal without
+        /// anybody re-implementing the rules beside the recording.
+        /// </summary>
+        private void ReportUnitGoal(
+            uint tick, in UnitState unit, in ArmyPosture posture, in UnitAssignment assignment,
+            GoalKind goal, bool forced, int hqCellX, int hqCellY, List<long> threatCells)
+        {
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+
+            _goalObserver.OnUnitGoal(_aiPlayerId, tick, new AiUnitGoal(
+                assignment.EntityRaw,
+                goal,
+                forced,
+                assignment.AttackTargetRaw,
+                assignment.MoveCellX,
+                assignment.MoveCellY,
+                unit.MaxHealth > 0 ? (int)((long)unit.CurrentHealth * 100 / unit.MaxHealth) : 0,
+                NearestThreatDistance(cellX, cellY, threatCells),
+                posture.StagingCellX < 0
+                    ? -1
+                    : Chebyshev(cellX, cellY, posture.StagingCellX, posture.StagingCellY),
+                Chebyshev(cellX, cellY, hqCellX, hqCellY)));
+        }
+
+        /// <summary>
+        /// Cells to the nearest visible armed enemy, or -1 when none is visible
+        /// or the retreat rule never collected any. Report-only — the rule
+        /// itself asks a cheaper question (is ANY of them within the radius) and
+        /// keeps asking it.
+        /// </summary>
+        private static int NearestThreatDistance(int cellX, int cellY, List<long> threatCells)
+        {
+            if (threatCells == null) return -1;
+            int nearest = -1;
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int distance = Chebyshev(cellX, cellY, (int)(uint)threatCells[i], (int)(threatCells[i] >> 32));
+                if (nearest < 0 || distance < nearest) nearest = distance;
+            }
+            return nearest;
+        }
+
+        private static int Chebyshev(int ax, int ay, int bx, int by)
+        {
+            return Math.Max(Math.Abs(ax - bx), Math.Abs(ay - by));
         }
 
         /// <summary>
