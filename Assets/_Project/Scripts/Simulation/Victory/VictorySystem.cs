@@ -62,9 +62,9 @@ namespace Nova.Simulation.Victory
     /// stable) and <see cref="MatchOutcome.DrawMutualAnnihilation"/> covers
     /// any same-tick mix of them. A slot that never owned an HQ — fixtures
     /// that spawn only units — is unaffected by the HQ trigger and is judged
-    /// by the D-056 rule alone. Only COMPLETED buildings carry
-    /// <see cref="UnitRole.HQ"/>; a construction site carries
-    /// <see cref="UnitRole.Unit"/> and never counts, so an unfinished HQ
+    /// by the D-056 rule alone. An HQ construction site carries
+    /// <see cref="UnitRole.HQ"/> since 16.3 (#44), but the construction
+    /// register excludes it from the completed-HQ count, so an unfinished HQ
     /// rebuild does not postpone the defeat.
     /// </para>
     /// <para>

@@ -570,8 +570,9 @@ namespace Nova.Gameplay.Match
         /// never the Alliance one), then the single legacy <see cref="_unitPrefab"/>
         /// override. The effective view role decides (16.3, #44): a site maps
         /// back to <see cref="UnitRole.Unit"/>, which resolves to the invalid
-        /// definition id 0 and therefore always falls through to the primitive —
-        /// a site never gets the finished building's art.
+        /// definition id 0. Active sites also bypass the optional legacy unit
+        /// fallback, so they always use the graybox site primitive and never
+        /// the finished building's art.
         /// </summary>
         private GameObject ResolveViewPrefab(in UnitState unit)
         {
@@ -595,6 +596,11 @@ namespace Nova.Gameplay.Match
                         }
                     }
                 }
+            }
+            ConstructionSystem construction = _matchRunner != null ? _matchRunner.Construction : null;
+            if (construction != null && construction.IsActiveSite(unit.Id))
+            {
+                return null;
             }
             return _unitPrefab;
         }
@@ -622,7 +628,7 @@ namespace Nova.Gameplay.Match
                     bounds.Encapsulate(renderers[i].bounds);
                 }
 
-                float target = TargetViewSize(unit.Role);
+                float target = TargetViewSize(EffectiveViewRole(in unit));
                 float current = Mathf.Max(bounds.size.x, bounds.size.z);
                 if (current > target && current > 1e-4f)
                 {

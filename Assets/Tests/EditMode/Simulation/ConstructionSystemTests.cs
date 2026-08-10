@@ -5,6 +5,7 @@ using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
 
@@ -420,7 +421,7 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void Completion_BecomesRoleEntity_PowerAppliesFromNextTick()
+        public void Completion_NormalizesLegacySiteRole_AndPowerAppliesFromNextTick()
         {
             var f = new Fixture();
             f.SpawnBuilder(0, 19, 20);
@@ -429,8 +430,13 @@ namespace Nova.Simulation.Tests
 
             f.Step(149);
             Assert.That(f.Construction.TryGetSite(siteRaw, out _, out _, out _), Is.True, "still a site one tick short");
+            // Emulate a pre-16.3 mid-construction snapshot: its site entity
+            // restores with the legacy generic role while the site table still
+            // names the Power definition.
+            f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role = UnitRole.Unit;
             f.Step(1); // tick 150: completion in phase 4
-            Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role, Is.EqualTo(UnitRole.Power));
+            Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role, Is.EqualTo(UnitRole.Power),
+                "completion normalizes legacy snapshot entities to their definition role");
             Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).CurrentHealth, Is.EqualTo(400),
                 "completion restores full HP");
             Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(0),
@@ -463,51 +469,6 @@ namespace Nova.Simulation.Tests
             var f = new Fixture();
             Assert.That(f.Construction.PlaceCompletedBuilding(0, 9, 20, 20).IsValid, Is.True);
             Assert.That(f.Construction.IsT2Unlocked(0), Is.True);
-        }
-
-        [Test]
-        public void Site_CarriesDefinitionRole_ButDrawsAndProvidesNoPower_UntilCompletion()
-        {
-            // 16.3 (#44): the site carries its definition role so the armed
-            // generic-slot fallback dies — and the power recompute must not
-            // read that role. A Refinery site drains nothing, a Power site
-            // feeds nothing, until the site register flips at completion.
-            var f = new Fixture();
-            f.SpawnBuilder(0, 19, 20);
-            f.Step(1); // commit: nothing provided, nothing required
-
-            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4 (draws 20 completed)");
-            uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
-            f.Step(1);
-            Assert.That(f.Entities.GetUnitRef(UnitCommandStateView.ToEntityId(siteRaw)).Role, Is.EqualTo(UnitRole.Refinery),
-                "the site carries its definition role");
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerRequired, Is.EqualTo(0),
-                "the unfinished site draws nothing");
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(0));
-
-            f.Step(200); // completion (200 full-power ticks)
-            Assert.That(f.Construction.TryGetSite(siteRaw, out _, out _, out _), Is.False, "completed: no longer a site");
-            f.Step(1); // next economy recompute
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerRequired, Is.EqualTo(20),
-                "the completed Refinery draws its 20");
-        }
-
-        [Test]
-        public void PowerSite_ProvidesNothing_UntilCompletion()
-        {
-            var f = new Fixture();
-            f.SpawnBuilder(0, 19, 20);
-            f.Step(1);
-
-            Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True, "Power plant def 5 (feeds 100 completed)");
-            f.Step(1);
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(0),
-                "a Power site must not power itself up mid-build");
-
-            f.Step(150); // completion (150 full-power ticks)
-            f.Step(1); // next economy recompute
-            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(100),
-                "the completed plant feeds its 100");
         }
 
         private static int CountUnits(Fixture f, byte slot, UnitRole role)
@@ -552,6 +513,119 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void RefineryCompletion_GrantedHarvester_StartsWithNearestFieldOrder()
+        {
+            // #43: the granted Harvester is born with a standing harvest
+            // order on the NEAREST field with reserve left — measured from
+            // the Refinery's footprint centre, ties resolved by index.
+            var f = new Fixture(startingCredits: 1000, configure: eco =>
+            {
+                Assert.That(eco.TryAddField(1, new GridPos2D(30, 30), 9000), Is.True);
+                Assert.That(eco.TryAddField(2, new GridPos2D(60, 60), 9000), Is.True);
+            });
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ power");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4");
+            f.Step(250);
+
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True, "the grant happened");
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(1),
+                "field 1 at (30,30) is closer to the footprint centre (21,21) than field 2 at (60,60)");
+
+            f.Step(50);
+            Assert.That(TryFindHarvester(f, 0, out harvester), Is.True);
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(1),
+                "the standing order is held, not dropped, while the field is out of reach");
+        }
+
+        [Test]
+        public void RefineryCompletion_WithoutFields_GrantedHarvesterCarriesNoOrder()
+        {
+            var f = new Fixture(startingCredits: 1000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True);
+            f.Step(250);
+
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True);
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo(0),
+                "no field registered: the grant still happens, only the order is skipped");
+        }
+
+        [Test]
+        public void RefineryCompletion_SecondRefinery_GrantsNothingWhileAHarvesterLives()
+        {
+            // #43 latch: the grant is derived from the unit store — a second
+            // Refinery (or a rebuild) grants nothing while any own Harvester
+            // lives. Before 16.1 EVERY completed Refinery handed one out.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True,
+                "power plant: two Refineries overdraw the HQ's 30 alone");
+            EntityId builderOne = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "first Refinery");
+            f.Step(250);
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1), "the first grant");
+
+            // The site auto-assigns the lowest-index own Builder, so the
+            // second site needs the only living builder in ITS reach.
+            Assert.That(f.Entities.DespawnUnit(builderOne), Is.True);
+            f.SpawnBuilder(0, 25, 20);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 26, 20), Is.True, "second Refinery");
+            f.Step(250);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "latched: the second Refinery grants nothing while the first Harvester lives");
+        }
+
+        [Test]
+        public void RefineryCompletion_AfterLosingEveryHarvester_TheGrantReArms()
+        {
+            // The latch is the dead-end insurance, not a once-per-match
+            // counter: with every Harvester lost the next completed Refinery
+            // grants again.
+            var f = new Fixture(startingCredits: 3000);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True);
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 44, 40).IsValid, Is.True);
+            EntityId builderOne = f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True);
+            f.Step(250);
+            Assert.That(TryFindHarvester(f, 0, out UnitState harvester), Is.True);
+
+            Assert.That(f.Entities.DespawnUnit(harvester.Id), Is.True, "every Harvester lost");
+            Assert.That(f.Entities.DespawnUnit(builderOne), Is.True);
+            f.SpawnBuilder(0, 25, 20);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 26, 20), Is.True, "second Refinery");
+            f.Step(250);
+
+            Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(1),
+                "no living Harvester: the grant fires again");
+        }
+
+        private static bool TryFindHarvester(Fixture f, byte slot, out UnitState harvester)
+        {
+            UnitState[] units = f.Entities.RawUnits;
+            for (int i = 0; i < f.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.Harvester)
+                {
+                    harvester = units[i];
+                    return true;
+                }
+            }
+            harvester = default;
+            return false;
+        }
+
+        [Test]
         public void PlaceCompletedBuilding_Refinery_GrantsNothing_MatchStartIsUnchanged()
         {
             // PlaceCompletedBuilding is the match-start path (starting HQ plus
@@ -563,6 +637,59 @@ namespace Nova.Simulation.Tests
 
             Assert.That(CountUnits(f, 0, UnitRole.Harvester), Is.EqualTo(0),
                 "an instantly placed Refinery grants nothing");
+        }
+
+        [Test]
+        public void Site_CarriesDefinitionRole_ButDrawsAndProvidesNoPower_UntilCompletion()
+        {
+            // 16.3 (#44): the site carries its definition role so the armed
+            // generic-slot fallback dies — and the power recompute must not
+            // read that role. A Refinery site drains nothing, a Power site
+            // feeds nothing, until the site register flips at completion.
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+                "the completed HQ supplies the 30 power needed to permit the Refinery");
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1); // commit: HQ provides 30, nothing required
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 4, 20, 20), Is.True, "Refinery def 4 (draws 20 completed)");
+            uint siteRaw = UnitCommandStateView.ToRawEntityId(SiteEntity(f));
+            EntityId siteId = UnitCommandStateView.ToEntityId(siteRaw);
+            f.Step(1);
+            Assert.That(f.Entities.GetUnitRef(siteId).Role, Is.EqualTo(UnitRole.Refinery),
+                "the site carries its definition role");
+            Assert.That(f.Construction.IsActiveSite(siteId), Is.True);
+            Assert.That(f.Construction.IsCompletedPlacement(siteRaw), Is.False);
+            Assert.That(f.Construction.HasFinishedBuilding(0, UnitRole.Refinery), Is.False,
+                "definition role is not completion; producer scans must use the placement register");
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerRequired, Is.EqualTo(0),
+                "the unfinished site draws nothing");
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(30),
+                "the unfinished site neither adds nor removes power from the completed-HQ baseline");
+
+            f.Step(200); // completion (200 full-power ticks)
+            Assert.That(f.Construction.TryGetSite(siteRaw, out _, out _, out _), Is.False, "completed: no longer a site");
+            f.Step(1); // next economy recompute
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerRequired, Is.EqualTo(20),
+                "the completed Refinery draws its 20");
+        }
+
+        [Test]
+        public void PowerSite_ProvidesNothing_UntilCompletion()
+        {
+            var f = new Fixture();
+            f.SpawnBuilder(0, 19, 20);
+            f.Step(1);
+
+            Assert.That(f.Construction.TryPlaceBuilding(0, 5, 20, 20), Is.True, "Power plant def 5 (feeds 100 completed)");
+            f.Step(1);
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(0),
+                "a Power site must not power itself up mid-build");
+
+            f.Step(150); // completion (150 full-power ticks)
+            f.Step(1); // next economy recompute
+            Assert.That(f.Economy.GetPlayerEconomy(0).PowerProvided, Is.EqualTo(100),
+                "the completed plant feeds its 100");
         }
 
         [Test]

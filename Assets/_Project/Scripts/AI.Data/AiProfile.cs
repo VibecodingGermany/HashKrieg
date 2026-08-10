@@ -83,17 +83,29 @@ namespace Nova.AI.Data
 
         // ---- waves ----
         //
-        // EVERY NEW BEHAVIOUR CARRIES AN OFF SETTING, and these three are the
+        // EVERY NEW BEHAVIOUR CARRIES AN OFF SETTING, and these were the
         // first to do it (methodology finding M001). A rule that lives only in
         // C# reaches BOTH sides of a self-play match, so "later decided, more
         // losses" cannot be told from "two stronger armies". With an off value
         // the same binary plays with against without, one-sided, in a single
-        // comparison run. The off value here is WaveSize 1.
+        // comparison run.
+        //
+        // There are TWO off switches here now and they are not the same one:
+        // WaveSize 1 turns waves off altogether, WaveStrengthPoints 0 keeps the
+        // waves and returns their threshold to a head count. The second is the
+        // one r6 is measured against.
 
         /// <summary>
-        /// Combat units that have to be waiting at the staging cell before the
-        /// wave marches. <b>1 means off</b>: every unit is its own wave, which
-        /// is the shipped behaviour of "march the moment you exist".
+        /// <b>1 means off</b> — every unit is its own wave, the pre-revision-3
+        /// behaviour of "march the moment you exist" — and this switch also
+        /// takes <see cref="WaveStrengthPoints"/> off with it.
+        /// <para>
+        /// ABOVE 1 IT IS NO LONGER THE WAVE'S THRESHOLD. Until r6 it was:
+        /// so many combat units waiting at the staging cell and the wave
+        /// marched. Since r6 the threshold is <see cref="WaveStrengthPoints"/>,
+        /// and this value is read only on the off path of THAT field — the
+        /// count rule still lives, but only while the strength gate is 0.
+        /// </para>
         /// </summary>
         public int WaveSize { get; }
 
@@ -110,6 +122,27 @@ namespace Nova.AI.Data
         /// committed to the attack.
         /// </summary>
         public int StagingToleranceCells { get; }
+
+        /// <summary>
+        /// Combat strength that has to stand at the staging cell before the
+        /// wave marches, in the points of <c>CombatStrength</c> (damage times
+        /// health per firing interval — an Alliance rifleman at full health is
+        /// 100). <b>0 means off</b> and the wave counts heads instead, exactly
+        /// as it did before behaviour revision 6.
+        /// <para>
+        /// WHY A POINT VALUE AND NOT A LARGER <see cref="WaveSize"/>: a head
+        /// count does not know what a head is worth. Twelve Legion recruits are
+        /// 528 points against the twelve Alliance riflemen's 1.200, so the
+        /// same number means two very different armies — and the Legion marches
+        /// into the stronger one and calls it a full wave.
+        /// </para>
+        /// <para>
+        /// ONE VALUE FOR BOTH FACTIONS ON PURPOSE. Per-faction thresholds would
+        /// re-introduce exactly the asymmetry this replaces, one indirection
+        /// further away from view.
+        /// </para>
+        /// </summary>
+        public int WaveStrengthPoints { get; }
 
         // ---- retreat ----
 
@@ -183,7 +216,8 @@ namespace Nova.AI.Data
             int stagingDistanceCells,
             int stagingToleranceCells,
             int retreatHealthPercent,
-            int retreatDangerCells)
+            int retreatDangerCells,
+            int waveStrengthPoints)
         {
             ProfileId = profileId ?? string.Empty;
             DecisionTickInterval = decisionTickInterval;
@@ -203,6 +237,7 @@ namespace Nova.AI.Data
             StagingToleranceCells = stagingToleranceCells;
             RetreatHealthPercent = retreatHealthPercent;
             RetreatDangerCells = retreatDangerCells;
+            WaveStrengthPoints = waveStrengthPoints;
         }
 
         /// <summary>
@@ -234,7 +269,8 @@ namespace Nova.AI.Data
             && StagingDistanceCells == other.StagingDistanceCells
             && StagingToleranceCells == other.StagingToleranceCells
             && RetreatHealthPercent == other.RetreatHealthPercent
-            && RetreatDangerCells == other.RetreatDangerCells;
+            && RetreatDangerCells == other.RetreatDangerCells
+            && WaveStrengthPoints == other.WaveStrengthPoints;
 
         public override bool Equals(object obj) => obj is AiProfile other && Equals(other);
 
@@ -260,6 +296,7 @@ namespace Nova.AI.Data
                 hash = (hash * 397) ^ StagingToleranceCells;
                 hash = (hash * 397) ^ RetreatHealthPercent;
                 hash = (hash * 397) ^ RetreatDangerCells;
+                hash = (hash * 397) ^ WaveStrengthPoints;
                 return hash;
             }
         }

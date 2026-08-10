@@ -668,8 +668,8 @@ namespace Nova.SimRunner
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -826,13 +826,14 @@ namespace Nova.SimRunner
         // Deterministic host scans (ascending entity index)
         // ----------------------------------------------------------------
 
-        /// <summary>Raw id of the first active entity of <paramref name="slot"/> with the role, else 0.</summary>
+        /// <summary>Raw id of the first active completed/non-site entity of <paramref name="slot"/> with the role, else 0.</summary>
         private static uint FindRoleRaw(Host host, byte slot, UnitRole role)
         {
             UnitState[] units = host.Entities.RawUnits;
             for (int i = 0; i < host.Entities.Capacity; i++)
             {
-                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role)
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role
+                    && !host.Construction.IsActiveSite(units[i].Id))
                 {
                     return UnitCommandStateView.ToRawEntityId(units[i].Id);
                 }

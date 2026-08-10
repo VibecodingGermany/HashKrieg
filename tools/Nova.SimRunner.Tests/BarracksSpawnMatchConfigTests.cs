@@ -99,8 +99,8 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -145,8 +145,10 @@ namespace Nova.SimRunner.Tests
         /// The report's exact situation: a completed Alliance barracks, one
         /// infantry queued through the sealed command path. The bar's data
         /// source must show the progressing entry (the owner's "bar runs"),
-        /// and after BuildTicks the entity must stand at the default rally
-        /// cell — if it does, the simulation side of the defect is closed.
+        /// and after BuildTicks the entity must stand at the barracks'
+        /// footprint ring with a standing order to the default rally cell
+        /// (16.2, #46: spawns at the building, walks to the rally point) —
+        /// if it does, the simulation side of the defect is closed.
         /// </summary>
         [Test]
         public void MatchConfig_BarracksQueueViaCommandPath_SpawnsInfantryAtDefaultRally()
@@ -179,7 +181,12 @@ namespace Nova.SimRunner.Tests
 
             // 100 build ticks at full power (HQ 30 provided, barracks 15
             // required), plus the ticks already spent — 110 is ample.
-            for (int i = 0; i < 110; i++)
+            // Stop AT the spawn tick: the no-teleport assert below reads the
+            // birth position, and with a MovementSystem in the host the
+            // infantryman reaches the rally cell within a few more ticks —
+            // which is exactly the intended behaviour and would make a
+            // fixed-length loop assert the opposite of what it means.
+            for (int i = 0; i < 110 && host.CountRole(0, UnitRole.BasicInfantry) == 0; i++)
             {
                 host.Step();
             }
@@ -188,9 +195,14 @@ namespace Nova.SimRunner.Tests
                 "SIM VERDICT: in the real match configuration the infantry MUST spawn — if this fails, " +
                 "one of the two silent ProductionSystem pause paths is reachable in an ordinary base");
 
-            // The spawned infantryman stands at the default rally cell (13,11)
-            // and is part of the viewer team's committed fog view (the feed
-            // UnitViewManager renders — own entities always).
+            // 16.2 (#46): the spawned infantryman stands at the barracks'
+            // footprint ring (no longer AT the default rally cell) and walks
+            // there under a standing order. The spawn tick plus the few
+            // remaining loop ticks carry him at most ~1.5 cells, so the
+            // asserts pin the order and the footprint neighbourhood, not an
+            // exact en-route position. He is part of the viewer team's
+            // committed fog view (the feed UnitViewManager renders — own
+            // entities always).
             UnitState[] units = host.Entities.RawUnits;
             EntityId infantry = EntityId.Invalid;
             for (int i = 0; i < host.Entities.Capacity; i++)
@@ -199,8 +211,15 @@ namespace Nova.SimRunner.Tests
                 if (u.IsActive && u.PlayerId == 0 && u.Role == UnitRole.BasicInfantry)
                 {
                     infantry = u.Id;
-                    Assert.That(u.Transform.PositionX, Is.EqualTo(SimFixed.FromInt(13)));
-                    Assert.That(u.Transform.PositionY, Is.EqualTo(SimFixed.FromInt(11)));
+                    int gx = System.Math.Max(0, SimFixed.WorldToGrid(u.Transform.PositionX));
+                    int gy = System.Math.Max(0, SimFixed.WorldToGrid(u.Transform.PositionY));
+                    Assert.That(System.Math.Max(System.Math.Abs(gx - 11), System.Math.Abs(gy - 11)), Is.LessThanOrEqualTo(3),
+                        "spawns at the footprint ring of the (11,11) barracks and walks");
+                    Assert.That(gx == 13 && gy == 11, Is.False,
+                        "at the spawn tick he is not yet at the rally cell — he walks there");
+                    Assert.That(u.GoalGridPos.X, Is.EqualTo(13));
+                    Assert.That(u.GoalGridPos.Y, Is.EqualTo(11));
+                    Assert.That(u.IsMoving, Is.True, "ordered at the default rally cell (13,11)");
                 }
             }
             Assert.That(infantry.IsValid, Is.True);
@@ -215,28 +234,29 @@ namespace Nova.SimRunner.Tests
         /// Companion verdict for the second silent pause path: with the
         /// manifest's 1024-entity store the only way production can hang in an
         /// ordinary match is a fully blocked spawn search — proven here by
-        /// walling the default rally cell's entire eight-ring search area with
-        /// placements, which must pause the finished unit at the threshold
-        /// (progress clamped, nothing spawned, nothing lost).
+        /// walling the entire eight-ring search area around the FOOTPRINT
+        /// CENTRE (16.2: the search anchors there, not at the rally cell)
+        /// with placements, which must pause the finished unit at the
+        /// threshold (progress clamped, nothing spawned, nothing lost).
         /// </summary>
         [Test]
         public void MatchConfig_NoFreeSpawnCell_PausesAtThreshold_Silently()
         {
             MatchHost host = BuildMatchHost();
 
-            // Barracks at origin (21,21) -> centre (22,22) -> default rally
-            // (24,22); the eight-ring spawn search covers (16..32, 14..30).
+            // Barracks at origin (21,21) -> centre (22,22); the eight-ring
+            // spawn search anchored at the centre covers (14..30, 14..30).
             EntityId barracks = host.Construction.PlaceCompletedBuilding(0, DefBarracksAlliance, 21, 21);
             Assert.That(barracks.IsValid, Is.True);
             uint rawBarracks = UnitCommandStateView.ToRawEntityId(barracks);
 
             // Wall the ENTIRE search area with exactly tiling 3x3 footprints:
-            // origins every three cells covering (15..32, 12..32) — the
+            // origins every three cells covering (12..32, 12..32) — the
             // barracks itself fills the (21,21) slot, so every placement is
             // free and no cell of the search square stays uncovered.
             for (int y = 12; y <= 30; y += 3)
             {
-                for (int x = 15; x <= 30; x += 3)
+                for (int x = 12; x <= 30; x += 3)
                 {
                     if (x == 21 && y == 21) continue; // the barracks slot itself
                     Assert.That(

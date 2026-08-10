@@ -166,10 +166,10 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void Production_SpawnsAtDefaultRally_AfterExactBuildTicks()
+        public void Production_SpawnsAtFootprint_ThenOrdersToRally()
         {
             var f = new Fixture();
-            uint barracks = f.SpawnBarracks(0); // center cell (11,11) -> default rally (13,11)
+            uint barracks = f.SpawnBarracks(0); // footprint (10,10)-(12,12), center (11,11) -> default rally (13,11)
             Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
 
             f.Step(99);
@@ -178,9 +178,17 @@ namespace Nova.Simulation.Tests
             Assert.That(CountRole(f, UnitRole.BasicInfantry), Is.EqualTo(1), "spawned after exactly 100 full-power ticks");
 
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(13)));
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(11)));
-            Assert.That(f.Entities.GetUnitRef(unit).MaxHealth, Is.EqualTo(90));
+            ref readonly UnitState spawned = ref f.Entities.GetUnitRef(unit);
+            // 16.2 (#46): the ring scan anchors at the building's CENTER cell —
+            // the footprint loses to the occupancy rule, so the first free
+            // cell in ascending (y, x) is (9,9). The rally point is the ORDER
+            // target the unit walks to, no longer the spawn anchor.
+            Assert.That(spawned.Transform.PositionX, Is.EqualTo(SimFixed.FromInt(9)));
+            Assert.That(spawned.Transform.PositionY, Is.EqualTo(SimFixed.FromInt(9)));
+            Assert.That(spawned.IsMoving, Is.True, "a standing move order to the rally cell is issued at spawn");
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(13));
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(11));
+            Assert.That(spawned.MaxHealth, Is.EqualTo(90));
             Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(0));
         }
 
@@ -206,7 +214,7 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void SetRallyPoint_MovesTheSpawnLocation()
+        public void SetRallyPoint_MovesTheOrderTarget_NotTheSpawnCell()
         {
             var f = new Fixture();
             uint barracks = f.SpawnBarracks(0);
@@ -218,8 +226,13 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+            ref readonly UnitState spawned = ref f.Entities.GetUnitRef(unit);
+            // 16.2 (#46): the spawn cell stays at the footprint ring (9,9);
+            // SetRallyPoint moves the ORDER target, not the spawn anchor.
+            Assert.That(spawned.Transform.PositionX, Is.EqualTo(SimFixed.FromInt(9)), "still spawns at the footprint");
+            Assert.That(spawned.Transform.PositionY, Is.EqualTo(SimFixed.FromInt(9)));
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(30));
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(30));
         }
 
         [Test]
@@ -245,18 +258,20 @@ namespace Nova.Simulation.Tests
         public void SpawnSearch_SkipsOccupiedCells_Deterministically()
         {
             var f = new Fixture();
-            uint barracks = f.SpawnBarracks(0); // default rally (13,11)
-            // Occupy the rally cell with a completed Storage at (13,11).
-            Assert.That(f.Construction.PlaceCompletedBuilding(0, 6, 13, 11).IsValid, Is.True);
+            uint barracks = f.SpawnBarracks(0); // center (11,11)
+            // Occupy the first ring-2 candidate (9,9): a completed Storage at
+            // origin (7,7) covers (7,7)-(9,9) without touching the Barracks
+            // footprint (10,10)-(12,12).
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 6, 7, 7).IsValid, Is.True);
 
             Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
 
-            // Ring-1 scan in ascending (y, x): (12,10) is Barracks footprint,
-            // (13,10) is the first free cell.
+            // Ring-2 scan in ascending (y, x): (9,9) is Storage footprint,
+            // (10,9) is the first free cell.
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(13)));
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(10)),
+            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(10)));
+            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(9)),
                 "the documented ring scan skips occupied cells deterministically");
         }
 
@@ -388,8 +403,22 @@ namespace Nova.Simulation.Tests
             Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
             f.Step(100);
             EntityId unit = FindRole(f, UnitRole.BasicInfantry);
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
-            Assert.That(f.Entities.GetUnitRef(unit).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+            ref readonly UnitState spawned = ref f.Entities.GetUnitRef(unit);
+
+            // 16.2 (#46): the unit is born at the barracks footprint and is
+            // ORDERED to the rally cell — it no longer materialises there.
+            // This fixture registers no MovementSystem, so it stays at the
+            // spawn cell; the standing order is what proves the rally
+            // survived the rejected update.
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(30),
+                "the surviving rally (30,30) is what the finished unit is sent to");
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(30));
+
+            int spawnX = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionX));
+            int spawnY = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionY));
+            Assert.That(System.Math.Max(System.Math.Abs(spawnX - 11), System.Math.Abs(spawnY - 11)),
+                Is.LessThanOrEqualTo(3),
+                "born at the footprint ring of the (11,11) barracks, not at the rally");
         }
 
         [Test]

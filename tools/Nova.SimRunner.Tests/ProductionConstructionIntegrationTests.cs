@@ -62,8 +62,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, startingCredits);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -269,7 +269,7 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void FullLoop_BuildBarracks_QueueInfantry_SpawnsAtRally()
+        public void FullLoop_BuildBarracks_QueueInfantry_SpawnsAtFootprint_OrderedToRally()
         {
             var host = ProdHost.Create(Seed);
             EntityId builder = host.SpawnBaseFixture(0, 4, 4);
@@ -311,8 +311,19 @@ namespace Nova.SimRunner.Tests
             for (int i = 0; i < 100; i++) host.StepTick();
             Assert.That(host.CountRole(0, UnitRole.BasicInfantry), Is.EqualTo(1));
             EntityId infantry = FindRole(host, 0, UnitRole.BasicInfantry);
-            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(30)));
-            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(30)));
+            ref readonly UnitState spawned = ref host.Entities.GetUnitRef(infantry);
+            // 16.2 (#46): the infantry spawns at the Barracks' footprint ring
+            // (center (21,21); first free ring-2 cell (19,19)) and walks to
+            // the rally point. The spawn happened inside this loop's last
+            // tick, so movement has carried it at most a fraction of a cell —
+            // assert the footprint neighbourhood and the standing order.
+            int gx = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionX));
+            int gy = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionY));
+            Assert.That(System.Math.Max(System.Math.Abs(gx - 21), System.Math.Abs(gy - 21)), Is.LessThanOrEqualTo(2),
+                "spawns at the footprint ring, no longer teleports to the rally cell");
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(30));
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(30));
+            Assert.That(spawned.IsMoving, Is.True, "ordered at the rally cell (30,30)");
         }
 
         [Test]
@@ -524,15 +535,24 @@ namespace Nova.SimRunner.Tests
                 "no producer row was created by the rejected command");
 
             // Production continues normally: queue applies and the unit
-            // spawns at the DEFAULT rally (two cells east of the center).
+            // spawns at the footprint ring, ordered at the DEFAULT rally
+            // (two cells east of the center).
             host.Submit(new QueueUnitPayload(barracksRaw, 12, 1));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
             for (int i = 0; i < 100; i++) host.StepTick();
             Assert.That(host.CountRole(0, UnitRole.BasicInfantry), Is.EqualTo(1));
             EntityId infantry = FindRole(host, 0, UnitRole.BasicInfantry);
-            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionX, Is.EqualTo(SimFixed.FromInt(23)));
-            Assert.That(host.Entities.GetUnitRef(infantry).Transform.PositionY, Is.EqualTo(SimFixed.FromInt(21)));
+            ref readonly UnitState spawned = ref host.Entities.GetUnitRef(infantry);
+            // 16.2 (#46): spawn at the footprint ring of center (21,21) —
+            // the rejected off-map rally changed nothing, the standing order
+            // targets the default rally cell (23,21).
+            int gx = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionX));
+            int gy = System.Math.Max(0, SimFixed.WorldToGrid(spawned.Transform.PositionY));
+            Assert.That(System.Math.Max(System.Math.Abs(gx - 21), System.Math.Abs(gy - 21)), Is.LessThanOrEqualTo(2),
+                "spawns at the footprint ring, no longer teleports to the rally cell");
+            Assert.That(spawned.GoalGridPos.X, Is.EqualTo(23));
+            Assert.That(spawned.GoalGridPos.Y, Is.EqualTo(21));
         }
 
         private static uint BarracksRaw(ProdHost host)

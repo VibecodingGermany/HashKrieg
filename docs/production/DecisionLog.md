@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.32.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.34.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -1654,9 +1654,13 @@ Donnerkanone 60; der Scout bleibt abgeleitet (10).
 
 ---
 
-### D-076 | verbindlich | Sprint 7 (Governance-Tier-Modell, Gate-Kette schlafend)
+### D-076 | teilweise ersetzt durch D-105 | Sprint 7 (Governance-Tier-Modell, Gate-Kette schlafend)
 
 **Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis Westermann).
+
+**Fortschreibung:** D-105 ersetzt nur die Zuordnung der manuellen Spielabnahme
+zum einzelnen PR. Für Meilensteine bleibt die gespielte Runde Pflicht; ein PR
+darf nun mit ehrlich dokumentierter Zurückstellung früher integriert werden.
 
 **Kontext:** Das Repository trug ein Governance-Regime für ein Projekt, das es
 nicht ist. Messbar am Ist-Stand vor dieser Entscheidung:
@@ -2412,12 +2416,17 @@ technisch umgesetzt, nicht als vollständig spielerisch abgenommen bezeichnet.
 
 ---
 
-### D-091 | verbindlich ab Merge | Sprint 13.0 (Tier 2, Source-available-Beiträge und PR-Schutz)
+### D-091 | teilweise ersetzt durch D-105 | Sprint 13.0 (Tier 2, Source-available-Beiträge und PR-Schutz)
 
 **Status:** Inhaberentscheidung vom 2026-08-08 (Dennis Westermann). Sie wird
 mit dem Merge dieses Freigabe-PR wirksam. Michael Falk (`@travelhawk`) und Dennis
 Westermann (`@cubetribe`) sind die einzigen Maintainer mit Merge-Zugang zu
 `main`.
+
+**Fortschreibung:** D-105 ersetzt die zwei Merge-Accounts, die
+Maintainer-Peer-Review und die daraus abgeleitete CODEOWNERS-/Branch-Protection-
+Konfiguration. Tier 2, Lizenz, CLA, Baseline-Trennung und `integrity` bleiben
+unverändert verbindlich.
 
 **Kontext:** Ein externer Beitragender arbeitet am Einheitenstrang. Das bisherige
 Tier 1 setzt Vertrauen zwischen zwei Maintainers voraus und enthält weder einen
@@ -2924,6 +2933,169 @@ Vertriebsweg und setzt sich später neben `install_hash`, ohne Tabellen,
 Sperrarten oder Bedienweg zu ändern. Q-041 bleibt bis zur Öffnung der Beta
 offen.
 
+---
+
+### D-101 | verbindlich | Sprint 16 (der Ausgangspin der kanonischen KI-Partie wird vom Identitätspin getrennt)
+
+**Status:** Inhaberentscheidung vom 2026-08-09, umgesetzt im selben Zug.
+
+**Kontext:** `SkirmishAiTests.AiBehaviorId_TracksWhatTheAiActuallyDoes` pinnte
+drei Werte in einer Zusicherung: die KI-Kennung `AiBehaviorId.Value`, den
+Entscheidungstick der kanonischen Partie und deren Endzustands-Hash. Die
+Kopplung war beabsichtigt — der Kommentar begründet sie damit, dass die Kennung
+geänderte Zahlen fängt und der Endzustand geänderte Regeln.
+
+Der erste Wirtschaftssprint hat gezeigt, dass die Kopplung an der falschen Naht
+liegt: Entscheidungstick und Endzustand bewegen sich bei **jeder** Änderung an
+der Simulation, in der die KI spielt. Paket 16.1 verschob den Endzustand, 16.2
+zusätzlich den Tick — beide fassen keine Zeile KI-Code an. Die im Test
+hinterlegte Prozedur schickte den Netzstrang damit in Arns Verhaltensjournal,
+also in das falsche Buch. Der Test liegt zudem in
+`tools/Nova.SimRunner.Tests/`, einem Verzeichnis, das in der
+Schreibhoheitstabelle gar keinen Eigentümer hatte.
+
+**Alternativen:**
+
+1. **Arn zieht den Pin nach jedem Merge des Netzstrangs nach.** Verworfen: bei
+   zehn Paketen in Sprint 16 sind das zehn Runden Ping-Pong über einen
+   Fork-PR-Weg, und jede blockiert einen fertigen Maintainer-PR an einer
+   Zahl, die niemand aus seinem Strang bewegt hat.
+2. **Der Netzstrang aktualisiert die Zahlen selbst, der Test bleibt, wo er
+   ist.** Verworfen: dann schreibt ein Strang regelmäßig in die Testdatei des
+   anderen, ohne dass die Tabelle das deckt — genau die Unklarheit, die den
+   Fall erzeugt hat. Ausserdem bliebe die irreführende Prozedur im Kommentar
+   stehen.
+3. **Den Ausgangspin ersatzlos streichen.** Verworfen: er ist der einzige Test,
+   der bemerkt, dass die KI die kanonische Partie überhaupt nicht mehr
+   entscheidet. Genau das ist in Paket 16.3 passiert (Entscheidungstick 0), und
+   ohne den Pin wäre es niemandem aufgefallen.
+4. **ANGENOMMEN: der Pin wird geteilt.** Die Kennung bleibt beim
+   Einheitenstrang (`SkirmishAiTests.AiBehaviorId_TracksWhichAiThisIs`),
+   Entscheidungstick und Endzustand ziehen in `CanonicalAiOutcomeTests` um,
+   das der Netzstrang besitzt.
+
+**Entscheidung:**
+
+1. `CanonicalAiOutcomeTests` (neu, Netzstrang) pinnt Entscheidungstick und
+   Endzustands-Hash der kanonischen KI-Partie.
+2. `SkirmishAiTests` behält die Kennung und deren Prozedur (Revision bumpen,
+   Journaleintrag) unverändert.
+3. Der Ausgangstest **liest die Kennung mit** und macht die Unterscheidung im
+   Fehlertext: Ausgang bewegt **und** Kennung bewegt heisst KI-Änderung;
+   Ausgang bewegt und Kennung unverändert heisst Simulationsänderung.
+4. **Unentschieden ist ein Defekt, kein verschobener Pin.** Der Ausgangstest
+   sichert das zuerst und getrennt zu, damit der Fehlertext beide Fälle
+   auseinanderhält.
+5. `tools/Nova.SimRunner.Tests/` bekommt eine Eigentümerzeile: geteilt je
+   Datei, fremde Testdateien nur nach Ansage. Der KI-Harness (`AiHost`,
+   `BuildMatch`) wird Vertragsfläche und dafür `internal`.
+
+**Begründung:** Die Kennung beantwortet „welche KI ist das", der Ausgang
+beantwortet „hat sich irgendetwas bewegt". Das sind zwei Fragen, und nur die
+erste gehört dem Einheitenstrang. Die Diagnose, die die Kopplung leistete, geht
+nicht verloren — sie wandert aus der Zusicherung in den Fehlertext, wo sie
+ohnehin hingehört: gelesen wird sie erst, wenn der Test rot ist.
+
+**Konsequenzen:** Vier Deklarationen in `SkirmishAiTests` werden `internal`,
+die Zusicherung dort schrumpft auf eine Zeile, der erklärende Kommentar
+verweist auf die neue Datei. Der Einheitenstrang ist zu informieren (Issue #75).
+Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
+
+---
+
+### D-105 | verbindlich | Sprint 16 (alleinige Projektleitung und Merge-Autorität)
+
+**Status:** unmittelbar wirksame Inhaberentscheidung vom 2026-08-10 (Dennis
+Westermann). D-102 bis D-104 sind durch die offenen Sprint-16-PRs #80 bis #82
+belegt; D-105 vermeidet diese reservierten IDs bewusst.
+
+**Kontext:** Michael Falk (`@travelhawk`) ist weiterhin Teil der GitHub-
+Organisation, aber nicht mehr Teil dieses Projekts. Dennis Westermann
+(`@cubetribe`) leitet das Projekt allein. D-091 bildete dagegen zwei
+Projektmaintainer ab und verlangte die Freigabe des jeweils anderen auf jedem
+PR. Diese Regel ist nach Michaels Ausscheiden nicht nur sachlich falsch, sondern
+zirkulär: Niemand könnte den PR freigeben, der den tatsächlichen Zustand
+dokumentiert.
+
+Die Verfassung löst den Übergang bereits auf der richtigen Ebene:
+[../../GOVERNANCE.md](../../GOVERNANCE.md) weist Tier-Wechsel dem Inhaber zu,
+und D-076 wie D-091 sind Inhaberentscheidungen von Dennis. Die heutige
+außerrepositoryliche Inhaberentscheidung gilt deshalb sofort; dieser PR
+dokumentiert und implementiert sie. Er bleibt dennoch PR-only, durchläuft die
+strikte Pflicht-CI und ein unabhängiges Read-only-Review und wird ohne
+Force-Push per Squash integriert.
+
+**Alternativen:**
+
+1. **Michael bis zur Benennung eines Ersatzes als Projektmaintainer führen.**
+   Verworfen: Das wäre eine wissentlich falsche Zuständigkeitsbehauptung und
+   blockierte jeden PR an einer Person, die das Projekt nicht mehr betreut.
+2. **Sofort einen zweiten Maintainer ernennen.** Verworfen: Eine unbesetzte
+   Rolle nur für eine Freigabe zu füllen erzeugt keine unabhängige Prüfung und
+   gäbe unnötig Merge- und Governance-Rechte ab.
+3. **Auf Tier 1 zurückwechseln.** Verworfen: Der externe Einheitenstrang und
+   damit CLA-, Herkunfts- und aktuelle Inhaberfreigabe bleiben real. Tier 2 ist
+   weiterhin die passende Vertrauensgrenze.
+4. **Tier 2 mit einem alleinigen Projektinhaber und unabhängiger technischer
+   Prüfung betreiben.** Angenommen: Entscheidungen bleiben eindeutig, externe
+   Beiträge bleiben geschützt und Nachweis wird nicht mit Mitentscheidung
+   verwechselt.
+
+**Entscheidung:**
+
+1. Dennis Westermann (`@cubetribe`) ist alleiniger Projektinhaber, Maintainer,
+   Tier-Entscheider und Mergeberechtigter. Michael Falk (`@travelhawk`) hat
+   keine Projekt-Governance- oder Maintainer-Rolle mehr. Organisationsrechte
+   und historische Urheberschaft bleiben unberührt und verleihen keine
+   Entscheidungsbefugnis für Project Nova/HashKrieg.
+2. Tier 2 bleibt aktiv. Der Inhaber darf eigene PRs nach grüner Pflicht-CI und
+   dokumentiertem, unabhängigem Read-only-Review selbst mergen. Externe PRs
+   brauchen weiterhin die CLA-Zustimmung und eine `APPROVED`-Review von
+   `@cubetribe` auf dem aktuellen Head.
+3. Tier-Wechsel und Tier-3-Entscheidungen liegen ebenfalls allein beim Inhaber.
+   Aktivierte Gate-Evidenz und technische Prüfungen bleiben verbindliche
+   Nachweise. Der unabhängige Required Reviewer des Evidence-Authorizers
+   bestätigt die technische Vertrauensgrenze, ist aber keine zweite
+   Governance-Stimme.
+4. Unverändert bleiben: geschütztes PR-only-`main`, strikte grüne Pflichtchecks,
+   Squash-Merge, lineare Historie, aufgelöste Review-Gespräche, kein Force-Push
+   auf oder Löschen von `main` sowie die Trennung von Simulationsverhalten und
+   den vier geschützten Determinismus-Baselines. Der dokumentierte Baseline-
+   Ausnahmeweg wird nicht gelockert; Topic-Branches werden nach dem Merge wie
+   bisher gelöscht.
+5. Der Inhaber darf die manuelle Spielabnahme eines einzelnen PR ausdrücklich
+   zurückstellen. Der PR nennt dann „nicht gespielt“, Grund, gelaufene
+   automatisierte Ersatznachweise und Restrisiko. Er ist mergebar, aber weder
+   spielerisch abgenommen noch ein Meilenstein-Nachweis; eine spätere gemeinsame
+   Spielrunde kann mehrere integrierte PRs abnehmen. Tier-3-Evidenz wird dadurch
+   nicht erlassen.
+6. Die in D-091 verlangte zweite Maintainer-Freigabe gilt nicht für den
+   dokumentierenden D-105-PR, weil die Inhaberentscheidung vor dem PR unmittelbar
+   wirksam wurde. Sein Ersatzschutz ist unabhängiges Read-only-Review plus
+   strikte grüne CI; rote Checks bleiben unübergehbar.
+7. Fachliche Schreibhoheiten bleiben der Standard. Für eine serielle
+   Integrationskette darf der Inhaber eine fremde Fläche jedoch vorübergehend
+   für eine minimale Reparatur freigeben, wenn der PR sonst nicht grün werden
+   kann. Pfad, Anlass, Änderung, Tests und Restrisiko werden dokumentiert und
+   der Strangverantwortliche wird informiert. Das ändert die dauerhafte
+   Eigentümerschaft nicht.
+
+**Begründung:** Projektentscheidung und technische Prüfung sind zwei
+verschiedene Funktionen. Die erste braucht eine wahrheitsgemäße, eindeutig
+verantwortliche Person; die zweite bleibt durch CI, unabhängige Agentenreviews,
+Tests und späteres Spielen reproduzierbar. Ein fiktiver zweiter Entscheider
+würde weder Qualität noch Bus-Faktor verbessern.
+
+**Konsequenzen:** `CODEOWNERS`, der externe Review-Check und die Main-
+Restriktion nennen nur noch `@cubetribe`. Michaels fortbestehende Rolle als
+Organisationsinhaber kann ihm auf GitHub technisch weiter administrative
+Möglichkeiten geben; sie wird in diesem projektbegrenzten Entscheid nicht
+verändert und ist keine Projekt-Governance-Rolle. Fremde fachliche
+Schreibhoheiten im Parallelbetrieb bleiben bestehen; D-105 erlaubt nur die
+dokumentierte, begrenzte Integrationsreparatur. PRs mit zurückgestellter
+Spielabnahme müssen ihr Restrisiko offen tragen und dürfen nicht als vollständig
+gespielt gemeldet werden.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3004,6 +3176,8 @@ offen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.34.0 | 2026-08-10 | D-105 aufgenommen: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 bleibt mit CLA und aktueller Inhaberfreigabe aktiv, Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Review selbst gemergt werden, und manuelle Spielabnahme darf ehrlich zurückgestellt, aber nicht als gelaufen behauptet werden | Project Owner / Orchestrator |
+| 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
 | 1.1.0 | 2026-07-21 | D-006 (Unity 6.3 LTS + URP bestätigt) aus Sprint-1-Validierung | Lead Technical Director |
 | 1.2.0 | 2026-07-21 | D-007 bis D-019: verbindliche Game-Design-Grundlagen (Q-001–Q-012, Q-016, Q-017) | Game Director |

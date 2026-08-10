@@ -248,6 +248,38 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
+        /// Nearest field with reserve left to a grid cell, false when every
+        /// registered field is exhausted (or none is registered). Ascending
+        /// registration-index scan, deterministic: Chebyshev distance decides
+        /// and a tie resolves to the LOWER index — never to a discovery
+        /// order. Exhausted fields are skipped: an exhausted target would
+        /// resolve a fresh harvest order on its first tick and teach the
+        /// grant that issues it (16.1, #43) nothing.
+        /// </summary>
+        public bool TryFindNearestField(int gridX, int gridY, out ushort fieldId)
+        {
+            fieldId = 0;
+            int bestDistance = int.MaxValue;
+            for (int i = 0; i < _fieldCount; i++)
+            {
+                ref readonly AetheriumField field = ref _fields[i];
+                if (field.IsExhausted)
+                {
+                    continue;
+                }
+                int distance = Math.Max(
+                    Math.Abs(gridX - field.GridPos.X),
+                    Math.Abs(gridY - field.GridPos.Y));
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    fieldId = field.FieldId;
+                }
+            }
+            return fieldId != 0;
+        }
+
+        /// <summary>
         /// The faction one slot plays (economy block v2). Part of the hashed
         /// state, so every consumer of faction-differentiated content —
         /// power figures, build costs, weapon profiles — reads it here rather
@@ -486,7 +518,7 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
-        /// True when an active own refinery stands in reach of the unit
+        /// True when a completed own refinery stands in reach of the unit
         /// (ascending entity-index scan, first hit decides). Reach is measured
         /// against the building FOOTPRINT, not its entity cell: the entity
         /// sits at the footprint centre (ConstructionSystem.SpawnBuildingEntity
@@ -511,6 +543,9 @@ namespace Nova.Simulation.Economy
                 ref readonly UnitState candidate = ref units[i];
                 if (!candidate.IsActive || candidate.Role != UnitRole.Refinery) continue;
                 if (candidate.PlayerId != unit.PlayerId) continue;
+                // 16.3 (#44): a site already carries the Refinery role, but
+                // it is not a cargo drop-off until completion.
+                if (_isSiteLookup != null && _isSiteLookup(candidate.Id)) continue;
 
                 int rx = Math.Max(0, SimFixed.WorldToGrid(candidate.Transform.PositionX));
                 int ry = Math.Max(0, SimFixed.WorldToGrid(candidate.Transform.PositionY));

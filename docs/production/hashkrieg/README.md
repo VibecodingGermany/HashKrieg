@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.7.1 | **Status:** fortgeschriebene Planungsmappe – Sprint 13 zur Hälfte gemergt (13.1, 13.7 seit `e15f5e6`), die offenen Pakete 13.2–13.5 warten auf Zugangsdaten und zwei Menschen an zwei Rechnern; **Sprint 16 ist nach dem ersten Betatest vorgezogen** und läuft seit D-095 parallel zum Einheitenstrang; Sprint 18 neu angelegt | **Verantwortungsbereich:** Orchestrator / Producer | **Sprint:** 16
+**Version:** 0.7.2 | **Status:** fortgeschriebene Planungsmappe – Sprint 13 zur Hälfte gemergt (13.1, 13.7 seit `e15f5e6`), die offenen Pakete 13.2–13.5 warten auf Zugangsdaten und zwei Menschen an zwei Rechnern; **Sprint 16 ist nach dem ersten Betatest vorgezogen** und läuft seit D-095 parallel zum Einheitenstrang; Sprint 18 neu angelegt | **Verantwortungsbereich:** Project Owner / Orchestrator / Producer | **Sprint:** 16
 
 ## Zweck
 
@@ -22,7 +22,7 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 
 ## Abhängigkeiten
 
-- [../../../GOVERNANCE.md](../../../GOVERNANCE.md) – Governance-Tier 2 (D-091): Nachweis ist grüne CI plus gespielte Runde
+- [../../../GOVERNANCE.md](../../../GOVERNANCE.md) – Governance-Tier 2 (D-091/D-105): Meilenstein-Nachweis ist grüne CI plus gespielte Runde; einzelne PRs dürfen sichtbar zurückgestellt integriert werden
 - [../MVPContentManifest.md](../MVPContentManifest.md) – autorisierter MS-1-Sollinhalt
 - [../ScopeLedger.md](../ScopeLedger.md) – registrierte Zurückstellungen
 - [../DemoRunbook.md](../DemoRunbook.md) – heutiger spielbarer Umfang
@@ -43,7 +43,7 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [07_CC0_Quellen.md](07_CC0_Quellen.md) | Welche Kulissen-Assets aus freien CC0-Paketen kommen statt gebaut zu werden — mit Prüfvermerk |
 | [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) | Sprint 12; Strang A A1–A7 umgesetzt und A8 Stufe 1 über 10.023 TCP-Ticks nachgewiesen, manuelle Loopback-/LAN-/VPS-Stufen offen (D-089) |
 | [12B_Sprint_Sichtbares_Gefecht.md](12B_Sprint_Sichtbares_Gefecht.md) | Sprint 12 Strang B; fog-sicheres VFX- und Tier-0-Audio technisch umgesetzt, manuelle 60-Einheiten-Sicht-/Gegenhörabnahme offen (D-090) |
-| [13-0_Sprint_Freigabe.md](13-0_Sprint_Freigabe.md) | Sprint 13.0; Lizenz, Tier-2-Wechsel, Maintainer-/Fork-Modell und CI-Wächter vor dem ersten externen PR |
+| [13-0_Sprint_Freigabe.md](13-0_Sprint_Freigabe.md) | Historischer Sprint-13.0-Rollout; Lizenz, Tier-2-Wechsel, damaliges Zwei-Maintainer-/Fork-Modell und CI-Wächter vor dem ersten externen PR; Reviewmodell durch D-105 ersetzt |
 | [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **Parallelbetrieb 13–18 — Regelwerk für die parallele Arbeit** — Schreibhoheit, Determinismus-Baselines, Merge-Fenster, Zugangsmodell für externe Beitragende; seit **D-095** trennt die **Dateihoheit** die Stränge, nicht mehr der Verhaltensraum |
 | [13_Sprint_Netzpartie.md](13_Sprint_Netzpartie.md) | Sprint 13 (Maintainer); Verbindungsdialog, Relay auf dem VPS, A8 Stufen 2–4 als gespielte Abnahme |
 | [13B_Sprint_Einheitenverhalten.md](13B_Sprint_Einheitenverhalten.md) | Sprint 13B (externer Beitragender, PR-only); Einheitenverhalten, KI und Legion-Waffenidentität — fortlaufend parallel zu 13–15 |
@@ -218,3 +218,4 @@ Masterplans grundlegend — sonst nichts.
 | 0.6.0 | 2026-08-09 | Ersten Betatest-Bericht **anonymisiert** aufgenommen und in die Sprintfolge eingeordnet (Issues #43–#58); Testberichte-Ordner angelegt, Ablauf in [../Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) festgelegt | Orchestrator |
 | 0.7.0 | 2026-08-09 | Nach der Inhaberentscheidung zum ersten Betatest: **Sprint 16 vorgezogen**, [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) und [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md) in die Mappe aufgenommen, Regelwerk als Parallelbetrieb 13–18 mit Trennung über Dateihoheit (**D-095**) fortgeschrieben, Großauftrag mit den Blöcken 0 bis 4 eingehängt. „Nächste Schritte" neu geschrieben: Sprint 13 halb gemergt (`e15f5e6`), 13.2–13.5 nicht durch einen Agenten erledigbar, `SimDefinitions`-Pakete vor dem VPS-Rollout. Punkt 2 der Fünf-Sätze-Zusammenfassung nach **D-077** berichtigt — die Skirmish-KI ist registriert und spielt | Orchestrator |
 | 0.7.1 | 2026-08-09 | Index gegen den Großauftrag und die Sprintdateien nachgezogen: Sprint 17 Paket A ist nicht „sofort vorziehbar", sondern läuft als **Block 3 hinter der Lobby**, die seit `b4e75e5` auf `main` gebaut ist, und es berührt mit dem `.partial`-Fix in `RelayServerCore.cs` genau **eine** Datei unter `Assets/`. Sprint 16 trägt **acht** Betatest-Befunde (#43, #44, #45, #46, #47, #48, #53, #54), nicht sechs. Alle Markdown-Links dieser Datei gegen das Dateisystem geprüft — kein toter Link | Orchestrator |
+| 0.7.2 | 2026-08-10 | D-105 nachgezogen: alleinige Projektleitung, sichtbare Spielabnahme-Zurückstellung und den historischen Charakter des D-091-Zwei-Maintainer-Rollouts im Index kenntlich gemacht | Project Owner / Orchestrator |
