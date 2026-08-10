@@ -30,6 +30,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Testbericht T-01 vom 10.08.2026 (Build `4053c15`) zerlegt — zehn Issues
+  (#85–#94) und ein Sprintvorschlag.** Der Bericht bewertet die mit #80
+  eingeführte AE-Verknappung und zeigt, dass diese eine Änderung acht weitere
+  Systeme betrifft, die noch auf der alten Annahme stehen. Kritisch ist #85:
+  `SkirmishAiSystem.TryGetOwnFieldCell` wählt das Erntefeld allein nach Distanz
+  und prüft `IsExhausted` nicht — der Spielerpfad in `RtsDeviceInput` filtert
+  bereits korrekt, der KI-Pfad wurde bei #80 nicht nachgezogen. Daraus entsteht
+  ein Livelock: `EconomySystem` räumt die Feldzuordnung des leeren Feldes, die
+  KI weist genau dadurch dasselbe Feld erneut zu, und die Wirtschaft der KI
+  steht. Neu abgelegt sind die anonymisierte Fassung des Berichts
+  (`docs/production/hashkrieg/Testberichte/2026-08-10_4053c15_T-01.md`, Kennung
+  `T-01` nach [Nutzerfeedback_Ablauf.md](docs/production/Nutzerfeedback_Ablauf.md))
+  und der Vorschlag zur Sprintbildung
+  (`docs/production/hashkrieg/20_Vorschlag_Verknappungsfolgen.md`), der die zehn
+  Befunde nach Schreibhoheit trennt und die Vertragsflächen ausweist. Kein
+  Sprint ist damit festgeplant
 - **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
   (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als
   `Schaden × Leben / Feuerintervall` — ganzzahlig, eine Division, eine
