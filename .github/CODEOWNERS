@@ -1,25 +1,25 @@
 # CODEOWNERS – automatic review routing for Project Nova
 #
 # Merge authority comes from the protected-main push restriction, not from this
-# file: only @cubetribe and @travelhawk may merge into main. Once native
-# code-owner review is enabled, every PR requires an approval by the other
-# maintainer. The detailed day-to-day stream ownership remains authoritative in
+# file: only @cubetribe may merge into main. CODEOWNERS routes review to the
+# project owner; it is not a second-person approval gate for owner-authored PRs.
+# The detailed day-to-day stream ownership remains authoritative in
 # docs/production/hashkrieg/13-15_Parallelbetrieb.md.
 
-# Every path is owned by the two maintainers for the required peer review.
-*                                               @cubetribe @travelhawk
+# Every path is owned by the sole project owner.
+*                                               @cubetribe
 
 # CI, PR policy, code-owner policy, and their enforcement scripts.
-/.github/                                      @cubetribe @travelhawk
+/.github/                                      @cubetribe
 
 # Repository governance and commercial-relicensing terms.
-/AGENTS.md                                     @cubetribe @travelhawk
-/GOVERNANCE.md                                 @cubetribe @travelhawk
-/CONTRIBUTING.md                               @cubetribe @travelhawk
-/CONTRIBUTOR_LICENSE_AGREEMENT.md              @cubetribe @travelhawk
-/LICENSE                                       @cubetribe @travelhawk
-/NOTICE                                        @cubetribe @travelhawk
-/CHANGELOG.md                                  @cubetribe @travelhawk
-/docs/meta/                                    @cubetribe @travelhawk
-/docs/production/DecisionLog.md                @cubetribe @travelhawk
-/docs/production/hashkrieg/                    @cubetribe @travelhawk
+/AGENTS.md                                     @cubetribe
+/GOVERNANCE.md                                 @cubetribe
+/CONTRIBUTING.md                               @cubetribe
+/CONTRIBUTOR_LICENSE_AGREEMENT.md              @cubetribe
+/LICENSE                                       @cubetribe
+/NOTICE                                        @cubetribe
+/CHANGELOG.md                                  @cubetribe
+/docs/meta/                                    @cubetribe
+/docs/production/DecisionLog.md                @cubetribe
+/docs/production/hashkrieg/                    @cubetribe

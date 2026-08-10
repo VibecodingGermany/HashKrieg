@@ -332,8 +332,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
@@ -407,8 +407,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
                 kernel.RegisterSystem(construction);
@@ -446,7 +446,7 @@ namespace Nova.SimRunner.Tests
                 // static or lobby-derived (D-093) — never a test constant.
                 ulong offeredSeed = Client != null ? Client.Seed : Seed;
                 return MatchFingerprint.CreateCurrent(
-                    MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                    MatchFingerprint.ComputeCurrentRulesHash64(),
                     SimDefinitions.ComputeDefinitionsHash64(),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                     slots, factions, offeredSeed, Kernel.CalculateStateHash(), Session.InputDelayTicks);
@@ -1139,6 +1139,72 @@ namespace Nova.SimRunner.Tests
             Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
             Assert.That(clientA.RejectReason, Does.Contain("InputDelayTicks"),
                 "the refusal names the differing fingerprint field");
+            server.Stop();
+        }
+
+        [Test]
+        public void LegacyEmptyRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint legacy = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(legacy.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the old/new rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
+            server.Stop();
+        }
+
+        [Test]
+        public void RevisionOneRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint revisionOne = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(revisionOne.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the revision-1/current rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
             server.Stop();
         }
 
@@ -1964,8 +2030,9 @@ namespace Nova.SimRunner.Tests
             // drive helper permits the normal input-delay pipeline lead, so
             // aiming at 49 could already have crossed tick 50 on one end.
             Drive(server, clientA, clientB, hostA, hostB, 25);
-            ref PlayerEconomyState divergentEconomy = ref hostB.Economy.GetPlayerEconomy(0);
-            divergentEconomy.AddCredits(1);
+            ref UnitState divergentBuilder = ref hostB.Entities.GetUnitRef(
+                UnitCommandStateView.ToEntityId(hostB.BuilderRaw));
+            divergentBuilder.CurrentHealth -= 1;
             Drive(server, clientA, clientB, hostA, hostB, 50);
             PumpUntil(server, clientA, clientB,
                 () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,

@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.2.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.5.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -30,7 +30,7 @@ Sprint 16 vorzuziehen. Die beiden dort offenen Wirtschaftsfragen (#53 Lager,
 - [16-19_Betatest_Einordnung.md](16-19_Betatest_Einordnung.md) — Herkunft der Issues #43–#58
 - [../MVPContentManifest.md](../MVPContentManifest.md) — Feldreserve-Sollwerte
 
-## Ausgangslage — am Code geprüft, nicht aus dem Masterplan übernommen
+## Ausgangslage am 2026-08-09 — am damaligen Code geprüft, nicht aus dem Masterplan übernommen
 
 | Befund | Beleg |
 |---|---|
@@ -67,12 +67,21 @@ sondern ein Platzierungsfehler.** Das ändert den Aufwand, nicht die Dringlichke
 | `Scripts/Gameplay/UI/CommandCardPresenter.cs` | 16.10 — Strombedarf am angeklickten Gebäude |
 | `tools/Nova.SimRunner/Determinism10000Scenario.cs`, `tools/Nova.SimRunner.Tests/CanonicalMatchSetupTests.cs`, `Assets/Tests/EditMode/Gameplay/CanonicalMatchSetupTests.cs` | 16.7 — Drehbuch und beide Spiegel |
 
-**Keine Datei unter** `Scripts/Simulation/Combat/`, `Movement/`, `Factions/`,
+**Grundsätzlich keine Datei unter** `Scripts/Simulation/Combat/`, `Movement/`, `Factions/`,
 `Pathfinding/`, `Scripts/AI/`, `AI.Data/`, `Presentation/UI/DebugHud.cs`. Das ist
 der Einheitenstrang. Disjunkt gegen [13B](13B_Sprint_Einheitenverhalten.md) —
 **ausser an zwei Vertragsflächen:** `Simulation/Definitions/` ist geteilt
 (Absprache vor 16.8), und der `WeaponProfiles`-Slot `UnitRole.Unit`, den 16.3
 faktisch umwidmet, gehört 13B. **Beides wird vor dem PR angesagt, nicht danach.**
+
+**D-105-Integrationsausnahme für 16.3:** Die geänderte Rollendarstellung hat
+beim Zusammenführen zwei Fehler ausserhalb des ursprünglichen Schreibbereichs
+offengelegt. Der Projektinhaber darf dafür den kleinsten gebundenen Reparaturdiff
+führen: `CombatSystem` schliesst aktive Sites als Angreifer und Ziel aus;
+`SkirmishAiSystem` und das kanonische 10.000-Tick-Szenario unterscheiden Sites
+vor der Gebäuderolle von fertigen Gebäuden. Gespiegelte Regressionstests und
+die Benachrichtigung im PR sind Pflicht; die dauerhafte Stranghoheit ändert sich
+nicht.
 
 **Kein neuer `CommandKind`.** Das Register `Simulation/CommandsV1/` bleibt
 eingefroren; kein Paket dieses Sprints braucht einen neuen Befehlstyp.
@@ -125,7 +134,9 @@ nicht in eine Behebung.
 
 Die Baustelle bekommt bei `SpawnBuildingEntity(completed: false)` **`def.Role`
 statt `UnitRole.Unit`**. Unbewaffnete Gebäuderollen tragen `AttackDamage = 0`;
-damit fällt der Fallback-Schuss weg, ohne dass eine Zeile in `Combat/` nötig ist.
+damit fällt der Fallback-Schuss weg. Weil eine Verteidigungsplattform selbst
+als Gebäuderolle bewaffnet ist, schliesst `CombatSystem` zusätzlich jede aktive
+Site als Angreifer und Ziel aus.
 
 Drei Stellen, die das mitzieht:
 
@@ -136,14 +147,29 @@ Drei Stellen, die das mitzieht:
 | `SelectionManager.CopyMobileSelection` | fällt in die andere Richtung: die Baustelle verschwindet aus dem Versand mobiler Befehle. Auswählbar ist sie heute schon — `SelectSingle` und `SelectBoxAdditive` prüfen nur `PlayerId`. Die Befehlskarte ist unbetroffen, `TryGetSite` greift vor `IsBuildingRole` |
 | `VictorySystem.IsBuilding` | prüft `IsBuildingRole` zuerst und liefert weiterhin `true` — hier ändert sich nichts |
 
+Zusätzlich müssen `SkirmishAiSystem` und das kanonische
+`Determinism10000Scenario` Sites vor jeder Rollenauswertung über das
+Baustellenregister ausfiltern. Sonst gilt eine unfertige Raffinerie bereits als
+Produzent und die KI reicht Folgeaufträge zu früh ein.
+
 `ConstructionSystem.HasFinishedBuilding` ist **nicht** betroffen: es iteriert
 `_buildings[]`, das nur `CompleteSite` und `PlaceCompletedBuilding` schreiben.
 Bauvoraussetzungen bleiben korrekt.
 
 ### 16.4 · Das Lager wird ein Gebäude (#53, C2)
 
-AE-Obergrenze im `EconomySystem`: **HQ 2.000 AE Basis, +2.000 je Lager,
-Überschuss verfällt, 25 % Verlust bei Zerstörung** (D-024).
+AE-Obergrenze im `EconomySystem`: **genau eine HQ-Kontobasis von 2.000 AE,
+sobald mindestens ein fertiges HQ lebt; +2.000 je fertigem Lager**
+(D-024/D-096/D-106). Baustellen zählen nicht. Jede neue Einzahlung und
+Rückerstattung wird sofort an der aktuellen Grenze gekappt; der Rest verfällt.
+
+Ein bereits vorhandener Bestand oberhalb der Grenze verliert alle 10
+Simulationsticks (1 s) **25 % des aktuellen Überhangs**, ganzzahlig abgerundet
+und mindestens 1 AE, bis die Grenze erreicht ist. Das gilt für den
+3.000-AE-Start, Restore sowie die Grenzsenkung durch Zerstörung oder Verkauf
+eines Lagers und den Verlust des letzten HQ. Es gibt keinen zusätzlichen
+Einmalverlust. Beim Verkauf wird die Rückerstattung noch gegen die vor dem
+Despawn geltende Kapazität gedeckelt; danach sinkt die Grenze.
 
 > **Die Kapazität wird aus dem Gebäudebestand abgeleitet, nicht gespeichert.**
 > Ein neues Feld im Wirtschaftszustand bumpt `EconomySystem.StateVersion`, und
@@ -152,9 +178,16 @@ AE-Obergrenze im `EconomySystem`: **HQ 2.000 AE Basis, +2.000 je Lager,
 > nachziehen muss, wäre eine eigene Inhaberentscheidung. Die abgeleitete Variante
 > kostet nichts davon.
 
-`AddCredits` hat genau vier Aufrufer, alle in diesem Sprintbereich: Abladen
-(`EconomySystem`), Streichung (`ProductionSystem`), Abbruch und Verkauf
-(`ConstructionSystem`).
+Die Zustandsbytes bleiben kompatibel; die **Regelidentität** ändert sich aber.
+`RulesHash64` bindet deshalb Revision 1 und die Werte 2.000/2.000/25/10. Alte
+Replay-/Snapshot-Dateien bleiben strukturell lesbar, doch eine Replay-Wiedergabe
+unter einem anderen Rules-Hash wird vor Tick 1 abgelehnt. So können alte und
+neue Peers nicht erst am ersten Zerfallstick desynchronisieren (D-106).
+
+`DepositCapped` bündelt genau vier produktive Gutschriftpfade in diesem
+Sprintbereich: Abladen (`EconomySystem`), Streichung (`ProductionSystem`),
+Abbruch und Verkauf (`ConstructionSystem`). Nur dieser Helfer ruft produktiv
+`PlayerEconomyState.AddCredits` auf.
 
 ### 16.5 · Das Radar wird ein Gebäude (#54, C3)
 
@@ -191,20 +224,28 @@ Reparatur** in dieser Ordnung fallen. Heute existiert nur der Tempo-Malus über
 Erst damit wird ein Angriff auf das gegnerische Kraftwerk ein taktischer Zug —
 und erst damit wird 16.5 spürbar, weil ein Stromausfall die Minimap mitnimmt.
 
+Die Reparaturhalbierung verändert autoritativen Simulationszustand, obwohl kein
+Snapshot- oder Replay-Formatfeld hinzukommt. Deshalb bindet `RulesHash64` ab
+diesem Paket **Revision 2** sowie die Reparaturraten 10/5 HP pro Tick. Ein
+Revision-1-Replay oder -Peer bleibt strukturell lesbar, wird gegenüber einem
+aktuellen Host aber vor Tick 1 mit `RulesHash64`-Mismatch abgelehnt.
+
 ### 16.7 · Knappheit (C1) — **fasst die Startaufstellung an**, nicht `SimDefinitions`
 
 | Was | Heute | Ziel |
 |---|---|---|
 | Feldreserve | 2.000.000 AE (≈ 28 h ununterbrochene Ernte eines Sammlers) | Manifestwerte **9.000 / 15.000 AE** |
 | Feldanzahl | 2 (je Slot eins) | **5** — 2 Start, 2 Expansion, 1 umkämpftes Zentrum |
-| Ernterate | 2 AE/Tick, als Provisorium markiert | gegen die Zielkurve kalibriert |
+| Ernterate | 2 AE/Tick, als Provisorium markiert | **bleibt in 16.7 bei 2 AE/Tick**; gespielte Kalibrierung bewusst vertagt (D-102) |
 
 **Symmetrie ist Pflicht.** Beide Startpositionen müssen gleich weit zu Expansion
 und Zentrum liegen — sonst entscheidet die Karte das erste Mensch-gegen-Mensch-Match.
 
-Keiner der drei Zielwerte liegt in `SimDefinitions`: `FieldReserveAE` und die
-Feldpositionen stehen in `MatchBootstrap`, `HarvestRateAE` in `EconomySystem`.
-Der Definitions-Hash bewegt sich hier **nicht** — das tut nur 16.8.
+Feldreserven und Feldpositionen liegen nicht in `SimDefinitions`, sondern in
+der kanonischen Startaufstellung. D-102 trennt diese belegte
+Knappheitskorrektur ausdrücklich von der noch unbelegten Ernteraten-Kalibrierung;
+`HarvestRateAE` bleibt unverändert. Der Definitions-Hash bewegt sich hier
+**nicht** — das tut erst 16.8.
 
 **Fünf synchrone Stellen** (siehe Regelwerk, „kanonische Startaufstellung"):
 
@@ -247,10 +288,15 @@ delegiert auf dieselbe Maskenprüfung.
 > Deshalb müssen Relay und beide Clients aus demselben Commit ausgerollt werden;
 > das Paket liegt **vor** dem VPS-Rollout, nicht danach.
 
-Die ausgelieferte Skirmish-KI plant bislang Raffinerie → Kaserne. Das neue
-Kraftwerk-Tor verlangt den koordinierten, getrennten Handoff im fremden
-`Scripts/AI*`-Schreibbereich; 16.8 wird erst nach dessen grünem Integrationslauf
-gemergt.
+Die ausgelieferte Skirmish-KI plante bislang Raffinerie → Kaserne. Das neue
+Kraftwerk-Tor wird nach D-105 durch eine begrenzte Integrationsreparatur im
+fremden `Scripts/AI*`-Schreibbereich bedient: r7 plant Raffinerie → Kraftwerk →
+Kaserne, beide Testspiegel sichern die Reihenfolge. Der kanonische Ausgang wurde
+auf dem integrierten Head mit Tick 2.705 und `0x28F2CC571BCE6B76` frisch
+gemessen; die lokale Gesamtsuite ist mit 685/685 grün. Der Merge wartet danach
+noch auf die grüne PR-CI. Der referenzierte externe AiLab-Journalpfad ist in
+diesem Repository nicht vorhanden, daher stehen Messung und Restrisiko ehrlich
+in Changelog und PR statt in einem erfundenen Artefakt.
 
 ### 16.9 · Platzierungsregeln und Reparaturkosten (C6)
 
@@ -314,12 +360,12 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
 | **Baseline und Verhalten im selben PR** | wird nicht gemergt. `Determinism10000Scenario.cs` liegt ausserhalb der Guard-Präfixe und darf im selben PR nachgezogen werden — `Determinism10000Tests.cs` nicht |
 | **Ein 13B-Merge im selben Fenster** | ein Fenster hat einen Strang (Regelwerk, Merge-Fenster) |
 | **Die Minimap-Sperre wird als Rückschritt gelesen** | der Bauknopf erklärt, was das Radar freischaltet; der Befund geht in die nächste Testrunde |
-| **`dotnet test` läuft auf der Arbeitsmaschine nicht** | `global.json` pinnt `8.0.318` mit `rollForward: disable`, installiert ist 10.0.302. Der Nachweis läuft über die CI im PR |
+| **Lokales SDK wird übersehen** | Das Repository enthält `.dotnet/sdk/8.0.318`; der kanonische lokale Lauf ist `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore`, anschließend bestätigt die PR-CI denselben Umfang |
 | **Reparaturkosten machen Verteidigung unbezahlbar** | 30 % ist ein Startwert, kein Beschluss. Er kommt mit der ersten gespielten Runde auf den Prüfstand |
 
 ## Fertig wenn
 
-1. `dotnet test tools/Nova.SimRunner.Tests` ist **in der CI** grün — ohne
+1. `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore` ist lokal und **in der CI** grün — ohne
    Baseline-Neusetzung im selben PR wie eine Verhaltensänderung.
 2. Ein Mensch hat eine Runde gespielt und dabei gesehen:
    - der Sammler fährt nach der ersten Raffinerie von allein los,
@@ -352,17 +398,22 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 |---|---|---|
 | D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
+| D-102 | Fünf endliche, punktgespiegelte Aetheriumfelder; `HarvestRateAE` bleibt bis zur gespielten Kalibrierung bei 2 AE/Tick | Inhaber / Agent |
+| D-103 | Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske; unbekannte Bits scheitern geschlossen | Agent unter Inhaberdelegation |
+| D-106 | AE-Kontobasis gilt einmalig je Slot; vorhandener Überhang zerfällt zustandslos pro Sekunde und die Regelrevision wird im Match-Fingerprint gebunden | Agent unter Inhaberdelegation |
 
-D-096 und D-097 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
-(Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
-D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
-[Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
-werden.
+D-096, D-097, D-102, D-103 und D-106 sind im [DecisionLog](../DecisionLog.md)
+eingetragen. D-098 (Entwurf) und D-099 stehen dort für
+[Sprint 17](17_Sprint_Zugangsprotokoll.md); D-092 bis D-094 gehören zu
+[Sprint 14](14_Sprint_Lobby.md). D-100 wird hier mangels eigenem
+DecisionLog-Eintrag keinem Paket zugeordnet. Keine dieser Nummern darf hier
+verbraucht werden.
 
 ## Changelog-Notiz
 
 Die Wirtschaft trägt sich selbst: Aetherium wird knapp, Lager begrenzt das Konto,
-Radar schaltet die Minimap frei, Strommangel schaltet Radar und Verteidigung ab,
+Radar schaltet die Minimap frei, Strommangel schaltet Radar und Minimap ab und
+halbiert Produktion, Bau und Reparatur,
 Bauvoraussetzungen greifen mehrfach, Platzierung und Reparatur kosten. Dazu die
 Betatest-Behebungen: der erste Sammler erntet von allein, Einheiten fahren aus
 dem Gebäude, Baustellen schiessen nicht mehr, und der gesperrte Bauknopf nennt
@@ -370,12 +421,18 @@ den zutreffenden Grund.
 
 ## Versionsrelevanz
 
-`minor` — neue spielbare Fähigkeiten und Verhaltensänderungen, kein Vertragsbruch.
-Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
+`minor` — neue spielbare Fähigkeiten und Verhaltensänderungen; kein Zustands-,
+Schema- oder Wireformatbruch. Die `RulesHash64`-Kompatibilitätsgrenze zwischen
+Revision 1 und 2 ist beabsichtigt. Die Baseline-Neusetzung ist Zweck der Tests,
+kein Bruch.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.5.0 | 2026-08-10 | D-103 für Paket 16.8 ergänzt: fraktionsgleiche All-of-Voraussetzungen, fail-closed Maskenvertrag, Definitions-Hash-Grenze und koordinierter KI-Handoff | Agent (unter Delegation) / Dennis Westermann |
+| 1.4.0 | 2026-08-10 | D-102 ergänzt: fünf endliche symmetrische Felder sind Paket 16.7; die Ernterate bleibt mangels gespielter Zielkurve ausdrücklich bei 2 AE/Tick und wird getrennt kalibriert | Project Owner / Agent |
+| 1.3.0 | 2026-08-10 | C4-Kompatibilitätsgrenze dokumentiert: Low-Power-Reparatur bindet Rules-Revision 2 und 10/5 HP pro Tick, ohne Zustands- oder Schema-Bump | Codex / Dennis Westermann |
+| 1.2.0 | 2026-08-10 | D-106 für 16.4 festgeschrieben: einmalige HQ-Kontobasis, periodischer 25-%-Abbau des aktuellen Überhangs und Rules-Hash-Kompatibilitätsgrenze | Codex / Dennis Westermann |
+| 1.1.0 | 2026-08-10 | D-105-Integrationsausnahme für 16.3 dokumentiert: aktive Sites sind keine Kampfteilnehmer oder fertigen KI-Produzenten | Codex / Dennis Westermann |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |
-| 1.2.0 | 2026-08-09 | Paket 16.8 mit D-103 konkretisiert: identische All-of-Kette für beide Fraktionen, fail-closed Maskenvertrag, Definitions-Hash-Folge und KI-Handoff festgeschrieben | Agent (unter Delegation) |

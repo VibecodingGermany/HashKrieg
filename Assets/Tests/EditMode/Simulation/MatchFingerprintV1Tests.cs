@@ -18,7 +18,7 @@ namespace Nova.Simulation.Tests
         private static MatchFingerprint CreateStandard()
         {
             return MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 ReplayV1TestUtil.StandardSlots(),
@@ -66,14 +66,28 @@ namespace Nova.Simulation.Tests
             Assert.AreEqual(CreateStandard().ComputeHash(), CreateStandard().ComputeHash(),
                 "identical fingerprints must hash identically");
 
-            ulong rules = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules);
+            ulong rules = MatchFingerprint.ComputeCurrentRulesHash64();
             ulong definitions = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions);
             ulong map = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map);
             Assert.AreNotEqual(rules, definitions);
             Assert.AreNotEqual(rules, map);
             Assert.AreNotEqual(definitions, map);
-            Assert.AreEqual(rules, MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
-                "stub hashes must be deterministic");
+            Assert.AreEqual(rules, MatchFingerprint.ComputeCurrentRulesHash64(),
+                "the current rules hash must be deterministic");
+            Assert.AreNotEqual(rules, MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                "D-106 rules must not match the legacy empty rules stub");
+        }
+
+        [Test]
+        public void CurrentRulesHash_MovesPastRevisionOne_ForLowPowerRepair()
+        {
+            ulong revisionOne = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1);
+            ulong current = MatchFingerprint.ComputeCurrentRulesHash64();
+
+            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV2));
+            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2)));
+            Assert.That(current, Is.Not.EqualTo(revisionOne),
+                "Sprint-16.6 C4 repair behavior must not share D-106's revision-1 rules identity");
         }
 
         [Test]

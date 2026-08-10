@@ -7,9 +7,9 @@ namespace Nova.Simulation.State
     /// documented minimal variant of this slice models buildings as entities
     /// carrying one of these roles. The economy derives power provided /
     /// required from the building roles; harvest orders are only effective
-    /// for <see cref="Harvester"/>; construction output becomes the building
-    /// role entity on completion (before that a site carries
-    /// <see cref="Unit"/>). Values are stable wire identifiers of the entity
+    /// for <see cref="Harvester"/>; a construction site carries its target
+    /// building role from creation and is distinguished from a completed
+    /// placement by the construction register. Values are stable wire identifiers of the entity
     /// store block v4 — renaming a member never changes the wire value.
     /// <para>
     /// MS-1 roles (mvp-v1.json): nine building roles
@@ -21,8 +21,8 @@ namespace Nova.Simulation.State
     /// <see cref="BasicInfantry"/>, <see cref="AntiArmorInfantry"/>,
     /// <see cref="ScoutVehicle"/>, <see cref="LightTank"/>,
     /// <see cref="BattleTank"/>, <see cref="Artillery"/>).
-    /// <see cref="Unit"/> stays the generic fallback role and the role of an
-    /// unfinished construction site.
+    /// <see cref="Unit"/> stays the generic fallback role; unfinished sites
+    /// have carried their definition role since 16.3 (#44).
     /// </para>
     /// <para>
     /// The seventeen content roles are deliberately numbered 1..17: the
@@ -33,7 +33,7 @@ namespace Nova.Simulation.State
     /// </summary>
     public enum UnitRole : byte
     {
-        /// <summary>Plain mobile unit without an economic or building function; also the role of a construction site until completion.</summary>
+        /// <summary>Plain mobile unit without an economic or building function; sites use their definition role and the construction register.</summary>
         Unit = 0,
 
         /// <summary>Construction unit; the only role that can repair buildings and progress construction sites.</summary>
@@ -51,7 +51,7 @@ namespace Nova.Simulation.State
         /// <summary>Power plant building; provides power to its owner's grid.</summary>
         Power = 5,
 
-        /// <summary>Storage building (MS-1 role; no canonical behavior beyond power draw yet).</summary>
+        /// <summary>Storage building; each completed placement adds 2,000 AE to its owner's derived account capacity (D-106).</summary>
         Storage = 6,
 
         /// <summary>Barracks building; produces the infantry unit roles.</summary>

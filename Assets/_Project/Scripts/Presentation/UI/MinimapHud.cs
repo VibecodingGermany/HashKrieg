@@ -6,6 +6,7 @@ using Nova.Gameplay;
 using Nova.Gameplay.Match;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 using EntityId = Nova.Core.EntityId;
@@ -176,13 +177,19 @@ namespace Nova.Presentation.UI
 
         /// <summary>
         /// 16.5 (#54, C3): the minimap unlocks with the local slot's first
-        /// COMPLETED Radar building and goes dark when it is lost. One read,
-        /// shared by the draw and the hit test, so they can never disagree.
+        /// COMPLETED Radar building and goes dark when it is lost. 16.6 (C4,
+        /// Economy.md Low-Power rule): at a power deficit the radar is the FIRST system to fall —
+        /// the map goes dark too, exactly like the sim-side pings stop. One
+        /// read, shared by the draw and the hit test, so they can never
+        /// disagree.
         /// </summary>
         private bool LocalRadarOnline()
         {
             if (_runner == null || _runner.Construction == null || _runner.Session == null) return false;
-            return _runner.Construction.HasFinishedBuilding(_runner.Session.LocalSlot, UnitRole.Radar);
+            if (!_runner.Construction.HasFinishedBuilding(_runner.Session.LocalSlot, UnitRole.Radar)) return false;
+            EconomySystem economy = _runner.Economy;
+            if (economy == null) return false;
+            return !economy.GetPlayerEconomy(_runner.Session.LocalSlot).IsLowPower;
         }
 
         /// <summary>The local viewer team — the same convention as FogOfWarOverlayView/UnitViewManager.</summary>

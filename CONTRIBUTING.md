@@ -1,6 +1,6 @@
 # Beitragen zu Project Nova
 
-**Version:** 4.0.1 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers | **Sprint:** 13.0 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
+**Version:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Branch-, PR- und Review-Ablauf für Menschen und KI-Agenten. Detailregeln stehen
 in [AGENTS.md](AGENTS.md), Dokumentregeln in
@@ -23,7 +23,7 @@ Force-Pushes auf `main`, keine History-Rewrites auf geteilten Branches.
    lokal grün bekommen.
 4. Zeile unter `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) ergänzen.
 5. Conventional Commit, Branch pushen, PR nach `main` öffnen.
-6. CI abwarten, mergen.
+6. CI abwarten; der Projektinhaber merged.
 
 Commit, Push, Merge und Release sind getrennte Autoritätsgrenzen. **KI-Agenten
 committen oder pushen nur nach einer ausdrücklichen Anfrage für die konkrete
@@ -54,7 +54,7 @@ Pflicht auf jedem PR:
   dürfen nicht im selben PR geändert werden. Ein dokumentierter Reset braucht
   das Maintainer-Label `baseline-reset-approved`.
 - **`external-contributor-review`** – bei einem externen PR müssen die
-  CLA-Zustimmung und eine Freigabe eines Maintainers auf dem aktuellen Head
+  CLA-Zustimmung und die Freigabe des Projektinhabers auf dem aktuellen Head
   vorliegen.
 
 Unity-EditMode-Tests laufen mangels CI-Lizenz nicht automatisch. Wer die
@@ -63,30 +63,30 @@ führt sie lokal aus und schreibt das Ergebnis in den PR.
 
 ## 4. Zugänge und Reviews (Tier 2)
 
-`main` ist technisch auf die beiden Maintainer beschränkt:
+`main` ist technisch auf den alleinigen Projektinhaber und Maintainer beschränkt:
 
 - [@cubetribe](https://github.com/cubetribe) (Dennis Westermann)
-- [@travelhawk](https://github.com/travelhawk) (Michael Falk)
 
-Nur diese Accounts dürfen einen PR nach `main` mergen. Externe arbeiten aus
-einem Fork, erhalten weder einen Collaborator-Zugang noch Mitgliedschaft im
-Maintainer-Team und öffnen einen PR nach `main`.
+Nur dieser Account darf einen PR nach `main` mergen. Michael Falk
+(`@travelhawk`) hat keine Maintainer- oder Governance-Rolle mehr in diesem
+Projekt; eine fortbestehende Organisationsmitgliedschaft ändert das nicht.
+Externe arbeiten aus einem Fork, erhalten weder einen Schreibzugang noch eine
+Projekt-Maintainer-Rolle und öffnen einen PR nach `main`.
 
-Jeder PR braucht eine Freigabe des jeweils anderen Maintainers auf dem aktuellen
-Head-Commit. Ein neuer Push macht eine alte Freigabe unwirksam. Der Remote-
-Rollout setzt dafür eine erforderliche Freigabe, das Verwerfen veralteter
-Freigaben und eine Freigabe des letzten Pushes. Für externe PRs prüft
-`external-contributor-review` zusätzlich die CLA-Zustimmung und genau diese
-Maintainer-Freigabe. Bis die Einstellungen nach den ersten erfolgreichen Läufen
-in Folge-PRs aus dem geschützten `main`-Stand aktiv sind, werden keine externen
-PRs gemergt.
+Inhaber-PRs dürfen nach grüner Pflicht-CI und dokumentiertem, unabhängigem
+Read-only-Review selbst gemergt werden. Für externe PRs prüft
+`external-contributor-review` zusätzlich zur CLA-Zustimmung eine
+`APPROVED`-Review von `@cubetribe` auf dem aktuellen Head-Commit. Ein neuer Push
+macht diese Freigabe unwirksam.
 
 Nach einer neu eingereichten Freigabe wird der jüngste fehlgeschlagene
-`external-contributor-review`-Lauf erneut gestartet. Die native Branch
-Protection bleibt der maßgebliche, automatisch aktualisierte Review-Schutz.
+`external-contributor-review`-Lauf erneut gestartet. Die Branch Protection
+bleibt der maßgebliche Schutz für PR-only, Pflichtchecks, lineare Historie und
+das Verbot von Force-Pushes.
 
-`CODEOWNERS` ordnet jeden Pfad den beiden Maintainers zu; GitHubs native
-Code-Owner-Prüfung macht die Peer-Freigabe damit eindeutig. Die ausdrücklich
+`CODEOWNERS` ordnet jeden Pfad `@cubetribe` zu und routet Review-Anfragen; eine
+Code-Owner-Freigabe ist für Inhaber-PRs kein zusätzliches Selbstfreigabe-Gate.
+Die ausdrücklich
 benannte Steuerfläche (`.github/`, Lizenz, Governance und Planungsdokumente)
 bleibt besonders sichtbar, ersetzt aber nicht die Schreibhoheit aus
 [13-15_Parallelbetrieb.md](docs/production/hashkrieg/13-15_Parallelbetrieb.md).
@@ -122,25 +122,26 @@ Binärdateien oder Debug-Artefakte einchecken.
 ## 7. Pull Requests
 
 Die Beschreibung nennt: was und warum, betroffene Bereiche, gegebenenfalls die
-D-ID einer echten Architektur-, Design- oder Prozessentscheidung, den
-Changelog-Eintrag und – bei Änderungen am Spielverhalten – was du im laufenden
-Spiel gesehen hast. Verträge und öffentliche Doku erhalten in Tier 2 außerdem
-eine Kopfversion und einen Änderungsverlauf.
+D-ID einer echten Architektur-, Design- oder Prozessentscheidung und den
+Changelog-Eintrag. Bei Änderungen am Spielverhalten nennt sie entweder die
+Beobachtung im laufenden Spiel oder ausdrücklich „nicht gespielt“, Grund,
+automatisierte Ersatznachweise und Restrisiko. Eine solche Zurückstellung macht
+den PR mergebar, aber nicht spielerisch abgenommen. Verträge und öffentliche
+Doku erhalten in Tier 2 außerdem eine Kopfversion und einen Änderungsverlauf.
 
 ## 8. Releases
 
-Nur ein Maintainer erzeugt nach expliziter Freigabe Tag und Release. Wiki-Versionen
+Nur der Projektinhaber erzeugt nach expliziter Freigabe Tag und Release. Wiki-Versionen
 sind keine Game-Releases. Es gibt bisher kein veröffentlichtes Release.
 
 ## Offene Punkte
 
-- Die neuen Tier-2-Checks und die erforderliche Maintainer-Peer-Review werden
-  erst nach dem Merge und ihren ersten erfolgreichen Folge-PR-Läufen in GitHubs
-  Branch Protection hinterlegt.
+- `integrity`, `baseline-guard` und `external-contributor-review` sind noch
+  nicht als Required Checks in GitHubs Branch Protection hinterlegt.
 
 ## Nächste Schritte
 
-1. Neue externe Beiträge erst nach dem vollständigen Remote-Rollout annehmen.
+1. Neue externe Beiträge nur mit CLA und aktueller Inhaberfreigabe annehmen.
 2. Den Baseline-Wächter mit einem absichtlich falschen PR nachweislich rot
    auslösen.
 
@@ -154,3 +155,4 @@ sind keine Game-Releases. Es gibt bisher kein veröffentlichtes Release.
 | 3.0.0 | 2026-08-06 | D-076: auf Tier 1 zurückgeschnitten. Gate- und Evidenzpflichten entfernt, `tests` als Pflichtcheck ergänzt, `integrity` auf `quality/**` begrenzt, Selbst-Merge erlaubt | Maintainers |
 | 4.0.0 | 2026-08-08 | D-091: Tier 2 aktiviert; Maintainer-Peer-Review auf aktuellem Head für jeden PR, Fork-only plus CLA für externe Beiträge, Baseline-Wächter und zwei festgelegte Merge-Accounts dokumentiert | Dennis Westermann / Michael Falk |
 | 4.0.1 | 2026-08-08 | CLA-Wirkung nicht rückwirkend präzisiert und D-ID-Pflicht auf echte Entscheidungen vereinheitlicht | Dennis Westermann |
+| 5.0.0 | 2026-08-10 | D-105: `@cubetribe` als alleinigen Projektinhaber und Mergeberechtigten festgelegt; Inhaber-Selbst-Merge, externe aktuelle Freigabe und ehrliche Spielabnahme-Zurückstellung geregelt | Dennis Westermann |

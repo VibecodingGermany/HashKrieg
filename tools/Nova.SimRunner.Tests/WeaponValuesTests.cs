@@ -220,7 +220,7 @@ namespace Nova.SimRunner.Tests
                 "the same table must hash identically every time");
             Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions)),
                 "the real table hash replaces the empty-content stub");
-            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules)));
+            Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeCurrentRulesHash64()));
             Assert.That(hash, Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map)));
 
             // Row coverage: mutating ANY single row — first Alliance, first
@@ -340,8 +340,8 @@ namespace Nova.SimRunner.Tests
                 // FoW radar read also requires the placement register.
                 var factions = new EconomySystem(entities);
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, factions);
-                var fog = new FogOfWarSystem(entities, construction, teamCount: 2, 64, 64);
-                var combat = new CombatSystem(entities, fog, factions);
+                var fog = new FogOfWarSystem(entities, construction, factions, teamCount: 2, 64, 64);
+                var combat = new CombatSystem(entities, fog, factions, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(pathfinding);

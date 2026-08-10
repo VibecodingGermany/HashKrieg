@@ -13,9 +13,21 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.17.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.20.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
+
+### Entschieden
+- **D-105: Dennis Westermann (`@cubetribe`) führt das Projekt allein.** Er ist
+  alleiniger Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter;
+  Michael Falk (`@travelhawk`) bleibt historischer Autor und
+  Organisationsmitglied, hat aber keine Projekt-Governance-Rolle mehr.
+  Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Read-only-Review
+  selbst gemergt werden, externe PRs brauchen weiterhin CLA und seine aktuelle
+  Freigabe. PR-only, strikte Checks, Squash/lineare Historie und kein
+  Force-Push bleiben bestehen. Manuelle Spielabnahme darf sichtbar als „nicht
+  gespielt“ zurückgestellt werden; der PR ist dann integrierbar, aber nicht
+  spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
 - **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
@@ -52,7 +64,57 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
   sie belegt keine Verbesserung.
 
+### Geändert
+- **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
+  zwei praktisch endlosen Startfelder werden durch zwei symmetrische
+  Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes
+  Zentrum mit 15.000 AE ersetzt. Alle fünf Startaufstellungs-Spiegel und die
+  Kartenmarker folgen derselben Reihenfolge; `HarvestRateAE` bleibt bewusst
+  bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
+
 ### Behoben
+- **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
+  fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
+  (Economy als Pflicht-Abhängigkeit), und die Minimap geht mit aus (dieselbe
+  Bilanz, dieselbe Abfrage). Produktion und Bau behalten den exakten
+  Tempo-Malus (0.5 in Q16.16), und die Reparatur halbiert jetzt exakt
+  (10 → 5 HP/Tick, Economy.md-Reparaturregel). Die Regelidentität steigt auf
+  Revision 2 und bindet beide Reparaturraten; Revision-1-Replays und -Peers
+  werden gegenüber Revision-2-Hosts beziehungsweise -Peers vor Tick 1 mit
+  `RulesHash64`-Mismatch abgelehnt. Erst damit
+  ist der Angriff aufs Kraftwerk ein taktischer Zug. **Nicht dabei:** die Verteidigungs-
+  abschaltung — ob ein Turm feuert, entscheidet `CombatSystem` (Einheiten-
+  strang), das einen Strombegriff nicht kennt; Befund geht an 13B
+- **#53: Das Lager begrenzt das Konto (D-024/D-096/D-106)** — das Aetherium-Konto hat
+  jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
+  gespeichert (kein Zustandsfeld, kein Formatbruch): ein oder mehrere fertige
+  HQs geben zusammen genau eine Basis von 2.000 AE, jedes fertige Lager
+  +2.000; Baustellen zählen nicht. Jede
+  Einzahlung (Ernte, Rückerstattungen bei Streichung, Abbruch, Verkauf) läuft
+  über `EconomySystem.DepositCapped` und deckelt hart — Überschuss verfällt.
+  Ein Bestand über der Grenze zerfällt einmal pro Sekunde um 25 % des
+  Überschusses (getaktet über den Sim-Tick, zustandslos, restore-sicher): das
+  ist der „25 % Verlust bei Zerstörung" ohne Ereignis getragen — ein
+  zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
+  Verlust. D-106 präzisiert die Zerstörungsregel als zustandslosen Zerfall
+  statt Slot-gebundenem Einmalverlust und bindet Revision sowie
+  2.000/2.000/25/10 erstmals in `RulesHash64`: alte Dateien bleiben lesbar,
+  eine Wiedergabe oder ein Lockstep-Start mit dem alten leeren Rules-Stub wird
+  vor Tick 1 abgelehnt. Der kanonische KI-Endzustand
+  blieb auf dem Stand von Paket 16.4 bei Tick 2.546 entschieden und bewegte
+  sich durch diese Wirtschaftsregel
+  von `0x9F93097AD526B6F7` auf `0xE784E6184AD16081`; die KI-Kennung bleibt
+  dort unverändert `r6.E34435F9` (der spätere D-103-Handoff ist separat unter
+  „Geändert“ dokumentiert)
+- **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
+  Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
+  Waffentabelle greift nicht mehr, und `CombatSystem` schliesst zusätzlich jede aktive
+  Baustelle als Angreifer und Ziel aus — auch die Verteidigungsplattform feuert
+  vor Fertigstellung nicht. Strombilanz, Skirmish-KI, kanonisches
+  Determinismus-Szenario und HQ-Siegprüfung behandeln Sites ebenfalls nicht als
+  fertige Gebäude; `UnitViewManager` behält die Baustellenoptik bis zur
+  Fertigstellung. Die minimale AI-/Combat-Integrationsreparatur ist nach D-105
+  dokumentiert und ändert die dauerhafte Stranghoheit nicht
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
   solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im
@@ -160,7 +222,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Baubar leiten alle fehlenden fertigen eigenen Gebäude aus derselben
   fail-closed Maske ab. Die Maske ist vollständig vom `DefinitionsHash64`
   gedeckt; Relay und Clients müssen daher aus demselben Commit stammen. Kein
-  Zustands- oder Befehlsformat und keine Golden-Baseline wurde geändert.
+  Zustands- oder Befehlsformat und keine Golden-Baseline wurde geändert. Die
+  nach D-105 begrenzte KI-Integrationsreparatur lässt die Legion das von D-103
+  verlangte Kraftwerk zwischen Raffinerie und Kaserne fertigstellen; die
+  Verhaltenskennung steigt deshalb von `r6.E34435F9` auf `r7.E34435F9`. Der
+  kanonische Ausgang bewegt sich auf dem integrierten Head von Tick 2.546 /
+  `0xE784E6184AD16081` auf Tick 2.705 / `0x28F2CC571BCE6B76`. Der in den
+  KI-Kommentaren vorgeschriebene externe Pfad
+  `tools/Nova.AiLab/reports/behavior-log.md` ist in diesem Repository nicht
+  vorhanden; die Messung wird deshalb ehrlich hier und im PR dokumentiert,
+  statt einen nicht existierenden Journalnachweis zu behaupten. Die dauerhafte
+  Schreibhoheit des Einheitenstrangs bleibt unverändert.
 - **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
   (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
   Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei

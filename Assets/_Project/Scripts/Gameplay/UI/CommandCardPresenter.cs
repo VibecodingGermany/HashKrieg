@@ -138,7 +138,7 @@ namespace Nova.Gameplay
             return commands;
         }
 
-        /// <summary>The command buttons of a CONSTRUCTION SITE (role Unit with an active site): only cancelling is meaningful.</summary>
+        /// <summary>The command buttons of a CONSTRUCTION SITE (definition role with an active site-register row): only cancelling is meaningful.</summary>
         public CommandButtonType GetSiteCommands()
         {
             return CommandButtonType.CancelConstruction;

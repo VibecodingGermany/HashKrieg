@@ -69,7 +69,21 @@ namespace Nova.SimRunner.Tests
         private const ushort MapWidth = 128;
         private const ushort MapHeight = 128;
         private const int EntityCapacity = 1024;
-        private const long FieldReserveAE = 2000000L;
+        private struct FieldLayout
+        {
+            public ushort Id;
+            public int X, Y;
+            public long ReserveAE;
+        }
+
+        private static readonly FieldLayout[] FieldLayouts =
+        {
+            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+        };
         // Faction-resolved opening placement ids (SimDefinitions id rule):
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
         private const ushort DefHQAlliance = 3;
@@ -103,8 +117,8 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -142,46 +156,47 @@ namespace Nova.SimRunner.Tests
         /// <summary>Fixed opening layout of one slot, in grid cells.</summary>
         private sealed class SlotLayout
         {
-            public ushort FieldId;
-            public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
             public int BuilderX, BuilderY;
         }
 
         private static readonly SlotLayout Slot0Layout = new SlotLayout
         {
-            FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
             BuilderX = 13, BuilderY = 7,
         };
 
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
-            FieldId = 2, FieldX = 119, FieldY = 119,
             HqOriginX = 120, HqOriginY = 120,
-            BuilderX = 113, BuilderY = 119,
+            BuilderX = 111, BuilderY = 117,
         };
 
         /// <summary>
         /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
-        /// per slot one Aetherium field, a completed HQ and ONE Builder —
-        /// nothing else. Spawn ORDER is load-bearing: EntityManager hands
-        /// out ids from a deterministic free list, so any reordering shifts
-        /// every id and therefore every hash. Units spawn through SpawnUnit's
-        /// defaults (maxHealth 100 for all), exactly like the scenario —
-        /// NOT through SimDefinitions.
+        /// five finite Aetherium fields in canonical id order, then per slot a
+        /// completed HQ and ONE Builder — nothing else. Entity spawn order is
+        /// load-bearing: EntityManager hands out ids from a deterministic free
+        /// list, so any reordering shifts every id and therefore every hash.
+        /// Units spawn through SpawnUnit's defaults (maxHealth 100 for all),
+        /// exactly like the scenario — NOT through SimDefinitions.
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
             // The slot factions are already bound: BuildReferenceHost mirrors
             // BuildHost, which assigns them before Kernel.Start() (the
             // SetSlotFaction guard requires it).
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                FieldLayout field = FieldLayouts[i];
+                Assert.That(host.Economy.TryAddField(
+                    field.Id, new GridPos2D(field.X, field.Y), field.ReserveAE),
+                    Is.True, "reference field registration");
+            }
+
             for (byte slot = 0; slot < 2; slot++)
             {
                 SlotLayout c = slot == 0 ? Slot0Layout : Slot1Layout;
-
-                Assert.That(host.Economy.TryAddField(c.FieldId, new GridPos2D(c.FieldX, c.FieldY), FieldReserveAE),
-                    Is.True, "reference field registration");
                 Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefHQAlliance : DefHQLegion, c.HqOriginX, c.HqOriginY).IsValid,
                     Is.True, "reference HQ placement");
 
@@ -274,6 +289,23 @@ namespace Nova.SimRunner.Tests
                 $"(reference 0x{referenceHash:X16}, scenario 0x{scenarioHash:X16}). " +
                 "The EditMode lane asserts MatchBootstrap against this same reference, so a " +
                 "drift here means the Unity host and the headless harness are no longer the same match.");
+        }
+
+        [Test]
+        public void ReferenceOpeningPosition_RegistersFiveFiniteFields()
+        {
+            ReferenceHost host = BuildReferenceHost(CanonicalSeed);
+            ApplyOpeningPosition(host);
+
+            Assert.That(host.Economy.FieldCount, Is.EqualTo(FieldLayouts.Length));
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                FieldLayout expected = FieldLayouts[i];
+                Assert.That(host.Economy.TryGetField(expected.Id, out AetheriumField actual), Is.True);
+                Assert.That(actual.GridPos.X, Is.EqualTo(expected.X));
+                Assert.That(actual.GridPos.Y, Is.EqualTo(expected.Y));
+                Assert.That(actual.RemainingAE, Is.EqualTo(expected.ReserveAE));
+            }
         }
 
         [Test]

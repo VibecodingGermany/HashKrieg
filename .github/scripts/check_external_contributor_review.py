@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require a current maintainer approval and CLA acceptance for external PRs."""
+"""Require the project owner's current approval and CLA for external PRs."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import sys
 from typing import Any
 
 
-MAINTAINERS = frozenset({"cubetribe", "travelhawk"})
+MAINTAINERS = frozenset({"cubetribe"})
 CLA_MARKER = "- [x] I agree to the Contributor License Agreement"
 DECISIVE_REVIEW_STATES = frozenset({"APPROVED", "CHANGES_REQUESTED", "DISMISSED"})
 
@@ -59,8 +59,8 @@ def evaluate(
 
     return (
         False,
-        "External contributions require an APPROVED review by cubetribe or "
-        "travelhawk on the current head commit.",
+        "External contributions require an APPROVED review by cubetribe "
+        "on the current head commit.",
     )
 
 
@@ -75,6 +75,9 @@ def _self_test() -> None:
     }
     stale = {**approved, "id": 2, "commit_id": "b" * 40}
     assert evaluate(author="cubetribe", head_sha=head, body="", reviews=[])[0]
+    assert not evaluate(author="travelhawk", head_sha=head, body="", reviews=[])[0]
+    assert not evaluate(author="travelhawk", head_sha=head, body=CLA_MARKER, reviews=[])[0]
+    assert evaluate(author="travelhawk", head_sha=head, body=CLA_MARKER, reviews=[approved])[0]
     assert not evaluate(author="outside", head_sha=head, body="", reviews=[])[0]
     assert not evaluate(author="outside", head_sha=head, body=CLA_MARKER, reviews=[])[0]
     assert evaluate(author="outside", head_sha=head, body=CLA_MARKER, reviews=[approved])[0]

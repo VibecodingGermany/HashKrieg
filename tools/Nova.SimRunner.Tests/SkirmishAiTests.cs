@@ -51,7 +51,7 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// End-to-end tick budget: this suite's deterministic match decides
-        /// at tick 2242, so 6.000 ticks is a ~2.7x margin — comfortably sane,
+        /// at tick 2705, so 6.000 ticks is a ~2.2x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
         internal const int EndToEndBudgetTicks = 6000;
@@ -165,8 +165,8 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
-            var combat = new CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
+            var combat = new CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new VictorySystem(entities, construction);
 
             var session = new MatchSession(HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
@@ -312,16 +312,31 @@ namespace Nova.SimRunner.Tests
         // ----------------------------------------------------------------
 
         [Test]
-        public void SkirmishAi_PlacesRefineryThenBarracks_ThroughTheSealedCommandPath()
+        public void SkirmishAi_PlacesRefineryPowerThenBarracks_ThroughTheSealedCommandPath()
         {
             AiHost host = BuildMatch(Seed);
 
-            host.Run(800);
+            uint refineryTick = 0;
+            uint powerTick = 0;
+            uint barracksTick = 0;
+            for (int i = 0; i < 1000 && barracksTick == 0; i++)
+            {
+                host.Step();
+                uint tick = host.Kernel.CurrentTick.Value;
+                if (refineryTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery)) refineryTick = tick;
+                if (powerTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power)) powerTick = tick;
+                if (barracksTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks)) barracksTick = tick;
+            }
 
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.True,
-                "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.True,
-                "the AI must follow up with the Barracks once the Refinery stands");
+            Assert.Multiple(() =>
+            {
+                Assert.That(refineryTick, Is.GreaterThan(0u),
+                    "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
+                Assert.That(powerTick, Is.GreaterThan(refineryTick),
+                    "D-103 requires the AI to complete a Power plant after the Refinery and before its Barracks");
+                Assert.That(barracksTick, Is.GreaterThan(powerTick),
+                    "the AI must complete the Barracks only after its required Power plant stands");
+            });
             Assert.That(host.Construction.HasFinishedBuilding(HumanSlot, UnitRole.Refinery), Is.False,
                 "slot 0 is the passive fixture: nobody issues orders for it");
 
@@ -330,6 +345,36 @@ namespace Nova.SimRunner.Tests
             // the host ingress sealed slot-1 records.
             Assert.That(host.Ingress.DedupeState.SealedWatermark(AiSlot), Is.GreaterThan(0u),
                 "AI orders must enter through the canonical session/ingress intent path, not direct system calls");
+        }
+
+        [Test]
+        public void SkirmishAi_DefinitionRoleSite_DoesNotCountAsCompletedOrAdvanceBuildOrder()
+        {
+            AiHost host = BuildMatch(Seed);
+
+            // The tick-20 decision submits the Refinery, tick 21 creates its
+            // site, and tick 40 is the first decision that must classify that
+            // definition-role entity through the site register. A bare role
+            // check queues a second (Power) site for tick 41 under D-103.
+            host.Run(41);
+
+            Assert.That(host.Construction.SiteCount, Is.EqualTo(1),
+                "an unfinished Refinery is the active build, not a completed producer that unlocks Barracks");
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.False);
+
+            UnitState[] units = host.Entities.RawUnits;
+            int definitionRoleSites = 0;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != AiSlot || !host.Construction.IsActiveSite(unit.Id)) continue;
+                definitionRoleSites++;
+                Assert.That(unit.Role, Is.EqualTo(UnitRole.Refinery),
+                    "the sole site carries the Refinery role without becoming a finished Refinery");
+            }
+            Assert.That(definitionRoleSites, Is.EqualTo(1));
         }
 
         // ----------------------------------------------------------------
@@ -468,7 +513,7 @@ namespace Nova.SimRunner.Tests
             // outcome unmoved is exactly the "declared change, no effect yet"
             // case — under the old coupled pin it was indistinguishable from a
             // simulation change.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r7.E34435F9"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 
@@ -541,6 +586,37 @@ namespace Nova.SimRunner.Tests
 
             Assert.That(ArmyAttackTarget(host, army), Is.EqualTo(tank),
                 "the army must shoot what actually threatens it, not what it happened to see first");
+        }
+
+        [Test]
+        public void SkirmishAi_IgnoresDefinitionRoleHqSite_AndTargetsLegalEnemy()
+        {
+            AiHost host = BuildMatch(Seed, WavesOff());
+            const int SquadThreshold = 6;
+            int budget = EndToEndBudgetTicks;
+            while (budget-- > 0 && CountUnits(host, AiSlot, UnitRole.BasicInfantry) < SquadThreshold)
+            {
+                host.Step();
+            }
+            Assert.That(TryFirstCombatCell(host, AiSlot, out int armyX, out int armyY), Is.True);
+            List<EntityId> army = CombatUnitIds(host, AiSlot);
+
+            // 16.4: the passive slot has decayed to its 2.000-AE HQ ceiling,
+            // below the 2.500-AE HQ-site cost. A completed Storage raises the
+            // derived cap and the capped deposit funds this focused fixture.
+            ushort storageDefId = SimDefinitions.ToDefinitionId(
+                host.Economy.GetSlotFaction(HumanSlot), UnitRole.Storage);
+            Assert.That(host.Construction.PlaceCompletedBuilding(HumanSlot, storageDefId, 60, 60).IsValid, Is.True);
+            Assert.That(host.Economy.DepositCapped(HumanSlot, 1000), Is.EqualTo(1000));
+
+            EntityId hqSite = PlaceEnemySiteNear(host, UnitRole.HQ, armyX + 3, armyY);
+            EntityId legalTarget = SpawnEnemyUnit(host, UnitRole.BattleTank, armyX + 3, armyY + 1);
+            RunToDecisionWithSquad(host, SquadThreshold);
+
+            Assert.That(host.Construction.IsActiveSite(hqSite), Is.True,
+                "the HQ-role entity is still only a site");
+            Assert.That(ArmyAttackTarget(host, army), Is.EqualTo(legalTarget),
+                "the HQ short-circuit must not select a site that Combat rejects");
         }
 
         // ----------------------------------------------------------------
@@ -926,6 +1002,11 @@ namespace Nova.SimRunner.Tests
             Assert.That(FarthestCombatDistance(host, AiSlot, hqX, hqY), Is.GreaterThan(ring),
                 "the army never marched, so nothing could turn back");
 
+            ushort powerDefId = SimDefinitions.ToDefinitionId(
+                host.Economy.GetSlotFaction(HumanSlot), UnitRole.Power);
+            Assert.That(host.Construction.PlaceCompletedBuilding(HumanSlot, powerDefId, 60, 60).IsValid, Is.True);
+            host.Step(); // commit the new completed Power plant to the energy balance
+
             Assert.That(TryFirstCombatUnit(host, AiSlot, out EntityId woundedId, out int armyX, out int armyY),
                 Is.True);
             Assert.That(host.Entities.TryGetUnit(woundedId, out UnitState marching), Is.True);
@@ -933,7 +1014,11 @@ namespace Nova.SimRunner.Tests
 
             int aheadX = armyX + System.Math.Sign(marching.TargetGridPos.X - armyX) * shipped.RetreatDangerCells;
             int aheadY = armyY + System.Math.Sign(marching.TargetGridPos.Y - armyY) * shipped.RetreatDangerCells;
-            EntityId pursuer = SpawnEnemyUnit(host, UnitRole.BasicInfantry, aheadX, aheadY);
+            EntityId inertSite = PlaceEnemySiteNear(host, UnitRole.DefensePlatform, aheadX, aheadY);
+            Assert.That(host.Entities.TryGetUnit(inertSite, out UnitState siteState), Is.True);
+            int siteX = SimFixed.WorldToGrid(siteState.Transform.PositionX);
+            int siteY = SimFixed.WorldToGrid(siteState.Transform.PositionY);
+            EntityId pursuer = SpawnEnemyUnit(host, UnitRole.BasicInfantry, siteX, siteY);
 
             ref UnitState target = ref host.Entities.GetUnitRef(woundedId);
             target.CurrentHealth = target.MaxHealth * (shipped.RetreatHealthPercent - 20) / 100;
@@ -946,6 +1031,8 @@ namespace Nova.SimRunner.Tests
                 "a retreating unit is still aimed at the target it marched away from. It cannot reach it, " +
                 "and holding a valid target is exactly what makes the D-087 auto-acquisition skip the unit — " +
                 "so it fires at nothing the whole way home and defends nothing once there");
+            Assert.That(after.AttackTarget, Is.Not.EqualTo(inertSite),
+                "an armed DefensePlatform role is not a threat while its entity remains a site");
         }
 
         /// <summary>The slot's combat units standing outside the staging ring around the given cell.</summary>
@@ -1129,6 +1216,42 @@ namespace Nova.SimRunner.Tests
                 def.MoveSpeed,
                 maxHealth: def.MaxHealth,
                 role: role);
+        }
+
+        private static EntityId PlaceEnemySiteNear(AiHost host, UnitRole role, int centreX, int centreY)
+        {
+            FactionId faction = host.Economy.GetSlotFaction(HumanSlot);
+            ushort definitionId = SimDefinitions.ToDefinitionId(faction, role);
+
+            for (int radius = 0; radius <= 6; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        if (radius > 0 && System.Math.Abs(dx) != radius && System.Math.Abs(dy) != radius) continue;
+                        int originX = centreX + dx - 1;
+                        int originY = centreY + dy - 1;
+                        if (host.Construction.ValidatePlacement(HumanSlot, definitionId, originX, originY)
+                            != CommandResultCode.Applied) continue;
+                        Assert.That(host.Construction.TryPlaceBuilding(HumanSlot, definitionId, originX, originY), Is.True);
+
+                        UnitState[] units = host.Entities.RawUnits;
+                        for (int i = 0; i < host.Entities.Capacity; i++)
+                        {
+                            ref readonly UnitState unit = ref units[i];
+                            if (unit.IsActive && unit.PlayerId == HumanSlot && unit.Role == role
+                                && host.Construction.IsActiveSite(unit.Id))
+                            {
+                                return unit.Id;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Assert.Fail($"no legal {role} site near ({centreX},{centreY})");
+            return EntityId.Invalid;
         }
 
         /// <summary>

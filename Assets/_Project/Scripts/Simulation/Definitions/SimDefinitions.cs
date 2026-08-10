@@ -556,7 +556,7 @@ namespace Nova.Simulation.Definitions
         /// NOVA_DEFINITIONS_V1 domain (SimulationCore.md section 5) over ids
         /// 1..<see cref="MaxDefinitionId"/> in ascending order; each
         /// definition contributes a field tag (its id) followed by a uniform
-        /// 21-field layout in canonical order: kind u8 (0 = building, 1 =
+        /// 19-field layout in canonical order: kind u8 (0 = building, 1 =
         /// unit), faction u8, role u8, costAE i32, buildTicks i32,
         /// powerProvided i32, powerRequired i32, hasPrerequisite u8,
         /// prerequisiteRoles u32, tier u8, producerRole u8, maxHealth i32,
