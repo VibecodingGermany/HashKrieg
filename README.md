@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.21.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
+**Dokumentversion:** 0.22.2 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -136,12 +136,12 @@ gemacht, das man starten, bedienen und gewinnen kann:
 
 Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich
 in Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein
-deterministischer Simulationskern mit **549/549 bestandenen Headless-Tests**,
-eine Unity-Baseline von **521/521 EditMode** und **8/9 PlayMode** — einziger
-Fehler ist der bekannte headless-`RenderTexture`-Fall — sowie **34 3D-Assets**,
-die über eine Drop-in-Pipeline einfahren (§5). Die nach dem Unity-Lauf
-ergänzten Audio-/Death-Hold-Assertions sind kompiliert, aber nicht erneut
-ausgeführt.
+deterministischer Simulationskern mit **706/706 bestandenen Headless-Tests** auf
+dem integrierten 16.9-Stand sowie **34 3D-Assets**, die über eine Drop-in-Pipeline
+einfahren (§5). Auf demselben Stand sind außerdem die vollständige Unity-
+EditMode-Suite mit **587/587** Tests und die fokussierte Graybox-Proof-
+PlayMode-Suite mit **3/3** Tests im gepinnten Editor grün gelaufen. Das ist
+automatisierte Laufzeitevidenz, keine behauptete manuelle Spielabnahme.
 
 ### Was noch fehlt
 
@@ -156,10 +156,10 @@ funktionierender Loop:
 - **Gefechtsdichte ist noch nicht manuell abgenommen.** VFX und SFX sind
   implementiert; die geplante Sicht- und Gegenhörprüfung mit 60 Einheiten
   bleibt offen.
-- **Strang C läuft weiter.** Fünf endliche Aetheriumfelder, Lagergrenze, Radar
-  und Low-Power-Wirkung sind umgesetzt; Mehrfachvoraussetzungen,
-  Platzierungsregeln, Reparaturkosten und ehrliches Blocker-Feedback folgen
-  noch in den nachgelagerten Paketen.
+- **Strang C läuft weiter.** Fünf endliche Aetheriumfelder, Lagergrenze, Radar,
+  Low-Power-Wirkung, Mehrfachvoraussetzungen sowie Platzierungs- und
+  Reparaturkosten sind umgesetzt; das ehrliche Blocker- und Energiefeedback am
+  Entscheidungspunkt folgt noch in Paket 16.10.
 - **Kein Speichern.** Die Simulation kann ihren Zustand vollständig
   serialisieren und hash-identisch fortsetzen — es fehlt nur das Schreiben auf
   die Platte.
@@ -285,9 +285,9 @@ Runde*.
 - **Netzwerk und Gefechtsdichte sind noch nicht vollständig manuell
   abgenommen.** A8 Stufen 2–4 sowie die 60-Einheiten-Sicht-/Gegenhörprüfung
   bleiben offen.
-- **Strang C läuft weiter.** Wirtschaftsdruck, Lager, Radar und Low Power sind
-  da; Mehrfachvoraussetzungen, Platzierungsregeln, Reparaturkosten und das
-  vollständige Entscheidungsfeedback fehlen noch.
+- **Strang C läuft weiter.** Wirtschaftsdruck, Lager, Radar, Low Power,
+  Mehrfachvoraussetzungen, Platzierungsregeln und Reparaturkosten sind da; nur
+  das vollständige Entscheidungsfeedback aus Paket 16.10 fehlt noch.
 
 Die vollständigen Grenzen stehen im aktuellen
 [Sprintbericht](docs/production/hashkrieg/12_Sprint_Zu_Zweit.md).
@@ -434,9 +434,8 @@ nicht rückwirkend übertragen.
 
 ## Offene Punkte
 
-- **Die verbleibenden Strang-C-Pakete aus §2** — Voraussetzungen,
-  Platzierung/Reparaturkosten und Entscheidungsfeedback — sind die wichtigste
-  offene Umsetzungsfolge.
+- **Das verbleibende Strang-C-Paket 16.10** — korrektes Blocker-, Energie- und
+  Stop-Feedback — ist die wichtigste offene Umsetzungsfolge.
 - Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses Repositories
   noch nicht vollzogen — Repo, Code und Wiki laufen weiter unter *Project Nova*.
 - Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
@@ -449,8 +448,8 @@ Zur Bewertung, in dieser Reihenfolge:
    2–4; Linux/systemd und der Live-Workflow müssen ebenfalls real laufen.
 2. **Gefechtsfeedback manuell abnehmen** — ungefähr 60 feuernde Einheiten,
    SFX-Regler, Klangbalance und Kamera-Listener gegenhören und ansehen.
-3. **Strang C abschließen** — Mehrfachvoraussetzungen,
-   Platzierungs-/Reparaturregeln und ehrliches Blocker-Feedback integrieren.
+3. **Strang C abschließen** — ehrliches Blocker-, Energie- und Stop-Feedback
+   aus Paket 16.10 integrieren.
 4. **Attack-Move** — Truppen sollen unterwegs Gegner bekämpfen, ohne jeden
    Kontakt einzeln befohlen zu bekommen.
 5. **KI-Ausbau** — der Gegner spielt, aber weiterhin schlicht; die neuen
@@ -468,6 +467,9 @@ Projekt ein Publikum hat.
 | 0.19.1 | 2026-08-08 | CLA-Wirkung auf Beiträge mit dokumentierter Zustimmung begrenzt; keine rückwirkende Rechteübertragung unterstellt | Technical Writer |
 | 0.20.0 | 2026-08-10 | D-105: alleinige Projektleitung und Merge-Autorität von `@cubetribe`, externe aktuelle Inhaberfreigabe sowie die ehrliche Zurückstellung manueller Spielabnahmen dokumentiert | Technical Writer |
 | 0.21.0 | 2026-08-10 | Strang-C-Status auf #73/#77/#78/#80 nachgezogen: Lagergrenze, Radar, Low Power und fünf endliche Aetheriumfelder sind umgesetzt; die tatsächlich verbleibenden Pakete bleiben offen | Codex / Dennis Westermann |
+| 0.22.0 | 2026-08-10 | Strang-C-Status auf D-103/D-104/D-107 nachgezogen: All-of-Voraussetzungen, footprintbasierte Platzierung, bezahlte Reparatur und faire Glutrinne-Startgeometrie sind umgesetzt; nur Paket 16.10 bleibt offen | Codex / Dennis Westermann |
+| 0.22.1 | 2026-08-10 | Die veraltete Unity-Baseline durch die tatsächlich gelaufenen Nachweise 586/586 EditMode und 3/3 fokussierte Graybox-PlayMode-Tests ersetzt und klar von einer manuellen Spielabnahme getrennt | Codex / Dennis Westermann |
+| 0.22.2 | 2026-08-10 | Nach dem Snapshot-Restore-Fix die erneut gelaufenen Nachweise auf 706/706 Headless- und 587/587 EditMode-Tests fortgeschrieben | Codex / Dennis Westermann |
 | 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
 | 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
 | 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |

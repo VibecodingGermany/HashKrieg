@@ -3,6 +3,7 @@ using System.Text;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Snapshots;
 
@@ -116,8 +117,14 @@ namespace Nova.Simulation.Replays
         /// </summary>
         public const ushort RulesRevisionV2 = 2;
 
+        /// <summary>
+        /// D-104 deterministic placement geometry and paid, single-winner
+        /// repair behavior layered onto revision 2.
+        /// </summary>
+        public const ushort RulesRevisionV3 = 3;
+
         /// <summary>The rules revision emitted by current hosts.</summary>
-        public const ushort CurrentRulesRevision = RulesRevisionV2;
+        public const ushort CurrentRulesRevision = RulesRevisionV3;
 
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
         public const int MaxIdentifierBytes = 64;
@@ -265,14 +272,18 @@ namespace Nova.Simulation.Replays
         /// </summary>
         public static ulong ComputeRulesHash64(ushort rulesRevision)
         {
-            if (rulesRevision != RulesRevisionV1 && rulesRevision != RulesRevisionV2)
+            if (rulesRevision != RulesRevisionV1
+                && rulesRevision != RulesRevisionV2
+                && rulesRevision != RulesRevisionV3)
             {
                 throw new ArgumentOutOfRangeException(nameof(rulesRevision), rulesRevision, "Unknown rules revision.");
             }
 
             var hash = SimHashWriter.ForDefinitions();
             hash.WriteFieldTag((uint)MatchContentStub.Rules);
-            hash.WriteUInt32(rulesRevision == RulesRevisionV1 ? 5u : 7u); // ordered rule fields below
+            hash.WriteUInt32(rulesRevision == RulesRevisionV1
+                ? 5u
+                : rulesRevision == RulesRevisionV2 ? 7u : 14u); // ordered rule fields below
             hash.WriteFieldTag(1);
             hash.WriteUInt16(rulesRevision);
             hash.WriteFieldTag(2);
@@ -290,13 +301,31 @@ namespace Nova.Simulation.Replays
                 hash.WriteFieldTag(7);
                 hash.WriteInt32(ConstructionSystem.LowPowerRepairRateHpPerTick);
             }
+            if (rulesRevision >= RulesRevisionV3)
+            {
+                hash.WriteFieldTag(8);
+                hash.WriteInt32(SimDefinitions.BuildingFootprintCells);
+                hash.WriteFieldTag(9);
+                hash.WriteInt32(ConstructionSystem.RepairCostPercent);
+                hash.WriteFieldTag(10);
+                hash.WriteInt32(ConstructionSystem.BuildInfluenceRadiusCells);
+                hash.WriteFieldTag(11);
+                hash.WriteInt32(ConstructionSystem.MinimumBuildingDistanceCells);
+                hash.WriteFieldTag(12);
+                hash.WriteInt32(ConstructionSystem.RefineryMinimumFieldDistanceCells);
+                hash.WriteFieldTag(13);
+                hash.WriteInt32(ConstructionSystem.RefineryMaximumFieldDistanceCells);
+                hash.WriteFieldTag(14);
+                hash.WriteInt32(ConstructionSystem.MinimumNonRefineryFieldDistanceCells);
+            }
             return hash.Digest();
         }
 
         /// <summary>
-        /// Canonical rules identity for the current simulation. Revision 2
-        /// binds both D-106 economy behavior and the Sprint-16.6 C4 low-power radar
-        /// and repair behavior that can diverge without changing snapshot
+        /// Canonical rules identity for the current simulation. Revision 3
+        /// retains D-106 and Sprint-16.6 C4 from revisions 1/2, then binds the
+        /// D-104 footprint, influence, field-spacing, repair-price and
+        /// single-winner behavior that can diverge without changing snapshot
         /// bytes or definition rows. Old/new peers and replays therefore fail
         /// the exact-fingerprint gate before executing tick 1.
         /// </summary>

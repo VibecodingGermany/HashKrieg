@@ -79,15 +79,26 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
-        public void CurrentRulesHash_MovesPastRevisionOne_ForLowPowerRepair()
+        public void RulesRevisionOneAndTwo_GoldenHashesRemainByteStable()
         {
             ulong revisionOne = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1);
+            ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
+
+            Assert.That(revisionOne, Is.EqualTo(0x531CE8F614A16CB5UL), "revision 1 canonical stream is frozen");
+            Assert.That(revisionTwo, Is.EqualTo(0x07725EA26668C9F8UL), "revision 2 canonical stream is frozen");
+        }
+
+        [Test]
+        public void CurrentRulesHash_MovesPastRevisionTwo_ForD104PlacementAndRepair()
+        {
+            ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
             ulong current = MatchFingerprint.ComputeCurrentRulesHash64();
 
-            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV2));
-            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2)));
-            Assert.That(current, Is.Not.EqualTo(revisionOne),
-                "Sprint-16.6 C4 repair behavior must not share D-106's revision-1 rules identity");
+            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV3));
+            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV3)));
+            Assert.That(current, Is.EqualTo(0x05CCA8475789AD4AUL), "revision 3 canonical stream is frozen");
+            Assert.That(current, Is.Not.EqualTo(revisionTwo),
+                "D-104 placement and repair behavior must not share revision 2's rules identity");
         }
 
         [Test]

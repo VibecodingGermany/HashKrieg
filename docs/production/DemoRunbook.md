@@ -145,7 +145,7 @@ steht davor und dauert so lange, wie man ihn zeigen will.
 6. **Gegenwehr (6:00):** Die erste gegnerische Angriffswelle trifft ein.
    Infanterie per Box auswählen, mit A auf einen Angreifer klicken; Schaden
    und Gesundheits-Tint beobachten.
-7. **Gegenstoß (9:00):** Eigene Truppe Richtung (120,120) schicken; die
+7. **Gegenstoß (9:00):** Eigene Truppe Richtung (119,119) schicken; die
    Legion-Basis erscheint, sobald eigene Einheiten sie aufklären. **Ziel: das
    gegnerische Hauptquartier zerstören** — das beendet das Spiel sofort.
 8. **Abschluss:** Ergebnis in der Statusleiste (VICTORY / DEFEAT); per F3 die

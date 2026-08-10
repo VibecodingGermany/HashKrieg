@@ -18,7 +18,7 @@ MonoBehaviour:
   _height: 128
   _spawnPoints:
   - {x: 5, y: 5}
-  - {x: 121, y: 121}
+  - {x: 119, y: 119}
   _resourceNodes:
   - {x: 7, y: 7}
   - {x: 117, y: 117}

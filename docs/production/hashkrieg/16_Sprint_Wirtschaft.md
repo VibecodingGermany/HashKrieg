@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.5.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.7.1 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -241,6 +241,15 @@ aktuellen Host aber vor Tick 1 mit `RulesHash64`-Mismatch abgelehnt.
 **Symmetrie ist Pflicht.** Beide Startpositionen müssen gleich weit zu Expansion
 und Zentrum liegen — sonst entscheidet die Karte das erste Mensch-gegen-Mensch-Match.
 
+D-107 präzisiert die ausgelieferte Glutrinne-Geometrie: Die bestehende
+D-102-Layoutachse läuft durch Zelle `(62,62)`. Punkte spiegeln als
+`(x,y) → (124-x,124-y)`, die unteren linken Ursprünge der einheitlichen
+3×3-Footprints als `(x,y) → (122-x,122-y)`. Der zweite HQ-Ursprung liegt daher
+bei `(118,118)` statt `(120,120)`. Das gleicht die D-104-Abstände und legalen
+Folge-Raffinerieplätze auf 45/45 aus; die gesetzten Start-HQs selbst nutzen den
+dokumentierten Setup-Bypass. Die Achse ist die bestehende Glutrinne-Layoutachse,
+nicht die physische Mittelpunktspiegelung des gesamten 128×128-Rasters.
+
 Feldreserven und Feldpositionen liegen nicht in `SimDefinitions`, sondern in
 der kanonischen Startaufstellung. D-102 trennt diese belegte
 Knappheitskorrektur ausdrücklich von der noch unbelegten Ernteraten-Kalibrierung;
@@ -291,28 +300,58 @@ delegiert auf dieselbe Maskenprüfung.
 Die ausgelieferte Skirmish-KI plante bislang Raffinerie → Kaserne. Das neue
 Kraftwerk-Tor wird nach D-105 durch eine begrenzte Integrationsreparatur im
 fremden `Scripts/AI*`-Schreibbereich bedient: r7 plant Raffinerie → Kraftwerk →
-Kaserne, beide Testspiegel sichern die Reihenfolge. Der kanonische Ausgang wurde
-auf dem integrierten Head mit Tick 2.705 und `0x28F2CC571BCE6B76` frisch
-gemessen; die lokale Gesamtsuite ist mit 685/685 grün. Der Merge wartet danach
-noch auf die grüne PR-CI. Der referenzierte externe AiLab-Journalpfad ist in
+Kaserne, beide Testspiegel sichern die Reihenfolge. Auf dem integrierten
+16.8-Head vor D-104/D-107 wurde der kanonische Ausgang mit Tick 2.705 und
+`0x28F2CC571BCE6B76` gemessen; die damalige lokale Gesamtsuite war mit 685/685
+grün. D-104/D-107 bewegen diesen Simulationsausgang anschließend erneut, ohne
+die r7-KI-Kennung zu ändern. Der referenzierte externe AiLab-Journalpfad ist in
 diesem Repository nicht vorhanden, daher stehen Messung und Restrisiko ehrlich
 in Changelog und PR statt in einem erfundenen Artefakt.
 
 ### 16.9 · Platzierungsregeln und Reparaturkosten (C6)
 
-- **Platzierung:** Bau-Einflussradius 8 Zellen um HQ / Lager / Kraftwerk,
-  Mindestabstand zu Aetherium-Feldern, Gebäudeabstand. Heute prüft der Code nur
-  „innerhalb der Karte" und „Zelle frei". Die Begehbarkeitsprüfung liest
-  `Pathfinding.CostField` — **Vertragsfläche, `IsWalkable` wird benutzt, nicht
-  geändert.**
-- **Reparatur kostet 30 % des Neupreises.** Zwei Details, die dazugehören:
-  - `ProcessRepairOrders` hat **keine Ziel-Deduplikation** — mehrere Bauarbeiter
-    am selben Gebäude zahlen im selben Tick mehrfach. Das ist zu lösen, sonst
-    ist es der Betatest-Fehler der nächsten Runde.
+- **Platzierung (D-104):** Abstände werden footprintbasiert in der
+  Chebyshev-Metrik gemessen. Jede der neun Footprintzellen muss über
+  `CostField.IsWalkable` begehbar sein. Ein Neubau braucht in höchstens acht
+  Zellen Entfernung ein eigenes, lebendes, fertiges HQ, Lager oder Kraftwerk
+  und zu jeder aktiven Baustelle beziehungsweise jedem lebenden fertigen
+  Gebäude mindestens Abstand 2. Feldüberlappung ist immer verboten;
+  Raffinerien brauchen zu mindestens einem registrierten Feld Abstand 1 bis 3,
+  alle anderen Gebäude zu jedem Feld mindestens Abstand 2. Erschöpfte Felder
+  zählen weiter. `Pathfinding.CostField` bleibt Vertragsfläche:
+  **`IsWalkable` wird benutzt, nicht geändert.**
+- **Reparatur kostet kumulativ 30 % des Neupreises (D-104).** Für
+  `R = floor(CostAE × 30 / 100)` und
+  `S(h) = floor(R × clamp(h, 0, MaxHealth) / MaxHealth)` kostet ein Tick
+  `S(h1) − S(h0)`. Das teleskopiert ohne Rundungsdrift und ohne neues
+  Zustandsfeld. Reicht AE nicht, ändern sich Guthaben und Trefferpunkte nicht.
+  Pro Ziel und Tick gewinnt der erste valide, beschädigte und erreichbare
+  Auftrag; spätere Aufträge wirken nicht, der Gewinner claimt auch bei
+  fehlendem AE, und andere Ziele laufen weiter.
+  Zwei bestehende Details gehören dazu:
+  - `ProcessRepairOrders` hatte **keine Ziel-Deduplikation** — mehrere
+    Bauarbeiter heilten dasselbe Gebäude im selben Tick mehrfach.
   - Die Bauphase läuft **nach** `RecomputePower` im selben Tick. Ein Abzug in der
     Reparaturschleife wirkt darum erst im Folgetick auf die Strombilanz. Das ist
     hinnehmbar; die Tickreihenfolge zu drehen wäre `SimulationKernel.cs` und
     damit eine eigene Inhaberentscheidung.
+- **Snapshot-Fortsetzung bleibt reihenfolgeidentisch.** Sites, fertige
+  Platzierungen und Reparaturaufträge bilden dichte, reihenfolgestabile Folgen:
+  Entfernen kompaktiert, neue Einträge hängen hinten an. Gespiegelte Tests
+  sichern Abbruch/Verkauf/Stop → Snapshot/Restore → Append sowie die
+  beobachtbare Reparatur-Gewinnerreihenfolge. Ein Restore entfernt außerdem
+  zuerst die ausschließlich im Zielhost vorhandenen dynamischen Footprints aus
+  dem Pfadkostenfeld, bevor er den Snapshotzustand neu aufbaut.
+- **Kompatibilitätsgrenze:** D-104 hebt `RulesHash64` append-only auf Revision 3
+  und bindet den 3×3-Footprint, 30-Prozent-Reparaturkosten, Einflussradius 8,
+  Gebäudeabstand 2 sowie Feldabstände 1/3/2. Die historischen V1-/V2-Streams
+  und Hashes bleiben eingefroren; V2-Replays und -Peers werden gegenüber V3
+  vor Tick 1 abgelehnt.
+- **Integrierter Ausgang:** Mit D-104 und der D-107-HQ-Korrektur entscheidet die
+  kanonische KI-Partie auf Tick 2.726 mit `0x10B83E94F86F2E55`. Die Kennung
+  bleibt `r7.E34435F9`: bewegt hat sich die Simulation, nicht die KI. Die
+  vollständige lokale .NET-Suite ist auf diesem Integrationsstand mit 706/706
+  grün.
 
 ### 16.10 · Ehrliche Rückmeldung am Entscheidungspunkt (#47, #48, #45)
 
@@ -400,9 +439,11 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
 | D-102 | Fünf endliche, punktgespiegelte Aetheriumfelder; `HarvestRateAE` bleibt bis zur gespielten Kalibrierung bei 2 AE/Tick | Inhaber / Agent |
 | D-103 | Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske; unbekannte Bits scheitern geschlossen | Agent unter Inhaberdelegation |
+| D-104 | Footprintbasierte Chebyshev-Platzierung; Reparatur kostet kumulativ 30 % des Neupreises, höchstens ein wirksamer Auftrag je Ziel und Tick | Inhaber (Zielwerte) / Agent (Ausformung) |
 | D-106 | AE-Kontobasis gilt einmalig je Slot; vorhandener Überhang zerfällt zustandslos pro Sekunde und die Regelrevision wird im Match-Fingerprint gebunden | Agent unter Inhaberdelegation |
+| D-107 | Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge um 122; der zweite HQ-Ursprung wird auf `(118,118)` korrigiert | Agent unter Inhaberdelegation |
 
-D-096, D-097, D-102, D-103 und D-106 sind im [DecisionLog](../DecisionLog.md)
+D-096, D-097, D-102, D-103, D-104, D-106 und D-107 sind im [DecisionLog](../DecisionLog.md)
 eingetragen. D-098 (Entwurf) und D-099 stehen dort für
 [Sprint 17](17_Sprint_Zugangsprotokoll.md); D-092 bis D-094 gehören zu
 [Sprint 14](14_Sprint_Lobby.md). D-100 wird hier mangels eigenem
@@ -422,14 +463,17 @@ den zutreffenden Grund.
 ## Versionsrelevanz
 
 `minor` — neue spielbare Fähigkeiten und Verhaltensänderungen; kein Zustands-,
-Schema- oder Wireformatbruch. Die `RulesHash64`-Kompatibilitätsgrenze zwischen
-Revision 1 und 2 ist beabsichtigt. Die Baseline-Neusetzung ist Zweck der Tests,
-kein Bruch.
+Schema- oder Wireformatbruch. Die `RulesHash64`-Kompatibilitätsgrenzen zwischen
+Revision 1, 2 und 3 sind beabsichtigt. Die Baseline-Neusetzung ist Zweck der
+Tests, kein Bruch.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.7.1 | 2026-08-10 | Snapshot-Restore ersetzt nun auch den dynamischen CostField-Footprintzustand eines abweichenden Zielhosts; gespiegelter Regressionstest und finaler 706/706-Nachweis ergänzt | Agent (unter Delegation) / Dennis Westermann |
+| 1.7.0 | 2026-08-10 | D-107 und den integrierten 16.9-Vertrag ergänzt: Glutrinne-Layoutachse, HQ-Ursprung `(118,118)`, 45/45 Folge-Raffinerieplätze, dichte Snapshot-Reihenfolgen, Rules-Revision 3 und finaler r7-Ausgangspin | Agent (unter Delegation) / Dennis Westermann |
+| 1.6.0 | 2026-08-10 | Paket 16.9 mit D-104 konkretisiert: footprintbasierte Einfluss-, Feld-, Gelände- und Gebäudeabstände sowie zustandslose kumulative 30-Prozent-Reparaturkosten und Ziel-Deduplikation festgeschrieben | Project Owner / Agent (unter Delegation) |
 | 1.5.0 | 2026-08-10 | D-103 für Paket 16.8 ergänzt: fraktionsgleiche All-of-Voraussetzungen, fail-closed Maskenvertrag, Definitions-Hash-Grenze und koordinierter KI-Handoff | Agent (unter Delegation) / Dennis Westermann |
 | 1.4.0 | 2026-08-10 | D-102 ergänzt: fünf endliche symmetrische Felder sind Paket 16.7; die Ernterate bleibt mangels gespielter Zielkurve ausdrücklich bei 2 AE/Tick und wird getrennt kalibriert | Project Owner / Agent |
 | 1.3.0 | 2026-08-10 | C4-Kompatibilitätsgrenze dokumentiert: Low-Power-Reparatur bindet Rules-Revision 2 und 10/5 HP pro Tick, ohne Zustands- oder Schema-Bump | Codex / Dennis Westermann |

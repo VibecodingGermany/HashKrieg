@@ -221,6 +221,29 @@ namespace Nova.Simulation.Tests
         }
 
         [Test]
+        public void FingerprintMismatch_RevisionTwoRules_RefusesPlaybackBeforeTickOne()
+        {
+            ReplayV1TestUtil.LiveMatch live = ReplayV1TestUtil.RunLiveMatch();
+            MatchFingerprint revisionTwo = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2),
+                live.Fingerprint.DefinitionsHash64, live.Fingerprint.MapHash64,
+                live.Fingerprint.GetSlotOccupancyCopy(), live.Fingerprint.GetSlotFactionCopy(),
+                live.Fingerprint.StartSeed, live.Fingerprint.InitialStateHash,
+                live.Fingerprint.InputDelayTicks);
+
+            ReplayV1TestUtil.TestHost playback = ReplayV1TestUtil.CreatePlaybackHost();
+            Assert.That(
+                ReplayPlayer.TryPlay(
+                    live.ReplayBytes, revisionTwo, playback.Kernel, playback.Ingress,
+                    out ReplayPlaybackError error, out string detail),
+                Is.False);
+            Assert.That(error, Is.EqualTo(ReplayPlaybackError.FingerprintMismatch));
+            StringAssert.Contains("RulesHash64", detail);
+            Assert.That(playback.Kernel.CurrentTick.Value, Is.EqualTo(0u),
+                "revision-2 rules must be refused before execution");
+        }
+
+        [Test]
         public void FingerprintMismatch_DifferentSlotOccupancy_RefusesPlayback()
         {
             ReplayV1TestUtil.LiveMatch live = ReplayV1TestUtil.RunLiveMatch();

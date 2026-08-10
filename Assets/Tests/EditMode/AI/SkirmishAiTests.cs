@@ -49,7 +49,7 @@ namespace Nova.AI.Tests
 
         /// <summary>
         /// End-to-end tick budget: this suite's deterministic match decides
-        /// at tick 2705, so 6.000 ticks is a ~2.2x margin — comfortably sane,
+        /// at tick 2726, so 6.000 ticks is a ~2.2x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
         private const int EndToEndBudgetTicks = 6000;
@@ -189,10 +189,10 @@ namespace Nova.AI.Tests
             for (byte slot = 0; slot < 2; slot++)
             {
                 ushort fieldId = (ushort)(slot + 1);
-                int fieldCell = slot == HumanSlot ? 7 : 119;
-                int hqOrigin = slot == HumanSlot ? 4 : 120;
-                int builderX = slot == HumanSlot ? 13 : 113;
-                int builderY = slot == HumanSlot ? 7 : 119;
+                int fieldCell = slot == HumanSlot ? 7 : 117;
+                int hqOrigin = slot == HumanSlot ? 4 : 118;
+                int builderX = slot == HumanSlot ? 13 : 111;
+                int builderY = slot == HumanSlot ? 7 : 117;
 
                 Assert.That(host.Economy.TryAddField(fieldId, new GridPos2D(fieldCell, fieldCell), FieldReserveAE),
                     Is.True, $"field {fieldId} could not be registered");
@@ -286,15 +286,12 @@ namespace Nova.AI.Tests
                 if (barracksTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks)) barracksTick = tick;
             }
 
-            Assert.Multiple(() =>
-            {
-                Assert.That(refineryTick, Is.GreaterThan(0u),
-                    "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
-                Assert.That(powerTick, Is.GreaterThan(refineryTick),
-                    "D-103 requires the AI to complete a Power plant after the Refinery and before its Barracks");
-                Assert.That(barracksTick, Is.GreaterThan(powerTick),
-                    "the AI must complete the Barracks only after its required Power plant stands");
-            });
+            Assert.That(refineryTick, Is.GreaterThan(0u),
+                "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
+            Assert.That(powerTick, Is.GreaterThan(refineryTick),
+                "D-103 requires the AI to complete a Power plant after the Refinery and before its Barracks");
+            Assert.That(barracksTick, Is.GreaterThan(powerTick),
+                "the AI must complete the Barracks only after its required Power plant stands");
             Assert.That(host.Construction.HasFinishedBuilding(HumanSlot, UnitRole.Refinery), Is.False,
                 "slot 0 is the passive fixture: nobody issues orders for it");
 
@@ -373,7 +370,7 @@ namespace Nova.AI.Tests
             Assert.That(CountUnits(host, AiSlot, UnitRole.BasicInfantry), Is.GreaterThanOrEqualTo(6),
                 "the Barracks keeps infantry queued — the attack threshold of the profile must be reachable");
             Assert.That(MinCombatCellX(host, AiSlot), Is.LessThan(64),
-                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 113-122)");
+                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 111-120)");
         }
 
         // ----------------------------------------------------------------

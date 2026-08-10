@@ -153,11 +153,11 @@ namespace Nova.Gameplay.Match
         /// The five canonical fields (16.7, C1 — MVPContentManifest section 5,
         /// mirror of Determinism10000Scenario.FieldLayouts): two start fields
         /// and two natural expansions at 9.000 AE each, one contested centre
-        /// at 15.000. Symmetry is binding: every slot-1 coordinate is the
-        /// point mirror of slot 0 through the map centre ((x, y) -&gt;
-        /// (124 - x, 124 - y), the same mirror that maps HQ (4,4) to HQ
-        /// (120,120)), so both starts are equally far from their expansion
-        /// (36 cells) and from the centre (58).
+        /// at 15.000. Symmetry is binding: point coordinates mirror as
+        /// (x, y) -&gt; (124 - x, 124 - y); a 3x3 footprint's lower-left
+        /// origin therefore mirrors as (x, y) -&gt; (122 - x, 122 - y).
+        /// D-107 maps HQ (4,4) to HQ (118,118), so both starts are equally
+        /// far from their expansion (34 cells) and from the centre (56).
         /// </summary>
         private static readonly FieldLayout[] FieldLayouts =
         {
@@ -250,7 +250,7 @@ namespace Nova.Gameplay.Match
         /// <summary>Aetherium field cell of the human player (7, 7).</summary>
         public Vector2Int LocalFieldCell => new Vector2Int(LocalPlayerLayout.FieldX, LocalPlayerLayout.FieldY);
 
-        /// <summary>Aetherium field cell of the opponent (117, 117 since 16.7 — the exact centre mirror).</summary>
+        /// <summary>Aetherium field cell of the opponent (117, 117 — the D-102/D-107 Glutrinne layout-axis mirror).</summary>
         public Vector2Int EnemyFieldCell => new Vector2Int(EnemyPlayerLayout.FieldX, EnemyPlayerLayout.FieldY);
 
         /// <summary>
@@ -274,7 +274,7 @@ namespace Nova.Gameplay.Match
         /// <summary>Lower-left footprint origin of the human HQ (4, 4).</summary>
         public Vector2Int LocalHqOrigin => new Vector2Int(LocalPlayerLayout.HqOriginX, LocalPlayerLayout.HqOriginY);
 
-        /// <summary>Lower-left footprint origin of the opponent HQ (120, 120).</summary>
+        /// <summary>Lower-left footprint origin of the opponent HQ (118, 118).</summary>
         public Vector2Int EnemyHqOrigin => new Vector2Int(EnemyPlayerLayout.HqOriginX, EnemyPlayerLayout.HqOriginY);
 
         /// <summary>Center cell of the human HQ footprint — the natural camera start focus.</summary>
@@ -992,12 +992,12 @@ namespace Nova.Gameplay.Match
             BuilderX = 13, BuilderY = 7,
         };
 
-        /// <summary>Opponent base, top-right: the exact centre mirror of <see cref="LocalLayout"/>.</summary>
+        /// <summary>Opponent base, top-right: the exact D-107 footprint mirror of <see cref="LocalLayout"/>.</summary>
         private static readonly SlotLayout EnemyLayout = new SlotLayout
         {
             Slot = EnemySlot,
             FieldId = 2, FieldX = 117, FieldY = 117,
-            HqOriginX = 120, HqOriginY = 120,
+            HqOriginX = 118, HqOriginY = 118,
             BuilderX = 111, BuilderY = 117,
         };
     }

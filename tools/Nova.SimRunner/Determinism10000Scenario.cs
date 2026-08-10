@@ -197,7 +197,7 @@ namespace Nova.SimRunner
         /// The five canonical fields (16.7, C1 — MVPContentManifest section 5):
         /// two start fields and two natural expansions at 9.000 AE each, one
         /// contested centre at 15.000. Every slot-1 coordinate is the point
-        /// mirror of slot 0 through the map centre ((x, y) -&gt;
+        /// mirror of slot 0 across the D-102/D-107 Glutrinne layout axis ((x, y) -&gt;
         /// (124 - x, 124 - y)). Registration in ascending id order is part of
         /// the canonical initial state.
         /// </summary>
@@ -625,11 +625,11 @@ namespace Nova.SimRunner
             RefineryRallyX = 7, RefineryRallyY = 6,
         };
 
-        /// <summary>Slot 1 base layout (top-right), the exact centre mirror of slot 0.</summary>
+        /// <summary>Slot 1 base layout (top-right), the exact D-107 point/footprint mirror of slot 0.</summary>
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
             FieldId = 2, FieldX = 117, FieldY = 117,
-            HqOriginX = 120, HqOriginY = 120,
+            HqOriginX = 118, HqOriginY = 118,
             BuilderSpawnX = 111, BuilderSpawnY = 117,
             RefineryOriginX = 114, RefineryOriginY = 118, RefineryBuildX = 114, RefineryBuildY = 117,
             RefineryRallyX = 117, RefineryRallyY = 118,

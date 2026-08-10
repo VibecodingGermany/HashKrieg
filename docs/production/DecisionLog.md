@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.37.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.39.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -3115,6 +3115,85 @@ persistentes Zustandsformat wird in diesem Paket geändert.
 
 ---
 
+### D-104 | verbindlich | Sprint 16.9 (footprintbasierte Platzierung und deterministische Reparaturkosten)
+
+**Status:** Die Zielwerte stammen aus dem Inhaberauftrag vom 2026-08-09; die
+deterministische Ausformung wurde vom Agenten unter Delegation entschieden und
+bleibt überstimmbar. Umsetzung und Integrationsnachweis folgen in Paket 16.9
+auf die bereits integrierten Pakete 16.7 und 16.8.
+
+**Kontext:** Die bestehende Platzierungsprüfung kennt nur Kartengrenze und
+belegte Zellen. Reparaturen erhöhen Trefferpunkte kostenlos; mehrere
+Bauarbeiter können dasselbe Ziel im selben Tick mehrfach bearbeiten. Die GDDs
+widersprechen sich außerdem bei 30 beziehungsweise 50 Prozent
+Reparaturkosten.
+
+**Alternativen:**
+
+1. Status quo beibehalten — verworfen, weil weder Territorium noch Feld- und
+   Gebäudeabstände wirken und Reparatur den AE-Druck vollständig umgeht.
+2. Abstände von Gebäudezentren messen und jeden Reparaturauftrag separat
+   abrechnen — verworfen, weil verschieden große Footprints unterschiedlich
+   behandelt, Rundungsfehler vervielfacht und mehrere Bauarbeiter dasselbe Ziel
+   überberechnen würden.
+3. Einen Reparaturkosten-Akkumulator im Zustand speichern — verworfen, weil
+   dafür ein neues Zustandsfeld und ein `StateVersion`-Bump nötig wären.
+4. **Gewählt:** footprintbasierte Chebyshev-Abstände, zustandslose kumulative
+   Reparaturkosten und höchstens ein wirksamer Reparaturauftrag je Ziel und
+   Tick.
+
+**Entscheidung:**
+
+1. Abstände werden als kleinster Chebyshev-Abstand zwischen den beteiligten
+   Footprints gemessen.
+2. Ein Neubau braucht ein eigenes, lebendes und fertiggestelltes HQ, Lager oder
+   Kraftwerk in höchstens acht Zellen Abstand.
+3. Feldüberlappung ist immer verboten. Raffinerien brauchen zu mindestens
+   einem registrierten Aetheriumfeld Abstand 1 bis 3; alle anderen Gebäude zu
+   jedem Feld mindestens Abstand 2. Erschöpfte Felder bleiben Kartenmerkmale.
+4. Zu aktiven Baustellen und lebenden fertiggestellten Gebäuden gilt mindestens
+   Abstand 2 — ein vollständig leerer Zellenring.
+5. Jede Footprintzelle muss über `CostField.IsWalkable` begehbar sein;
+   `Pathfinding/` bleibt unverändert.
+6. Sei `R = floor(CostAE × 30 / 100)` und
+   `S(h) = floor(R × clamp(h, 0, MaxHealth) / MaxHealth)`. Eine Reparatur von
+   `h0` auf `h1` kostet exakt `S(h1) − S(h0)`. So kostet die vollständige
+   Lebensleiste kumulativ 30 Prozent des Neupreises, ohne zusätzlichen Zustand
+   und ohne Rundungsdrift.
+7. Reicht das AE nicht, ändern sich weder AE noch Trefferpunkte. Pro Ziel und
+   Tick gewinnt der erste deterministisch geordnete, valide, beschädigte und
+   in Reichweite befindliche Reparaturauftrag; weitere Aufträge auf dasselbe
+   Ziel wirken nicht. Der Gewinner behält den Anspruch auch bei fehlendem AE,
+   andere Ziele werden weiterbearbeitet. Aktive Reparaturaufträge bilden dafür
+   eine dichte, reihenfolgestabile Folge: Entfernen kompaktiert, neue Aufträge
+   werden angehängt. Snapshot und Fortsetzung behalten dadurch dieselbe
+   Gewinnerreihenfolge ohne neues Zustandsfeld.
+8. Die deterministischen D-104-Regeln erhalten eine append-only
+   `RulesRevisionV3` im Match-Fingerprint. V1 und V2 bleiben als historische
+   Berechnungen erhalten; Builds vor und nach D-104 gelten absichtlich als
+   inkompatibel.
+9. Aktive Baustellen und fertige Platzierungen verwenden denselben dichten,
+   reihenfolgestabilen Entfernen-/Anhängen-Vertrag wie Reparaturaufträge. Das
+   persistierte Format speichert keine Tabellenlöcher; Live-Fortsetzung und
+   Snapshot-Restore dürfen deshalb niemals unterschiedliche Folgeplätze
+   vergeben.
+
+**Begründung:** Chebyshev entspricht dem quadratischen Grid und behandelt alle
+Footprintgrößen gleich. Die kumulative Kostenfunktion bewahrt den Gesamtpreis
+trotz ganzzahliger Tick-Abrechnung. Die Ein-Auftrag-Regel verhindert
+Mehrfachheilung und Mehrfachkosten ohne neues Zustandsformat. Die dichte
+Auftragsfolge macht diese Reihenfolge auch über Snapshot-Restore kanonisch;
+dieselbe Dichte hält die Platzierungsregister restore-transparent.
+
+**Konsequenzen:** Platzierung und Reparatur verändern deterministisches
+Simulationsverhalten und deshalb den `RulesHash64`, aber weder Befehls- noch
+Zustandsformat. Die Setup-Funktion `PlaceCompletedBuilding` bleibt ein
+ausdrücklicher Bypass. Geschützte Golden-Baselines bleiben aus diesem PR
+heraus. Q-047 bleibt als Balancingfrage offen: 30 Prozent sind der verbindlich
+implementierte MS-1-Startwert, noch kein gespielter Endwert.
+
+---
+
 ### D-105 | verbindlich | Sprint 16 (alleinige Projektleitung und Merge-Autorität)
 
 **Status:** unmittelbar wirksame Inhaberentscheidung vom 2026-08-10 (Dennis
@@ -3294,6 +3373,62 @@ Sekunde. Mehrere HQs geben weiterhin nur 2.000 AE Basis. Spiegeltests in .NET
 und Unity sichern Mehrfach-HQ, HQ-Baustelle, echte Lagerzerstörung,
 Konvergenz, `long.MaxValue` und die Ablehnung des alten Rules-Stubs ab.
 
+---
+
+### D-107 | verbindlich | Sprint 16 (Glutrinne-Layoutachse für Punkte und 3×3-Footprints)
+
+**Status:** Agentenentscheidung vom 2026-08-10 unter ausdrücklicher
+Inhaberdelegation; überstimmbar.
+
+**Kontext:** D-102 spiegelt die kanonischen Glutrinne-Feld- und Builderpunkte
+über die bestehende Layoutachse durch `(62,62)` mit
+`(x,y) → (124-x,124-y)`. Das ist die ausgelieferte D-102-Layoutachse, nicht die
+physische Mittelpunktspiegelung des vollständigen 128×128-Rasters. Der zweite
+HQ-Ursprung wurde bislang mit derselben
+Formel von `(4,4)` nach `(120,120)` gespiegelt. Für einen 3×3-Footprint ist das
+geometrisch falsch: die belegten Rechtecke `(4..6)` und `(120..122)` sind keine
+Spiegelbilder. D-104 machte den Unterschied messbar. Die Startfelder lagen in
+Footprint-Abstand 1 beziehungsweise 3, die Expansionen in Abstand 34
+beziehungsweise 36 und das Zentrum in Abstand 56 beziehungsweise 58; daraus
+entstanden 45 gegen 57 legale erste Raffinerie-Ursprünge. Builder und das
+deterministische Raffineriedrehbuch folgten bereits der korrekten Punkt- und
+Footprintspiegelung.
+
+**Alternativen:**
+
+1. Den zweiten HQ-Ursprung auf `(118,118)` verschieben und die etablierte
+   Punktachse sowie Felder, Builder und Raffineriedrehbuch unverändert lassen.
+2. Beide HQs beibehalten und stattdessen sämtliche Feld-, Builder-,
+   Raffinerie- und Assetkoordinaten auf eine andere Achse verschieben.
+3. Die asymmetrischen Startbedingungen als Kartenmerkmal tolerieren.
+
+**Entscheidung:** Alternative 1. Für die Punkte des kanonischen
+Glutrinne-Layouts gilt weiterhin `T(x,y) = (124-x,124-y)`. Für den unteren
+linken Ursprung eines
+3×3-Footprints folgt daraus `T3(x,y) = (122-x,122-y)`. Die HQ-Ursprünge sind
+damit `(4,4)` und `(118,118)`, ihre Mittelpunkte `(5,5)` und `(119,119)`.
+Felder, Builder und das Raffineriedrehbuch bleiben unverändert.
+
+**Begründung:** Diese Korrektur stellt die von D-102 verlangte Symmetrie der
+ausgelieferten Glutrinne-Startaufstellung mit dem kleinsten Eingriff her und
+bewahrt deren bestehende Layoutachse. Beide Seiten erhalten exakt dieselben
+Punkt-zu-Footprint-Abstände und je 45 legale gespiegelte Folge-Raffinerieplätze,
+ohne das Feldlayout oder die Ernteroute neu zu balancieren. Eine spätere
+Rezentrierung auf die physische Kartenmitte wäre eine eigene Karten- und
+Balanceentscheidung.
+
+**Konsequenzen:** Runtime, Headless-Szenario, Map-Asset, Generator und beide
+Canonical-Match-Testspiegel ziehen den zweiten HQ-Ursprung beziehungsweise
+Mittelpunkt atomar nach. Initialzustands-, Replay- und Ausgangshashes werden
+neu gemessen; alte Starts scheitern über den `InitialStateHash` vor Tick 1.
+Die gesetzten Start-HQs laufen über den dokumentierten
+`PlaceCompletedBuilding`-Bypass; D-107 gleicht die D-104-Abstände und legalen
+Folge-Raffinerieplätze aus, nicht die Platzierungslegalität der Start-HQs
+selbst.
+`RulesHash64` bleibt auf D-104-Revision V3, `DefinitionsHash64` sowie Zustands-
+und Befehlsschemata bleiben unverändert. D-102 bleibt für Feldanzahl,
+Koordinaten, Reserven, Reihenfolge und Ernterate vollständig verbindlich.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3374,6 +3509,8 @@ Konvergenz, `long.MaxValue` und die Ablehnung des alten Rules-Stubs ab.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.39.0 | 2026-08-10 | D-107 aufgenommen: Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge abgeleitet um 122; der zweite HQ-Ursprung wird von `(120,120)` auf `(118,118)` korrigiert | Agent (unter Delegation) / Dennis Westermann |
+| 1.38.0 | 2026-08-10 | D-104 aufgenommen: footprintbasierte Chebyshev-Platzierung mit Einfluss-, Feld-, Gelände- und Gebäudeabständen, zustandslose kumulative Reparaturkosten von 30 Prozent, kanonisch dichte Reparaturreihenfolge und Rules-Revision V3 | Project Owner / Agent (unter Delegation) |
 | 1.37.0 | 2026-08-10 | D-103 aufgenommen: Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske über unveränderte `UnitRole`-Wirewerte; Hash-, Fail-Closed-, Plattformmodul- und KI-Handoff-Folgen festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
 | 1.36.0 | 2026-08-10 | D-102 aufgenommen: fünf symmetrische endliche Aetheriumfelder werden geliefert, die mangels belastbarer Zielkurve unveränderte Ernterate von 2 AE/Tick wird ausdrücklich getrennt kalibriert | Project Owner / Agent |
 | 1.35.0 | 2026-08-10 | D-106 aufgenommen: einmalige 2.000-AE-HQ-Basis, +2.000 je fertigem Lager, sofort gedeckelte Einzahlungen, zustandsloser 25-%-Abbau des aktuellen Überhangs je Sekunde und kanonischer Rules-Hash; D-024/D-096 in Verlustausformung, HQ-Stapelung und Replay-Kompatibilität teilweise ersetzt; Fehlverweise der Lobbyfamilie D-095–D-097 auf D-092–D-094 berichtigt | Agent (unter Delegation) / Dennis Westermann |

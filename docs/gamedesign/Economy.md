@@ -1,6 +1,6 @@
 # Wirtschaftssystem (Economy)
 
-**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Spezifiziert den Wirtschafts-Kreislauf von Project Nova: Sammler-Loop, Lagerkapa
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Hybridwirtschaft, Matchdauer), D-011 (Evolvierte-Wachstum/Regeneration), D-014 (Drohnen), D-015 (Elite-Einheiten), D-016 (Objective-Belohnungen), D-024 (Lager & Raffinerie), D-027 (Regenerations-Bonus), D-030 (Low-Power & Forschung), D-077 (MS-1-Startzustand), D-096/D-106 (abgeleitete AE-Grenze und Überhang)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Hybridwirtschaft, Matchdauer), D-011 (Evolvierte-Wachstum/Regeneration), D-014 (Drohnen), D-015 (Elite-Einheiten), D-016 (Objective-Belohnungen), D-024 (Lager & Raffinerie), D-027 (Regenerations-Bonus), D-030 (Low-Power & Forschung), D-077 (MS-1-Startzustand), D-096/D-106 (abgeleitete AE-Grenze und Überhang), D-104 (kumulative MS-1-Reparaturkosten)
 - [./Resources.md](./Resources.md) – Feldregeln, Nachwuchsraten, Überernte
 - [./Factions.md](./Factions.md) – Fraktionsprofile (Allianz teuer/präzise, Legion günstig/Masse, Evolvierte organisch)
 - [./Buildings.md](./Buildings.md) – **führend für Gebäudekosten, Energiewerte und Bauzeiten** (Review F-03, Grundsatzregel D-047); Bauvoraussetzungen, Evolvierte-Reifung, HQ-Grundenergie
@@ -108,8 +108,8 @@ nach ~4–6 min, Tier 3 nach ~12–15 min erreichbar – passend zur Ziel-Matchd
 
 | Regel | Wert v0.1 |
 |---|---|
-| Reparatur (Allianz/Legion, Gebäude) | Kosten 50 % der Baukosten für 0→100 % HP, anteilig; Rate ~3 % HP/s; nur bei positivem Energiesaldo in voller Rate, bei Low-Power halbiert |
-| Reparatur (Fahrzeuge) | Über Repair-Drohne (D-014) oder Werft-Funktion der Fahrzeugfabrik, gleiche 50-%-Regel |
+| Reparatur (Allianz/Legion, Gebäude) | **MS-1: kumulativ 30 %** der Baukosten für 0→100 % HP (D-104), anteilig über `S(h)`, ohne Rundungsdrift; Rate 10 HP/Tick, bei Low Power 5 HP/Tick |
+| Reparatur (Fahrzeuge) | Über Repair-Drohne (D-014) oder Werft-Funktion der Fahrzeugfabrik; bis zur Umsetzung gilt derselbe 30-%-Startwert aus D-104 |
 | Evolvierte | Keine aktive Reparatur: Regeneration ~1 % HP/s kostenlos, doppelt so schnell auf/nahe **lebender** Aetherium-Felder (D-011; Einschränkung auf lebende Felder gemäß D-027); kein AE-Abzug – Ausgleich über langsamere Rate |
 | Verkauf | 50 % der investierten AE zurück (Basiswert, keine Reparatur-Rückerstattung); 5 s Abwickel-Phase, Gebäude in dieser Zeit verwundbar und funktionslos; Evolvierte "Rückbau" übernimmt dieselbe 50-%-Regel (Resorption) |
 
@@ -165,3 +165,4 @@ Leitplanke: Gesamt-AE-Fluss pro Spieler über ein typisches 25-min-Match ≈ 25.
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Gebäudekosten/-energie durch Verweise auf Buildings.md ersetzt (Review F-03, D-047-Grundsatzregel); Economy.md behält nur Systemlogik (Raten, Low-Power, Lager) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-21 | F-03 vollständig geschlossen: Harvester-Kosten in der Fraktions-Wirtschaftsmodifier-Tabelle durch Verweis auf die führende Quelle [Vehicles.md](./Vehicles.md) ersetzt (D-047) – keine dritte Zahl mehr neben Vehicles.md (700/550/620 AE) | Lead Gameplay Designer |
 | 0.5.0 | 2026-08-10 | MS-1-Start auf 3.000 AE (D-077) nachgezogen und D-106 präzisiert: eine HQ-Basis je Konto, +2.000 je fertigem Lager, harte Einzahlungskappung sowie zustandsloser 25-%-Abbau des aktuellen Überhangs pro Sekunde | Codex / Dennis Westermann |
+| 0.6.0 | 2026-08-10 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |

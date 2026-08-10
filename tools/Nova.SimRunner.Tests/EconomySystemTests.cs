@@ -504,9 +504,9 @@ namespace Nova.SimRunner.Tests
             kernel.RegisterSystem(economy);
             kernel.Start();
             Assert.That(construction.PlaceCompletedBuilding(
-                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 12, 20).IsValid, Is.True);
             Assert.That(construction.PlaceCompletedBuilding(
-                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Refinery), 36, 40).IsValid, Is.True,
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Refinery), 16, 20).IsValid, Is.True,
                 "the completed Refinery satisfies the Storage prerequisite");
             kernel.StepTick(); // commit the grid (30 provided) for the placement power rule
 
@@ -547,6 +547,9 @@ namespace Nova.SimRunner.Tests
             var economy = new EconomySystem(entities, startingCredits: 3000);
             var construction = new ConstructionSystem(entities, economy);
 
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Power), 12, 20).IsValid, Is.True,
+                "a completed Power plant supplies D-104 influence without adding account capacity");
             Assert.That(construction.TryPlaceBuilding(
                 0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 20, 20), Is.True);
             Assert.That(economy.CapacityFor(0), Is.EqualTo(0L),

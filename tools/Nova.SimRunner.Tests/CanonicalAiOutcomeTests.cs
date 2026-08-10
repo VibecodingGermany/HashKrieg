@@ -43,17 +43,18 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class CanonicalAiOutcomeTests
     {
-        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 16.8 / D-103 (r7 prerequisite handoff). Previous value: 2546 (Sprint 16.4).</summary>
-        private const uint PinnedDecidedTick = 2705u;
+        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 16.9 / D-104 and D-107 placement geometry. Previous value: 2705 (Sprint 16.8).</summary>
+        private const uint PinnedDecidedTick = 2726u;
 
         /// <summary>
         /// End-state hash of the canonical AI match, last moved by: Sprint 16
-        /// package 16.8 / D-103. The all-of prerequisite contract and the r7
-        /// handoff add the required Power plant before the Barracks.
+        /// package 16.9 / D-104 and D-107. The footprint placement rules and
+        /// corrected mirrored HQ geometry move the simulated match without
+        /// changing the AI implementation.
         /// AiBehaviorId is r7.E34435F9.
-        /// Previous value: 0xE784E6184AD16081 (Sprint 16.4).
+        /// Previous value: 0x28F2CC571BCE6B76 (Sprint 16.8).
         /// </summary>
-        private const string PinnedEndState = "0x28F2CC571BCE6B76";
+        private const string PinnedEndState = "0x10B83E94F86F2E55";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()

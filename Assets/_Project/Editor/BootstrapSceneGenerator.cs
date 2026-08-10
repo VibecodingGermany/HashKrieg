@@ -290,8 +290,8 @@ namespace Nova.Editor
                 MapBiomeType.Desert,
                 128,
                 128,
-                // HQ footprint centres of the canonical opening (4,4)+(3x3) and its 180° mirror.
-                new[] { new Vector2(5f, 5f), new Vector2(121f, 121f) },
+                // D-107 HQ footprint centres: point mirror p -> 124-p.
+                new[] { new Vector2(5f, 5f), new Vector2(119f, 119f) },
                 // The five fields MatchBootstrap registers, in canonical id order.
                 new[]
                 {

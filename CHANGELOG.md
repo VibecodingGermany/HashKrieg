@@ -216,6 +216,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **16.9/C6: Bauplätze und Reparaturen kosten Raum und Aetherium (D-104).**
+  Alle MS-1-Gebäude verwenden den einheitlichen 3×3-Footprint; Neubauten folgen
+  footprintbasierten Einfluss-, Feld-, Gelände- und Gebäudeabständen.
+  Reparaturen kosten kumulativ 30 % des Neupreises. Je Ziel und Tick wirkt nur
+  der erste valide und erreichbare Reparaturauftrag, und bei fehlendem AE
+  bleiben Guthaben und Trefferpunkte vollständig unverändert. Sites, fertige
+  Platzierungen und Reparaturaufträge werden nach Entfernen stabil kompaktiert,
+  sodass Append-Reihenfolge und Gewinner auch über Snapshot-Restore identisch
+  bleiben. Ein Restore entfernt zusätzlich alte dynamische CostField-Footprints
+  des Zielhosts, bevor er exakt die Snapshot-Belegung neu aufbaut. `RulesHash64`
+  steigt append-only auf Revision 3; V1/V2 bleiben
+  eingefroren und alte Replays oder Peers werden vor Tick 1 abgelehnt. D-107
+  korrigiert dazu den zweiten HQ-Ursprung von `(120,120)` auf `(118,118)` an
+  der bestehenden Glutrinne-Layoutachse: beide Seiten erhalten 45/45 legale
+  gespiegelte Folge-Raffinerieplätze. Der integrierte kanonische KI-Ausgang
+  bewegt sich dadurch bei unveränderter Kennung `r7.E34435F9` von Tick 2.705 /
+  `0x28F2CC571BCE6B76` auf Tick 2.726 / `0x10B83E94F86F2E55`.
 - **16.8/D-103: Bauvoraussetzungen sind jetzt echte All-of-Ketten.** Eine
   separate `UnitRoleMask` ersetzt das singuläre `PrerequisiteRole`, beide
   Fraktionen verwenden dieselbe neun Rollen umfassende Kette, und Executor wie

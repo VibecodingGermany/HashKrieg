@@ -244,7 +244,8 @@ namespace Nova.SimRunner.Tests
             // register is excluded from the HQ scan, exactly like the generic
             // role was before.
             TestHost host = NewHost(startingCredits: 6000);
-            host.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 10, 10).IsValid, Is.True,
+                "the real HQ must be a tracked completed placement for D-104 influence");
             host.SpawnUnit(0, 16, 10, UnitRole.Builder);
             host.SpawnUnit(1, 50, 50, UnitRole.HQ);
             host.SpawnUnit(1, 52, 50);
@@ -253,7 +254,7 @@ namespace Nova.SimRunner.Tests
             // Slot 0 starts a second HQ as a SITE — definition role HQ since
             // 16.3, 1 HP, never completed in this test (the builder stands
             // out of reach, so the site pauses).
-            Assert.That(host.Construction.TryPlaceBuilding(0, 3, 30, 30), Is.True, "HQ def 3 (Alliance)");
+            Assert.That(host.Construction.TryPlaceBuilding(0, 3, 18, 10), Is.True, "HQ def 3 (Alliance)");
             Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
 
             // The real HQ falls: the D-077 elimination must fire despite the
@@ -404,8 +405,9 @@ namespace Nova.SimRunner.Tests
             // Slot 0 gets a real DefensePlatform site: power provider + builder
             // + credits are the placement prerequisites. It deliberately has
             // no HQ, so D-077's separate last-HQ defeat trigger cannot mask
-            // the D-056 site-counting behavior under test.
-            EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 40, 40);
+            // the D-056 site-counting behavior under test. The provider stays
+            // within D-104 construction influence of the site.
+            EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 26, 20);
             Assert.That(power.IsValid, Is.True, "power provider");
             EntityId builder = host.SpawnUnit(0, 19, 20, UnitRole.Builder);
             host.Step(1);

@@ -116,10 +116,13 @@ namespace Nova.SimRunner.Tests
             FactionId faction = host.Economy.GetSlotFaction(team);
             ushort powerDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.Power);
             ushort platformDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.DefensePlatform);
-            Assert.That(host.Construction.PlaceCompletedBuilding(team, powerDefId, 50, 50).IsValid, Is.True,
+            EntityId power = host.Construction.PlaceCompletedBuilding(team, powerDefId, originX + 6, originY);
+            Assert.That(power.IsValid, Is.True,
                 "a completed Power plant unlocks the DefensePlatform site");
             host.Economy.ExecuteTick(Tick.Zero);
             Assert.That(host.Construction.TryPlaceBuilding(team, platformDefId, originX, originY), Is.True);
+            Assert.That(host.Entities.DespawnUnit(power), Is.True,
+                "remove the fixture anchor so combat can observe only the active site");
 
             UnitState[] units = host.Entities.RawUnits;
             for (int i = 0; i < host.Entities.Capacity; i++)

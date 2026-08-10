@@ -88,6 +88,8 @@ namespace Nova.SimRunner.Tests
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
         private const ushort DefHQAlliance = 3;
         private const ushort DefHQLegion = 20;
+        private const ushort DefRefineryAlliance = 4;
+        private const ushort DefRefineryLegion = 21;
 
         private sealed class ReferenceHost
         {
@@ -168,7 +170,7 @@ namespace Nova.SimRunner.Tests
 
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
-            HqOriginX = 120, HqOriginY = 120,
+            HqOriginX = 118, HqOriginY = 118,
             BuilderX = 111, BuilderY = 117,
         };
 
@@ -306,6 +308,55 @@ namespace Nova.SimRunner.Tests
                 Assert.That(actual.GridPos.Y, Is.EqualTo(expected.Y));
                 Assert.That(actual.RemainingAE, Is.EqualTo(expected.ReserveAE));
             }
+        }
+
+        [Test]
+        public void CanonicalOpeningGeometry_UsesD107PointAndFootprintMirrors()
+        {
+            Assert.That(Slot0Layout.HqOriginX + Slot1Layout.HqOriginX, Is.EqualTo(122),
+                "3x3 footprint origins mirror as o -> 122-o");
+            Assert.That(Slot0Layout.HqOriginY + Slot1Layout.HqOriginY, Is.EqualTo(122));
+            Assert.That(Slot0Layout.BuilderX + Slot1Layout.BuilderX, Is.EqualTo(124),
+                "point coordinates mirror as p -> 124-p");
+            Assert.That(Slot0Layout.BuilderY + Slot1Layout.BuilderY, Is.EqualTo(124));
+            Assert.That(FieldLayouts[0].X + FieldLayouts[1].X, Is.EqualTo(124));
+            Assert.That(FieldLayouts[0].Y + FieldLayouts[1].Y, Is.EqualTo(124));
+            Assert.That(FieldLayouts[2].X + FieldLayouts[3].X, Is.EqualTo(124));
+            Assert.That(FieldLayouts[2].Y + FieldLayouts[3].Y, Is.EqualTo(124));
+            Assert.That(FieldLayouts[4].X, Is.EqualTo(62));
+            Assert.That(FieldLayouts[4].Y, Is.EqualTo(62));
+        }
+
+        [Test]
+        public void CanonicalOpeningGeometry_OffersEqualMirroredRefineryPlacements()
+        {
+            ReferenceHost host = BuildReferenceHost(CanonicalSeed);
+            ApplyOpeningPosition(host);
+            host.Kernel.StepTick(); // commit the two completed HQ power balances
+            int mismatches = 0;
+            int allianceApplied = 0;
+            int legionApplied = 0;
+
+            for (int y = 0; y <= 122; y++)
+            {
+                for (int x = 0; x <= 122; x++)
+                {
+                    CommandResultCode alliance = host.Construction.ValidatePlacement(
+                        0, DefRefineryAlliance, x, y);
+                    CommandResultCode legion = host.Construction.ValidatePlacement(
+                        1, DefRefineryLegion, 122 - x, 122 - y);
+                    if (alliance != legion) mismatches++;
+                    if (alliance == CommandResultCode.Applied) allianceApplied++;
+                    if (legion == CommandResultCode.Applied) legionApplied++;
+                }
+            }
+
+            Assert.That(mismatches, Is.EqualTo(0),
+                "D-107 requires every legal or rejected refinery origin to mirror exactly");
+            Assert.That(allianceApplied, Is.EqualTo(45),
+                "the corrected Alliance opening has 45 legal follow-up refinery origins");
+            Assert.That(legionApplied, Is.EqualTo(45),
+                "the corrected Legion opening has the same 45 legal mirrored origins");
         }
 
         [Test]

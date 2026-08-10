@@ -176,8 +176,10 @@ namespace Nova.SimRunner.Tests
         public void ReturnCargo_HoldsAtRefinerySite_ThenDepositsAtCompletedRefinery()
         {
             var host = EcoHost.Create(Seed);
-            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True,
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 2, 10).IsValid, Is.True,
                 "the completed HQ supplies the placement power budget");
+            Assert.That(host.Economy.TryAddField(63, new GridPos2D(10, 14), 9000), Is.True,
+                "a Refinery needs a registered field at footprint distance 1 through 3");
             host.StepTick();
             Assert.That(host.Construction.TryPlaceBuilding(0, 4, 10, 10), Is.True,
                 "the nearby definition-role Refinery is still only a site");

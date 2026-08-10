@@ -341,6 +341,24 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
+        /// Read-only lookup by deterministic registration index. Unlike
+        /// <see cref="TryFindNearestField"/>, exhausted fields are included:
+        /// construction placement treats their cells as permanent map
+        /// features. Returns false for every index outside the registered
+        /// range and never exposes the mutable backing array.
+        /// </summary>
+        internal bool TryGetFieldAtIndex(int index, out AetheriumField field)
+        {
+            if (index >= 0 && index < _fieldCount)
+            {
+                field = _fields[index];
+                return true;
+            }
+            field = default;
+            return false;
+        }
+
+        /// <summary>
         /// Nearest field with reserve left to a grid cell, false when every
         /// registered field is exhausted (or none is registered). Ascending
         /// registration-index scan, deterministic: Chebyshev distance decides

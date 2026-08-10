@@ -51,7 +51,7 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// End-to-end tick budget: this suite's deterministic match decides
-        /// at tick 2705, so 6.000 ticks is a ~2.2x margin — comfortably sane,
+        /// at tick 2726, so 6.000 ticks is a ~2.2x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
         internal const int EndToEndBudgetTicks = 6000;
@@ -231,10 +231,10 @@ namespace Nova.SimRunner.Tests
             for (byte slot = 0; slot < 2; slot++)
             {
                 ushort fieldId = (ushort)(slot + 1);
-                int fieldCell = slot == HumanSlot ? 7 : 119;
-                int hqOrigin = slot == HumanSlot ? 4 : 120;
-                int builderX = slot == HumanSlot ? 13 : 113;
-                int builderY = slot == HumanSlot ? 7 : 119;
+                int fieldCell = slot == HumanSlot ? 7 : 117;
+                int hqOrigin = slot == HumanSlot ? 4 : 118;
+                int builderX = slot == HumanSlot ? 13 : 111;
+                int builderY = slot == HumanSlot ? 7 : 117;
 
                 Assert.That(host.Economy.TryAddField(fieldId, new GridPos2D(fieldCell, fieldCell), FieldReserveAE),
                     Is.True, $"field {fieldId} could not be registered");
@@ -415,7 +415,7 @@ namespace Nova.SimRunner.Tests
             Assert.That(CountUnits(host, AiSlot, UnitRole.BasicInfantry), Is.GreaterThanOrEqualTo(6),
                 "the Barracks keeps infantry queued — the attack threshold of the profile must be reachable");
             Assert.That(MinCombatCellX(host, AiSlot), Is.LessThan(64),
-                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 113-122)");
+                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 111-120)");
         }
 
         // ----------------------------------------------------------------
@@ -1222,6 +1222,24 @@ namespace Nova.SimRunner.Tests
         {
             FactionId faction = host.Economy.GetSlotFaction(HumanSlot);
             ushort definitionId = SimDefinitions.ToDefinitionId(faction, role);
+            ushort powerDefinitionId = SimDefinitions.ToDefinitionId(faction, UnitRole.Power);
+
+            // D-104 requires a nearby tracked completed HQ/Storage/Power
+            // footprint. Keep this focused fixture independent of the live
+            // base by adding a temporary Power anchor outside the site ring,
+            // then despawn it as soon as the site exists.
+            int maxOrigin = ConstructionSystem.GridSize - SimDefinitions.BuildingFootprintCells;
+            int[,] anchorOffsets = { { 8, 0 }, { -10, 0 }, { 0, 8 }, { 0, -10 } };
+            EntityId influenceAnchor = EntityId.Invalid;
+            for (int i = 0; i < anchorOffsets.GetLength(0); i++)
+            {
+                int anchorX = System.Math.Max(0, System.Math.Min(maxOrigin, centreX + anchorOffsets[i, 0]));
+                int anchorY = System.Math.Max(0, System.Math.Min(maxOrigin, centreY + anchorOffsets[i, 1]));
+                influenceAnchor = host.Construction.PlaceCompletedBuilding(
+                    HumanSlot, powerDefinitionId, anchorX, anchorY);
+                if (influenceAnchor.IsValid) break;
+            }
+            Assert.That(influenceAnchor.IsValid, Is.True, "a temporary D-104 influence anchor must fit near the site search");
 
             for (int radius = 0; radius <= 6; radius++)
             {
@@ -1243,6 +1261,7 @@ namespace Nova.SimRunner.Tests
                             if (unit.IsActive && unit.PlayerId == HumanSlot && unit.Role == role
                                 && host.Construction.IsActiveSite(unit.Id))
                             {
+                                Assert.That(host.Entities.DespawnUnit(influenceAnchor), Is.True);
                                 return unit.Id;
                             }
                         }
@@ -1250,6 +1269,7 @@ namespace Nova.SimRunner.Tests
                 }
             }
 
+            host.Entities.DespawnUnit(influenceAnchor);
             Assert.Fail($"no legal {role} site near ({centreX},{centreY})");
             return EntityId.Invalid;
         }

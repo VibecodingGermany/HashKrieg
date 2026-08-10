@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.7.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.8.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Spielbare Spezifikation aller 12 Gebäudetypen (D-008) für die drei Fraktionen 
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung), D-077 (MS-1-Startzustand), D-096 (abgeleitete AE-Grenze), D-103 (MS-1-Bauvoraussetzungen), D-106 (zustandsloser Überhang)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Typen), D-010 (Aetherium-Wirtschaft), D-011 (Evolvierte-Wachstum), D-012 (Zerstörbarkeit), D-022 (Capture-System), D-023 (Superwaffen-Limit), D-024 (Lager & Raffinerie), D-030 (Low-Power/Forschung), D-077 (MS-1-Startzustand), D-096 (abgeleitete AE-Grenze), D-103 (MS-1-Bauvoraussetzungen), D-104 (MS-1-Platzierung und Reparatur), D-106 (zustandsloser Überhang)
 - [./Factions.md](./Factions.md) – Fraktionsidentitäten
 - [./Economy.md](./Economy.md) – AE-Währung, Energie, Low-Power-Regel, Harvester-Werte, Lager-Kapazität (D-024)
 - [./ResearchTree.md](./ResearchTree.md) – Tech-Tiers 1–3
@@ -45,6 +45,21 @@ fertiggestelltes Gebäude vorhanden sein; Baustellen genügen nicht.
 | Radar | Kraftwerk **und** Kaserne |
 | Verteidigungsplattform (Basis) | Kraftwerk |
 
+Alle neun MS-1-Gebäude besitzen einen einheitlichen **3×3-Footprint**. D-104
+misst Gelände, Baueinfluss sowie Gebäude- und Feldabstände am vollständigen
+Footprint in der Chebyshev-Metrik: jede Zelle muss begehbar sein; ein eigenes,
+lebendes und fertiges HQ, Lager oder Kraftwerk muss höchstens acht Zellen
+entfernt sein; zu Baustellen und lebenden fertigen Gebäuden gilt mindestens
+Abstand 2. Feldüberlappung ist verboten. Raffinerien brauchen zu mindestens
+einem registrierten Feld Abstand 1 bis 3, alle anderen Gebäude zu jedem Feld
+mindestens Abstand 2; auch erschöpfte Felder bleiben Kartenmerkmale.
+
+Allianz und Legion reparieren mit **10 TP/Tick**, bei Low Power mit
+**5 TP/Tick**. Die vollständige Lebensleiste kostet kumulativ genau 30 % des
+Neupreises; die ganzzahlige Abrechnung erfolgt zustandslos aus dem
+Gesundheitsstand. Reicht AE für einen Tick nicht, bleiben AE und TP unverändert.
+Je Ziel wirkt pro Tick nur der erste valide, erreichbare Auftrag.
+
 Ein fertiggestelltes Forschungslabor schaltet T2 unmittelbar frei; Forschung,
 Forschungsqueue und T3 sind deaktiviert. Die Voraussetzung der
 Verteidigungsplattform meint nur das Basisgebäude. Die Modulfreischaltungen aus
@@ -56,7 +71,7 @@ Bei Widerspruch übersteuert dieser Abschnitt den nachfolgenden Vollspielentwurf
 
 - **Führende Quelle für Gebäudewerte (Review F-03, Grundsatzregel D-047):** Dieses Dokument ist die alleinige Quelle für Gebäudekosten, Energiewerte (Erzeugung/Verbrauch) und Bauzeiten. [./Economy.md](./Economy.md) verweist hierher und enthält nur Systemlogik (Einkommensraten, Low-Power-Regel, Lager-Kapazität); doppelte Zahlenpflege ist unzulässig.
 - **12 Typen pro Fraktion, identische Rollen, eigene Namen und Werte-Deltas** (D-008, D-011). Die Rolle ist fraktionsübergreifend balancierbar; Kosten/TP/Bauzeit tragen die Fraktionsidentität (Allianz teuer/präzise, Legion günstig/massig, Evolvierte regenerativ/wachsend).
-- **Energiebilanz:** Kraftwerke produzieren, fast alles andere verbraucht. Defizit löst die Low-Power-Regel aus: Produktions-, Bau- und Forschungsgeschwindigkeit −50 % (D-030), Radar und Verteidigungsplattformen offline, Superwaffen-Ladung pausiert (D-030) (Zahlengerüst).
+- **Energiebilanz:** Kraftwerke produzieren, fast alles andere verbraucht. Im ausgelieferten MS-1 halbiert ein Defizit Produktion, Bau und Reparatur; Radar und Minimap fallen aus. Forschung, Superwaffen-Ladung und stromabhängige Verteidigungsplattformen bleiben Ziele des nachfolgenden Vollspielentwurfs und sind im aktuellen Combat-Pfad nicht als Low-Power-Effekt implementiert.
 - **Lagerkapazität (D-024/D-096/D-106):** Genau eine HQ-Basiskapazität von 2.000 AE je Konto, sobald mindestens ein fertiges HQ lebt; +2.000 AE je fertigem Lager. Neue Einzahlungen werden hart gedeckelt. Vorhandener Überhang verliert unabhängig von seiner Ursache einmal pro Sekunde 25 % des aktuellen Überhangs (Abrundung, mindestens 1 AE) bis zur Grenze.
 - **Eroberung (D-022):** Feindliche Gebäude sind eroberbar – eine Capture-Einheit kanalisiert 5 s am Ziel (Abbruch bei Schaden) und wird bei Erfolg verbraucht. Capture-Einheiten: Engineer (Allianz), Saboteur (Legion), Tunnelgräber (Evolvierte). Regelwerk und Details in [./Infantry.md](./Infantry.md) und [./NeutralUnits.md](./NeutralUnits.md); gilt ebenso für neutrale Geschütztürme (D-016).
 - **Trefferpunkt-Klassen:** Leicht (400–800 TP), Mittel (900–1.500 TP), Schwer (1.600–2.500 TP). Klasse statt Pseudo-Präzision; exakte Werte entstehen im Balancing-Pass.
@@ -177,7 +192,7 @@ Voraussetzungsschlüssel: HQ = Hauptquartier, KW = Kraftwerk, Raff = Raffinerie,
 | Legion | Geschützstellung | 300 AE | 10 s | −8 | Mittel |
 | Evolvierte | Rankenturm | 350 AE | 11 s (Reifung) | −8 | Mittel |
 
-- Rolle: stationäre Verteidigung; Basis ist ein unbewaffnetes Podest, Bewaffnung über Module (§3). Offline bei Low Power.
+- Rolle: stationäre Verteidigung; Basis ist ein unbewaffnetes Podest, Bewaffnung über Module (§3). „Offline bei Low Power“ bleibt Vollspielziel; der aktuelle MS-1-Combat-Pfad schaltet die Plattform bei Strommangel noch nicht ab.
 - **Aggressions-Modi (D-031.6):** Die Plattform nutzt dieselben drei Aggressions-Modi wie Einheiten – **Halten / Abwehren (Standard) / Freies Feuer** –, umschaltbar über die Befehlskachel der Auswahl; Logik identisch zu [../vision/CoreGameplay.md](../vision/CoreGameplay.md) (Abschnitt Aggressions-Modi). Der Modus gilt unverändert für alle Modul-Stufen (MG/Flak/Rakete).
 - Voraussetzung: Kaserne (MG-Modul), Radar (Flak-Modul), FL (Raketen-Modul).
 
@@ -231,18 +246,36 @@ Module werden auf dem fertigen Podest installiert (nicht als separates Gebäude)
 
 ## 6. Detail: Platzierungsregeln
 
-- **Baugrid:** einheitliches quadratisches Grid (Deckung mit Pathfinding-/FoW-Grid, siehe Maps.md); Gebäudefootprints von 2×2 (Lager, Radar, Plattform) bis 4×4 (HQ, Fabriken, Superwaffe); Rotieren in 90°-Schritten.
-- **Einflussradius:** Neubauten nur innerhalb des Radius (8 Zellen) eines eigenen HQ, Lagers oder Kraftwerks; Evolvierte zusätzlich innerhalb des Herzkristall-/Wachstumsknoten-Radius.
-- **Abstand zu Aetherium-Feldern:** nur Raffinerien (und Evolvierte-Bauten zwecks Wachstumsbonus, §7) dürfen direkt angrenzen (max. 3 Zellen); alle anderen Gebäude mindestens 2 Zellen Abstand – verhindert Feld-Blockade und hält Harvester-Routen frei (D-010).
-- **Kollision:** kein Bau auf Feldern, Steilhängen, Wasser (D-013), Brücken, neutralen Strukturen oder im Mindestabstand von 1 Zelle zu anderen Gebäuden (Ausnahme Mauern).
-- Platzierungs-Vorschau zeigt valide (grün) / invalide (rot) Zellen inkl. Begründungs-Tooltip.
+- **MS-1 (D-104):** einheitliches quadratisches Grid und einheitlicher
+  3×3-Footprint; keine Rotation. Jede Footprintzelle muss im gemeinsamen
+  Pathfinding-Kostenfeld begehbar und unbelegt sein.
+- **Einflussradius:** footprintbasierter Chebyshev-Abstand höchstens 8 zu einem
+  eigenen, lebenden, fertigen HQ, Lager oder Kraftwerk.
+- **Aetheriumfelder:** keine Footprintüberlappung. Raffinerien brauchen Abstand
+  1 bis 3 zu mindestens einem registrierten Feld; alle anderen Gebäude Abstand
+  mindestens 2 zu jedem Feld. Erschöpfte Felder zählen weiterhin.
+- **Gebäudering:** Abstand mindestens 2 zu jeder aktiven Baustelle und jedem
+  lebenden fertigen Gebäude; damit bleibt ein voller Zellenring leer.
+- Die Platzierungsvorschau zeigt valide (grün) und invalide (rot) Zellen. Der
+  exakte Sperrgrund am Bauknopf gehört zu Paket 16.10.
+- **Vollspielziel:** variable 2×2- bis 4×4-Footprints, Rotation, Evolvierte-
+  Einfluss und weitere Terrain-/Neutralregeln werden erst außerhalb von MS-1
+  entschieden und implementiert.
 
 ## 7. Detail: Verkauf, Reparatur, Evolvierte-Wachstum (D-011)
 
 **Allianz & Legion**
 
 - Verkauf: 50 % Rückerstattung, 3 s Abbau, jederzeit außer unter Beschuss.
-- Reparatur: Baufahrzeug oder Repair-Drohne (D-014); Kosten 30 % des Neupreises für volle Reparatur, Reparaturrate ~2 % TP/s.
+- **MS-1-Reparatur (D-104):** Builder reparieren 10 TP/Tick, bei Low Power
+  5 TP/Tick. Für `R = floor(Kosten × 30 / 100)` und
+  `S(h) = floor(R × clamp(h, 0, MaxTP) / MaxTP)` kostet ein Tick
+  `S(h1) − S(h0)`. Die vollständige Leiste kostet dadurch kumulativ exakt
+  30 % ohne Rundungsdrift oder zusätzliches Zustandsfeld. Fehlendes AE lehnt
+  Abbuchung und Heilung atomar ab; pro Ziel wirkt nur der erste valide,
+  erreichbare Auftrag in stabiler Reihenfolge.
+- Repair-Drohnen und die Vollspiel-Zielrate von ungefähr 2 % TP/s sind nicht
+  Teil des ausgelieferten MS-1.
 
 **Evolvierte (Wachstum statt Konstruktion)**
 
@@ -265,14 +298,17 @@ Module werden auf dem fertigen Podest installiert (nicht als separates Gebäude)
 - **Tor-Modul (Post-MVP):** Mauern und Tore sind nicht Teil von MS-1. Ein
   späterer Scope entscheidet Durchlass- und Torregel gemeinsam neu.
 - **Flak-DPS-Korridor: entschieden (D-047, Korrekturlauf Sprint 4).** [Weapons.md](./Weapons.md) ist die einzige Werte-Quelle für das Flak-Modul (Reichweite 11–12 Felder ≙ m, Schaden 25–40 pro Schuss / 1,5 s Abklingzeit, ×2,0-Multiplikator gegen Luft ≈ 33–53 DPS effektiv); [Aircraft.md](./Aircraft.md) wurde im selben Korrekturlauf auf diesen Korridor angeglichen (der frühere Wert 90 DPS ist überholt und entfällt). Punkt geschlossen.
-- **Footprints (Status: Abgleich mit Maps.md läuft):** Exakte Footprints (2×2 bis 4×4) sind Annahmen; Finalisierung mit Maps.md.
+- **Vollspiel-Footprints:** Die variable Staffelung 2×2 bis 4×4 bleibt offen;
+  MS-1 ist durch D-104 verbindlich und vollständig auf 3×3 festgelegt.
 
 Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führend in diesem Dokument, D-032 – war bereits als geschlossen markiert).
 
 ## Nächste Schritte
 
 - Abgleich der AE-/Energie-Werte mit Economy.md (Harvester-Raten, Low-Power-Definition, HQ-Grundenergie +30, Lagerwerte D-024) und der Tier-Freischaltungen mit ResearchTree.md.
-- Footprint- und Grid-Finalisierung mit Maps.md; KI-Bauplatzierungs-Regeln als Input für AIArchitecture.
+- Variable Vollspiel-Footprints mit Maps.md finalisieren; die MS-1-Regeln sind
+  durch D-104 festgelegt. KI-Bauplatzierungs-Regeln bleiben Input für
+  AIArchitecture.
 - Balancing-Pass v0.2 nach erstem spielbaren Skirmish-Prototyp (Sprint 3+).
 
 ## Änderungsverlauf
@@ -288,3 +324,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.5.0 | 2026-07-24 | Neun Gebäuderollen, Start-Ausnahme, T2-Freischaltung und MG-/Raketenmodule für MS-1 gemäß D-056 abgegrenzt | Lead Gameplay Designer |
 | 0.6.0 | 2026-08-10 | MS-1-Startwert (D-077) und Lagervertrag (D-106) nachgezogen: eine 2.000-AE-HQ-Basis je Konto, +2.000 je fertigem Lager und periodischer 25-%-Abbau des aktuellen Überhangs statt separatem Zerstörungsabzug | Codex / Dennis Westermann |
 | 0.7.0 | 2026-08-10 | Die neun fraktionsgleichen All-of-Platzierungsvoraussetzungen samt Trennung von Plattformbasis und Modulen gemäß D-103 festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
+| 0.8.0 | 2026-08-10 | D-104-MS-1-Override ergänzt: einheitliche 3×3-Footprints, footprintbasierte Einfluss-, Gelände-, Gebäude- und Feldabstände sowie kumulative 30-%-Reparaturkosten mit 10/5 TP pro Tick; nicht implementierte Vollspielziele klar abgegrenzt | Agent (unter Delegation) / Dennis Westermann |
