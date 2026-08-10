@@ -9,16 +9,13 @@ namespace Nova.Presentation.Maps
     /// what is rendered is exactly what the simulation registered: the
     /// procedural desert ground of the Glutrinne biome, scattered rock
     /// debris, a weathered edge band instead of a hard frame, and an
-    /// aetherium crystal cluster on each of the two fields the canonical
-    /// match actually registers.
+    /// aetherium crystal cluster on each of the five fields the canonical
+    /// match registers.
     /// <para>
     /// Pure presentation: this component reads the bootstrap's layout
     /// properties and spawns primitive-only markers; it never writes into
-    /// simulation state. The full five-field manifest layout with the two
-    /// primary attack routes is G4 scope and deliberately NOT shown — the
-    /// blockout must not promise fields the match does not have
-    /// (docs/production/ScopeLedger.md, rows map.aetheriumFields /
-    /// map.primaryRouteCount).
+    /// simulation state. The five-field manifest layout is visible since
+    /// Sprint 16.7; primary-route dressing remains later map-art scope.
     /// </para>
     /// <para>
     /// KARTENBILD (D-085): everything here is generated at runtime with a
@@ -92,11 +89,14 @@ namespace Nova.Presentation.Maps
                 return;
             }
 
+            Vector2Int[] fieldCells = _bootstrap.AllFieldCells;
             TintGround();
-            BuildScatterRocks();
+            BuildScatterRocks(fieldCells);
             BuildWeatheredEdge(_bootstrap.MapSize);
-            BuildFieldMarker(_bootstrap.LocalFieldCell, "Local");
-            BuildFieldMarker(_bootstrap.EnemyFieldCell, "Enemy");
+            for (int i = 0; i < fieldCells.Length; i++)
+            {
+                BuildFieldMarker(fieldCells[i], $"Field_{i + 1}");
+            }
         }
 
         /// <summary>
@@ -140,11 +140,11 @@ namespace Nova.Presentation.Maps
         /// <summary>
         /// Rock debris: squashed-sphere boulders and pebbles, placed by a
         /// fixed-seed xorshift (no UnityEngine.Random), rejected inside the
-        /// exclusion zones around both start bases and both aetherium
+        /// exclusion zones around both start bases and all five aetherium
         /// fields, and NEVER carrying a collider — the debris is pure
         /// visual, the sim's grid pathing does not see it (and must not).
         /// </summary>
-        private void BuildScatterRocks()
+        private void BuildScatterRocks(Vector2Int[] fieldCells)
         {
             Vector2Int mapSize = _bootstrap.MapSize;
             var scatter = new GameObject("ScatterRocks");
@@ -157,7 +157,7 @@ namespace Nova.Presentation.Maps
             {
                 float x = 2f + Next01(ref rng) * (mapSize.x - 4f);
                 float z = 2f + Next01(ref rng) * (mapSize.y - 4f);
-                if (IsExcluded(x, z)) continue;
+                if (IsExcluded(x, z, fieldCells)) continue;
 
                 float sx = 0.25f + Next01(ref rng) * 0.70f;
                 float sy = 0.15f + Next01(ref rng) * 0.40f;
@@ -180,16 +180,25 @@ namespace Nova.Presentation.Maps
         }
 
         /// <summary>Inside a start-base or aetherium-field exclusion zone the scatter stays out (the D-085 brief).</summary>
-        private bool IsExcluded(float x, float z)
+        private bool IsExcluded(float x, float z, Vector2Int[] fieldCells)
         {
             Vector2Int localHq = _bootstrap.LocalHqCenterCell;
             Vector2Int enemyHq = _bootstrap.EnemyHqCenterCell;
-            Vector2Int localField = _bootstrap.LocalFieldCell;
-            Vector2Int enemyField = _bootstrap.EnemyFieldCell;
-            return WithinRadius(x, z, localHq.x + 0.5f, localHq.y + 0.5f, BaseExclusionRadius)
-                || WithinRadius(x, z, enemyHq.x + 0.5f, enemyHq.y + 0.5f, BaseExclusionRadius)
-                || WithinRadius(x, z, localField.x + 0.5f, localField.y + 0.5f, FieldExclusionRadius)
-                || WithinRadius(x, z, enemyField.x + 0.5f, enemyField.y + 0.5f, FieldExclusionRadius);
+            if (WithinRadius(x, z, localHq.x + 0.5f, localHq.y + 0.5f, BaseExclusionRadius)
+                || WithinRadius(x, z, enemyHq.x + 0.5f, enemyHq.y + 0.5f, BaseExclusionRadius))
+            {
+                return true;
+            }
+
+            for (int i = 0; i < fieldCells.Length; i++)
+            {
+                Vector2Int field = fieldCells[i];
+                if (WithinRadius(x, z, field.x + 0.5f, field.y + 0.5f, FieldExclusionRadius))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool WithinRadius(float x, float z, float cx, float cz, float radius)

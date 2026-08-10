@@ -39,7 +39,7 @@ namespace Nova.Presentation.UI
     /// and is not wired at runtime, so SimDefinitions is the honest source:
     /// the bar cannot drift from the executor. Availability mirrors the
     /// executor's own rule precisely — the prerequisite check is the sim's
-    /// <see cref="ConstructionSystem.HasFinishedBuilding"/> and the credit
+    /// <see cref="ConstructionSystem.HasFinishedBuildings"/> and the credit
     /// check is the balance the executor charges at placement.
     /// </para>
     /// <para>
@@ -60,6 +60,14 @@ namespace Nova.Presentation.UI
         private static readonly UnitRole[] BuildableRoles =
         {
             UnitRole.HQ, UnitRole.Refinery, UnitRole.Power, UnitRole.Storage,
+            UnitRole.Barracks, UnitRole.VehicleFactory, UnitRole.ResearchLab,
+            UnitRole.Radar, UnitRole.DefensePlatform
+        };
+
+        /// <summary>Stable display order for missing all-of prerequisites.</summary>
+        private static readonly UnitRole[] PrerequisiteDisplayOrder =
+        {
+            UnitRole.HQ, UnitRole.Power, UnitRole.Refinery, UnitRole.Storage,
             UnitRole.Barracks, UnitRole.VehicleFactory, UnitRole.ResearchLab,
             UnitRole.Radar, UnitRole.DefensePlatform
         };
@@ -209,7 +217,7 @@ namespace Nova.Presentation.UI
             for (int i = 0; i < capacity; i++)
             {
                 ref readonly UnitState unit = ref units[i];
-                if (!unit.IsActive || unit.PlayerId != slot || unit.Role != UnitRole.Unit) continue;
+                if (!unit.IsActive || unit.PlayerId != slot) continue;
                 uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
                 if (raw != 0
                     && construction.TryGetSite(raw, out _, out _, out uint assignedBuilderRaw)
@@ -338,8 +346,7 @@ namespace Nova.Presentation.UI
         /// <summary>Entry availability, the executor's own rule: prerequisite finished (if any) and enough credits.</summary>
         private static bool IsAvailable(in SimBuildingDefinition def, byte slot, long credits, ConstructionSystem construction)
         {
-            bool prerequisiteMet = !def.HasPrerequisite
-                || construction.HasFinishedBuilding(slot, def.PrerequisiteRole);
+            bool prerequisiteMet = construction.HasFinishedBuildings(slot, def.PrerequisiteRoles);
             return prerequisiteMet && credits >= def.CostAE;
         }
 
@@ -418,14 +425,33 @@ namespace Nova.Presentation.UI
         }
 
         /// <summary>The hovered entry's blocker, in the executor's own check order — prerequisite first, then affordability.</summary>
-        private static string BlockerReason(
+        private string BlockerReason(
             UnitRole role, in SimBuildingDefinition def, byte slot, long credits, ConstructionSystem construction)
         {
-            bool prerequisiteMet = !def.HasPrerequisite
-                || construction.HasFinishedBuilding(slot, def.PrerequisiteRole);
-            if (!prerequisiteMet)
+            UnitRoleMask missing = construction.GetMissingPrerequisiteRoles(slot, def.PrerequisiteRoles);
+            if (missing != UnitRoleMask.None)
             {
-                return $"{CommandCardPresenter.BuildingDisplayName(role)}: benötigt {CommandCardPresenter.BuildingDisplayName(def.PrerequisiteRole)}";
+                _builder.Clear();
+                _builder.Append(CommandCardPresenter.BuildingDisplayName(role)).Append(": benötigt ");
+                bool appended = false;
+                UnitRoleMask remaining = missing;
+                for (int i = 0; i < PrerequisiteDisplayOrder.Length; i++)
+                {
+                    UnitRole prerequisiteRole = PrerequisiteDisplayOrder[i];
+                    UnitRoleMask roleMask = (UnitRoleMask)(1u << (int)prerequisiteRole);
+                    if ((missing & roleMask) == UnitRoleMask.None) continue;
+
+                    if (appended) _builder.Append(" + ");
+                    _builder.Append(CommandCardPresenter.BuildingDisplayName(prerequisiteRole));
+                    appended = true;
+                    remaining &= ~roleMask;
+                }
+                if (remaining != UnitRoleMask.None)
+                {
+                    if (appended) _builder.Append(" + ");
+                    _builder.Append("unbekannte Voraussetzung 0x").Append(((uint)remaining).ToString("X8"));
+                }
+                return _builder.ToString();
             }
             return $"{CommandCardPresenter.BuildingDisplayName(role)}: nicht genug Aetherium";
         }

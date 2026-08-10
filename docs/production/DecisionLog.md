@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.36.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.39.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -211,7 +211,7 @@ als Post-MVP-/Vollspiel-Zielbild bestehen.
 **Begründung:** Lesbarkeit und Endspiel-Dramaturgie; unbegrenzte Superwaffen degradieren sie zum Wirtschafts-Spam.
 **Konsequenzen:** Buildings.md/Weapons.md/GameLoop.md angeglichen.
 
-### D-024 | verbindlich | Sprint 2 (Lager & Raffinerie)
+### D-024 | teilweise ersetzt durch D-106 | Sprint 2 (Lager & Raffinerie)
 
 **Kontext:** Lager-Kapazitätsmechanik (+2.000 AE/Lager) war nicht im Zahlengerüst; Raffinerie-Packaging offen.
 **Alternativen:** (a) keine Lager-Kapazität (Lager nutzlos); (b) Kapazität mit hartem Erntestopp bei vollem Konto; (c) Kapazität +2.000 AE je Lager, Überschuss verfällt, anteiliger Verlust bei Lager-Zerstörung; Raffinerie wird mit 1 Harvester geliefert.
@@ -1654,9 +1654,13 @@ Donnerkanone 60; der Scout bleibt abgeleitet (10).
 
 ---
 
-### D-076 | verbindlich | Sprint 7 (Governance-Tier-Modell, Gate-Kette schlafend)
+### D-076 | teilweise ersetzt durch D-105 | Sprint 7 (Governance-Tier-Modell, Gate-Kette schlafend)
 
 **Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis Westermann).
+
+**Fortschreibung:** D-105 ersetzt nur die Zuordnung der manuellen Spielabnahme
+zum einzelnen PR. Für Meilensteine bleibt die gespielte Runde Pflicht; ein PR
+darf nun mit ehrlich dokumentierter Zurückstellung früher integriert werden.
 
 **Kontext:** Das Repository trug ein Governance-Regime für ein Projekt, das es
 nicht ist. Messbar am Ist-Stand vor dieser Entscheidung:
@@ -2412,12 +2416,17 @@ technisch umgesetzt, nicht als vollständig spielerisch abgenommen bezeichnet.
 
 ---
 
-### D-091 | verbindlich ab Merge | Sprint 13.0 (Tier 2, Source-available-Beiträge und PR-Schutz)
+### D-091 | teilweise ersetzt durch D-105 | Sprint 13.0 (Tier 2, Source-available-Beiträge und PR-Schutz)
 
 **Status:** Inhaberentscheidung vom 2026-08-08 (Dennis Westermann). Sie wird
 mit dem Merge dieses Freigabe-PR wirksam. Michael Falk (`@travelhawk`) und Dennis
 Westermann (`@cubetribe`) sind die einzigen Maintainer mit Merge-Zugang zu
 `main`.
+
+**Fortschreibung:** D-105 ersetzt die zwei Merge-Accounts, die
+Maintainer-Peer-Review und die daraus abgeleitete CODEOWNERS-/Branch-Protection-
+Konfiguration. Tier 2, Lizenz, CLA, Baseline-Trennung und `integrity` bleiben
+unverändert verbindlich.
 
 **Kontext:** Ein externer Beitragender arbeitet am Einheitenstrang. Das bisherige
 Tier 1 setzt Vertrauen zwischen zwei Maintainers voraus und enthält weder einen
@@ -2641,7 +2650,7 @@ Entscheidung selbst ist unverändert — deshalb keine neue D-ID.
 
 ---
 
-### D-096 | verbindlich | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
+### D-096 | teilweise ersetzt durch D-106 | Sprint 16 (Lager mit abgeleiteter AE-Obergrenze, Radar schaltet die Minimap frei)
 
 **Status:** Inhaberentscheidung vom 2026-08-09 (Richtung); die Ausformung in
 Paketen liegt beim Agenten. Umgesetzt in
@@ -2711,7 +2720,9 @@ einzige Variante, die das Gebäude für den Spieler spürbar macht, ohne eine ne
 Anzeige zu erfinden.
 
 **Konsequenzen:** `MatchFingerprint.StateSchemaVersionV1` bleibt unberührt,
-vorhandene Snapshots und Replays bleiben lesbar. `AddCredits` hat vier Aufrufer
+vorhandene Snapshots und Replays bleiben strukturell lesbar. D-106 präzisiert:
+Eine exakte Wiedergabe unter geänderten Regeln wird über `RulesHash64` vor dem
+Start abgelehnt. `AddCredits` hat vier Aufrufer
 — Abladen, Streichung, Abbruch und Verkauf —, alle im Schreibbereich des
 Netzstrangs. Erst zusammen mit der Low-Power-Abschaltreihenfolge (16.6) wird die
 Kopplung zur Waffe: ein zerstörtes Kraftwerk nimmt Radar, Verteidigung und damit
@@ -2994,12 +3005,122 @@ Wer den Harness umbenennt, sagt es an. Keine Baseline-Datei ist berührt.
 
 ---
 
+### D-102 | verbindlich | Sprint 16 (fünf endliche Aetheriumfelder; Ernterate getrennt kalibrieren)
+
+**Status:** Inhaberfreigabe vom 2026-08-09.
+
+**Kontext:** Die kanonische Glutrinne registriert bislang zwei Felder mit je
+2.000.000 AE. Ein Sammler könnte daran rund 28 Stunden ununterbrochen ernten;
+Expansion und Kartenmitte haben damit keinen wirtschaftlichen Zweck. Das
+MVP-Manifest nennt fünf Felder mit 9.000 beziehungsweise 15.000 AE, während
+`EconomySystem.HarvestRateAE = 2` ausdrücklich nur provisorisch ist. Für eine
+neue Ernterate existiert weder ein verbindlicher Zielwert noch gespielte
+Messung.
+
+**Alternativen:** (a) Feldlayout und Ernterate gleichzeitig nach Gefühl
+ändern; (b) die endlichen Manifestfelder liefern und die Rate unverändert
+lassen, bis eine gespielte Kurve kalibriert werden kann; (c) Knappheit bis zur
+vollständigen Balance-Runde vertagen und die praktisch endlosen Felder
+behalten.
+
+**Entscheidung:** (b). Die kanonische Karte registriert in dieser Reihenfolge:
+
+1. Start Slot 0 `(7,7)`, 9.000 AE;
+2. Start Slot 1 `(117,117)`, 9.000 AE;
+3. Expansion Slot 0 `(24,40)`, 9.000 AE;
+4. Expansion Slot 1 `(100,84)`, 9.000 AE;
+5. Zentrum `(62,62)`, 15.000 AE.
+
+Die Paarpositionen sind durch `(x,y) → (124-x,124-y)` punktgespiegelt. Felder
+werden vor den HQ-/Builder-Entitäten in aufsteigender ID-Reihenfolge
+registriert. `HarvestRateAE` bleibt für Paket 16.7 bei **2 AE/Tick**; ihre
+Kalibrierung ist sichtbar vertagt und nicht als erledigt zu melden.
+
+**Begründung:** Die Manifestreserven beheben den belegten
+Knappheitsdefekt, ohne eine unbelegte zweite Balancevariable zu verändern.
+Symmetrie verhindert einen Startvorteil, die feste Reihenfolge hält beide
+Lockstep-Hosts und den Headless-Harness identisch.
+
+**Konsequenzen:** Alle fünf Spiegel der Startaufstellung müssen gemeinsam
+ziehen; die Präsentation markiert und schützt alle fünf Felder vor
+Steinstreuung. Der Definitions-Hash und das Zustandsformat ändern sich nicht,
+der gehashte Initialzustand aber schon. Geschützte Determinismus-Baselines
+werden nur in einem getrennten Baseline-PR bewegt, falls der Guard dies
+verlangt. Die Ernteraten-Kalibrierung braucht eine gespielte Runde mit
+Zeitkurve und bleibt bis dahin offen.
+
+---
+
+### D-103 | verbindlich | Sprint 16 (Bauvoraussetzungen werden eine All-of-Bitmaske)
+
+**Status:** Am 2026-08-09 vom Agenten unter ausdrücklicher Inhaberdelegation
+entschieden; überstimmbar. Umsetzung und Integrationsnachweis in Paket 16.8.
+
+**Kontext:** `SimBuildingDefinition.PrerequisiteRole` konnte genau eine fertige
+Gebäuderolle ausdrücken. Der verbindliche Gebäudeentwurf nennt dagegen für
+Kaserne, Fahrzeugfabrik und Radar mehrere gleichzeitige Voraussetzungen. Eine
+zweite Spezialprüfung pro Rolle würde Definitionstabelle, Executor und UI
+auseinanderlaufen lassen. Das Feld ist außerdem Teil von `DefinitionsHash64`;
+seine Darstellung ist deshalb Match- und Relay-Kompatibilität, nicht nur eine
+lokale C#-Signatur.
+
+**Alternativen:**
+
+1. Das einzelne Feld behalten und Mehrfachregeln im `ConstructionSystem`
+   hartcodieren — verworfen, weil Definition, Executor und Baubar dann drei
+   Wahrheiten pflegen.
+2. Eine variable Liste je Definition — verworfen, weil sie Allokation,
+   Ordnungsregeln und eine längere Hash-Kodierung einführt, obwohl höchstens
+   neun stabile Rollen abzubilden sind.
+3. **Gewählt: eine `uint`-Bitmaske über die unveränderten `UnitRole`-Wirewerte.**
+   Bit `n` steht für Rollenwert `n`; die Prüfung verlangt alle gesetzten Bits.
+
+**Entscheidung:**
+
+1. `UnitRole` bleibt unverändert. `UnitRoleMask` ist ein separates
+   `[Flags]`-Enum; `SimBuildingDefinition.PrerequisiteRoles` ersetzt das
+   singuläre Feld. `HasPrerequisite` bleibt abgeleitet (`mask != 0`).
+2. Allianz und Legion verwenden identisch: HQ keine; Kraftwerk HQ; Raffinerie
+   keine; Lager Raffinerie; Kaserne HQ + Kraftwerk; Fahrzeugfabrik Raffinerie +
+   Kaserne; Forschungslabor Fahrzeugfabrik; Radar Kraftwerk + Kaserne;
+   Verteidigungsplattform Kraftwerk.
+3. Die Raffinerie bleibt gemäß D-077 voraussetzungslos. Bei der
+   Verteidigungsplattform betrifft die Kraftwerk-Voraussetzung nur die Basis;
+   Modulfreischaltungen bleiben ein getrennter Vertrag.
+4. Nur eigene, fertiggestellte Gebäude erfüllen Bits. Baustellen, fremde
+   Gebäude und unbekannte Bits erfüllen nichts; unbekannte Bits scheitern damit
+   geschlossen.
+5. `DefinitionsHash64` schreibt weiterhin den abgeleiteten
+   `hasPrerequisite u8` und danach die vollständige Maske als `u32`. Der Hash
+   bewegt sich absichtlich; Relay und Clients müssen aus demselben Commit
+   stammen. Zustands-, Befehls- und Relay-Protokollversionen ändern sich nicht.
+
+**Begründung:** Die Maske ist die kleinste tabellarische Darstellung, die
+All-of vollständig ausdrückt, ohne `UnitRole` oder persistenten Zustand zu
+verändern. Eine gemeinsame Missing-Mask-Abfrage lässt Executor und UI exakt
+dieselbe Semantik verwenden und kann alle fehlenden Rollen stabil benennen.
+
+**Konsequenzen:** Die Skirmish-KI muss vor der Kaserne ein Kraftwerk planen.
+Der Eingriff liegt im fremden `Scripts/AI*`-Bereich und wird nach D-105 als
+kleinste gebundene Integrationsreparatur im selben Paket geführt: Kennung r7,
+gespiegelter Baufolgetest und frisch gemessener kanonischer Ausgang sind
+Pflicht; die dauerhafte Schreibhoheit ändert sich nicht. Der in den
+KI-Kommentaren referenzierte externe Pfad
+`tools/Nova.AiLab/reports/behavior-log.md` existiert in diesem Repository
+nicht. Messwerte und fehlender Journalpfad werden deshalb offen in Changelog
+und PR dokumentiert, statt einen Nachweis zu erfinden. Paket 16.8 wird ohne
+grünen Integrationslauf nicht gemergt. Der Definitions-Hash macht alte
+Relay-/Client-Builds bewusst inkompatibel. Keine Golden-Baseline und kein
+persistentes Zustandsformat wird in diesem Paket geändert.
+
+---
+
 ### D-104 | verbindlich | Sprint 16.9 (footprintbasierte Platzierung und deterministische Reparaturkosten)
 
 **Status:** Die Zielwerte stammen aus dem Inhaberauftrag vom 2026-08-09; die
 deterministische Ausformung wurde vom Agenten unter Delegation entschieden und
-bleibt überstimmbar. D-102 und D-103 sind seriell für die vorhergehenden Pakete
-16.7 und 16.8 reserviert.
+bleibt überstimmbar. Umsetzung und Integrationsnachweis folgen in Paket 16.9
+auf die bereits integrierten Pakete 16.7 und 16.8.
 
 **Kontext:** Die bestehende Platzierungsprüfung kennt nur Kartengrenze und
 belegte Zellen. Reparaturen erhöhen Trefferpunkte kostenlos; mehrere
@@ -3043,19 +3164,270 @@ Reparaturkosten.
    Tick gewinnt der erste deterministisch geordnete, valide, beschädigte und
    in Reichweite befindliche Reparaturauftrag; weitere Aufträge auf dasselbe
    Ziel wirken nicht. Der Gewinner behält den Anspruch auch bei fehlendem AE,
-   andere Ziele werden weiterbearbeitet.
+   andere Ziele werden weiterbearbeitet. Aktive Reparaturaufträge bilden dafür
+   eine dichte, reihenfolgestabile Folge: Entfernen kompaktiert, neue Aufträge
+   werden angehängt. Snapshot und Fortsetzung behalten dadurch dieselbe
+   Gewinnerreihenfolge ohne neues Zustandsfeld.
+8. Die deterministischen D-104-Regeln erhalten eine append-only
+   `RulesRevisionV3` im Match-Fingerprint. V1 und V2 bleiben als historische
+   Berechnungen erhalten; Builds vor und nach D-104 gelten absichtlich als
+   inkompatibel.
+9. Aktive Baustellen und fertige Platzierungen verwenden denselben dichten,
+   reihenfolgestabilen Entfernen-/Anhängen-Vertrag wie Reparaturaufträge. Das
+   persistierte Format speichert keine Tabellenlöcher; Live-Fortsetzung und
+   Snapshot-Restore dürfen deshalb niemals unterschiedliche Folgeplätze
+   vergeben.
 
 **Begründung:** Chebyshev entspricht dem quadratischen Grid und behandelt alle
 Footprintgrößen gleich. Die kumulative Kostenfunktion bewahrt den Gesamtpreis
 trotz ganzzahliger Tick-Abrechnung. Die Ein-Auftrag-Regel verhindert
-Mehrfachheilung und Mehrfachkosten ohne neues Zustandsformat.
+Mehrfachheilung und Mehrfachkosten ohne neues Zustandsformat. Die dichte
+Auftragsfolge macht diese Reihenfolge auch über Snapshot-Restore kanonisch;
+dieselbe Dichte hält die Platzierungsregister restore-transparent.
 
 **Konsequenzen:** Platzierung und Reparatur verändern deterministisches
-Simulationsverhalten, aber weder Befehls- noch Zustandsformat. Die
-Setup-Funktion `PlaceCompletedBuilding` bleibt ein ausdrücklicher Bypass.
-Geschützte Golden-Baselines bleiben aus diesem PR heraus. Q-047 bleibt als
-Balancingfrage offen: 30 Prozent sind der verbindlich implementierte
-MS-1-Startwert, noch kein gespielter Endwert.
+Simulationsverhalten und deshalb den `RulesHash64`, aber weder Befehls- noch
+Zustandsformat. Die Setup-Funktion `PlaceCompletedBuilding` bleibt ein
+ausdrücklicher Bypass. Geschützte Golden-Baselines bleiben aus diesem PR
+heraus. Q-047 bleibt als Balancingfrage offen: 30 Prozent sind der verbindlich
+implementierte MS-1-Startwert, noch kein gespielter Endwert.
+
+---
+
+### D-105 | verbindlich | Sprint 16 (alleinige Projektleitung und Merge-Autorität)
+
+**Status:** unmittelbar wirksame Inhaberentscheidung vom 2026-08-10 (Dennis
+Westermann). D-102 bis D-104 sind durch die offenen Sprint-16-PRs #80 bis #82
+belegt; D-105 vermeidet diese reservierten IDs bewusst.
+
+**Kontext:** Michael Falk (`@travelhawk`) ist weiterhin Teil der GitHub-
+Organisation, aber nicht mehr Teil dieses Projekts. Dennis Westermann
+(`@cubetribe`) leitet das Projekt allein. D-091 bildete dagegen zwei
+Projektmaintainer ab und verlangte die Freigabe des jeweils anderen auf jedem
+PR. Diese Regel ist nach Michaels Ausscheiden nicht nur sachlich falsch, sondern
+zirkulär: Niemand könnte den PR freigeben, der den tatsächlichen Zustand
+dokumentiert.
+
+Die Verfassung löst den Übergang bereits auf der richtigen Ebene:
+[../../GOVERNANCE.md](../../GOVERNANCE.md) weist Tier-Wechsel dem Inhaber zu,
+und D-076 wie D-091 sind Inhaberentscheidungen von Dennis. Die heutige
+außerrepositoryliche Inhaberentscheidung gilt deshalb sofort; dieser PR
+dokumentiert und implementiert sie. Er bleibt dennoch PR-only, durchläuft die
+strikte Pflicht-CI und ein unabhängiges Read-only-Review und wird ohne
+Force-Push per Squash integriert.
+
+**Alternativen:**
+
+1. **Michael bis zur Benennung eines Ersatzes als Projektmaintainer führen.**
+   Verworfen: Das wäre eine wissentlich falsche Zuständigkeitsbehauptung und
+   blockierte jeden PR an einer Person, die das Projekt nicht mehr betreut.
+2. **Sofort einen zweiten Maintainer ernennen.** Verworfen: Eine unbesetzte
+   Rolle nur für eine Freigabe zu füllen erzeugt keine unabhängige Prüfung und
+   gäbe unnötig Merge- und Governance-Rechte ab.
+3. **Auf Tier 1 zurückwechseln.** Verworfen: Der externe Einheitenstrang und
+   damit CLA-, Herkunfts- und aktuelle Inhaberfreigabe bleiben real. Tier 2 ist
+   weiterhin die passende Vertrauensgrenze.
+4. **Tier 2 mit einem alleinigen Projektinhaber und unabhängiger technischer
+   Prüfung betreiben.** Angenommen: Entscheidungen bleiben eindeutig, externe
+   Beiträge bleiben geschützt und Nachweis wird nicht mit Mitentscheidung
+   verwechselt.
+
+**Entscheidung:**
+
+1. Dennis Westermann (`@cubetribe`) ist alleiniger Projektinhaber, Maintainer,
+   Tier-Entscheider und Mergeberechtigter. Michael Falk (`@travelhawk`) hat
+   keine Projekt-Governance- oder Maintainer-Rolle mehr. Organisationsrechte
+   und historische Urheberschaft bleiben unberührt und verleihen keine
+   Entscheidungsbefugnis für Project Nova/HashKrieg.
+2. Tier 2 bleibt aktiv. Der Inhaber darf eigene PRs nach grüner Pflicht-CI und
+   dokumentiertem, unabhängigem Read-only-Review selbst mergen. Externe PRs
+   brauchen weiterhin die CLA-Zustimmung und eine `APPROVED`-Review von
+   `@cubetribe` auf dem aktuellen Head.
+3. Tier-Wechsel und Tier-3-Entscheidungen liegen ebenfalls allein beim Inhaber.
+   Aktivierte Gate-Evidenz und technische Prüfungen bleiben verbindliche
+   Nachweise. Der unabhängige Required Reviewer des Evidence-Authorizers
+   bestätigt die technische Vertrauensgrenze, ist aber keine zweite
+   Governance-Stimme.
+4. Unverändert bleiben: geschütztes PR-only-`main`, strikte grüne Pflichtchecks,
+   Squash-Merge, lineare Historie, aufgelöste Review-Gespräche, kein Force-Push
+   auf oder Löschen von `main` sowie die Trennung von Simulationsverhalten und
+   den vier geschützten Determinismus-Baselines. Der dokumentierte Baseline-
+   Ausnahmeweg wird nicht gelockert; Topic-Branches werden nach dem Merge wie
+   bisher gelöscht.
+5. Der Inhaber darf die manuelle Spielabnahme eines einzelnen PR ausdrücklich
+   zurückstellen. Der PR nennt dann „nicht gespielt“, Grund, gelaufene
+   automatisierte Ersatznachweise und Restrisiko. Er ist mergebar, aber weder
+   spielerisch abgenommen noch ein Meilenstein-Nachweis; eine spätere gemeinsame
+   Spielrunde kann mehrere integrierte PRs abnehmen. Tier-3-Evidenz wird dadurch
+   nicht erlassen.
+6. Die in D-091 verlangte zweite Maintainer-Freigabe gilt nicht für den
+   dokumentierenden D-105-PR, weil die Inhaberentscheidung vor dem PR unmittelbar
+   wirksam wurde. Sein Ersatzschutz ist unabhängiges Read-only-Review plus
+   strikte grüne CI; rote Checks bleiben unübergehbar.
+7. Fachliche Schreibhoheiten bleiben der Standard. Für eine serielle
+   Integrationskette darf der Inhaber eine fremde Fläche jedoch vorübergehend
+   für eine minimale Reparatur freigeben, wenn der PR sonst nicht grün werden
+   kann. Pfad, Anlass, Änderung, Tests und Restrisiko werden dokumentiert und
+   der Strangverantwortliche wird informiert. Das ändert die dauerhafte
+   Eigentümerschaft nicht.
+
+**Begründung:** Projektentscheidung und technische Prüfung sind zwei
+verschiedene Funktionen. Die erste braucht eine wahrheitsgemäße, eindeutig
+verantwortliche Person; die zweite bleibt durch CI, unabhängige Agentenreviews,
+Tests und späteres Spielen reproduzierbar. Ein fiktiver zweiter Entscheider
+würde weder Qualität noch Bus-Faktor verbessern.
+
+**Konsequenzen:** `CODEOWNERS`, der externe Review-Check und die Main-
+Restriktion nennen nur noch `@cubetribe`. Michaels fortbestehende Rolle als
+Organisationsinhaber kann ihm auf GitHub technisch weiter administrative
+Möglichkeiten geben; sie wird in diesem projektbegrenzten Entscheid nicht
+verändert und ist keine Projekt-Governance-Rolle. Fremde fachliche
+Schreibhoheiten im Parallelbetrieb bleiben bestehen; D-105 erlaubt nur die
+dokumentierte, begrenzte Integrationsreparatur. PRs mit zurückgestellter
+Spielabnahme müssen ihr Restrisiko offen tragen und dürfen nicht als vollständig
+gespielt gemeldet werden.
+
+---
+
+### D-106 | verbindlich | Sprint 16 (zustandsloser AE-Überhang und kanonische Regelidentität)
+
+**Status:** Agentenentscheidung vom 2026-08-10 unter der ausdrücklichen
+Delegation des alleinigen Inhabers; nach D-105 überstimmbar. Umgesetzt in
+[16_Sprint_Wirtschaft.md](hashkrieg/16_Sprint_Wirtschaft.md) 16.4.
+
+**Kontext:** D-024 und D-096 verlangen eine aus dem Gebäudebestand abgeleitete
+AE-Obergrenze sowie „25 % Verlust bei Zerstörung“, lassen aber drei für die
+Simulation entscheidende Punkte offen: ob mehrere HQs die Basis stapeln, ob
+25 % vom gesamten Kontostand oder nur vom neuen Überhang verloren gehen und
+wie Verkauf, HQ-Verlust oder ein bereits oberhalb der Grenze geladener
+Start-/Snapshot-Zustand behandelt werden.
+
+Der Sprint-16-Strang hat dafür einen zustandslosen Abbau implementiert. Das ist
+nicht gleichbedeutend mit einem einmaligen Zerstörungsereignis: Er wirkt auch
+ohne Lagerzerstörung und baut den Überhang über mehrere Sekunden vollständig
+bis zur Grenze ab. Diese Ausformung braucht deshalb einen eigenen, offen
+protokollierten Entscheid statt einer stillen Umdeutung von D-024/D-096.
+
+**Alternativen:**
+
+1. **Bei jeder Lagerzerstörung sofort 25 % des gesamten Kontostands abziehen.**
+   Verworfen: Verkauf, HQ-Verlust und oberhalb der Grenze geladene Zustände
+   blieben Sonderfälle; außerdem müsste der Economy-Pfad an jede
+   Zerstörungsursache gekoppelt werden.
+2. **Den Kontostand bei jeder Kapazitätssenkung sofort hart auf die neue Grenze
+   kappen.** Verworfen: Der vollständige Sofortverlust ist deutlich härter als
+   der beschlossene 25-%-Effekt und gibt kein Reaktionsfenster zum Ausgeben.
+3. **Vorhandenen Überhang dauerhaft behalten und nur neue Einzahlungen
+   blockieren.** Verworfen: Damit hätte die Zerstörungsregel keine
+   wirtschaftliche Wirkung; gespeicherte Überschüsse könnten unbegrenzt
+   konserviert werden.
+4. **Den aktuellen Überhang zustandslos und periodisch abbauen.** Angenommen:
+   ein einheitlicher, deterministischer Pfad deckt Startzustand, Restore,
+   Zerstörung und Verkauf ab, ohne ein neues Snapshot-Feld oder Ereignislog.
+
+**Entscheidung:**
+
+1. Ein Slot besitzt genau eine **HQ-Basiskapazität von 2.000 AE**, solange
+   mindestens ein lebendes, fertiggestelltes HQ existiert. Weitere HQs
+   stapeln diese Basis nicht.
+2. Jedes lebende, fertiggestellte Lager addiert 2.000 AE. Baustellen zählen
+   weder als HQ noch als Lager. Die Kapazität bleibt vollständig aus dem
+   Gebäudebestand abgeleitet; `EconomySystem.StateVersion` bleibt unverändert.
+3. Jede neue Einzahlung und Rückerstattung wird sofort an der aktuellen
+   Grenze gekappt; der nicht passende Anteil verfällt. Beim Verkauf wird die
+   Rückerstattung noch gegen die vor dem Despawn geltende Kapazität gebucht;
+   erst danach sinkt die abgeleitete Grenze und ein Überhang beginnt abzubauen.
+4. Ein bereits vorhandener Kontostand oberhalb der Grenze verliert auf jedem
+   zehnten Simulationstick (eine Sekunde bei 10 Hz) 25 % des **aktuellen
+   Überhangs**. Es gilt ganzzahlige Abrundung, mindestens 1 AE je Intervall,
+   bis der Kontostand die Grenze erreicht.
+5. Der Abbau gilt unabhängig von der Ursache des Überhangs: kanonischer
+   Startbestand, Snapshot-Restore, Zerstörung oder Verkauf eines Lagers sowie
+   Verlust des letzten HQ. Es gibt daneben keinen separaten Einmalverlust.
+6. Die Prozentrechnung muss für jeden gültigen nichtnegativen `long`-Kontostand
+   überlauffrei sein. `CapacityFor` liefert für einen ungültigen Slot 0;
+   `DepositCapped` verwirft dessen Einzahlung und liefert ebenfalls 0, damit
+   diese read-/deposit-Helfer keine Arraygrenze berühren.
+7. Die Regelidentität wird erstmals kanonisch in `RulesHash64` gebunden:
+   Revision 1 plus 2.000/2.000/25/10. Alter Rules-Stub und D-106-Regeln dürfen
+   niemals denselben Match-Fingerprint bilden. Alte Replay-Dateien und
+   Snapshots bleiben strukturell lesbar; exakte Replay-Wiedergabe unter einem
+   anderen Rules-Hash wird vor Tick 1 mit `RulesHash64`-Mismatch abgelehnt.
+8. D-106 präzisiert und ersetzt nur die Verlustausformung, HQ-Stapelungsfrage
+   und die weitergehende Replay-Zusage aus D-024/D-096. Die Radarentscheidung
+   aus D-096 bleibt unverändert.
+
+**Begründung:** Die eine Kontobasis hält zusätzliche HQs von der Lagerrolle
+frei. Der periodische Überhang ist für alle Ursachen identisch, deterministisch
+und restore-sicher; er braucht kein persistiertes Ereignis und gibt dem Spieler
+ein kurzes Ausgabenfenster, ohne Überschuss dauerhaft zu schützen. Die harte
+Kappung neuer Einnahmen bewahrt gleichzeitig den klassischen Silo-Druck. Der
+Rules-Hash verhindert, dass diese Verhaltensänderung als scheinbar kompatibler
+Lockstep- oder Replay-Start erst nach Tick 10 desynchronisiert.
+
+**Konsequenzen:** Der kanonische Start mit 3.000 AE (D-077) liegt ohne Lager
+zunächst 1.000 AE über der HQ-Basis und beginnt am Tick 10 zu zerfallen, sofern
+er nicht vorher ausgegeben wird. Zerstörung und Verkauf eines Lagers senken die
+Grenze sofort; 25 % des dadurch entstehenden aktuellen Überhangs fallen pro
+Sekunde. Mehrere HQs geben weiterhin nur 2.000 AE Basis. Spiegeltests in .NET
+und Unity sichern Mehrfach-HQ, HQ-Baustelle, echte Lagerzerstörung,
+Konvergenz, `long.MaxValue` und die Ablehnung des alten Rules-Stubs ab.
+
+---
+
+### D-107 | verbindlich | Sprint 16 (Glutrinne-Layoutachse für Punkte und 3×3-Footprints)
+
+**Status:** Agentenentscheidung vom 2026-08-10 unter ausdrücklicher
+Inhaberdelegation; überstimmbar.
+
+**Kontext:** D-102 spiegelt die kanonischen Glutrinne-Feld- und Builderpunkte
+über die bestehende Layoutachse durch `(62,62)` mit
+`(x,y) → (124-x,124-y)`. Das ist die ausgelieferte D-102-Layoutachse, nicht die
+physische Mittelpunktspiegelung des vollständigen 128×128-Rasters. Der zweite
+HQ-Ursprung wurde bislang mit derselben
+Formel von `(4,4)` nach `(120,120)` gespiegelt. Für einen 3×3-Footprint ist das
+geometrisch falsch: die belegten Rechtecke `(4..6)` und `(120..122)` sind keine
+Spiegelbilder. D-104 machte den Unterschied messbar. Die Startfelder lagen in
+Footprint-Abstand 1 beziehungsweise 3, die Expansionen in Abstand 34
+beziehungsweise 36 und das Zentrum in Abstand 56 beziehungsweise 58; daraus
+entstanden 45 gegen 57 legale erste Raffinerie-Ursprünge. Builder und das
+deterministische Raffineriedrehbuch folgten bereits der korrekten Punkt- und
+Footprintspiegelung.
+
+**Alternativen:**
+
+1. Den zweiten HQ-Ursprung auf `(118,118)` verschieben und die etablierte
+   Punktachse sowie Felder, Builder und Raffineriedrehbuch unverändert lassen.
+2. Beide HQs beibehalten und stattdessen sämtliche Feld-, Builder-,
+   Raffinerie- und Assetkoordinaten auf eine andere Achse verschieben.
+3. Die asymmetrischen Startbedingungen als Kartenmerkmal tolerieren.
+
+**Entscheidung:** Alternative 1. Für die Punkte des kanonischen
+Glutrinne-Layouts gilt weiterhin `T(x,y) = (124-x,124-y)`. Für den unteren
+linken Ursprung eines
+3×3-Footprints folgt daraus `T3(x,y) = (122-x,122-y)`. Die HQ-Ursprünge sind
+damit `(4,4)` und `(118,118)`, ihre Mittelpunkte `(5,5)` und `(119,119)`.
+Felder, Builder und das Raffineriedrehbuch bleiben unverändert.
+
+**Begründung:** Diese Korrektur stellt die von D-102 verlangte Symmetrie der
+ausgelieferten Glutrinne-Startaufstellung mit dem kleinsten Eingriff her und
+bewahrt deren bestehende Layoutachse. Beide Seiten erhalten exakt dieselben
+Punkt-zu-Footprint-Abstände und je 45 legale gespiegelte Folge-Raffinerieplätze,
+ohne das Feldlayout oder die Ernteroute neu zu balancieren. Eine spätere
+Rezentrierung auf die physische Kartenmitte wäre eine eigene Karten- und
+Balanceentscheidung.
+
+**Konsequenzen:** Runtime, Headless-Szenario, Map-Asset, Generator und beide
+Canonical-Match-Testspiegel ziehen den zweiten HQ-Ursprung beziehungsweise
+Mittelpunkt atomar nach. Initialzustands-, Replay- und Ausgangshashes werden
+neu gemessen; alte Starts scheitern über den `InitialStateHash` vor Tick 1.
+Die gesetzten Start-HQs laufen über den dokumentierten
+`PlaceCompletedBuilding`-Bypass; D-107 gleicht die D-104-Abstände und legalen
+Folge-Raffinerieplätze aus, nicht die Platzierungslegalität der Start-HQs
+selbst.
+`RulesHash64` bleibt auf D-104-Revision V3, `DefinitionsHash64` sowie Zustands-
+und Befehlsschemata bleiben unverändert. D-102 bleibt für Feldanzahl,
+Koordinaten, Reserven, Reihenfolge und Ernterate vollständig verbindlich.
 
 ## Offene Punkte
 
@@ -3116,11 +3488,11 @@ MS-1-Startwert, noch kein gespielter Endwert.
   „Offene Punkte"-Zeile nennt noch den zu kurzen Bereich D-078 bis D-081 und
   begründet die Reservierung mit einem inzwischen erfolgten Eintrag (D-077).
   Beides ist in jener Datei nachzuziehen, nicht hier.
-- **D-095 bis D-097 stehen in derselben Delegationslage** wie D-074/D-083
+- **D-092 bis D-094 stehen in derselben Delegationslage** wie D-074/D-083
   (Lobby-Vermittlung über Supabase Edge Functions, kurzlebige
-  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-096 hat der
+  HMAC-Match-Tokens, Build-Commit-Exposition zur Laufzeit); bei D-093 hat der
   Inhaber die Richtung (HMAC-Token) selbst vorgegeben, die Ausformung sowie
-  D-095/D-097 hat der Agent unter Delegation entschieden — gekennzeichnet und
+  D-092/D-094 hat der Agent unter Delegation entschieden — gekennzeichnet und
   überstimmbar. **Offen darin:** Das Supabase-Projekt ist noch nicht angelegt
   und die Function-Referenzen in
   [../tech/LobbySupabase.md](../tech/LobbySupabase.md) noch nicht gegen ein
@@ -3137,7 +3509,12 @@ MS-1-Startwert, noch kein gespielter Endwert.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
-| 1.36.0 | 2026-08-09 | D-104 aufgenommen: footprintbasierte Chebyshev-Platzierung mit Einfluss-, Feld-, Gelände- und Gebäudeabständen sowie zustandslose kumulative Reparaturkosten von 30 Prozent; Mehrfachreparatur je Ziel und Tick deterministisch ausgeschlossen | Project Owner / Agent (unter Delegation) |
+| 1.39.0 | 2026-08-10 | D-107 aufgenommen: Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge abgeleitet um 122; der zweite HQ-Ursprung wird von `(120,120)` auf `(118,118)` korrigiert | Agent (unter Delegation) / Dennis Westermann |
+| 1.38.0 | 2026-08-10 | D-104 aufgenommen: footprintbasierte Chebyshev-Platzierung mit Einfluss-, Feld-, Gelände- und Gebäudeabständen, zustandslose kumulative Reparaturkosten von 30 Prozent, kanonisch dichte Reparaturreihenfolge und Rules-Revision V3 | Project Owner / Agent (unter Delegation) |
+| 1.37.0 | 2026-08-10 | D-103 aufgenommen: Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske über unveränderte `UnitRole`-Wirewerte; Hash-, Fail-Closed-, Plattformmodul- und KI-Handoff-Folgen festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
+| 1.36.0 | 2026-08-10 | D-102 aufgenommen: fünf symmetrische endliche Aetheriumfelder werden geliefert, die mangels belastbarer Zielkurve unveränderte Ernterate von 2 AE/Tick wird ausdrücklich getrennt kalibriert | Project Owner / Agent |
+| 1.35.0 | 2026-08-10 | D-106 aufgenommen: einmalige 2.000-AE-HQ-Basis, +2.000 je fertigem Lager, sofort gedeckelte Einzahlungen, zustandsloser 25-%-Abbau des aktuellen Überhangs je Sekunde und kanonischer Rules-Hash; D-024/D-096 in Verlustausformung, HQ-Stapelung und Replay-Kompatibilität teilweise ersetzt; Fehlverweise der Lobbyfamilie D-095–D-097 auf D-092–D-094 berichtigt | Agent (unter Delegation) / Dennis Westermann |
+| 1.34.0 | 2026-08-10 | D-105 aufgenommen: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 bleibt mit CLA und aktueller Inhaberfreigabe aktiv, Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Review selbst gemergt werden, und manuelle Spielabnahme darf ehrlich zurückgestellt, aber nicht als gelaufen behauptet werden | Project Owner / Orchestrator |
 | 1.33.0 | 2026-08-09 | D-101 aufgenommen: der Ausgangspin der kanonischen KI-Partie (Entscheidungstick, Endzustand) wird vom Identitätspin getrennt und zieht in eine Maintainer-Datei; `tools/Nova.SimRunner.Tests/` bekommt erstmals eine Eigentümerzeile | Project Owner / Orchestrator |
 | 1.0.0 | 2026-07-21 | D-001 bis D-005 aus Sprint 0 protokolliert | Game Director |
 | 1.1.0 | 2026-07-21 | D-006 (Unity 6.3 LTS + URP bestätigt) aus Sprint-1-Validierung | Lead Technical Director |
@@ -3173,6 +3550,6 @@ MS-1-Startwert, noch kein gespielter Endwert.
 | 1.27.0 | 2026-08-07 | D-089 aufgenommen: implementiertes 1v1-Lockstep über TCP, `TickComplete` als reiner Transport-Barrier, optionales Submission-Readiness-Gate, getrenntes `NOVAREC2`-/Diagnostikformat und fail-closed linux-x64-/systemd-/Deploy-Vertrag; D-033 hinsichtlich UDP und Ergebnisautorität teilweise ersetzt | Project Owner / Agent (Umsetzung) |
 | 1.28.0 | 2026-08-08 | D-090 aufgenommen: fog-sicheres sichtbares Gefechtsfeedback, D-039-konformer Tier-0-One-Shot-Service, 35 unveränderte Kenney-OGGs mit Batch-Provenienz, ehrlich unvollständige Suno-Nachweise und headless Quellcode-Guard; sämtliche Abweichungen vom 12B-Plan explizit begrenzt | Project Owner / Agent (Umsetzung) |
 | 1.29.0 | 2026-08-08 | D-091 aufgenommen: Tier 2 vor dem ersten externen PR aktiviert; PolyForm Noncommercial plus dokumentierte, nicht rückwirkende CLA für externe Beiträge, zwei Merge-Accounts, Maintainer-Peer-Review auf jedem PR sowie vertrauenswürdige metadata-only Review-/Baseline-Checks entschieden | Dennis Westermann |
-| 1.30.0 | 2026-08-09 | D-095 bis D-097 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-096-Richtung vom Inhaber vorgegeben, Ausformung sowie D-095/D-097 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-096 Richtung: Dennis Westermann |
+| 1.30.0 | 2026-08-09 | D-092 bis D-094 aufgenommen (Sprint 14 Lobby): Vermittlung über Supabase Edge Functions mit schlankem engine-freiem HTTPS-Client, Polling und RLS deny-all; kurzlebige 64-bit-HMAC-Match-Tokens für den Relay (Single-Use über Resets, abgeleiteter Seed, statischer Direktweg unverändert); Build-Commit zur Laufzeit lesbar (Editor-Build-Stempel, `dev-editor`-Fallback). D-093-Richtung vom Inhaber vorgegeben, Ausformung sowie D-092/D-094 vom Agenten unter Delegation — überstimmbar | Agent (unter Delegation) / D-093 Richtung: Dennis Westermann |
 | 1.30.0 | 2026-08-09 | D-095, D-096 und D-097 aufgenommen: Parallelbetrieb trennt über Dateihoheit statt Verhaltensraum (Sprint 16 parallel zu 13B, `Simulation/State/` in eingefrorenes Layout und strangeigene Befehlsanwendung geteilt, ein Strang je Merge-Fenster); Lager erhält eine aus dem Gebäudebestand **abgeleitete** AE-Obergrenze statt eines Zustandsfeldes und das Radar schaltet die Minimap frei; „Stoppen" löscht zusätzlich `UnitState.AttackTarget`, das Halte-Feuer bleibt beim Einheitenstrang | Project Owner / Orchestrator |
 | 1.31.0 | 2026-08-09 | D-098 bis D-100 nachgetragen, nachdem sie anderswo bereits als geltend zitiert wurden: Tier-3-Auslöser auf Veröffentlichung, Geld und Publikum präzisiert statt auf jede personenbezogene Verarbeitung; Identitätsmodell der geschlossenen Beta mit Klartext-IP plus gekürztem Netzpräfix und 30-Tage-Löschfrist statt `HMAC(pepper, ip)`, MAC-Adresse verworfen, IP- und Präfixsperren zwingend befristet; Lobby-Serverseite als Quelltext unter `tools/lobby/` statt nur im Supabase-Projekt (vom Agenten unter Delegation entschieden, überstimmbar, in den Offenen Punkten vermerkt). D-095 Punkt 3 im Wortlaut auf das Regelwerk nachgezogen — die Befehlsanwendung trennt zwischen Zielsetzung und Ausführung, nicht zwischen Befehlsarten; dieselbe Entscheidung, keine neue D-ID. Kopfzeile von Sprint 13.0 auf 16 berichtigt | Project Owner / Agent (unter Delegation) |

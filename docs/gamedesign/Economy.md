@@ -1,6 +1,6 @@
 # Wirtschaftssystem (Economy)
 
-**Version:** 0.5.0 | **Status:** Entwurf (Korrekturlauf Sprint 16) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Spezifiziert den Wirtschafts-Kreislauf von Project Nova: Sammler-Loop, Lagerkapa
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Hybridwirtschaft, Matchdauer), D-011 (Evolvierte-Wachstum/Regeneration), D-014 (Drohnen), D-015 (Elite-Einheiten), D-016 (Objective-Belohnungen), D-024 (Lager & Raffinerie), D-027 (Regenerations-Bonus), D-030 (Low-Power & Forschung)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-008 (12 Gebäudetypen), D-010 (Hybridwirtschaft, Matchdauer), D-011 (Evolvierte-Wachstum/Regeneration), D-014 (Drohnen), D-015 (Elite-Einheiten), D-016 (Objective-Belohnungen), D-024 (Lager & Raffinerie), D-027 (Regenerations-Bonus), D-030 (Low-Power & Forschung), D-077 (MS-1-Startzustand), D-096/D-106 (abgeleitete AE-Grenze und Überhang), D-104 (kumulative MS-1-Reparaturkosten)
 - [./Resources.md](./Resources.md) – Feldregeln, Nachwuchsraten, Überernte
 - [./Factions.md](./Factions.md) – Fraktionsprofile (Allianz teuer/präzise, Legion günstig/Masse, Evolvierte organisch)
 - [./Buildings.md](./Buildings.md) – **führend für Gebäudekosten, Energiewerte und Bauzeiten** (Review F-03, Grundsatzregel D-047); Bauvoraussetzungen, Evolvierte-Reifung, HQ-Grundenergie
@@ -23,7 +23,9 @@ Spezifiziert den Wirtschafts-Kreislauf von Project Nova: Sammler-Loop, Lagerkapa
 | AE (Aetherium-Einheiten) | Einzige Bau-/Produktionswährung | Ernte an Feldern, Objective-Belohnungen 400/800/1.200 AE je Lager-Stufe (D-016, siehe [./NeutralUnits.md](./NeutralUnits.md)) |
 | Energie | Versorgt Gebäude; Defizit löst Low-Power aus | Kraftwerke |
 
-Standard-Startressourcen: **1.000 AE** (Zahlengerüst), Start-Energie 0 (erstes Kraftwerk Pflichtfrühinvestition).
+MS-1-Startressourcen: **3.000 AE** (D-077), Start-Energie 0; das fertige HQ
+liefert +30 Grundenergie. Ohne fertiges Lager liegt der Startbestand 1.000 AE
+über der HQ-Basis und erzeugt damit sofort den Ausgaben-/Bauanreiz aus D-106.
 
 ## Sammler-Loop
 
@@ -41,14 +43,16 @@ Standard-Startressourcen: **1.000 AE** (Zahlengerüst), Start-Energie 0 (erstes 
 
 Harvester sind unbewaffnet (Allianz/Legion) und haben mittlere Panzerung; Evolvierte-Sammler ("Zermahler") regenerieren langsam (D-011-Logik auf Einheitenebene, Details in Vehicles.md).
 
-## Lager- und Kapazitätsregeln (gemäß D-024)
+## Lager- und Kapazitätsregeln (D-024/D-096/D-106)
 
 | Regel | Wert v0.2 |
 |---|---|
-| Konto-Grundkapazität | 2.000 AE (HQ-Basis) – der Startwert von 1.000 AE liegt darunter; Lager werden ab der ersten Expansion relevant |
-| Kapazität pro Lager-Gebäude | +2.000 AE |
-| Überschuss-Regel | AE über der Kapazität **verfallen** (Ablade-Vorgang kappt auf Maximum) – klassische Silo-Regel als Ausgaben-/Bauanreiz |
-| Lager-Verlust | Zerstörtes Lager: **anteiliger Verlust von 25 % des gelagerten AE** (D-024; Detailwert gemäß [./Buildings.md](./Buildings.md)), zusätzlich entfällt die gebundene Kapazität |
+| Konto-Grundkapazität | Genau 2.000 AE, solange mindestens ein fertiges, lebendes HQ existiert; mehrere HQs stapeln die Basis nicht |
+| Kapazität pro Lager-Gebäude | +2.000 AE je fertigem, lebendem Lager; Baustellen zählen nicht |
+| Neue Einzahlungen | Ernte und Rückerstattungen werden an der aktuellen Grenze hart gekappt; der nicht passende Anteil verfällt |
+| Vorhandener Überhang | Alle 10 Sim-Ticks (1 s) verfallen 25 % des aktuellen AE-Anteils oberhalb der Grenze, ganzzahlig abgerundet und mindestens 1 AE, bis die Grenze erreicht ist |
+| Kapazitätsverlust | Zerstörung oder Verkauf eines Lagers sowie Verlust des letzten HQ senken die Grenze sofort; der neue Überhang folgt derselben periodischen Regel, ohne zusätzlichen Einmalverlust |
+| Verkauf-Reihenfolge | Die Rückerstattung wird noch gegen die vor dem Despawn geltende Kapazität gedeckelt; anschließend sinkt die Grenze |
 
 ## Energie-System und Low-Power
 
@@ -82,7 +86,7 @@ Fraktions-Profil-Faktor: Allianz ×1,15 (teuer, stark), Legion ×0,85 (günstig,
 
 ### Gebäude (12 Typen gemäß D-008)
 
-Kosten, Energiebilanz und Bauzeiten aller Gebäude stehen **ausschließlich in [./Buildings.md](./Buildings.md)** (führendes Dokument, Review F-03). Economy.md legt für Gebäude nur den systemischen Rahmen fest: Startressourcen (1.000 AE), Einkommensraten-Ziele, Low-Power-Regel, Lager-/Kapazitätsregeln (D-024) und Reparatur-/Verkaufsregeln (Prozentwerte unten).
+Kosten, Energiebilanz und Bauzeiten aller Gebäude stehen **ausschließlich in [./Buildings.md](./Buildings.md)** (führendes Dokument, Review F-03). Economy.md legt für Gebäude nur den systemischen Rahmen fest: MS-1-Startressourcen (3.000 AE, D-077), Einkommensraten-Ziele, Low-Power-Regel, Lager-/Kapazitätsregeln (D-024/D-096/D-106) und Reparatur-/Verkaufsregeln (Prozentwerte unten).
 
 ### Einheiten (Rahmen pro Kategorie und Tech-Tier)
 
@@ -94,7 +98,11 @@ Kosten, Energiebilanz und Bauzeiten aller Gebäude stehen **ausschließlich in [
 | Drohnen (2–3/Fraktion, D-014) | 200–400 | – | – |
 | Elite-Einheit (D-015, 1× MVP) | – | – | 3.000–4.000 |
 
-Begründung: Mit 1.000 AE Start und ~600 AE/min ist Tier 1 sofort, Tier 2 nach ~4–6 min, Tier 3 nach ~12–15 min erreichbar – passt zur Ziel-Matchdauer 20–35 min. Feinwerte pro Einheit in den Einheitendokumenten.
+Begründung: Mit 3.000 AE MS-1-Start (D-077) und ~600 AE/min ist der klassische
+Refinery-/Harvester-Aufbau sofort finanzierbar; die 2.000-AE-HQ-Basis erzeugt
+gleichzeitig Druck, früh auszugeben oder ein Lager zu errichten. Tier 2 bleibt
+nach ~4–6 min, Tier 3 nach ~12–15 min erreichbar – passend zur Ziel-Matchdauer
+20–35 min. Feinwerte stehen in den Einheitendokumenten.
 
 ## Reparatur- und Verkaufsregeln
 
@@ -119,7 +127,7 @@ Harvester-Kosten sind **führend in [./Vehicles.md](./Vehicles.md)** definiert (
 
 | Phase | Zeitraum | Wirtschaftlicher Ist-Zustand (Ziel) |
 |---|---|---|
-| Aufbau | 0–5 min | 1.000 AE Start + Stufe-1-Einkommen; erstes Kraftwerk, Kaserne, erste Harvester-Ergänzung |
+| Aufbau | 0–5 min | 3.000 AE MS-1-Start + Stufe-1-Einkommen; Raffinerie-/Harvester-Loop, erstes Kraftwerk und Kaserne |
 | Expansion | 5–12 min | Startfeld-Reserve ~50 % verbraucht → Zwang zu Stufe 2; erste Feld-Konflikte |
 | Dominanz | 12–22 min | Stufe 3 nötig für Tier 3/Elite/Superwaffe; Überernte-Entscheidungen (schnell auspressen vs. nachhaltig) werden matchrelevant |
 | Endspiel | 22–35 min | Zentrale Felder erschöpft oder zerstört; Einkommen sinkt natürlich auf ~Stufe-2-Niveau → Matches enden durch Druck, nicht durch Ressourcen-Timeout |
@@ -156,4 +164,5 @@ Leitplanke: Gesamt-AE-Fluss pro Spieler über ein typisches 25-min-Match ≈ 25.
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Gameplay Designer |
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Gebäudekosten/-energie durch Verweise auf Buildings.md ersetzt (Review F-03, D-047-Grundsatzregel); Economy.md behält nur Systemlogik (Raten, Low-Power, Lager) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-21 | F-03 vollständig geschlossen: Harvester-Kosten in der Fraktions-Wirtschaftsmodifier-Tabelle durch Verweis auf die führende Quelle [Vehicles.md](./Vehicles.md) ersetzt (D-047) – keine dritte Zahl mehr neben Vehicles.md (700/550/620 AE) | Lead Gameplay Designer |
-| 0.5.0 | 2026-08-09 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |
+| 0.5.0 | 2026-08-10 | MS-1-Start auf 3.000 AE (D-077) nachgezogen und D-106 präzisiert: eine HQ-Basis je Konto, +2.000 je fertigem Lager, harte Einzahlungskappung sowie zustandsloser 25-%-Abbau des aktuellen Überhangs pro Sekunde | Codex / Dennis Westermann |
+| 0.6.0 | 2026-08-10 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |

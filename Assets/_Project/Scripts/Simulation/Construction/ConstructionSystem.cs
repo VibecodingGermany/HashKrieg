@@ -37,7 +37,7 @@ namespace Nova.Simulation.Construction
     /// deterministic: unknown/foreign definition; footprint outside the
     /// 128x128 grid or occupied cells; then D-104 terrain, influence,
     /// building-clearance and Aetherium-field geometry (all
-    /// RejectedInvalidTarget); then missing prerequisite role, the power rule
+    /// RejectedInvalidTarget); then missing prerequisite roles, the power rule
     /// and site capacity (RejectedPrerequisitesNotMet).
     /// The power rule: a building with PowerRequired &gt; 0 may only be
     /// placed while the owner's last committed balance
@@ -46,9 +46,10 @@ namespace Nova.Simulation.Construction
     /// building. The Refinery carries NO prerequisite since D-077 (the
     /// classic loop start — quality/content/mvp-v1.json
     /// startStatePerPlayer): placed through the command path it is gated by
-    /// funds, D-104 geometry and the power rule. The remaining
-    /// prerequisite roles (VehicleFactory needs a Refinery, ResearchLab a
-    /// Barracks, Radar and DefensePlatform a Power plant) are unchanged.
+    /// funds, D-104 geometry and the power rule. D-103 represents every other
+    /// prerequisite as a fail-closed all-of mask over completed own roles (for
+    /// example Barracks needs HQ + Power, VehicleFactory needs Refinery +
+    /// Barracks, and Radar needs Power + Barracks).
     /// <see cref="PlaceCompletedBuilding"/> bypasses gameplay placement
     /// validation entirely, including D-104 geometry — it is the direct write
     /// deterministic match setup uses.
@@ -72,11 +73,18 @@ namespace Nova.Simulation.Construction
     /// later.
     /// </para>
     /// <para>
-    /// Sites: a site is a live entity carrying role
-    /// <see cref="UnitRole.Unit"/> (so the economy's power recompute
-    /// ignores it) at the footprint center with 1 HP of its definition's
+    /// Sites: a site is a live entity carrying its DEFINITION role (since
+    /// 16.3, #44 — the generic <see cref="UnitRole.Unit"/> slot was armed by
+    /// the weapon-table fallback, so every site shot). Combat also consults
+    /// <see cref="IsActiveSite"/> explicitly: even a DefensePlatform site is
+    /// neither an attacker nor a target before completion. The entity sits
+    /// at the footprint center with 1 HP of its definition's
     /// MaxHealth — construction HP interpolation is deliberately NOT
-    /// modeled (provisional, Q-040 candidate). Builder assignment: the
+    /// modeled (provisional, Q-040 candidate). The readers that resolved a
+    /// site by its old generic role are compensated at the source: the
+    /// economy's power recompute skips sites through the bound
+    /// <see cref="IsActiveSite"/> lookup, and the view layer maps sites back
+    /// to the site look until completion. Builder assignment: the
     /// PlaceBuilding payload names no builder, so the site auto-assigns the
     /// own Builder with the lowest entity index (ascending-index scan,
     /// deterministic); when the assigned builder dies the next tick
@@ -88,12 +96,13 @@ namespace Nova.Simulation.Construction
     /// <see cref="PlayerEconomyState.ProductionSpeedMultiplierQ16"/> raw per
     /// progressed tick (1.0 at full power, exactly 0.5 under low power —
     /// no rounding, 0.5 is exact in Q16.16, so low power means exactly one
-    /// tick of progress per two ticks). Completion sets the entity's role
-    /// to the definition's building role, restores full HP and — for a
-    /// ResearchLab — sets the owner's T2 unlock (phase 5;
+    /// tick of progress per two ticks). Completion restores full HP (the
+    /// role is already the definition's) and — for a ResearchLab — sets the
+    /// owner's T2 unlock (phase 5;
     /// mvp-v1.json technology.researchLabCompletionUnlocksTier2; there are
     /// no research upgrades, no research queue and no tier 3 in MS-1).
-    /// A site entity destroyed by combat aborts the site without refund.
+    /// A site missing from the entity store is swept without refund; active
+    /// sites themselves are excluded as combat targets since 16.3 (#44).
     /// </para>
     /// <para>
     /// Cancel/sell/repair (documented provisional economy rules, Q-040
@@ -103,10 +112,11 @@ namespace Nova.Simulation.Construction
     /// destroyed building is lost without refund (production domain).
     /// Repair assigns a Builder a standing repair order on an own completed
     /// damaged building. In reach (same Chebyshev rule) the target gains
-    /// <see cref="RepairRateHpPerTick"/> HP per tick, halved under low power,
-    /// and pays an exact cumulative integer share of 30% of its new price.
-    /// At most one reachable Builder may repair a target per tick; out-of-
-    /// reach orders are HELD, never dropped, and Stop clears them.
+    /// <see cref="RepairRateHpPerTick"/> HP per tick, or exactly
+    /// <see cref="LowPowerRepairRateHpPerTick"/> under low power, and pays an
+    /// exact cumulative integer share of 30% of its new price. At most one
+    /// reachable Builder may repair a target per tick; out-of-reach orders are
+    /// HELD, never dropped, and Stop clears them.
     /// </para>
     /// <para>
     /// State (snapshot block <see cref="SnapshotBlockIds.Construction"/>,
@@ -177,6 +187,9 @@ namespace Nova.Simulation.Construction
         /// <summary>Minimum field distance for every non-Refinery building footprint (D-104).</summary>
         public const int MinimumNonRefineryFieldDistanceCells = 2;
 
+        /// <summary>Repair rate in HP per tick while the owner's grid is in LOW POWER (C4, Sprint 16.6).</summary>
+        public const int LowPowerRepairRateHpPerTick = 5;
+
         private struct SiteState
         {
             public bool IsActive;
@@ -234,6 +247,11 @@ namespace Nova.Simulation.Construction
             _t2Unlocked = new bool[EconomySystem.MaxPlayers];
             _occupied = new byte[GridSize * GridSize];
             _costField = costField;
+            // 16.3 (#44): a site carries its definition role, so the power
+            // and capacity scans can no longer skip sites by role. Both use
+            // this authoritative register; binding here means no host can
+            // forget the dependency.
+            _economy.BindSiteLookup(IsActiveSite);
         }
 
         public void Initialize(SimulationKernel kernel)
@@ -309,21 +327,59 @@ namespace Nova.Simulation.Construction
             return IndexOfBuilding(rawEntityId) >= 0;
         }
 
-        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
-        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        /// <summary>
+        /// True while the entity is an unfinished site (16.3, #44: sites now
+        /// carry their definition role, so role alone no longer tells a site
+        /// apart). Bound into the economy's power and capacity scans via
+        /// <see cref="EconomySystem.BindSiteLookup"/>; also the read the
+        /// presentation layer needs to keep the site look until completion.
+        /// </summary>
+        public bool IsActiveSite(EntityId id)
         {
+            return IndexOfSite(UnitCommandStateView.ToRawEntityId(id)) >= 0;
+        }
+
+        /// <summary>
+        /// Missing completed own building roles for an all-of prerequisite.
+        /// Unknown bits stay missing (fail closed).
+        /// </summary>
+        public UnitRoleMask GetMissingPrerequisiteRoles(byte playerSlot, UnitRoleMask requiredRoles)
+        {
+            if (requiredRoles == UnitRoleMask.None) return UnitRoleMask.None;
+
+            UnitRoleMask completedRoles = UnitRoleMask.None;
             for (int i = 0; i < MaxBuildings; i++)
             {
                 if (!_buildings[i].IsActive) continue;
                 if (!SimDefinitions.TryGetBuilding(_buildings[i].BuildingDefId, out SimBuildingDefinition def)) continue;
-                if (def.Role != role) continue;
+
                 EntityId id = UnitCommandStateView.ToEntityId(_buildings[i].RawEntityId);
-                if (_entityManager.TryGetUnit(id, out UnitState unit) && unit.PlayerId == playerSlot)
-                {
-                    return true;
-                }
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+
+                completedRoles |= RoleMask(def.Role);
             }
-            return false;
+            return requiredRoles & ~completedRoles;
+        }
+
+        /// <summary>True when the slot owns every COMPLETED building role in the all-of mask.</summary>
+        public bool HasFinishedBuildings(byte playerSlot, UnitRoleMask requiredRoles)
+        {
+            return GetMissingPrerequisiteRoles(playerSlot, requiredRoles) == UnitRoleMask.None;
+        }
+
+        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
+        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        {
+            UnitRoleMask roleMask = RoleMask(role);
+            return roleMask != UnitRoleMask.None && HasFinishedBuildings(playerSlot, roleMask);
+        }
+
+        private static UnitRoleMask RoleMask(UnitRole role)
+        {
+            int bit = (int)role;
+            return bit >= 0 && bit < 32
+                ? (UnitRoleMask)(1u << bit)
+                : UnitRoleMask.None;
         }
 
         // ------------------------------------------------------------------
@@ -336,9 +392,9 @@ namespace Nova.Simulation.Construction
         /// definition, foreign-faction definition, out-of-map footprint and
         /// occupied cells; then terrain, build influence, one-cell building
         /// ring and field spacing (RejectedInvalidTarget); then prerequisite
-        /// role, power rule and site capacity
-        /// (RejectedPrerequisitesNotMet). Cost is the executor's separate
-        /// check (RejectedInsufficientResources) and runs BEFORE this.
+        /// roles, power rule and site capacity (RejectedPrerequisitesNotMet).
+        /// Cost is the executor's separate check
+        /// (RejectedInsufficientResources) and runs BEFORE this.
         /// </summary>
         public CommandResultCode ValidatePlacement(byte playerSlot, ushort buildingDefId, int originX, int originY)
         {
@@ -365,7 +421,7 @@ namespace Nova.Simulation.Construction
             {
                 return CommandResultCode.RejectedInvalidTarget;
             }
-            if (def.HasPrerequisite && !HasFinishedBuilding(playerSlot, def.PrerequisiteRole))
+            if (!HasFinishedBuildings(playerSlot, def.PrerequisiteRoles))
             {
                 return CommandResultCode.RejectedPrerequisitesNotMet;
             }
@@ -453,9 +509,8 @@ namespace Nova.Simulation.Construction
         /// Programmatic placement (command Apply path, AI): validates exactly
         /// as <see cref="ValidatePlacement"/> plus the credit spend, then
         /// charges the full cost, occupies the footprint, spawns the site
-        /// entity (role <see cref="UnitRole.Unit"/>, 1 HP) and auto-assigns
-        /// the lowest-index own Builder. Returns false without mutating when
-        /// any check fails.
+        /// entity (definition role, 1 HP) and auto-assigns the lowest-index
+        /// own Builder. Returns false without mutating when any check fails.
         /// </summary>
         public bool TryPlaceBuilding(byte playerSlot, ushort buildingDefId, int originX, int originY)
         {
@@ -522,11 +577,13 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * CancelRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * CancelRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(site.OriginX, site.OriginY);
             site.IsActive = false;
+            CompactSites();
             return true;
         }
 
@@ -546,11 +603,13 @@ namespace Nova.Simulation.Construction
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             if (_entityManager.TryGetUnit(id, out UnitState unit))
             {
-                _economy.GetPlayerEconomy(unit.PlayerId).AddCredits((long)def.CostAE * SellRefundPercent / 100);
+                // 16.4: refunds obey the derived ceiling too — overflow is forfeit.
+                _economy.DepositCapped(unit.PlayerId, (long)def.CostAE * SellRefundPercent / 100);
             }
             _entityManager.DespawnUnit(id);
             FreeFootprint(placement.OriginX, placement.OriginY);
             placement.IsActive = false;
+            CompactBuildings();
             return true;
         }
 
@@ -575,6 +634,7 @@ namespace Nova.Simulation.Construction
             if (index >= 0)
             {
                 _repairs[index].IsActive = false;
+                CompactRepairOrders();
             }
         }
 
@@ -616,6 +676,8 @@ namespace Nova.Simulation.Construction
                     _buildings[i].IsActive = false;
                 }
             }
+            CompactSites();
+            CompactBuildings();
         }
 
         private void ProgressSites()
@@ -663,6 +725,7 @@ namespace Nova.Simulation.Construction
                     CompleteSite(i, in def, siteUnit.PlayerId);
                 }
             }
+            CompactSites();
         }
 
         private void CompleteSite(int siteIndex, in SimBuildingDefinition def, byte ownerSlot)
@@ -674,6 +737,10 @@ namespace Nova.Simulation.Construction
 
             EntityId id = UnitCommandStateView.ToEntityId(rawEntityId);
             ref UnitState unit = ref _entityManager.GetUnitRef(id);
+            // New sites already carry the definition role (16.3), while an
+            // active site restored from a pre-16.3 snapshot can still carry
+            // UnitRole.Unit. Normalize idempotently at completion so the old
+            // snapshot becomes a valid powered/producing building.
             unit.Role = def.Role;
             unit.CurrentHealth = def.MaxHealth;
 
@@ -892,7 +959,7 @@ namespace Nova.Simulation.Construction
 
                 ref PlayerEconomyState repairEco = ref _economy.GetPlayerEconomy(target.PlayerId);
                 int rate = repairEco.IsLowPower
-                    ? RepairRateHpPerTick / 2
+                    ? LowPowerRepairRateHpPerTick
                     : RepairRateHpPerTick;
                 int healthBefore = Math.Max(0, target.CurrentHealth);
                 int healthAfter = Math.Min(target.MaxHealth, healthBefore + rate);
@@ -913,6 +980,7 @@ namespace Nova.Simulation.Construction
                     order.IsActive = false;
                 }
             }
+            CompactRepairOrders();
         }
 
         private static long RepairCostAtHealth(long fullRepairCost, int health, int maxHealth)
@@ -945,8 +1013,18 @@ namespace Nova.Simulation.Construction
 
         /// <summary>
         /// Spawns the building entity at the footprint center cell. A site
-        /// carries role <see cref="UnitRole.Unit"/> and 1 HP; a completed
-        /// building carries its definition role at full HP.
+        /// carries its DEFINITION role since 16.3 (#44) — the generic
+        /// <see cref="UnitRole.Unit"/> slot made every site an armed combatant
+        /// through the weapon-table fallback (15 damage, D-087 auto-acquires
+        /// for it). Unarmed building roles carry AttackDamage 0, so the
+        /// fallback shot disappears for unarmed roles; Combat additionally
+        /// excludes every active site, including DefensePlatform, as attacker
+        /// and target. The readers that resolved a site BY its generic role
+        /// are compensated at the source: the economy's power recompute skips sites through
+        /// <see cref="IsActiveSite"/> (a site neither provides nor draws),
+        /// and UnitViewManager keeps the site look until completion through
+        /// the same read. A completed building carries the same definition
+        /// role at full HP — completion no longer mutates the role at all.
         /// </summary>
         private EntityId SpawnBuildingEntity(byte playerSlot, in SimBuildingDefinition def, int originX, int originY, bool completed)
         {
@@ -955,7 +1033,7 @@ namespace Nova.Simulation.Construction
                 new Transform2D(SimFixed.FromInt(originX + 1), SimFixed.FromInt(originY + 1)),
                 SimFixed.Zero,
                 maxHealth: def.MaxHealth,
-                role: completed ? def.Role : UnitRole.Unit);
+                role: def.Role);
             if (!completed)
             {
                 _entityManager.GetUnitRef(id).CurrentHealth = 1;
@@ -1275,6 +1353,42 @@ namespace Nova.Simulation.Construction
             return -1;
         }
 
+        private void CompactSites()
+        {
+            int write = 0;
+            for (int read = 0; read < MaxSites; read++)
+            {
+                if (!_sites[read].IsActive) continue;
+                if (write != read) _sites[write] = _sites[read];
+                write++;
+            }
+            for (int i = write; i < MaxSites; i++) _sites[i] = default;
+        }
+
+        private void CompactBuildings()
+        {
+            int write = 0;
+            for (int read = 0; read < MaxBuildings; read++)
+            {
+                if (!_buildings[read].IsActive) continue;
+                if (write != read) _buildings[write] = _buildings[read];
+                write++;
+            }
+            for (int i = write; i < MaxBuildings; i++) _buildings[i] = default;
+        }
+
+        private void CompactRepairOrders()
+        {
+            int write = 0;
+            for (int read = 0; read < MaxRepairOrders; read++)
+            {
+                if (!_repairs[read].IsActive) continue;
+                if (write != read) _repairs[write] = _repairs[read];
+                write++;
+            }
+            for (int i = write; i < MaxRepairOrders; i++) _repairs[i] = default;
+        }
+
         // ------------------------------------------------------------------
         // Snapshot block 105 (v1)
         // ------------------------------------------------------------------
@@ -1345,6 +1459,20 @@ namespace Nova.Simulation.Construction
         public bool TryRestoreState(ReadOnlySpan<byte> blockContent)
         {
             if (!TryParseState(blockContent, out ParsedConstruction parsed)) return false;
+
+            // Remove the pre-restore dynamic footprint overlay before
+            // replacing the authoritative placement tables. Clearing only
+            // _occupied would leave cells that exist solely in the old live
+            // state impassable in the shared CostField and make placement or
+            // pathfinding after restore depend on the target host's history.
+            for (int i = 0; i < MaxSites; i++)
+            {
+                if (_sites[i].IsActive) FreeFootprint(_sites[i].OriginX, _sites[i].OriginY);
+            }
+            for (int i = 0; i < MaxBuildings; i++)
+            {
+                if (_buildings[i].IsActive) FreeFootprint(_buildings[i].OriginX, _buildings[i].OriginY);
+            }
 
             Array.Copy(parsed.Sites, _sites, MaxSites);
             Array.Copy(parsed.Buildings, _buildings, MaxBuildings);

@@ -28,9 +28,10 @@ namespace Nova.Simulation.Vision
     /// permission, and only from a COMPLETED Radar building (16.5, #54, C3):
     /// the building is the radiator, its own sight radius times
     /// <see cref="RadarRadiusMultiplier"/> is the coverage — no finished
-    /// Radar, no coverage. MS-1 simplification: team index equals the player
-    /// slot (D-058 activates exactly two slots; allied shared sight is
-    /// post-MS-1).
+    /// Radar, no coverage. At a power deficit the radar is the FIRST system
+    /// to fall (16.6, C4, Economy.md Low-Power rule): no coverage, no pings. MS-1 simplification:
+    /// team index equals the player slot (D-058 activates exactly two slots;
+    /// allied shared sight is post-MS-1).
     /// </para>
     /// <para>
     /// Determinism (FogOfWar.md section 5): integer distance tests in stable
@@ -62,6 +63,7 @@ namespace Nova.Simulation.Vision
 
         private readonly EntityManager _entityManager;
         private readonly Construction.ConstructionSystem _construction;
+        private readonly Economy.EconomySystem _economy;
         private readonly byte[][] _masks;
         private readonly HashSet<int> _radarSeenCells = new HashSet<int>();
 
@@ -82,13 +84,16 @@ namespace Nova.Simulation.Vision
         /// <summary>
         /// The construction system is a REQUIRED dependency since 16.5 (#54):
         /// radar coverage derives from COMPLETED Radar placements, which only
-        /// its register can tell from sites and corpses. It is read-only here
-        /// (placement queries) and never ticked through this system.
+        /// its register can tell from sites and corpses. The economy is one
+        /// since 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar goes OFFLINE —
+        /// no pings, no coverage. Both are read-only here (placement queries,
+        /// balance reads) and never ticked through this system.
         /// </summary>
-        public FogOfWarSystem(EntityManager entityManager, Construction.ConstructionSystem construction, int teamCount = 2, ushort width = 128, ushort height = 128)
+        public FogOfWarSystem(EntityManager entityManager, Construction.ConstructionSystem construction, Economy.EconomySystem economy, int teamCount = 2, ushort width = 128, ushort height = 128)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _construction = construction ?? throw new ArgumentNullException(nameof(construction));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             if (teamCount < 1 || teamCount > MaxTeams)
             {
                 throw new ArgumentOutOfRangeException(nameof(teamCount), teamCount, $"Team count must be in [1, {MaxTeams}].");
@@ -208,7 +213,9 @@ namespace Nova.Simulation.Vision
         /// team radiates, over the building's own sight radius times
         /// <see cref="RadarRadiusMultiplier"/>. A Radar site, a destroyed one
         /// and every other entity radiate nothing — without a finished Radar
-        /// the team has no coverage at all (and MinimapHud draws no map).
+        /// the team has no coverage at all (and MinimapHud draws no map). At
+        /// a power deficit the radar is the FIRST system to fall (16.6, C4,
+        /// Economy.md Low-Power rule): this method returns nothing.
         /// </para>
         /// <para>
         /// Cadence (Q-040(j), provisional): pings derive from live 10 Hz
@@ -225,6 +232,14 @@ namespace Nova.Simulation.Vision
             if (team >= TeamCount)
             {
                 throw new ArgumentOutOfRangeException(nameof(team), team, "Unknown team slot.");
+            }
+
+            // 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar is the FIRST
+            // system to fall — no coverage, no pings. The minimap reads the
+            // same balance and goes dark with it.
+            if (_economy.GetPlayerEconomy(team).IsLowPower)
+            {
+                return 0;
             }
 
             byte[] mask = _masks[team];

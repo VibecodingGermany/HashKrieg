@@ -22,7 +22,16 @@ namespace Nova.Simulation.Tests
     [TestFixture]
     public class HarvesterAutoCycleTests
     {
-        private static EntityManager CreateEntities() => new EntityManager(64);
+        private static EntityManager CreateEntities()
+        {
+            var entities = new EntityManager(64);
+            entities.SpawnUnit(
+                0,
+                new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)),
+                SimFixed.Zero,
+                role: UnitRole.HQ);
+            return entities;
+        }
 
         private static EntityId SpawnHarvester(EntityManager entities, byte player, int x, int y)
         {

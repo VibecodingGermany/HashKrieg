@@ -31,9 +31,9 @@ namespace Nova.SimRunner.Tests
         private const int Capacity = 64;
         private const ushort MapSize = 64;
 
-        /// <summary>Power plant / Barracks definition ids (SimDefinitions MS-1 table).</summary>
+        /// <summary>Power plant / DefensePlatform definition ids (SimDefinitions MS-1 table).</summary>
         private const ushort DefPower = 5;
-        private const ushort DefBarracks = 7;
+        private const ushort DefDefensePlatform = 11;
 
         /// <summary>
         /// Minimal canonical host: the systems the victory contract actually
@@ -75,13 +75,14 @@ namespace Nova.SimRunner.Tests
                 }
             }
 
-            /// <summary>Despawns every living HQ of a slot (the D-077 "HQ sniped" state, other entities survive).</summary>
+            /// <summary>Despawns every living COMPLETED HQ of a slot (the D-077 "HQ sniped" state, other entities survive; sites excluded — they carry the HQ role since 16.3 but are not a headquarters).</summary>
             public void SnipeHq(byte slot)
             {
                 UnitState[] units = Entities.RawUnits;
                 for (int i = 0; i < Entities.Capacity; i++)
                 {
-                    if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.HQ)
+                    if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.HQ
+                        && !Construction.IsActiveSite(units[i].Id))
                     {
                         Entities.DespawnUnit(units[i].Id);
                     }
@@ -235,6 +236,37 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void HqSite_DoesNotSaveTheSlot_FromTheHqLossElimination()
+        {
+            // 16.3 (#44): a site carries its definition role, so a half-built
+            // HQ would read as a headquarters to the bare role check and mask
+            // the D-077 elimination after the real HQ falls. The site
+            // register is excluded from the HQ scan, exactly like the generic
+            // role was before.
+            TestHost host = NewHost(startingCredits: 6000);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 10, 10).IsValid, Is.True,
+                "the real HQ must be a tracked completed placement for D-104 influence");
+            host.SpawnUnit(0, 16, 10, UnitRole.Builder);
+            host.SpawnUnit(1, 50, 50, UnitRole.HQ);
+            host.SpawnUnit(1, 52, 50);
+            host.Step(1); // both slots engage and latch their HQs
+
+            // Slot 0 starts a second HQ as a SITE — definition role HQ since
+            // 16.3, 1 HP, never completed in this test (the builder stands
+            // out of reach, so the site pauses).
+            Assert.That(host.Construction.TryPlaceBuilding(0, 3, 18, 10), Is.True, "HQ def 3 (Alliance)");
+            Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
+
+            // The real HQ falls: the D-077 elimination must fire despite the
+            // open site — a half-built HQ is not a headquarters.
+            host.SnipeHq(0);
+            host.Step(1);
+
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)1));
+        }
+
+        [Test]
         public void BothHqsSnipedInTheSameTick_IsMutualAnnihilationDraw()
         {
             // Both sides keep their units — the draw comes from two HQ-loss
@@ -370,13 +402,16 @@ namespace Nova.SimRunner.Tests
         {
             TestHost host = NewHost();
 
-            // Slot 0 gets a real construction site: power provider + builder
-            // + credits are the placement prerequisites.
+            // Slot 0 gets a real DefensePlatform site: power provider + builder
+            // + credits are the placement prerequisites. It deliberately has
+            // no HQ, so D-077's separate last-HQ defeat trigger cannot mask
+            // the D-056 site-counting behavior under test. The provider stays
+            // within D-104 construction influence of the site.
             EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 26, 20);
             Assert.That(power.IsValid, Is.True, "power provider");
             EntityId builder = host.SpawnUnit(0, 19, 20, UnitRole.Builder);
             host.Step(1);
-            Assert.That(host.Construction.TryPlaceBuilding(0, DefBarracks, 20, 20), Is.True, "Barracks site");
+            Assert.That(host.Construction.TryPlaceBuilding(0, DefDefensePlatform, 20, 20), Is.True, "DefensePlatform site");
             Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
 
             // Slot 1 is the opponent that keeps the match two-sided.

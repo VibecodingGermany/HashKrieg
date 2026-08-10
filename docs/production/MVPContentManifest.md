@@ -1,6 +1,6 @@
 # MVP-Inhaltsmanifest MS-1
 
-**Version:** 1.1.1 | **Status:** verbindlich – G0-A aktiv, Content gesperrt | **Verantwortungsbereich:** Game Director / Producer / Lead Technical Director | **Sprint:** 7
+**Version:** 1.2.0 | **Status:** verbindliche Inhaltsgrenze – Gate-Kette unter Tier 2 schlafend | **Verantwortungsbereich:** Game Director / Producer / Lead Technical Director | **Sprint:** 16
 
 ## Zweck
 
@@ -9,12 +9,14 @@ MVP als abhängigen, spielbaren Kern statt als Sammlung isolierter Features. Die
 maschinenlesbare Quelle ist
 [`../../quality/content/mvp-v1.json`](../../quality/content/mvp-v1.json); bei einer
 Abweichung muss beides in derselben Änderung korrigiert werden. Das Manifest ist
-eine Anforderung, kein Nachweis: G0, MS-0 und MS-1 sind offen.
+eine Anforderung, kein Nachweis. Der in der JSON-Datei erhaltene G0-Stand ist
+die schlafende Tier-3-Ausgangslage; unter Tier 2 führt er keinen aktiven Gate-
+oder Meilensteinstatus (D-076/D-105).
 
 ## Abhängigkeiten
 
 - [DecisionLog.md](DecisionLog.md) – D-056 (Closed-Core MS-1), D-058
-  (Kapazitäten) und D-061 (Abnahme)
+  (Kapazitäten), D-061 (Abnahme) und D-077 (spielbares Opening)
 - [MVPRecoveryPlan.md](MVPRecoveryPlan.md) – Gates G0 bis G5
 - [../gamedesign/Buildings.md](../gamedesign/Buildings.md),
   [../gamedesign/Infantry.md](../gamedesign/Infantry.md) und
@@ -49,18 +51,19 @@ Versprechen.
 
 ## 2. Startzustand
 
-Jede Seite beginnt mit:
+Jede Seite beginnt gemäß D-077 und der maschinenlesbaren Quelle mit:
 
 - einem fertiggestellten HQ,
-- einer fertiggestellten Raffinerie,
-- einem Builder,
-- zwei Harvestern und
-- 1.000 AE.
+- einem Builder und
+- 3.000 AE.
 
-Die Start-Raffinerie ist die **einzige** Ausnahme von ihren normalen
-Bauvoraussetzungen. Sie erzeugt beim Matchstart keinen zusätzlichen Harvester.
-Alle weiteren Gebäude und Einheiten folgen den regulären Voraussetzungen der
-führenden GDD-Dokumente, soweit dieses Manifest sie nicht für MS-1 überschreibt.
+Raffinerie und Harvester sind nicht vorplatziert. Die Raffinerie hat in MS-1
+kein Kraftwerk-Prerequisite und produziert die Harvester; ihr normaler
+Energiebedarf bleibt bestehen. Alle weiteren Gebäude und Einheiten folgen den
+regulären Voraussetzungen der führenden GDD-Dokumente, soweit dieses Manifest
+sie nicht für MS-1 überschreibt. Die detaillierte AE-Kontoregel bleibt bewusst
+in [../gamedesign/Economy.md](../gamedesign/Economy.md); sie ist kein Feld des
+maschinenlesbaren Inhaltsmanifests.
 
 ## 3. Gebäudeumfang
 
@@ -216,14 +219,17 @@ Vollspiel-Zielbild, werden für MS-1 jedoch durch D-056 übersteuert.
 
 - Q-018 und Q-019 bleiben offen, blockieren MS-1 aber nicht.
 - Balancing-Werte außerhalb der ausdrücklich überschriebenen Cargo-Kapazität
-  bleiben Tuningwerte ihrer führenden GDD-Dokumente und werden über G5
-  abgenommen.
+  bleiben Tuningwerte ihrer führenden GDD-Dokumente und werden in gespielten
+  Runden abgestimmt; G5 wird erst nach einer Tier-3-Reaktivierung wieder Gate.
 
 ## Nächste Schritte
 
-1. G0-A und G0-B ohne Inhaltsvorgriff herstellen.
-2. Definitionen erst nach bestandenem G1 gegen dieses Manifest implementieren.
-3. Ab G4 die exakte Manifestvollständigkeit und Provenienz nachweisen.
+1. Menschliche und maschinenlesbare Inhaltsgrenze bei jeder Änderung gemeinsam
+   halten.
+2. Aktive Pakete über PR, strikte CI und ehrlich dokumentierte Spielabnahme
+   integrieren.
+3. Bei einer späteren Tier-3-Reaktivierung den erhaltenen G0-Stand prüfen und
+   die Gate-Kette nach GOVERNANCE.md ausdrücklich aufwecken.
 
 ## Änderungsverlauf
 
@@ -232,3 +238,4 @@ Vollspiel-Zielbild, werden für MS-1 jedoch durch D-056 übersteuert.
 | 1.0.0 | 2026-07-24 | Verbindlichen dependency-closed MS-1-Umfang gemäß D-056 und D-058 festgelegt | Game Director / Producer / Lead Technical Director |
 | 1.1.0 | 2026-07-24 | Sieg-, Remis-, Zeitlimit- und Last-Unit-Reveal-Vertrag geschlossen | Game Director / Lead Technical Director |
 | 1.1.1 | 2026-07-24 | Aktiven Sprint-7-Status auf G0-A/G0-B korrigiert; Content bleibt bis nach G1 gesperrt | Game Director / Producer / Lead Technical Director |
+| 1.2.0 | 2026-08-10 | Menschliche Startzustandsbeschreibung an die seit D-077 bindende JSON-Quelle angeglichen (HQ + Builder + 3.000 AE, Raffinerie/Harvester nicht vorplatziert) und den G0-Status als schlafende Tier-3-Ausgangslage statt aktives Tier-2-Gate klargestellt | Codex / Dennis Westermann |

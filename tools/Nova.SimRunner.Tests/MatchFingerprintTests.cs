@@ -18,7 +18,7 @@ namespace Nova.SimRunner.Tests
         private static MatchFingerprint CreateStandard()
         {
             return MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 ReplayTestUtil.StandardSlots(),
@@ -66,14 +66,40 @@ namespace Nova.SimRunner.Tests
             Assert.That(CreateStandard().ComputeHash(), Is.EqualTo(CreateStandard().ComputeHash()),
                 "identical fingerprints must hash identically");
 
-            ulong rules = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules);
+            ulong rules = MatchFingerprint.ComputeCurrentRulesHash64();
             ulong definitions = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions);
             ulong map = MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map);
             Assert.That(definitions, Is.Not.EqualTo(rules));
             Assert.That(map, Is.Not.EqualTo(rules));
             Assert.That(map, Is.Not.EqualTo(definitions));
-            Assert.That(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules), Is.EqualTo(rules),
-                "stub hashes must be deterministic");
+            Assert.That(MatchFingerprint.ComputeCurrentRulesHash64(), Is.EqualTo(rules),
+                "the current rules hash must be deterministic");
+            Assert.That(rules,
+                Is.Not.EqualTo(MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules)),
+                "D-106 rules must not match the legacy empty rules stub");
+        }
+
+        [Test]
+        public void RulesRevisionOneAndTwo_GoldenHashesRemainByteStable()
+        {
+            ulong revisionOne = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1);
+            ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
+
+            Assert.That(revisionOne, Is.EqualTo(0x531CE8F614A16CB5UL), "revision 1 canonical stream is frozen");
+            Assert.That(revisionTwo, Is.EqualTo(0x07725EA26668C9F8UL), "revision 2 canonical stream is frozen");
+        }
+
+        [Test]
+        public void CurrentRulesHash_MovesPastRevisionTwo_ForD104PlacementAndRepair()
+        {
+            ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
+            ulong current = MatchFingerprint.ComputeCurrentRulesHash64();
+
+            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV3));
+            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV3)));
+            Assert.That(current, Is.EqualTo(0x05CCA8475789AD4AUL), "revision 3 canonical stream is frozen");
+            Assert.That(current, Is.Not.EqualTo(revisionTwo),
+                "D-104 placement and repair behavior must not share revision 2's rules identity");
         }
 
         [Test]

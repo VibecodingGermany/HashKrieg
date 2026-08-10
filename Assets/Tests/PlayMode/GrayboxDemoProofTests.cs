@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Nova.Gameplay.Match;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Economy;
 
 namespace Nova.PlayMode.Tests
 {
@@ -54,7 +55,7 @@ namespace Nova.PlayMode.Tests
 
             CaptureFrom($"{ShotDir}/demo_03_overview.png", new Vector3(64f, 110f, 24f), new Vector3(64f, 0f, 64f));
             CaptureFrom($"{ShotDir}/demo_04_base_alliance.png", new Vector3(5f, 30f, -12f), new Vector3(6f, 0f, 6f));
-            CaptureFrom($"{ShotDir}/demo_05_base_legion.png", new Vector3(121f, 30f, 138f), new Vector3(120f, 0f, 120f));
+            CaptureFrom($"{ShotDir}/demo_05_base_legion.png", new Vector3(119f, 30f, 136f), new Vector3(119f, 0f, 119f));
 
             foreach (string shot in new[]
             {
@@ -140,9 +141,11 @@ namespace Nova.PlayMode.Tests
             uint tickBaseline = runner.Session.CurrentTick;
             long creditsBaseline = runner.Economy.GetPlayerEconomy(0).AetheriumCredits;
             Assert.Greater(tickBaseline, 0u, "Session tick did not advance");
-            Assert.AreEqual(3000L, creditsBaseline,
-                "the D-077 opening starts with 3.000 AE and NO income of its own — " +
-                "no pre-placed refinery, no starting harvesters");
+            Assert.AreEqual(3000L, bootstrap.ActiveConfig.StartingCredits,
+                "D-077 configures the canonical 3.000-AE opening");
+            Assert.That(creditsBaseline,
+                Is.InRange(EconomySystem.HqBaseCapacityAE, 2999L),
+                "D-106 deterministically decays the initial overhang while no completed Storage exists");
 
             Camera camera = Camera.main;
             Assert.NotNull(camera, "no main camera in the Bootstrap scene");
@@ -153,6 +156,10 @@ namespace Nova.PlayMode.Tests
             // classic first move — the Alliance Refinery (definition id 4)
             // beside the field — enters through the sealed command intake,
             // exactly as device input would submit it.
+            Assert.AreEqual(
+                CommandResultCode.Applied,
+                runner.Construction.ValidatePlacement(MatchBootstrap.LocalSlot, 4, 8, 4),
+                "the canonical local Refinery origin must remain legal before command submission");
             Assert.AreEqual(
                 CommandIngressResult.Accepted,
                 runner.Ingress.TrySubmitIntent(
@@ -170,8 +177,8 @@ namespace Nova.PlayMode.Tests
                 "the player's placed refinery exists as a construction site (counted slot-scoped: " +
                 "the skirmish AI builds its own refinery on slot 1 in the same match, so the " +
                 "global Construction.SiteCount is no longer a player-only signal)");
-            Assert.AreEqual(2300L, creditsLater,
-                $"3000 - 700 refinery cost — the D-077 loop start is player-driven (was {creditsBaseline})");
+            Assert.AreEqual(creditsBaseline - 700L, creditsLater,
+                $"current credits - 700 refinery cost — the D-077 loop start is player-driven (was {creditsBaseline})");
 
             CaptureFrame(camera, $"{ShotDir}/demo_02_economy.png");
             yield return null;
@@ -289,7 +296,7 @@ namespace Nova.PlayMode.Tests
             for (int i = 0; i < runner.Entities.Capacity; i++)
             {
                 ref readonly Nova.Simulation.State.UnitState u = ref units[i];
-                if (!u.IsActive || u.PlayerId != slot || u.Role != Nova.Simulation.State.UnitRole.Unit) continue;
+                if (!u.IsActive || u.PlayerId != slot) continue;
                 uint raw = Nova.Simulation.State.UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw != 0 && runner.Construction.TryGetSite(raw, out _, out _, out _))
                 {
