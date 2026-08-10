@@ -17,6 +17,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Entschieden
+- **D-105: Dennis Westermann (`@cubetribe`) führt das Projekt allein.** Er ist
+  alleiniger Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter;
+  Michael Falk (`@travelhawk`) bleibt historischer Autor und
+  Organisationsmitglied, hat aber keine Projekt-Governance-Rolle mehr.
+  Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Read-only-Review
+  selbst gemergt werden, externe PRs brauchen weiterhin CLA und seine aktuelle
+  Freigabe. PR-only, strikte Checks, Squash/lineare Historie und kein
+  Force-Push bleiben bestehen. Manuelle Spielabnahme darf sichtbar als „nicht
+  gespielt“ zurückgestellt werden; der PR ist dann integrierbar, aber nicht
+  spielerisch abgenommen und kein Meilenstein-Nachweis
+
 ### Hinzugefügt
 - **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
   (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als

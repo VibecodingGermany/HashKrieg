@@ -1,6 +1,6 @@
 # quality/ – Gate-Apparat (schlafend)
 
-**Version:** 1.1.0 | **Status:** Gate-Kette schlafend in Tier 2 (D-076/D-091) | **Verantwortungsbereich:** Maintainers / Lead QA | **Sprint:** 13.0
+**Version:** 1.1.1 | **Status:** Gate-Kette schlafend in Tier 2 (D-076/D-091/D-105) | **Verantwortungsbereich:** Project Owner / Lead QA | **Sprint:** 16
 
 ## Zweck
 
@@ -12,7 +12,7 @@ bis D-066: Evidence-Schema, Semantikvalidator, Gate-Runner, kanonisches
 MS-1-Manifest und die Szenarienschwellen. Es ist auf **Governance-Tier 3**
 ausgelegt – also auf ein Projekt mit fremden Beitragenden, Nutzern und Haftung.
 
-Unter dem aktiven **Tier 2** (externe Beitragende, zwei Maintainer) blockiert es
+Unter dem aktiven **Tier 2** (externe Beitragende, ein Projektinhaber) blockiert es
 weiterhin keinen Meilenstein. Was stattdessen gilt, steht in
 [../GOVERNANCE.md](../GOVERNANCE.md).
 
@@ -57,7 +57,9 @@ Der Weg zurück steht in [../GOVERNANCE.md](../GOVERNANCE.md) unter „Was schl�
 und wie es aufwacht". Kurz:
 
 1. Tier-Wechsel als D-ID entscheiden.
-2. Geschütztes Environment `quality-gate` mit Required Reviewers anlegen.
+2. Geschütztes Environment `quality-gate` mit mindestens einem von der
+   Authorize-Ausführung unabhängigen Required Reviewer anlegen. Diese Freigabe
+   bestätigt technische Evidenz und ist keine Governance-Mitentscheidung.
 3. [MVPRecoveryPlan.md](../docs/production/MVPRecoveryPlan.md) wieder als führend
    für den Meilensteinstatus erklären.
 
@@ -79,3 +81,4 @@ Performance-Regeln – steht unverändert in
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 1.1.0 | 2026-08-08 | D-091: Tier-2-Status und `integrity` auf jedem PR dokumentiert | Maintainers |
+| 1.1.1 | 2026-08-10 | D-105: Tier-2-Beschreibung auf die alleinige Projektleitung nachgezogen; der schlafende Evidenzvertrag bleibt unverändert | Project Owner / Lead QA |
