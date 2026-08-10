@@ -1061,7 +1061,7 @@ namespace Nova.Presentation.UI
         private bool TryGetLeadProducer(out EntityId producer)
         {
             producer = EntityId.Invalid;
-            if (_runner.Entities == null) return false;
+            if (_runner.Entities == null || _runner.Construction == null) return false;
             ReadOnlySpan<EntityId> selected = _selection.SelectedEntities;
             if (selected.Length == 0) return false;
 
@@ -1072,7 +1072,9 @@ namespace Nova.Presentation.UI
                 if (candidate.PlayerId != _dispatcher.LocalSlot) return false;
                 if (SimDefinitions.IsBuildingRole(candidate.Role))
                 {
-                    if (!producer.IsValid && ProducerBuildingRoles.IsProducerRole(candidate.Role))
+                    uint raw = UnitCommandStateView.ToRawEntityId(candidate.Id);
+                    if (!producer.IsValid && ProducerBuildingRoles.IsProducerRole(candidate.Role)
+                        && _runner.Construction.IsCompletedPlacement(raw))
                     {
                         producer = candidate.Id;
                     }
@@ -1249,17 +1251,18 @@ namespace Nova.Presentation.UI
         }
 
         /// <summary>
-        /// Nearest own active entity with a building role to a ground point —
-        /// the repair pick's target search. A construction site (role Unit)
-        /// is excluded by construction; the completed-placement check the
-        /// executor runs stays authoritative at the target tick.
+        /// Nearest own completed placement with a building role to a ground
+        /// point — the repair pick's target search. A site carries the same
+        /// role since 16.3, so presentation prevalidation checks the placement
+        /// register; the executor remains authoritative at the target tick.
         /// </summary>
         private bool TryPickBuilding(Vector3 world, out EntityId picked, out UnitState building)
         {
             picked = EntityId.Invalid;
             building = default;
             EntityManager entities = _runner.Entities;
-            if (entities == null) return false;
+            ConstructionSystem construction = _runner.Construction;
+            if (entities == null || construction == null) return false;
 
             byte slot = _dispatcher.LocalSlot;
             UnitState[] units = entities.RawUnits;
@@ -1271,6 +1274,7 @@ namespace Nova.Presentation.UI
                 ref readonly UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.PlayerId != slot) continue;
                 if (!SimDefinitions.IsBuildingRole(unit.Role)) continue;
+                if (!construction.IsCompletedPlacement(UnitCommandStateView.ToRawEntityId(unit.Id))) continue;
 
                 // Presentation-side boundary conversion (picking is UI, not sim).
                 float dx = unit.Transform.PositionX.ToFloat() - world.x;
@@ -1412,14 +1416,16 @@ namespace Nova.Presentation.UI
         /// <summary>
         /// Producer for a unit definition: a selected own building of the
         /// definition's producer role wins, otherwise the first own building of
-        /// that role in entity order. Construction sites carry role Unit until
-        /// completion, so they are excluded by construction.
+        /// that role in entity order. A site carries its definition role since
+        /// 16.3, so both scans require a completed placement explicitly.
         /// </summary>
         private bool TryResolveProducer(ushort unitDefId, out EntityId building)
         {
             building = EntityId.Invalid;
             EntityManager entities = _runner.Entities;
-            if (entities == null || !SimDefinitions.TryGetUnit(unitDefId, out SimUnitDefinition definition))
+            ConstructionSystem construction = _runner.Construction;
+            if (entities == null || construction == null
+                || !SimDefinitions.TryGetUnit(unitDefId, out SimUnitDefinition definition))
             {
                 return false;
             }
@@ -1430,6 +1436,8 @@ namespace Nova.Presentation.UI
             {
                 if (!entities.TryGetUnit(selected[i], out UnitState candidate)) continue;
                 if (candidate.PlayerId != slot || candidate.Role != definition.ProducerRole) continue;
+                uint raw = UnitCommandStateView.ToRawEntityId(candidate.Id);
+                if (!construction.IsCompletedPlacement(raw)) continue;
                 building = candidate.Id;
                 return true;
             }
@@ -1440,6 +1448,8 @@ namespace Nova.Presentation.UI
             {
                 ref readonly UnitState unit = ref units[i];
                 if (!unit.IsActive || unit.PlayerId != slot || unit.Role != definition.ProducerRole) continue;
+                uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
+                if (!construction.IsCompletedPlacement(raw)) continue;
                 building = unit.Id;
                 return true;
             }

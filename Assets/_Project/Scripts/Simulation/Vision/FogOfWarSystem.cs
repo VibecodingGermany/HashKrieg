@@ -29,7 +29,7 @@ namespace Nova.Simulation.Vision
     /// the building is the radiator, its own sight radius times
     /// <see cref="RadarRadiusMultiplier"/> is the coverage — no finished
     /// Radar, no coverage. At a power deficit the radar is the FIRST system
-    /// to fall (16.6, C4, D-030): no coverage, no pings. MS-1 simplification:
+    /// to fall (16.6, C4, Economy.md Low-Power rule): no coverage, no pings. MS-1 simplification:
     /// team index equals the player slot (D-058 activates exactly two slots;
     /// allied shared sight is post-MS-1).
     /// </para>
@@ -85,7 +85,7 @@ namespace Nova.Simulation.Vision
         /// The construction system is a REQUIRED dependency since 16.5 (#54):
         /// radar coverage derives from COMPLETED Radar placements, which only
         /// its register can tell from sites and corpses. The economy is one
-        /// since 16.6 (C4, D-030): at a power deficit the radar goes OFFLINE —
+        /// since 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar goes OFFLINE —
         /// no pings, no coverage. Both are read-only here (placement queries,
         /// balance reads) and never ticked through this system.
         /// </summary>
@@ -215,7 +215,7 @@ namespace Nova.Simulation.Vision
         /// and every other entity radiate nothing — without a finished Radar
         /// the team has no coverage at all (and MinimapHud draws no map). At
         /// a power deficit the radar is the FIRST system to fall (16.6, C4,
-        /// D-030): this method returns nothing.
+        /// Economy.md Low-Power rule): this method returns nothing.
         /// </para>
         /// <para>
         /// Cadence (Q-040(j), provisional): pings derive from live 10 Hz
@@ -234,7 +234,7 @@ namespace Nova.Simulation.Vision
                 throw new ArgumentOutOfRangeException(nameof(team), team, "Unknown team slot.");
             }
 
-            // 16.6 (C4, D-030): at a power deficit the radar is the FIRST
+            // 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar is the FIRST
             // system to fall — no coverage, no pings. The minimap reads the
             // same balance and goes dark with it.
             if (_economy.GetPlayerEconomy(team).IsLowPower)

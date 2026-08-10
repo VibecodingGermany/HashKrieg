@@ -178,7 +178,7 @@ namespace Nova.Presentation.UI
         /// <summary>
         /// 16.5 (#54, C3): the minimap unlocks with the local slot's first
         /// COMPLETED Radar building and goes dark when it is lost. 16.6 (C4,
-        /// D-030): at a power deficit the radar is the FIRST system to fall —
+        /// Economy.md Low-Power rule): at a power deficit the radar is the FIRST system to fall —
         /// the map goes dark too, exactly like the sim-side pings stop. One
         /// read, shared by the draw and the hit test, so they can never
         /// disagree.

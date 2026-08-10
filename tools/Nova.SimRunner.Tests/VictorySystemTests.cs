@@ -75,13 +75,14 @@ namespace Nova.SimRunner.Tests
                 }
             }
 
-            /// <summary>Despawns every living HQ of a slot (the D-077 "HQ sniped" state, other entities survive).</summary>
+            /// <summary>Despawns every living COMPLETED HQ of a slot (the D-077 "HQ sniped" state, other entities survive; sites excluded — they carry the HQ role since 16.3 but are not a headquarters).</summary>
             public void SnipeHq(byte slot)
             {
                 UnitState[] units = Entities.RawUnits;
                 for (int i = 0; i < Entities.Capacity; i++)
                 {
-                    if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.HQ)
+                    if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.HQ
+                        && !Construction.IsActiveSite(units[i].Id))
                     {
                         Entities.DespawnUnit(units[i].Id);
                     }
@@ -232,6 +233,36 @@ namespace Nova.SimRunner.Tests
             Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)0), "slot 0 still owns its HQ");
             Assert.That(host.Victory.DecidedTick, Is.EqualTo(host.Kernel.CurrentTick.Value),
                 "the defeat lands immediately, on the tick the HQ died");
+        }
+
+        [Test]
+        public void HqSite_DoesNotSaveTheSlot_FromTheHqLossElimination()
+        {
+            // 16.3 (#44): a site carries its definition role, so a half-built
+            // HQ would read as a headquarters to the bare role check and mask
+            // the D-077 elimination after the real HQ falls. The site
+            // register is excluded from the HQ scan, exactly like the generic
+            // role was before.
+            TestHost host = NewHost(startingCredits: 6000);
+            host.SpawnUnit(0, 10, 10, UnitRole.HQ);
+            host.SpawnUnit(0, 16, 10, UnitRole.Builder);
+            host.SpawnUnit(1, 50, 50, UnitRole.HQ);
+            host.SpawnUnit(1, 52, 50);
+            host.Step(1); // both slots engage and latch their HQs
+
+            // Slot 0 starts a second HQ as a SITE — definition role HQ since
+            // 16.3, 1 HP, never completed in this test (the builder stands
+            // out of reach, so the site pauses).
+            Assert.That(host.Construction.TryPlaceBuilding(0, 3, 30, 30), Is.True, "HQ def 3 (Alliance)");
+            Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
+
+            // The real HQ falls: the D-077 elimination must fire despite the
+            // open site — a half-built HQ is not a headquarters.
+            host.SnipeHq(0);
+            host.Step(1);
+
+            Assert.That(host.Victory.Outcome, Is.EqualTo(MatchOutcome.VictoryElimination));
+            Assert.That(host.Victory.WinnerSlot, Is.EqualTo((byte)1));
         }
 
         [Test]

@@ -48,12 +48,12 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// End-state hash of the canonical AI match, last moved by: Sprint 16
-        /// package 16.2 (#46) — produced units spawn at the building footprint
-        /// and walk to their rally point. The AI itself is unchanged:
-        /// AiBehaviorId stayed r5.779A1B5B.
-        /// Previous value: 0x8C0B54F31F2986B7 (Sprint 16.1).
+        /// package 16.4 (#53) — storage capacity and excess decay change the
+        /// economy the AI plays in. The AI itself is unchanged:
+        /// AiBehaviorId stays r6.E34435F9.
+        /// Previous value: 0x9F93097AD526B6F7 (Sprint 16.2).
         /// </summary>
-        private const string PinnedEndState = "0x9F93097AD526B6F7";
+        private const string PinnedEndState = "0xE784E6184AD16081";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()

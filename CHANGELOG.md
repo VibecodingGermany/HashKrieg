@@ -17,6 +17,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
+### Entschieden
+- **D-105: Dennis Westermann (`@cubetribe`) führt das Projekt allein.** Er ist
+  alleiniger Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter;
+  Michael Falk (`@travelhawk`) bleibt historischer Autor und
+  Organisationsmitglied, hat aber keine Projekt-Governance-Rolle mehr.
+  Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Read-only-Review
+  selbst gemergt werden, externe PRs brauchen weiterhin CLA und seine aktuelle
+  Freigabe. PR-only, strikte Checks, Squash/lineare Historie und kein
+  Force-Push bleiben bestehen. Manuelle Spielabnahme darf sichtbar als „nicht
+  gespielt“ zurückgestellt werden; der PR ist dann integrierbar, aber nicht
+  spielerisch abgenommen und kein Meilenstein-Nachweis
+
 ### Hinzugefügt
 - **Die Welle der Skirmish-KI kann in Kampfstärke statt in Köpfen messen
   (Verhalten `r6`):** `CombatStrength` bewertet eine Einheit als
@@ -53,15 +65,46 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Behoben
-- **Low Power ist eine Waffe (C4/D-030, Sprint 16.6)** — bei Energiedefizit
+- **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
   fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
   (Economy als Pflicht-Abhängigkeit), und die Minimap geht mit aus (dieselbe
   Bilanz, dieselbe Abfrage). Produktion und Bau behalten den exakten
   Tempo-Malus (0.5 in Q16.16), und die Reparatur halbiert jetzt exakt
-  (10 → 5 HP/Tick, Economy.md-Reparaturregel). Erst damit ist der Angriff
-  aufs Kraftwerk ein taktischer Zug. **Nicht dabei:** die Verteidigungs-
+  (10 → 5 HP/Tick, Economy.md-Reparaturregel). Die Regelidentität steigt auf
+  Revision 2 und bindet beide Reparaturraten; Revision-1-Replays und -Peers
+  werden gegenüber Revision-2-Hosts beziehungsweise -Peers vor Tick 1 mit
+  `RulesHash64`-Mismatch abgelehnt. Erst damit
+  ist der Angriff aufs Kraftwerk ein taktischer Zug. **Nicht dabei:** die Verteidigungs-
   abschaltung — ob ein Turm feuert, entscheidet `CombatSystem` (Einheiten-
   strang), das einen Strombegriff nicht kennt; Befund geht an 13B
+- **#53: Das Lager begrenzt das Konto (D-024/D-096/D-106)** — das Aetherium-Konto hat
+  jetzt eine aus dem Gebäudebestand abgeleitete Obergrenze, nichts wird
+  gespeichert (kein Zustandsfeld, kein Formatbruch): ein oder mehrere fertige
+  HQs geben zusammen genau eine Basis von 2.000 AE, jedes fertige Lager
+  +2.000; Baustellen zählen nicht. Jede
+  Einzahlung (Ernte, Rückerstattungen bei Streichung, Abbruch, Verkauf) läuft
+  über `EconomySystem.DepositCapped` und deckelt hart — Überschuss verfällt.
+  Ein Bestand über der Grenze zerfällt einmal pro Sekunde um 25 % des
+  Überschusses (getaktet über den Sim-Tick, zustandslos, restore-sicher): das
+  ist der „25 % Verlust bei Zerstörung" ohne Ereignis getragen — ein
+  zerstörtes oder verkauftes Lager senkt die Grenze, der Zerfall ist der
+  Verlust. D-106 präzisiert die Zerstörungsregel als zustandslosen Zerfall
+  statt Slot-gebundenem Einmalverlust und bindet Revision sowie
+  2.000/2.000/25/10 erstmals in `RulesHash64`: alte Dateien bleiben lesbar,
+  eine Wiedergabe oder ein Lockstep-Start mit dem alten leeren Rules-Stub wird
+  vor Tick 1 abgelehnt. Der kanonische KI-Endzustand
+  bleibt bei Tick 2.546 entschieden und bewegt sich durch diese Wirtschaftsregel
+  von `0x9F93097AD526B6F7` auf `0xE784E6184AD16081`; die KI-Kennung bleibt
+  unverändert `r6.E34435F9`
+- **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
+  Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
+  Waffentabelle greift nicht mehr, und `CombatSystem` schliesst zusätzlich jede aktive
+  Baustelle als Angreifer und Ziel aus — auch die Verteidigungsplattform feuert
+  vor Fertigstellung nicht. Strombilanz, Skirmish-KI, kanonisches
+  Determinismus-Szenario und HQ-Siegprüfung behandeln Sites ebenfalls nicht als
+  fertige Gebäude; `UnitViewManager` behält die Baustellenoptik bis zur
+  Fertigstellung. Die minimale AI-/Combat-Integrationsreparatur ist nach D-105
+  dokumentiert und ändert die dauerhafte Stranghoheit nicht
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
   solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im

@@ -220,7 +220,7 @@ namespace Nova.Gameplay.Match
             Construction = new Simulation.Construction.ConstructionSystem(Entities, Economy, Pathfinding.CostField);
             Production = new Simulation.Production.ProductionSystem(Entities, Economy, Construction);
             FogOfWar = new FogOfWarSystem(Entities, Construction, Economy, teamCount: 2, _mapWidth, _mapHeight);
-            Combat = new CombatSystem(Entities, FogOfWar, Economy);
+            Combat = new CombatSystem(Entities, FogOfWar, Economy, Construction);
             Victory = new Simulation.Victory.VictorySystem(Entities, Construction);
 
             Session = new MatchSession(_config.LocalSlot, _config.ActiveSlots, _config.InputDelayTicks);

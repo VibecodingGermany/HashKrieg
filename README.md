@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.19.1 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-08
+**Dokumentversion:** 0.20.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -170,14 +170,18 @@ Der ausgeführte Stand und die offenen Abnahmen stehen im
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
 [Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md).
-Was stattdessen als Nachweis zählt, definiert [GOVERNANCE.md](GOVERNANCE.md):
-**grüne CI plus eine gespielte und protokollierte Runde.**
+Was stattdessen als Meilenstein-Nachweis zählt, definiert
+[GOVERNANCE.md](GOVERNANCE.md): **grüne CI plus eine gespielte und
+protokollierte Runde.** D-105 erlaubt, einen einzelnen grünen PR mit sichtbar
+zurückgestellter Spielabnahme zu mergen; er gilt dann nicht als spielerisch
+abgenommen und liefert noch keinen Meilenstein-Nachweis.
 
 Seit D-091 gilt **Governance-Tier 2**: Externe Beiträge kommen ausschließlich
-aus Forks, und nur Dennis Westermann (`@cubetribe`) und Michael Falk
-(`@travelhawk`) dürfen nach `main` mergen. Nach dem Tier-2-Remote-Rollout braucht
-jeder PR eine Freigabe des jeweils anderen Maintainers. Das Gate-Regime G0–G5
-mit Evidence- und Receipt-Verträgen blockiert nichts mehr; es ist vollständig
+aus Forks. Seit D-105 ist Dennis Westermann (`@cubetribe`) alleiniger
+Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter; externe PRs
+brauchen weiterhin CLA und seine Freigabe auf dem aktuellen Head. Michael Falk
+(`@travelhawk`) hat keine Projekt-Governance-Rolle mehr. Das Gate-Regime G0–G5
+mit Evidence- und Receipt-Verträgen blockiert in Tier 2 nichts; es ist vollständig
 erhalten und ruht bis Tier 3 — siehe
 [quality/README.md](quality/README.md).
 
@@ -460,6 +464,7 @@ Projekt ein Publikum hat.
 | 0.18.0 | 2026-08-08 | Sprint 11 und Sprint 12 A/B in Projektstatus, Spielanleitung, Grenzen und nächste Schritte übernommen; Truppenführung, TCP-Relay sowie VFX/SFX nicht länger als fehlend bezeichnet; macOS-Testbuild korrekt als universell und ad-hoc-signiert dokumentiert | Technical Writer |
 | 0.19.0 | 2026-08-08 | D-091: Source-available Lizenz, CLA und Tier-2-Beitragsmodell ergänzt; die zwei Maintainer mit Merge-Recht und die Asset-/Markenabgrenzung klar benannt | Technical Writer |
 | 0.19.1 | 2026-08-08 | CLA-Wirkung auf Beiträge mit dokumentierter Zustimmung begrenzt; keine rückwirkende Rechteübertragung unterstellt | Technical Writer |
+| 0.20.0 | 2026-08-10 | D-105: alleinige Projektleitung und Merge-Autorität von `@cubetribe`, externe aktuelle Inhaberfreigabe sowie die ehrliche Zurückstellung manueller Spielabnahmen dokumentiert | Technical Writer |
 | 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
 | 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
 | 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |

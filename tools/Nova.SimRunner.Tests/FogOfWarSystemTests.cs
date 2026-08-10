@@ -291,7 +291,7 @@ namespace Nova.SimRunner.Tests
         [Test]
         public void RadarSignatures_StopAtPowerDeficit_AndResumeWhenBalanceRecovers()
         {
-            // 16.6 (C4, D-030): at a power deficit the radar is the FIRST
+            // 16.6 (C4, Economy.md Low-Power rule): at a power deficit the radar is the FIRST
             // system to fall — no coverage, no pings. The deficit here is set
             // directly on the balance (the rig's economy never recomputes).
             var host = TestHost.Create(Seed);

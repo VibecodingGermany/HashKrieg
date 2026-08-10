@@ -669,7 +669,7 @@ namespace Nova.SimRunner
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
             var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -709,7 +709,7 @@ namespace Nova.SimRunner
 
         /// <summary>
         /// The standard match configuration fingerprint: slot 0
-        /// human/Alliance, slot 1 AI/Legion, stub rules/map hashes and the
+        /// human/Alliance, slot 1 AI/Legion, current rules hash, stub map hash and the
         /// REAL canonical definitions hash (SimDefinitions.ComputeDefinitionsHash64
         /// — a replay recorded against a different definition table refuses
         /// to start, SimulationCore.md section 6).
@@ -723,7 +723,7 @@ namespace Nova.SimRunner
             factions[HumanSlot] = (byte)FactionId.Alliance;
             factions[AiSlot] = (byte)FactionId.Legion;
             return MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 SimDefinitions.ComputeDefinitionsHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
@@ -826,13 +826,14 @@ namespace Nova.SimRunner
         // Deterministic host scans (ascending entity index)
         // ----------------------------------------------------------------
 
-        /// <summary>Raw id of the first active entity of <paramref name="slot"/> with the role, else 0.</summary>
+        /// <summary>Raw id of the first active completed/non-site entity of <paramref name="slot"/> with the role, else 0.</summary>
         private static uint FindRoleRaw(Host host, byte slot, UnitRole role)
         {
             UnitState[] units = host.Entities.RawUnits;
             for (int i = 0; i < host.Entities.Capacity; i++)
             {
-                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role)
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == role
+                    && !host.Construction.IsActiveSite(units[i].Id))
                 {
                     return UnitCommandStateView.ToRawEntityId(units[i].Id);
                 }

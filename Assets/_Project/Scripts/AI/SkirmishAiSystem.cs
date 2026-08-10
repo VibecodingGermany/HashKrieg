@@ -225,6 +225,21 @@ namespace Nova.AI
                 uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw == 0) continue;
 
+                // 16.3 (#44): a site already carries its definition role.
+                // Classify through the site register BEFORE building roles so
+                // an unfinished Refinery/HQ/etc. never becomes a completed
+                // producer or prerequisite in the planner.
+                if (_construction.TryGetSite(raw, out _, out _, out uint assignedBuilder))
+                {
+                    sites.Add(new SiteInfo
+                    {
+                        CellX = GridCellOf(u.Transform.PositionX),
+                        CellY = GridCellOf(u.Transform.PositionY),
+                        AssignedBuilderRaw = assignedBuilder,
+                    });
+                    continue;
+                }
+
                 if (SimDefinitions.IsBuildingRole(u.Role))
                 {
                     switch (u.Role)
@@ -261,19 +276,6 @@ namespace Nova.AI
                         if (u.HarvestFieldId == 0 && !u.IsReturningCargo)
                         {
                             idleHarvesterRaws.Add(raw);
-                        }
-                        break;
-                    case UnitRole.Unit:
-                        // A construction site carries the generic role; the
-                        // site table tells it from a plain unit.
-                        if (_construction.TryGetSite(raw, out _, out _, out uint assignedBuilder))
-                        {
-                            sites.Add(new SiteInfo
-                            {
-                                CellX = GridCellOf(u.Transform.PositionX),
-                                CellY = GridCellOf(u.Transform.PositionY),
-                                AssignedBuilderRaw = assignedBuilder,
-                            });
                         }
                         break;
                     default:
@@ -837,6 +839,7 @@ namespace Nova.AI
             {
                 if (!_entityManager.TryGetUnit(visible[i], out UnitState u)) continue;
                 if (u.PlayerId == _aiPlayerId) continue;
+                if (_construction.IsActiveSite(u.Id)) continue;
                 if (WeaponProfiles.Get(_economy.GetSlotFaction(u.PlayerId), u.Role).AttackDamage <= 0) continue;
 
                 long x = GridCellOf(u.Transform.PositionX);
@@ -1362,6 +1365,10 @@ namespace Nova.AI
                 // own unit would actually fire. The auto-acquisition filters
                 // hostile strictly; the command path does not.
                 if (u.PlayerId == _aiPlayerId) continue;
+                // Combat rejects every active site as a target. Excluding it
+                // here keeps the AI from repeatedly choosing an invulnerable
+                // definition-role site (especially an HQ site).
+                if (_construction.IsActiveSite(u.Id)) continue;
 
                 uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw == 0) continue;
