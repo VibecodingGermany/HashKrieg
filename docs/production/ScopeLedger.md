@@ -1,6 +1,6 @@
 # Scope-Ledger der Graybox-Spur
 
-**Version:** 0.6.0 | **Status:** laufendes Register – Graybox-Entwurf D-067 plus verbindliche 12B-Abweichungen D-090 | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 12
+**Version:** 0.7.0 | **Status:** laufendes Register – Graybox-Entwurf D-067 plus verbindliche 12B-Abweichungen D-090 und D-102-Fünf-Feld-Stand | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -41,7 +41,7 @@ funktionalen Anteil, das genannte Gate den vollständigen Inhalt.
 |---|---|---|---|
 | `startStatePerPlayer.unitRoles` | Startaufstellung des Determinismus-Szenarios portiert; zusätzlich vier Infanterieeinheiten je Slot, damit überhaupt etwas zu sehen ist | G4 | D-067 K1, K2 |
 | `map.id`, `map.biome` | die Karte heißt seit GB-003 Glutrinne und zeigt einen Wüsten-Blockout (Sandtönung, Kartenrand-Rahmen, Kristallmarker – reine Präsentation über `GlutrinneBlockoutView` plus Datenasset `MAP_Glutrinne.asset`); weiterhin kein Terrain-/Biom-System und keine Hindernisse, nur die Kantenlänge stimmt | G4 (G2: technisch korrektes Testlayout) | D-067 K1, K2 |
-| `map.aetheriumFields` | zwei Felder an festen Zellen nahe den Startbasen statt der im Manifest festgelegten Feldliste; seit GB-003 als Kristallmarker sichtbar, Reserven und Verhalten unverändert | G4 (G2) | D-067 K1, K2 |
+| `map.aetheriumFields` | seit D-102 sind fünf endliche Felder in Manifestanzahl und -reserven an festen, punktgespiegelten Zellen registriert und als Kristallmarker sichtbar; Startaufstellung, Headless-Szenario, Datenasset und Tests sind synchron, aber eine gespielte Abnahme beziehungsweise ein G4-Nachweis fehlt weiterhin | G4 (G2) | D-067 K1, K2; D-102 |
 | `map.primaryRouteCount` | keine Routenführung; die Ebene ist überall passierbar | G4 (G2) | D-067 K1, K2 |
 | `factions[1]` | seit dieser Sitzung Simulationswirklichkeit: 34 fraktionsaufgelöste Definitionen (`SimDefinitions`, Id-Regel und Provenienz per D-075), Slot-Fraktion im Economy-Snapshotblock v2 mit `SetSlotFaction`-Guard, fraktionsaufgelöste Kosten/Bauzeiten/Energie/Waffenwerte, Graybox-Farben aus den D-072-Paletten im `UnitViewManager` und Slot-Fraktionen im Debug-HUD. Verbleibend: das `weaponProfile` der Identität (eigene Zeile) und der untätige KI-Slot (eigene Zeile). Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
 | `factions[1].identity.harvesterCargoAE` | seit dieser Sitzung im Code erfüllt: die Kapazität lebt in der Harvester-Definitionszeile (`SimUnitDefinition.CargoCapacityAE`), das `EconomySystem` klammert die Ernte fraktionsaufgelöst; die Entity-Store-Snapshotvalidierung deckelt auf das fraktionsübergreifende Maximum und bietet die pro-Entity-Fraktionsgrenze als Überladung. Kein Gate-Nachweis — die Zeile bleibt bis zur auflösenden Evidence | G4 | D-067 K1, K2 |
@@ -152,3 +152,4 @@ implementierten Gefechtsfeedback fest. D-090 ist die führende Entscheidung.
 | 0.4.0 | 2026-08-05 | Sitzung GB-003: Zeilen `map.id`/`map.biome` und `map.aetheriumFields` auf den Stand des Glutrinne-Blockouts fortgeschrieben (Wüsten-Präsentation und Kristallmarker, weiterhin kein Terrain-System und nur zwei registrierte Felder; nicht entfernt – es gibt keinen auflösenden Gate-Nachweis) | Technical Writer |
 | 0.5.0 | 2026-08-05 | Sitzung GB-004: Zeile `persistence.pauseRequired` fortgeschrieben (Pause an P gebunden; kein Pausenmenü – Zeile bleibt bis G2) | Technical Writer |
 | 0.6.0 | 2026-08-08 | Separaten D-090-Abschnitt mit sämtlichen bekannten Abweichungen des ausgeführten Sprint-12-Strangs B ergänzt; Graybox-Hauptregister und Manifestverweise unverändert erhalten | Technical Writer / Agent (Umsetzung) |
+| 0.7.0 | 2026-08-10 | `map.aetheriumFields` auf D-102/Sprint 16.7 fortgeschrieben: fünf endliche Felder sind registriert, sichtbar und automatisiert gespiegelt; mangels gespielter Abnahme bleibt die Zeile bis zum Gate-Nachweis bestehen | Codex / Dennis Westermann |

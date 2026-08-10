@@ -62,8 +62,8 @@ namespace Nova.Simulation.Tests
                 var economy = new EconomySystem(entities, startingCredits);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 // Canonical tick order (SimulationCore.md section 2): economy
@@ -207,11 +207,11 @@ namespace Nova.Simulation.Tests
             EntityId builder = host.SpawnBaseFixture(0, 4, 4);
             host.StepTick(); // commit the start balance (30 provided / 20 required)
 
-            // Legal: Storage (def 6, 300 AE) at (20,20) — the start grid
+            // Legal: Storage (def 6, 300 AE) at (4,8) — the start grid
             // (30 provided, 20 required) powers its 5, not the Barracks' 15:
             // the Alliance must build a Power plant before its Barracks
             // (Buildings.md power figures).
-            host.Submit(new PlaceBuildingPayload(6, 20, 20));
+            host.Submit(new PlaceBuildingPayload(6, 4, 8));
             // Insufficient funds: HQ (def 3, 2500 AE) at (30,20).
             host.Submit(new PlaceBuildingPayload(3, 30, 20));
             host.StepTick();
@@ -231,12 +231,34 @@ namespace Nova.Simulation.Tests
             // Prerequisite: the DefensePlatform (def 11, 400 AE) needs a
             // completed Power plant — cheap enough that the generic cost
             // check passes and the domain check decides.
-            host.Submit(new PlaceBuildingPayload(11, 30, 30));
+            host.Submit(new PlaceBuildingPayload(11, 12, 12));
             host.StepTick();
             Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.RejectedPrerequisitesNotMet));
             Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(700L),
                 "every rejection charged nothing");
             Assert.That(host.Entities.IsValid(builder), Is.True);
+        }
+
+        [Test]
+        public void Repair_ThroughSealedCommand_ChargesBeforeHealing()
+        {
+            var host = ProdHost.Create(Seed);
+            EntityId builder = host.SpawnBaseFixture(0, 4, 4);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True, "full-power anchor");
+            EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 7, 20, 20);
+            host.Entities.GetUnitRef(builder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
+            host.Entities.GetUnitRef(barracks).CurrentHealth = 100;
+            host.StepTick();
+
+            host.Submit(new RepairPayload(
+                new[] { UnitCommandStateView.ToRawEntityId(builder) },
+                UnitCommandStateView.ToRawEntityId(barracks)));
+            host.StepTick();
+
+            Assert.That(host.Kernel.LastTickResults[0].Code, Is.EqualTo(CommandResultCode.Applied));
+            Assert.That(host.Entities.GetUnitRef(barracks).CurrentHealth, Is.EqualTo(110));
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(998L),
+                "S(110)-S(100)=2 AE is debited in the same tick before 10 HP are applied");
         }
 
         [Test]
@@ -277,7 +299,7 @@ namespace Nova.Simulation.Tests
             // Barracks' 15 — the Alliance builds its Power plant first
             // (Buildings.md); placed completed here, the test is about the
             // build/queue/spawn loop, not the power rule.
-            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True);
             host.StepTick(); // commit the start balance
 
             // The auto-assigned fixture builder walks nowhere in this test —
@@ -333,8 +355,8 @@ namespace Nova.Simulation.Tests
             var hostB = ProdHost.Create(Seed);
             EntityId builderA = hostA.SpawnBaseFixture(0, 4, 4);
             EntityId builderB = hostB.SpawnBaseFixture(0, 4, 4);
-            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
-            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True);
+            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True);
+            Assert.That(hostB.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True);
             hostA.StepTick(); // commit the start balance on both kernels
             hostB.StepTick();
 
@@ -412,7 +434,7 @@ namespace Nova.Simulation.Tests
         {
             var hostA = ProdHost.Create(Seed);
             EntityId builder = hostA.SpawnBaseFixture(0, 4, 4);
-            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+            Assert.That(hostA.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True,
                 "Power first — the start grid cannot power the Barracks (Buildings.md)");
             hostA.StepTick(); // commit the start balance
             hostA.Submit(new PlaceBuildingPayload(7, 20, 20));
@@ -462,7 +484,7 @@ namespace Nova.Simulation.Tests
             // (and therefore the playback) starts with the builder already
             // in reach of the future site — replay only replays commands.
             host.Entities.GetUnitRef(builder).Transform = new Transform2D(SimFixed.FromInt(19), SimFixed.FromInt(20));
-            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True,
                 "Power first — the start grid cannot power the Barracks (Buildings.md)");
             host.StepTick(); // commit the start balance before recording
 
@@ -470,7 +492,7 @@ namespace Nova.Simulation.Tests
             slots[0] = (byte)PlayerSlotOccupancy.Human;
             slots[1] = (byte)PlayerSlotOccupancy.AI;
             MatchFingerprint fingerprint = MatchFingerprint.CreateCurrent(
-                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                MatchFingerprint.ComputeCurrentRulesHash64(),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                 MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                 slots,
@@ -520,7 +542,7 @@ namespace Nova.Simulation.Tests
         {
             var host = ProdHost.Create(Seed);
             host.SpawnBaseFixture(0, 4, 4);
-            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 40, 40).IsValid, Is.True,
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 5, 14, 14).IsValid, Is.True,
                 "Power first — a low-power grid would double the production time under test");
             host.StepTick(); // commit the start balance
             EntityId barracks = host.Construction.PlaceCompletedBuilding(0, 7, 20, 20);

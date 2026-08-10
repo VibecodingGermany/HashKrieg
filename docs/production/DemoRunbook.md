@@ -1,6 +1,6 @@
 # Demo-Runbook – erste spielbare Runde (Glutrinne-Graybox)
 
-**Version:** 0.5.0 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 7
+**Version:** 0.6.1 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -42,7 +42,7 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
   Musiklautstärke in den Einstellungen auf 0 oder Musik ist ausgeschaltet —
   siehe §7.
 
-## 2. Was die Demo zeigt (Spielstand GB-005, D-077 + Hauptmenü, D-083)
+## 2. Was die Demo zeigt (Spielstand Sprint 16.7, D-077/D-102 + Hauptmenü, D-083)
 
 - **Hauptmenü mit Musik (D-083):** Key Art im Vollbild, Titel „HASHKRIEG",
   vier Einträge — **Neues Spiel / Laden / Einstellungen / Beenden**. „Laden" ist
@@ -51,8 +51,10 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
   Die Einstellungen überleben den Neustart (§7). Es ist das erste UI-Toolkit-UI
   des Projekts; das übrige HUD bleibt bis auf Weiteres OnGUI-Wegwerfcode.
 - **Karte „Glutrinne" (Blockout):** Wüstengetönte 128×128-Ebene, dunkler
-  Kartenrand-Rahmen, Aetherium-Kristallmarker (cyan) auf den beiden Feldern,
-  die das kanonische Match registriert (lokal (7,7), gegnerisch (119,119)).
+  Kartenrand-Rahmen und Aetherium-Kristallmarker (cyan) auf allen fünf
+  kanonischen Feldern: Start `(7,7)` / `(117,117)` und Expansion
+  `(24,40)` / `(100,84)` mit je 9.000 AE sowie Zentrum `(62,62)` mit
+  15.000 AE (D-102).
 - **Startaufstellung je Slot:** HQ + 1 Builder + 3.000 AE. Slot 0 (Mensch) =
   Allianz, Slot 1 = Legion. Mehr gibt es nicht — der Kernloop wird gespielt,
   nicht geschenkt.
@@ -143,23 +145,27 @@ steht davor und dauert so lange, wie man ihn zeigen will.
 6. **Gegenwehr (6:00):** Die erste gegnerische Angriffswelle trifft ein.
    Infanterie per Box auswählen, mit A auf einen Angreifer klicken; Schaden
    und Gesundheits-Tint beobachten.
-7. **Gegenstoß (9:00):** Eigene Truppe Richtung (120,120) schicken; die
+7. **Gegenstoß (9:00):** Eigene Truppe Richtung (119,119) schicken; die
    Legion-Basis erscheint, sobald eigene Einheiten sie aufklären. **Ziel: das
    gegnerische Hauptquartier zerstören** — das beendet das Spiel sofort.
 8. **Abschluss:** Ergebnis in der Statusleiste (VICTORY / DEFEAT); per F3 die
    Details (Tick, Census, Sieg-Code) zeigen. Zurück ins Menü führt kein Weg —
    die Runde endet mit dem Beenden des Spiels (§5).
 
-## 5. Bekannte Grenzen (ehrlich, Stand GB-005)
+## 5. Bekannte Grenzen (ehrlich, aktueller technischer Stand; manuelle Abnahme offen)
 
 - **Die KI ist bewusst einfach:** feste Build-Order, nur Infanterie-Wellen,
   kein Nachschub-Management jenseits der Grundregeln, kein Reagieren auf den
   Spieler (kein Konter, kein Rückzug). Ihre Peer-Session ist nicht
   snapshot-serialisiert.
-- **Keine Zielerfassung:** Einheiten erwidern kein Feuer; die
-  Verteidigungsplattform kann nie schießen; A ohne Gegner unter dem Cursor
-  ist ein schlichtes Move. (Die KI umgeht das mit expliziten Attack-Orders.)
-- `Stop` löscht das Angriffsziel nicht; Angriffe auf eigene Einheiten sind zulässig.
+- **Zielerfassung bleibt schlicht:** Bewaffnete Einheiten und fertige
+  Verteidigungsplattformen erfassen Ziele automatisch und erwidern Feuer. Ein
+  A-Befehl ohne Gegner unter dem Cursor bleibt jedoch ein schlichtes Move;
+  Attack-Move und Zielerfassung bei der Ankunft sind nicht implementiert.
+- `Stop` löscht Bewegung und das aktuelle Angriffsziel. Die automatische
+  Zielerfassung darf im nächsten Combat-Tick erneut ein Ziel setzen; ein echtes
+  Halte-Feuer ist weiterhin nicht implementiert. Angriffe auf eigene Einheiten
+  sind zulässig.
 - Nach Siegentscheid tickt der Host weiter; es gibt keinen Ergebnisbildschirm
   (nur die Statusleiste / F3) **und keinen Rückweg ins Hauptmenü**.
 - **„Laden" im Menü ist ohne Funktion** und deshalb ausgegraut. Die
@@ -179,8 +185,8 @@ steht davor und dauert so lange, wie man ihn zeigen will.
   Fraktionswahl hängt an `InitialStateHash` und wäre eine Determinismus-,
   keine Menü-Änderung (D-083).
 - Aetherium-Felder sind endlich, aber statisch (kein Nachwachsen, keine
-  Warnung); das Manifest-Layout mit 5 Feldern und 2 Angriffswegen ist G4-Scope
-  – der Blockout zeigt bewusst nur die zwei real registrierten Felder.
+  Warnung). Das Fünf-Feld-Layout ist seit D-102 registriert und sichtbar;
+  die zwei ausgearbeiteten Angriffswege bleiben G4-Scope.
 - Erledigt seit GB-005 (hier nur als Historie): das Vollbild-Debug-Overlay ist
   standardmäßig aus (F3); die 3D-Modelle überlagern sich nicht mehr
   (Laufzeit-Normierung auf den Sim-Footprint); der KI-Slot spielt; der
@@ -272,3 +278,5 @@ der Editor in der Konsole, wenn das Schreiben fehlschlägt.
 | 0.3.0 | 2026-08-06 | Stand GB-005 (D-077): Start HQ + Builder + 3.000 AE, Kernloop-Ablauf neu (Raffinerie → Harvester → Kaserne), KI-Gegner aktiv, Sieg bei HQ-Zerstörung, Statusleiste + F3-Panel, Skalierungsreparatur vermerkt | Agent |
 | 0.4.0 | 2026-08-06 | Hauptmenü (D-083): §1 korrigiert – Play zeigt das Menü, das Match startet über „Neues Spiel" (`AutoStart = false`), nicht mehr von selbst; §2 um Menü, Key Art und Menümusik ergänzt; §4 um einen Menüschritt vorangestellt und durchnummeriert (Zeitmarken zählen ab Matchstart); §5 um „Laden" ausgegraut, wirkungslosen SFX-Regler, gemeinsames URP-Asset über alle sechs Render-Detail-Stufen und fehlenden Rückweg ins Menü erweitert; neues §7 zu `settings.json` in `Application.persistentDataPath` (Inhalt, Zurücksetzen, Verhalten bei kaputter Datei) | Agent |
 | 0.5.0 | 2026-08-06 | Bedienbares HUD (D-084): §2 um Bauleiste/Ghost-Platzierung, Command Card, Minimap, sichtbaren Nebel und Selektionsmarker ergänzt; §3 um MMB-Drag-Rotation, Space-Reset und die tastaturfreien Wege über Bauleiste/Command Card erweitert | Agent |
+| 0.6.0 | 2026-08-10 | D-102/Sprint 16.7 nachgezogen: fünf endliche Aetheriumfelder samt Markerpositionen und Reserven ersetzen die alte Zwei-Feld-Beschreibung; Angriffswege bleiben G4-Scope | Codex / Dennis Westermann |
+| 0.6.1 | 2026-08-10 | D-097/Paket 16.10 nachgezogen: Stop löscht das aktuelle Angriffsziel; automatische Neuerfassung im Folgetick und das weiterhin fehlende Halte-Feuer ehrlich abgegrenzt; die benachbarte überholte Behauptung fehlender Auto-Zielerfassung auf den aktuellen Combat-Stand korrigiert | Codex / Dennis Westermann |

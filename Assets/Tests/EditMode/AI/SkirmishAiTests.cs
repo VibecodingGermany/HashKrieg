@@ -49,7 +49,7 @@ namespace Nova.AI.Tests
 
         /// <summary>
         /// End-to-end tick budget: this suite's deterministic match decides
-        /// at tick 2242, so 6.000 ticks is a ~2.7x margin — comfortably sane,
+        /// at tick 2726, so 6.000 ticks is a ~2.2x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
         private const int EndToEndBudgetTicks = 6000;
@@ -125,8 +125,8 @@ namespace Nova.AI.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
-            var combat = new CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
+            var combat = new CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new VictorySystem(entities, construction);
 
             var session = new MatchSession(HumanSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
@@ -189,10 +189,10 @@ namespace Nova.AI.Tests
             for (byte slot = 0; slot < 2; slot++)
             {
                 ushort fieldId = (ushort)(slot + 1);
-                int fieldCell = slot == HumanSlot ? 7 : 119;
-                int hqOrigin = slot == HumanSlot ? 4 : 120;
-                int builderX = slot == HumanSlot ? 13 : 113;
-                int builderY = slot == HumanSlot ? 7 : 119;
+                int fieldCell = slot == HumanSlot ? 7 : 117;
+                int hqOrigin = slot == HumanSlot ? 4 : 118;
+                int builderX = slot == HumanSlot ? 13 : 111;
+                int builderY = slot == HumanSlot ? 7 : 117;
 
                 Assert.That(host.Economy.TryAddField(fieldId, new GridPos2D(fieldCell, fieldCell), FieldReserveAE),
                     Is.True, $"field {fieldId} could not be registered");
@@ -270,16 +270,28 @@ namespace Nova.AI.Tests
         // ----------------------------------------------------------------
 
         [Test]
-        public void SkirmishAi_PlacesRefineryThenBarracks_ThroughTheSealedCommandPath()
+        public void SkirmishAi_PlacesRefineryPowerThenBarracks_ThroughTheSealedCommandPath()
         {
             AiHost host = BuildMatch(Seed);
 
-            host.Run(800);
+            uint refineryTick = 0;
+            uint powerTick = 0;
+            uint barracksTick = 0;
+            for (int i = 0; i < 1000 && barracksTick == 0; i++)
+            {
+                host.Step();
+                uint tick = host.Kernel.CurrentTick.Value;
+                if (refineryTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery)) refineryTick = tick;
+                if (powerTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power)) powerTick = tick;
+                if (barracksTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks)) barracksTick = tick;
+            }
 
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.True,
+            Assert.That(refineryTick, Is.GreaterThan(0u),
                 "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.True,
-                "the AI must follow up with the Barracks once the Refinery stands");
+            Assert.That(powerTick, Is.GreaterThan(refineryTick),
+                "D-103 requires the AI to complete a Power plant after the Refinery and before its Barracks");
+            Assert.That(barracksTick, Is.GreaterThan(powerTick),
+                "the AI must complete the Barracks only after its required Power plant stands");
             Assert.That(host.Construction.HasFinishedBuilding(HumanSlot, UnitRole.Refinery), Is.False,
                 "slot 0 is the passive fixture: nobody issues orders for it");
 
@@ -288,6 +300,36 @@ namespace Nova.AI.Tests
             // the host ingress sealed slot-1 records.
             Assert.That(host.Ingress.DedupeState.SealedWatermark(AiSlot), Is.GreaterThan(0u),
                 "AI orders must enter through the canonical session/ingress intent path, not direct system calls");
+        }
+
+        [Test]
+        public void SkirmishAi_DefinitionRoleSite_DoesNotCountAsCompletedOrAdvanceBuildOrder()
+        {
+            AiHost host = BuildMatch(Seed);
+
+            // The tick-20 decision submits the Refinery, tick 21 creates its
+            // site, and tick 40 is the first decision that must classify that
+            // definition-role entity through the site register. A bare role
+            // check queues a second (Power) site for tick 41 under D-103.
+            host.Run(41);
+
+            Assert.That(host.Construction.SiteCount, Is.EqualTo(1),
+                "an unfinished Refinery is the active build, not a completed producer that unlocks Barracks");
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.False);
+
+            UnitState[] units = host.Entities.RawUnits;
+            int definitionRoleSites = 0;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != AiSlot || !host.Construction.IsActiveSite(unit.Id)) continue;
+                definitionRoleSites++;
+                Assert.That(unit.Role, Is.EqualTo(UnitRole.Refinery),
+                    "the sole site carries the Refinery role without becoming a finished Refinery");
+            }
+            Assert.That(definitionRoleSites, Is.EqualTo(1));
         }
 
         // ----------------------------------------------------------------
@@ -328,7 +370,7 @@ namespace Nova.AI.Tests
             Assert.That(CountUnits(host, AiSlot, UnitRole.BasicInfantry), Is.GreaterThanOrEqualTo(6),
                 "the Barracks keeps infantry queued — the attack threshold of the profile must be reachable");
             Assert.That(MinCombatCellX(host, AiSlot), Is.LessThan(64),
-                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 113-122)");
+                "at the squad threshold the army marches toward the enemy start area (slot 1 starts at x ~ 111-120)");
         }
 
         // ----------------------------------------------------------------

@@ -47,11 +47,12 @@ namespace Nova.Gameplay
     }
 
     /// <summary>
-    /// Why a building cannot be placed, in the executor's state-dependent
-    /// validation order after target geometry: prerequisite, affordability,
-    /// free power and finally the global construction-site capacity. The UI
-    /// derives this reason because schema v1 deliberately shares one result
-    /// code between several of these cases.
+    /// Why the build bar reports a building as blocked. Before a target cell
+    /// exists, the HUD uses the explicit priority prerequisite, affordability,
+    /// free power and finally global construction-site capacity. This is a UI
+    /// priority, not the global CommandExecutor order (which checks credits
+    /// before domain validation). The UI derives the reason because schema v1
+    /// deliberately shares one result code between several domain cases.
     /// </summary>
     public enum BuildingPlacementBlocker
     {
@@ -156,7 +157,7 @@ namespace Nova.Gameplay
             return commands;
         }
 
-        /// <summary>The command buttons of a CONSTRUCTION SITE (role Unit with an active site): only cancelling is meaningful.</summary>
+        /// <summary>The command buttons of a CONSTRUCTION SITE (definition role with an active site-register row): only cancelling is meaningful.</summary>
         public CommandButtonType GetSiteCommands()
         {
             return CommandButtonType.CancelConstruction;
@@ -221,10 +222,11 @@ namespace Nova.Gameplay
         }
 
         /// <summary>
-        /// First building-placement blocker in the executor's own order.
-        /// Geometry is intentionally absent: the build bar has no target cell
-        /// until placement mode starts. An energy blocker is informational in
-        /// that bar and must not disable entering placement mode.
+        /// First building-placement blocker in the build bar's explicit UI
+        /// priority. Geometry is intentionally absent: the bar has no target
+        /// cell until placement mode starts. This priority is not the global
+        /// CommandExecutor order; an energy blocker is informational and must
+        /// not disable entering placement mode.
         /// </summary>
         public static BuildingPlacementBlocker EvaluateBuildingPlacementBlocker(
             in SimBuildingDefinition definition, bool prerequisiteMet, long credits,

@@ -51,15 +51,16 @@ namespace Nova.SimRunner.Tests
 
             /// <summary>
             /// Places a completed Barracks at (10,10) and returns its raw wire
-            /// id. Also places a completed Power plant at (40,40) unless
+            /// id. Also places a completed HQ at (40,40) unless
             /// <paramref name="withPower"/> is false — a Barracks draws 15,
-            /// so a powered grid keeps production at full speed.
+            /// so the HQ keeps production at full speed and provides the
+            /// canonical 2,000 AE storage capacity used by refund tests.
             /// </summary>
             public uint SpawnBarracks(byte slot, bool withPower = true)
             {
                 if (withPower)
                 {
-                    Assert.That(Construction.PlaceCompletedBuilding(slot, 5, 40, 40).IsValid, Is.True);
+                    Assert.That(Construction.PlaceCompletedBuilding(slot, 3, 40, 40).IsValid, Is.True);
                 }
                 EntityId id = Construction.PlaceCompletedBuilding(slot, 7, 10, 10);
                 Assert.That(id.IsValid, Is.True);
@@ -306,6 +307,20 @@ namespace Nova.SimRunner.Tests
                 "1000 - 360 + 240: the unstarted entry refunds in full, the cancel itself is free");
             Assert.That(f.Production.TryGetQueueEntry(barracks, 0, out _, out ushort remaining, out _), Is.True);
             Assert.That(remaining, Is.EqualTo((ushort)1), "the running entry is untouched");
+        }
+
+        [Test]
+        public void CancelProduction_RefundIsCappedAtStorageCeiling()
+        {
+            var f = new Fixture(startingCredits: EconomySystem.HqBaseCapacityAE);
+            uint barracks = f.SpawnBarracks(0);
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True); // 2.000 - 120 = 1.880
+            f.Economy.GetPlayerEconomy(0).AddCredits(115); // raw fixture setup: 1.995
+
+            Assert.That(f.Production.CancelProduction(barracks, 0), Is.True);
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits,
+                Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "only 5 of the 120 AE refund fit; the overflow is forfeit");
         }
 
         [Test]

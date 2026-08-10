@@ -332,8 +332,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
@@ -373,8 +373,8 @@ namespace Nova.SimRunner.Tests
                 for (byte slot = 0; slot < 2; slot++)
                 {
                     ushort fieldId = (ushort)(slot + 1);
-                    int fieldCell = slot == 0 ? 7 : 119;
-                    int hqOrigin = slot == 0 ? 4 : 120;
+                    int fieldCell = slot == 0 ? 7 : 117;
+                    int hqOrigin = slot == 0 ? 4 : 118;
                     Assert.That(economy.TryAddField(fieldId, new GridPos2D(fieldCell, fieldCell), 9000), Is.True);
                     FactionId faction = economy.GetSlotFaction(slot);
                     EntityId hq = construction.PlaceCompletedBuilding(
@@ -382,11 +382,11 @@ namespace Nova.SimRunner.Tests
                     Assert.That(hq.IsValid, Is.True);
                     SimDefinitions.TryGetUnit(faction, UnitRole.Builder, out SimUnitDefinition builderDef);
                     EntityId builder = entities.SpawnUnit(slot,
-                        new Transform2D(SimFixed.FromInt(slot == 0 ? 13 : 113), SimFixed.FromInt(slot == 0 ? 7 : 119)),
+                        new Transform2D(SimFixed.FromInt(slot == 0 ? 13 : 111), SimFixed.FromInt(slot == 0 ? 7 : 117)),
                         builderDef.MoveSpeed, maxHealth: builderDef.MaxHealth, role: UnitRole.Builder);
                     SimDefinitions.TryGetUnit(faction, UnitRole.BasicInfantry, out SimUnitDefinition infantryDef);
                     EntityId infantry = entities.SpawnUnit(slot,
-                        new Transform2D(SimFixed.FromInt(slot == 0 ? 10 : 110), SimFixed.FromInt(slot == 0 ? 10 : 110)),
+                        new Transform2D(SimFixed.FromInt(slot == 0 ? 10 : 114), SimFixed.FromInt(slot == 0 ? 10 : 114)),
                         infantryDef.MoveSpeed, maxHealth: infantryDef.MaxHealth, role: UnitRole.BasicInfantry);
                     if (slot == client.AssignedSlot)
                     {
@@ -407,8 +407,8 @@ namespace Nova.SimRunner.Tests
                 var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
-                var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 128, 128);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
                 kernel.RegisterSystem(construction);
@@ -446,7 +446,7 @@ namespace Nova.SimRunner.Tests
                 // static or lobby-derived (D-093) — never a test constant.
                 ulong offeredSeed = Client != null ? Client.Seed : Seed;
                 return MatchFingerprint.CreateCurrent(
-                    MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                    MatchFingerprint.ComputeCurrentRulesHash64(),
                     SimDefinitions.ComputeDefinitionsHash64(),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                     slots, factions, offeredSeed, Kernel.CalculateStateHash(), Session.InputDelayTicks);
@@ -474,12 +474,12 @@ namespace Nova.SimRunner.Tests
                 if (tick == 10)
                 {
                     SubmitIntent(new MovePayload(new[] { BuilderRaw },
-                        SimFixed.FromInt(slot == 0 ? 10 : 117), SimFixed.FromInt(slot == 0 ? 5 : 117)));
+                        SimFixed.FromInt(slot == 0 ? 10 : 114), SimFixed.FromInt(slot == 0 ? 5 : 119)));
                 }
                 if (tick == 40)
                 {
                     SubmitIntent(new PlaceBuildingPayload(refineryDef,
-                        (ushort)(slot == 0 ? 7 : 118), (ushort)(slot == 0 ? 4 : 116)));
+                        (ushort)(slot == 0 ? 8 : 114), (ushort)(slot == 0 ? 4 : 118)));
                 }
                 // The infantry marches at the enemy base: auto-acquisition
                 // (D-087) turns this into real combat ticks on the wire.
@@ -1139,6 +1139,105 @@ namespace Nova.SimRunner.Tests
             Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
             Assert.That(clientA.RejectReason, Does.Contain("InputDelayTicks"),
                 "the refusal names the differing fingerprint field");
+            server.Stop();
+        }
+
+        [Test]
+        public void LegacyEmptyRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint legacy = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(legacy.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the old/new rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
+            server.Stop();
+        }
+
+        [Test]
+        public void RevisionOneRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint revisionOne = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(revisionOne.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the revision-1/current rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
+            server.Stop();
+        }
+
+        [Test]
+        public void RevisionTwoRulesFingerprint_RefusesTheMatchBeforeRunning()
+        {
+            var server = new RelayServerCore(Token, Seed, Delay, string.Empty, _ => { });
+            server.Start(0);
+            var clientA = new RelayMatchClient();
+            var clientB = new RelayMatchClient();
+            clientA.Connect("127.0.0.1", server.Port, Token);
+            clientB.Connect("127.0.0.1", server.Port, Token);
+            PumpUntil(server, clientA, clientB, () => clientA.HasOffer && clientB.HasOffer, "offers");
+
+            ClientHost hostA = ClientHost.Create(clientA);
+            ClientHost hostB = ClientHost.Create(clientB);
+            MatchFingerprint current = hostA.CreateFingerprint();
+            MatchFingerprint revisionTwo = MatchFingerprint.CreateCurrent(
+                MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2),
+                current.DefinitionsHash64, current.MapHash64,
+                current.GetSlotOccupancyCopy(), current.GetSlotFactionCopy(),
+                current.StartSeed, current.InitialStateHash, current.InputDelayTicks);
+
+            clientA.SubmitLocalProof(current.Serialize(), hostA.Kernel.SaveSnapshot());
+            clientB.SubmitLocalProof(revisionTwo.Serialize(), hostB.Kernel.SaveSnapshot());
+            PumpUntil(server, clientA, clientB,
+                () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,
+                "the relay refused the revision-2/current rules mismatch");
+
+            Assert.That(clientA.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientB.Phase, Is.Not.EqualTo(RelayClientPhase.Running));
+            Assert.That(clientA.RejectReason, Does.Contain("RulesHash64"));
+            Assert.That(clientB.RejectReason, Does.Contain("RulesHash64"));
             server.Stop();
         }
 
@@ -1964,8 +2063,9 @@ namespace Nova.SimRunner.Tests
             // drive helper permits the normal input-delay pipeline lead, so
             // aiming at 49 could already have crossed tick 50 on one end.
             Drive(server, clientA, clientB, hostA, hostB, 25);
-            ref PlayerEconomyState divergentEconomy = ref hostB.Economy.GetPlayerEconomy(0);
-            divergentEconomy.AddCredits(1);
+            ref UnitState divergentBuilder = ref hostB.Entities.GetUnitRef(
+                UnitCommandStateView.ToEntityId(hostB.BuilderRaw));
+            divergentBuilder.CurrentHealth -= 1;
             Drive(server, clientA, clientB, hostA, hostB, 50);
             PumpUntil(server, clientA, clientB,
                 () => clientA.Phase == RelayClientPhase.Ended && clientB.Phase == RelayClientPhase.Ended,

@@ -49,9 +49,10 @@ namespace Nova.AI
     /// <para>
     /// DECISION LOOP (fixed cadence <see cref="DecisionTickInterval"/> = 20
     /// ticks = 2.0 s, ascending-index scans only, no PRNG): (1) build order —
-    /// Refinery first (no prerequisite since D-077), then Barracks, one site
-    /// at a time, a Power plant first whenever the committed margin would
-    /// drop below the profile reserve, the spot picked by a deterministic
+    /// Refinery first (no prerequisite since D-077), then the Power plant
+    /// required by D-103, then Barracks, one site at a time; Power also
+    /// preempts whenever the committed margin would drop below the profile
+    /// reserve, the spot picked by a deterministic
     /// search validated through <see cref="ConstructionSystem.ValidatePlacement"/>
     /// — the identical rules the command executor applies; (2) the Builder is
     /// moved next to an unfinished site when it is out of the documented
@@ -225,6 +226,21 @@ namespace Nova.AI
                 uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw == 0) continue;
 
+                // 16.3 (#44): a site already carries its definition role.
+                // Classify through the site register BEFORE building roles so
+                // an unfinished Refinery/HQ/etc. never becomes a completed
+                // producer or prerequisite in the planner.
+                if (_construction.TryGetSite(raw, out _, out _, out uint assignedBuilder))
+                {
+                    sites.Add(new SiteInfo
+                    {
+                        CellX = GridCellOf(u.Transform.PositionX),
+                        CellY = GridCellOf(u.Transform.PositionY),
+                        AssignedBuilderRaw = assignedBuilder,
+                    });
+                    continue;
+                }
+
                 if (SimDefinitions.IsBuildingRole(u.Role))
                 {
                     switch (u.Role)
@@ -263,19 +279,6 @@ namespace Nova.AI
                             idleHarvesterRaws.Add(raw);
                         }
                         break;
-                    case UnitRole.Unit:
-                        // A construction site carries the generic role; the
-                        // site table tells it from a plain unit.
-                        if (_construction.TryGetSite(raw, out _, out _, out uint assignedBuilder))
-                        {
-                            sites.Add(new SiteInfo
-                            {
-                                CellX = GridCellOf(u.Transform.PositionX),
-                                CellY = GridCellOf(u.Transform.PositionY),
-                                AssignedBuilderRaw = assignedBuilder,
-                            });
-                        }
-                        break;
                     default:
                         if (IsCombatRole(u.Role))
                         {
@@ -291,11 +294,11 @@ namespace Nova.AI
             // slot that owns nothing is defeated anyway): stay idle.
             if (hqRaw == 0) return;
 
-            // ---- (1) Build order: Refinery, then Barracks, one site at a
-            // time (a single Builder cannot progress two sites). A Power
-            // plant preempts whenever the committed margin would drop below
-            // the profile reserve — "when the margin would go negative" with
-            // the demo profile's reserve of 0. ----
+            // ---- (1) Build order: Refinery, required Power plant, then
+            // Barracks, one site at a time (a single Builder cannot progress
+            // two sites). Power also preempts whenever the committed margin
+            // would drop below the profile reserve — "when the margin would
+            // go negative" with the demo profile's reserve of 0. ----
             if (sites.Count == 0)
             {
                 UnitRole next = refineryRaw == 0
@@ -304,8 +307,13 @@ namespace Nova.AI
                 if (next != UnitRole.Unit
                     && SimDefinitions.TryGetBuilding(faction, next, out SimBuildingDefinition nextDef))
                 {
-                    if (nextDef.PowerRequired > 0 && !powerCompleted
-                        && powerMargin < nextDef.PowerRequired + _profile.TargetPowerMargin)
+                    UnitRoleMask missingPrerequisites = _construction.GetMissingPrerequisiteRoles(
+                        _aiPlayerId,
+                        nextDef.PrerequisiteRoles);
+                    bool missingRequiredPower = (missingPrerequisites & UnitRoleMask.Power) != 0;
+                    bool needsPowerMargin = nextDef.PowerRequired > 0
+                        && powerMargin < nextDef.PowerRequired + _profile.TargetPowerMargin;
+                    if (!powerCompleted && (missingRequiredPower || needsPowerMargin))
                     {
                         next = UnitRole.Power;
                     }
@@ -837,6 +845,7 @@ namespace Nova.AI
             {
                 if (!_entityManager.TryGetUnit(visible[i], out UnitState u)) continue;
                 if (u.PlayerId == _aiPlayerId) continue;
+                if (_construction.IsActiveSite(u.Id)) continue;
                 if (WeaponProfiles.Get(_economy.GetSlotFaction(u.PlayerId), u.Role).AttackDamage <= 0) continue;
 
                 long x = GridCellOf(u.Transform.PositionX);
@@ -1362,6 +1371,10 @@ namespace Nova.AI
                 // own unit would actually fire. The auto-acquisition filters
                 // hostile strictly; the command path does not.
                 if (u.PlayerId == _aiPlayerId) continue;
+                // Combat rejects every active site as a target. Excluding it
+                // here keeps the AI from repeatedly choosing an invulnerable
+                // definition-role site (especially an HQ site).
+                if (_construction.IsActiveSite(u.Id)) continue;
 
                 uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
                 if (raw == 0) continue;

@@ -1,13 +1,14 @@
 # AGENTS.md – Arbeitsregeln für KI-Agenten & Mitwirkende
 
-**Dokumentversion:** 4.1.0 | **Status:** verbindlich ab Merge des Sprint-13.0-PR | **Verantwortungsbereich:** Maintainers | **Sprint:** 13.0 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
+**Dokumentversion:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Verbindliche Betriebsanleitung für jeden KI-Coding-Agenten (Claude, Kimi, Codex,
 Cursor u. a.) und jede Person, die an *Project Nova* arbeitet. **Lies diese Datei
 zuerst.** Sie wird von den gängigen Agenten-Tools automatisch als Kontext geladen.
 
 Welche Regeln in welcher Projektphase gelten, steht in [GOVERNANCE.md](GOVERNANCE.md).
-Aktiv ist **Tier 2: externe Beitragende, zwei Maintainer.**
+Aktiv ist **Tier 2: externe Beitragende, ein Projektinhaber.** Dennis Westermann
+(`@cubetribe`) ist alleiniger Projektinhaber, Maintainer und Mergeberechtigter.
 
 ## 1. Projekt in einem Absatz
 
@@ -51,11 +52,16 @@ Eine Änderung ist fertig, wenn diese vier Punkte stimmen:
 Zusätzlich, wenn zutreffend:
 
 - Echte Entscheidung getroffen? → D-ID im [DecisionLog](docs/production/DecisionLog.md)
-- Spielverhalten geändert? → einmal im laufenden Spiel ansehen und im PR beschreiben
+- Spielverhalten geändert? → im laufenden Spiel ansehen und im PR beschreiben;
+  der Projektinhaber darf diese Abnahme ausdrücklich zurückstellen, wenn der PR
+  stattdessen „nicht gespielt“, Grund, automatisierte Ersatznachweise und
+  Restrisiko nennt. Der PR ist dann mergebar, aber nicht spielerisch abgenommen
+  und kein Meilenstein-Nachweis.
 - Neues oder entferntes Dokument? → [docs/README.md](docs/README.md)-Index nachziehen
-- Tier-2-PR? → Freigabe des anderen Maintainers auf dem aktuellen Head;
-  externer PR zusätzlich mit bestätigter
-  [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md)
+- Inhaber-PR? → Selbst-Merge erst nach grüner Pflicht-CI und dokumentiertem,
+  unabhängigem Read-only-Review.
+- Externer PR? → Freigabe des Projektinhabers auf dem aktuellen Head und
+  bestätigte [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md)
 - Vertrag oder öffentliche Doku? → Kopfversion und Änderungsverlauf pflegen
 
 Weiterhin nicht verlangt: Gate-Evidence, Receipt-Ketten und Performance-Evidenz
@@ -163,3 +169,4 @@ gh pr create --fill --base main
 | 3.1.0–3.7.0 | 2026-07-24 – 2026-07-26 | Ausbau des Gate-Evidenzregimes (D-062 bis D-067) | Orchestrator |
 | 4.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Gate-Kette, Receipt-Verträge und Evidenzpflicht schlafen gelegt; DoD von 13 auf 4 Punkte; Doku-Ritual freiwillig; Sprint-Ritual entfernt; `dotnet test` als kanonischer CI-Check verankert | Orchestrator |
 | 4.1.0 | 2026-08-08 | D-091: Governance-Tier 2 für externe Beiträge aktiviert; Maintainer-Review/CLA für fremde PRs und Versionspflicht für Verträge/öffentliche Doku ergänzt | Dennis Westermann / Michael Falk |
+| 5.0.0 | 2026-08-10 | D-105: Dennis Westermann als alleinigen Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigten festgelegt; Selbst-Merge bei grüner Pflicht-CI und unabhängigem Review sowie ehrliche Spielabnahme-Zurückstellung geregelt | Dennis Westermann |

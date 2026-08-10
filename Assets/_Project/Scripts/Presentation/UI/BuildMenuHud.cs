@@ -39,9 +39,11 @@ namespace Nova.Presentation.UI
     /// alternative BuildingRegistrySO has no asset instances in the project
     /// and is not wired at runtime, so SimDefinitions is the honest source:
     /// the bar cannot drift from the executor. Availability mirrors the
-    /// prerequisite, credit and global site-capacity gates. Power is derived
-    /// and shown too, but deliberately does not disable entering placement
-    /// mode — the target-cell decision still belongs to placement.
+    /// prerequisite, credit and global site-capacity gates; the prerequisite
+    /// check is the sim's all-of
+    /// <see cref="ConstructionSystem.HasFinishedBuildings"/> rule. Power is
+    /// derived and shown too, but deliberately does not disable entering
+    /// placement mode — the target-cell decision still belongs to placement.
     /// </para>
     /// <para>
     /// Clicking an available entry calls
@@ -61,6 +63,14 @@ namespace Nova.Presentation.UI
         private static readonly UnitRole[] BuildableRoles =
         {
             UnitRole.HQ, UnitRole.Refinery, UnitRole.Power, UnitRole.Storage,
+            UnitRole.Barracks, UnitRole.VehicleFactory, UnitRole.ResearchLab,
+            UnitRole.Radar, UnitRole.DefensePlatform
+        };
+
+        /// <summary>Stable display order for missing all-of prerequisites.</summary>
+        private static readonly UnitRole[] PrerequisiteDisplayOrder =
+        {
+            UnitRole.HQ, UnitRole.Power, UnitRole.Refinery, UnitRole.Storage,
             UnitRole.Barracks, UnitRole.VehicleFactory, UnitRole.ResearchLab,
             UnitRole.Radar, UnitRole.DefensePlatform
         };
@@ -207,7 +217,7 @@ namespace Nova.Presentation.UI
             for (int i = 0; i < capacity; i++)
             {
                 ref readonly UnitState unit = ref units[i];
-                if (!unit.IsActive || unit.PlayerId != slot || unit.Role != UnitRole.Unit) continue;
+                if (!unit.IsActive || unit.PlayerId != slot) continue;
                 uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
                 if (raw != 0
                     && construction.TryGetSite(raw, out _, out _, out uint assignedBuilderRaw)
@@ -297,12 +307,14 @@ namespace Nova.Presentation.UI
                     buttonsRect.x + i * (buttonWidth + ButtonSpacing), buttonsRect.y, buttonWidth, _buttonHeight);
                 if (!rect.Contains(guiMouse)) continue;
 
-                bool prerequisiteMet = PrerequisiteMet(in def, slot, construction);
+                UnitRoleMask missingPrerequisites =
+                    construction.GetMissingPrerequisiteRoles(slot, def.PrerequisiteRoles);
+                bool prerequisiteMet = missingPrerequisites == UnitRoleMask.None;
                 BuildingPlacementBlocker blocker = CommandCardPresenter.EvaluateBuildingPlacementBlocker(
                     in def, prerequisiteMet, credits,
                     playerEconomy.PowerProvided, playerEconomy.PowerRequired, activeSiteCount);
                 _hoveredStatusText = BlockerReason(
-                    role, in def, blocker, credits,
+                    role, in def, blocker, missingPrerequisites, credits,
                     playerEconomy.PowerProvided, playerEconomy.PowerRequired, activeSiteCount);
                 if (_hoveredStatusText == null)
                 {
@@ -348,8 +360,7 @@ namespace Nova.Presentation.UI
         private static bool PrerequisiteMet(
             in SimBuildingDefinition def, byte slot, ConstructionSystem construction)
         {
-            return !def.HasPrerequisite
-                || construction.HasFinishedBuilding(slot, def.PrerequisiteRole);
+            return construction.HasFinishedBuildings(slot, def.PrerequisiteRoles);
         }
 
         /// <summary>
@@ -448,18 +459,40 @@ namespace Nova.Presentation.UI
             return nameLine + "\n" + costLine;
         }
 
-        /// <summary>The hovered entry's first blocker, derived in the executor's own check order.</summary>
-        private static string BlockerReason(
+        /// <summary>The hovered entry's first blocker in the build bar's documented UI priority.</summary>
+        private string BlockerReason(
             UnitRole role, in SimBuildingDefinition def, BuildingPlacementBlocker blocker,
-            long credits, int powerProvided, int powerRequired, int activeSiteCount)
+            UnitRoleMask missingPrerequisites, long credits,
+            int powerProvided, int powerRequired, int activeSiteCount)
         {
             string name = CommandCardPresenter.BuildingDisplayName(role);
             string buildingPower = CommandCardPresenter.FormatBuildingPower(in def);
             switch (blocker)
             {
                 case BuildingPlacementBlocker.MissingPrerequisite:
-                    return $"{name}: benötigt {CommandCardPresenter.BuildingDisplayName(def.PrerequisiteRole)}"
-                        + $" · {buildingPower}";
+                    _builder.Clear();
+                    _builder.Append(name).Append(": benötigt ");
+                    bool appended = false;
+                    UnitRoleMask remaining = missingPrerequisites;
+                    for (int i = 0; i < PrerequisiteDisplayOrder.Length; i++)
+                    {
+                        UnitRole prerequisiteRole = PrerequisiteDisplayOrder[i];
+                        UnitRoleMask roleMask = (UnitRoleMask)(1u << (int)prerequisiteRole);
+                        if ((missingPrerequisites & roleMask) == UnitRoleMask.None) continue;
+
+                        if (appended) _builder.Append(" + ");
+                        _builder.Append(CommandCardPresenter.BuildingDisplayName(prerequisiteRole));
+                        appended = true;
+                        remaining &= ~roleMask;
+                    }
+                    if (remaining != UnitRoleMask.None)
+                    {
+                        if (appended) _builder.Append(" + ");
+                        _builder.Append("unbekannte Voraussetzung 0x")
+                            .Append(((uint)remaining).ToString("X8"));
+                    }
+                    _builder.Append(" · ").Append(buildingPower);
+                    return _builder.ToString();
                 case BuildingPlacementBlocker.InsufficientCredits:
                     return $"{name}: nicht genug Aetherium ({credits}/{def.CostAE} AE)"
                         + $" · {buildingPower}";

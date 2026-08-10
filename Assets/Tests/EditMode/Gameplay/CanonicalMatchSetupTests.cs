@@ -97,11 +97,27 @@ namespace Nova.Gameplay.Tests
         private const ushort MapWidth = 128;
         private const ushort MapHeight = 128;
         private const int EntityCapacity = 1024;
-        private const long FieldReserveAE = 2000000L;
+        private struct FieldLayout
+        {
+            public ushort Id;
+            public int X, Y;
+            public long ReserveAE;
+        }
+
+        private static readonly FieldLayout[] FieldLayouts =
+        {
+            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+        };
         // Faction-resolved opening placement ids (SimDefinitions id rule):
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
         private const ushort DefHQAlliance = 3;
         private const ushort DefHQLegion = 20;
+        private const ushort DefRefineryAlliance = 4;
+        private const ushort DefRefineryLegion = 21;
 
         private sealed class ReferenceHost
         {
@@ -131,8 +147,8 @@ namespace Nova.Gameplay.Tests
             var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
             var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
             var production = new ProductionSystem(entities, economy, construction);
-            var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, MapWidth, MapHeight);
-            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy);
+            var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
+            var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
 
             kernel.RegisterSystem(economy);
@@ -170,46 +186,47 @@ namespace Nova.Gameplay.Tests
         /// <summary>Fixed opening layout of one slot, in grid cells.</summary>
         private sealed class SlotLayout
         {
-            public ushort FieldId;
-            public int FieldX, FieldY;
             public int HqOriginX, HqOriginY;
             public int BuilderX, BuilderY;
         }
 
         private static readonly SlotLayout Slot0Layout = new SlotLayout
         {
-            FieldId = 1, FieldX = 7, FieldY = 7,
             HqOriginX = 4, HqOriginY = 4,
             BuilderX = 13, BuilderY = 7,
         };
 
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
-            FieldId = 2, FieldX = 119, FieldY = 119,
-            HqOriginX = 120, HqOriginY = 120,
-            BuilderX = 113, BuilderY = 119,
+            HqOriginX = 118, HqOriginY = 118,
+            BuilderX = 111, BuilderY = 117,
         };
 
         /// <summary>
         /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
-        /// per slot one Aetherium field, a completed HQ and ONE Builder —
-        /// nothing else. Spawn ORDER is load-bearing: EntityManager hands
-        /// out ids from a deterministic free list, so any reordering shifts
-        /// every id and therefore every hash. Units spawn through SpawnUnit's
-        /// defaults (maxHealth 100 for all), exactly like the scenario —
-        /// NOT through SimDefinitions.
+        /// five finite Aetherium fields in canonical id order, then per slot a
+        /// completed HQ and ONE Builder — nothing else. Entity spawn order is
+        /// load-bearing: EntityManager hands out ids from a deterministic free
+        /// list, so any reordering shifts every id and therefore every hash.
+        /// Units spawn through SpawnUnit's defaults (maxHealth 100 for all),
+        /// exactly like the scenario — NOT through SimDefinitions.
         /// </summary>
         private static void ApplyOpeningPosition(ReferenceHost host)
         {
             // The slot factions are already bound: BuildReferenceHost mirrors
             // BuildHost, which assigns them before Kernel.Start() (the
             // SetSlotFaction guard requires it).
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                FieldLayout field = FieldLayouts[i];
+                Assert.That(host.Economy.TryAddField(
+                    field.Id, new GridPos2D(field.X, field.Y), field.ReserveAE),
+                    Is.True, "reference field registration");
+            }
+
             for (byte slot = 0; slot < 2; slot++)
             {
                 SlotLayout c = slot == 0 ? Slot0Layout : Slot1Layout;
-
-                Assert.That(host.Economy.TryAddField(c.FieldId, new GridPos2D(c.FieldX, c.FieldY), FieldReserveAE),
-                    Is.True, "reference field registration");
                 Assert.That(host.Construction.PlaceCompletedBuilding(slot, slot == 0 ? DefHQAlliance : DefHQLegion, c.HqOriginX, c.HqOriginY).IsValid,
                     Is.True, "reference HQ placement");
 
@@ -376,9 +393,17 @@ namespace Nova.Gameplay.Tests
             bootstrap.StartGrayboxMatch();
 
             Assert.That(bootstrap.LocalFieldCell, Is.EqualTo(new Vector2Int(7, 7)));
-            Assert.That(bootstrap.EnemyFieldCell, Is.EqualTo(new Vector2Int(119, 119)));
+            Assert.That(bootstrap.EnemyFieldCell, Is.EqualTo(new Vector2Int(117, 117)));
+            Assert.That(bootstrap.AllFieldCells, Is.EqualTo(new[]
+            {
+                new Vector2Int(7, 7),
+                new Vector2Int(117, 117),
+                new Vector2Int(24, 40),
+                new Vector2Int(100, 84),
+                new Vector2Int(62, 62),
+            }));
             Assert.That(bootstrap.LocalHqOrigin, Is.EqualTo(new Vector2Int(4, 4)));
-            Assert.That(bootstrap.EnemyHqOrigin, Is.EqualTo(new Vector2Int(120, 120)));
+            Assert.That(bootstrap.EnemyHqOrigin, Is.EqualTo(new Vector2Int(118, 118)));
             Assert.That(bootstrap.MapSize, Is.EqualTo(new Vector2Int(MapWidth, MapHeight)));
 
             Assert.That(bootstrap.Runner.Session.LocalSlot, Is.EqualTo((byte)MatchBootstrap.LocalSlot),
@@ -396,6 +421,72 @@ namespace Nova.Gameplay.Tests
 
             Assert.That(bootstrap.Runner.Economy.GetPlayerEconomy(MatchBootstrap.LocalSlot).AetheriumCredits,
                 Is.EqualTo(3000L), "the D-077 start balance (EconomySystem.CanonicalMatchStartingCreditsAE)");
+        }
+
+        [Test]
+        public void ReferenceOpeningPosition_RegistersFiveFiniteFields()
+        {
+            ReferenceHost host = BuildReferenceHost(CanonicalSeed);
+            ApplyOpeningPosition(host);
+
+            Assert.That(host.Economy.FieldCount, Is.EqualTo(FieldLayouts.Length));
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                FieldLayout expected = FieldLayouts[i];
+                Assert.That(host.Economy.TryGetField(expected.Id, out AetheriumField actual), Is.True);
+                Assert.That(actual.GridPos.X, Is.EqualTo(expected.X));
+                Assert.That(actual.GridPos.Y, Is.EqualTo(expected.Y));
+                Assert.That(actual.RemainingAE, Is.EqualTo(expected.ReserveAE));
+            }
+        }
+
+        [Test]
+        public void CanonicalOpeningGeometry_UsesD107PointAndFootprintMirrors()
+        {
+            Assert.That(Slot0Layout.HqOriginX + Slot1Layout.HqOriginX, Is.EqualTo(122),
+                "3x3 footprint origins mirror as o -> 122-o");
+            Assert.That(Slot0Layout.HqOriginY + Slot1Layout.HqOriginY, Is.EqualTo(122));
+            Assert.That(Slot0Layout.BuilderX + Slot1Layout.BuilderX, Is.EqualTo(124),
+                "point coordinates mirror as p -> 124-p");
+            Assert.That(Slot0Layout.BuilderY + Slot1Layout.BuilderY, Is.EqualTo(124));
+            Assert.That(FieldLayouts[0].X + FieldLayouts[1].X, Is.EqualTo(124));
+            Assert.That(FieldLayouts[0].Y + FieldLayouts[1].Y, Is.EqualTo(124));
+            Assert.That(FieldLayouts[2].X + FieldLayouts[3].X, Is.EqualTo(124));
+            Assert.That(FieldLayouts[2].Y + FieldLayouts[3].Y, Is.EqualTo(124));
+            Assert.That(FieldLayouts[4].X, Is.EqualTo(62));
+            Assert.That(FieldLayouts[4].Y, Is.EqualTo(62));
+        }
+
+        [Test]
+        public void CanonicalOpeningGeometry_OffersEqualMirroredRefineryPlacements()
+        {
+            ReferenceHost host = BuildReferenceHost(CanonicalSeed);
+            ApplyOpeningPosition(host);
+            host.Kernel.StepTick(); // commit the two completed HQ power balances
+            int mismatches = 0;
+            int allianceApplied = 0;
+            int legionApplied = 0;
+
+            for (int y = 0; y <= 122; y++)
+            {
+                for (int x = 0; x <= 122; x++)
+                {
+                    CommandResultCode alliance = host.Construction.ValidatePlacement(
+                        0, DefRefineryAlliance, x, y);
+                    CommandResultCode legion = host.Construction.ValidatePlacement(
+                        1, DefRefineryLegion, 122 - x, 122 - y);
+                    if (alliance != legion) mismatches++;
+                    if (alliance == CommandResultCode.Applied) allianceApplied++;
+                    if (legion == CommandResultCode.Applied) legionApplied++;
+                }
+            }
+
+            Assert.That(mismatches, Is.EqualTo(0),
+                "D-107 requires every legal or rejected refinery origin to mirror exactly");
+            Assert.That(allianceApplied, Is.EqualTo(45),
+                "the corrected Alliance opening has 45 legal follow-up refinery origins");
+            Assert.That(legionApplied, Is.EqualTo(45),
+                "the corrected Legion opening has the same 45 legal mirrored origins");
         }
 
         [Test]

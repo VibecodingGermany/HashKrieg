@@ -3,6 +3,7 @@ using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
 using Nova.Simulation.CommandsV1;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -35,14 +36,17 @@ namespace Nova.Simulation.Tests
         {
             public SimulationKernel Kernel { get; }
             public EntityManager Entities { get; }
+            public EconomySystem Economy { get; }
             public FogOfWarSystem Fog { get; }
             public CombatSystem Combat { get; }
 
             private TestHost(SimulationKernel kernel, EntityManager entities,
-                Nova.Simulation.Construction.ConstructionSystem construction, FogOfWarSystem fog, CombatSystem combat)
+                EconomySystem economy, Nova.Simulation.Construction.ConstructionSystem construction,
+                FogOfWarSystem fog, CombatSystem combat)
             {
                 Kernel = kernel;
                 Entities = entities;
+                Economy = economy;
                 Construction = construction;
                 Fog = fog;
                 Combat = combat;
@@ -60,8 +64,8 @@ namespace Nova.Simulation.Tests
                 // FoW radar read also requires the placement register.
                 var factions = new EconomySystem(entities);
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, factions);
-                var fog = new FogOfWarSystem(entities, construction, teamCount: 2, width, height);
-                var combat = new CombatSystem(entities, fog, factions);
+                var fog = new FogOfWarSystem(entities, construction, factions, teamCount: 2, width, height);
+                var combat = new CombatSystem(entities, fog, factions, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(pathfinding);
@@ -69,7 +73,7 @@ namespace Nova.Simulation.Tests
                 kernel.RegisterSystem(fog);
                 kernel.RegisterSystem(combat);
                 kernel.Start();
-                return new TestHost(kernel, entities, construction, fog, combat);
+                return new TestHost(kernel, entities, factions, construction, fog, combat);
             }
 
             public void Step() => Kernel.StepTick();
@@ -105,6 +109,34 @@ namespace Nova.Simulation.Tests
         {
             Assert.That(host.Entities.TryGetUnit(id, out UnitState u), Is.True, "unit must be alive");
             return u.CurrentHealth;
+        }
+
+        private static EntityId PlaceActiveDefensePlatformSite(TestHost host, byte team, int originX, int originY)
+        {
+            FactionId faction = host.Economy.GetSlotFaction(team);
+            ushort powerDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.Power);
+            ushort platformDefId = SimDefinitions.ToDefinitionId(faction, UnitRole.DefensePlatform);
+            EntityId power = host.Construction.PlaceCompletedBuilding(team, powerDefId, originX + 6, originY);
+            Assert.That(power.IsValid, Is.True,
+                "a completed Power plant unlocks the DefensePlatform site");
+            host.Economy.ExecuteTick(Tick.Zero);
+            Assert.That(host.Construction.TryPlaceBuilding(team, platformDefId, originX, originY), Is.True);
+            Assert.That(host.Entities.DespawnUnit(power), Is.True,
+                "remove the fixture anchor so combat can observe only the active site");
+
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (unit.IsActive && unit.PlayerId == team && unit.Role == UnitRole.DefensePlatform
+                    && host.Construction.IsActiveSite(unit.Id))
+                {
+                    return unit.Id;
+                }
+            }
+
+            Assert.Fail("the active DefensePlatform site was not found in the entity store");
+            return EntityId.Invalid;
         }
 
         [Test]
@@ -210,6 +242,46 @@ namespace Nova.Simulation.Tests
             Assert.That(host.Entities.GetUnitRef(platform).AttackTarget, Is.EqualTo(attacker),
                 "the only armed building must acquire by itself — it can never receive an explicit order");
             Assert.That(HealthOf(host, attacker), Is.LessThan(200), "the platform actually fires");
+        }
+
+        [Test]
+        public void ActiveDefensePlatformSite_NeitherAcquiresNorExecutesExplicitAttack()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId site = PlaceActiveDefensePlatformSite(host, 0, 10, 10);
+            EntityId hostile = SpawnAt(host, 1, 14, 11, maxHealth: 200);
+
+            host.Step(2);
+            Assert.That(host.Construction.IsActiveSite(site), Is.True);
+            Assert.That(host.Entities.GetUnitRef(site).AttackTarget.IsValid, Is.False,
+                "an armed building role must stay inert while its entity is a site");
+            Assert.That(HealthOf(host, hostile), Is.EqualTo(200));
+
+            host.Entities.GetUnitRef(site).AttackTarget = hostile;
+            host.Step();
+            Assert.That(host.Entities.GetUnitRef(site).AttackTarget.IsValid, Is.False,
+                "an explicit or stale site order is cleared instead of becoming a completion-time free shot");
+            Assert.That(HealthOf(host, hostile), Is.EqualTo(200));
+        }
+
+        [Test]
+        public void ActiveConstructionSite_CannotBeAutoAcquiredOrExplicitlyEngaged()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId site = PlaceActiveDefensePlatformSite(host, 1, 10, 10);
+            EntityId attacker = SpawnAt(host, 0, 14, 11, maxHealth: 200);
+
+            host.Step(2);
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget.IsValid, Is.False,
+                "auto-acquisition must exclude unfinished sites");
+            Assert.That(host.Entities.GetUnitRef(site).CurrentHealth, Is.EqualTo(1));
+
+            host.Entities.GetUnitRef(attacker).AttackTarget = site;
+            host.Step();
+            Assert.That(host.Entities.GetUnitRef(attacker).AttackTarget.IsValid, Is.False,
+                "an explicit order on an illegal site target is cleared");
+            Assert.That(host.Construction.IsActiveSite(site), Is.True);
+            Assert.That(host.Entities.GetUnitRef(site).CurrentHealth, Is.EqualTo(1));
         }
 
         [Test]
@@ -575,8 +647,8 @@ namespace Nova.Simulation.Tests
                 var economy = new EconomySystem(entities);
                 // 16.5: the FoW radar read requires the placement register.
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, economy);
-                var fog = new FogOfWarSystem(entities, construction, teamCount: 2, 64, 64);
-                var combat = new CombatSystem(entities, fog, economy);
+                var fog = new FogOfWarSystem(entities, construction, economy, teamCount: 2, 64, 64);
+                var combat = new CombatSystem(entities, fog, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(seed));
                 kernel.RegisterSystem(economy);
@@ -601,7 +673,7 @@ namespace Nova.Simulation.Tests
                 slots[HumanSlot] = (byte)PlayerSlotOccupancy.Human;
                 slots[AiSlot] = (byte)PlayerSlotOccupancy.AI;
                 return MatchFingerprint.CreateCurrent(
-                    MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Rules),
+                    MatchFingerprint.ComputeCurrentRulesHash64(),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Definitions),
                     MatchFingerprint.ComputeEmptyContentStubHash(MatchContentStub.Map),
                     slots,

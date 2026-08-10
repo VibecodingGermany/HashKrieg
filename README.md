@@ -1,6 +1,6 @@
 # Project Nova
 
-**Dokumentversion:** 0.19.1 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-08
+**Dokumentversion:** 0.23.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -136,12 +136,12 @@ gemacht, das man starten, bedienen und gewinnen kann:
 
 Dazu durchgehend: **Fraktionsidentität** (Allianz und Legion unterscheiden sich
 in Schadensmatrix, Waffenwerten, Kosten und Harvester-Kapazität), ein
-deterministischer Simulationskern mit **549/549 bestandenen Headless-Tests**,
-eine Unity-Baseline von **521/521 EditMode** und **8/9 PlayMode** — einziger
-Fehler ist der bekannte headless-`RenderTexture`-Fall — sowie **34 3D-Assets**,
-die über eine Drop-in-Pipeline einfahren (§5). Die nach dem Unity-Lauf
-ergänzten Audio-/Death-Hold-Assertions sind kompiliert, aber nicht erneut
-ausgeführt.
+deterministischer Simulationskern mit **707/707 bestandenen Headless-Tests** auf
+dem integrierten 16.9-Stand sowie **34 3D-Assets**, die über eine Drop-in-Pipeline
+einfahren (§5). Auf demselben Stand sind außerdem die vollständige Unity-
+EditMode-Suite mit **591/591** Tests und die fokussierte Graybox-Proof-
+PlayMode-Suite mit **3/3** Tests im gepinnten Editor grün gelaufen. Das ist
+automatisierte Laufzeitevidenz, keine behauptete manuelle Spielabnahme.
 
 ### Was noch fehlt
 
@@ -156,9 +156,10 @@ funktionierender Loop:
 - **Gefechtsdichte ist noch nicht manuell abgenommen.** VFX und SFX sind
   implementiert; die geplante Sicht- und Gegenhörprüfung mit 60 Einheiten
   bleibt offen.
-- **Strang C ist offen.** Endliche Aetheriumfelder, wirksames Lager und Radar,
-  Low-Power-Wirkung sowie die übrigen Wirtschafts- und Platzierungsregeln sind
-  noch nicht umgesetzt.
+- **Strang C ist technisch umgesetzt, aber noch nicht manuell abgenommen.**
+  Endliche Felder, Lagergrenze, Radar, Low Power, Mehrfachvoraussetzungen,
+  Platzierung, Reparaturkosten sowie Blocker-, Energie- und Stop-Feedback sind
+  verdrahtet; die menschliche Prüfung am Entscheidungspunkt bleibt offen.
 - **Kein Speichern.** Die Simulation kann ihren Zustand vollständig
   serialisieren und hash-identisch fortsetzen — es fehlt nur das Schreiben auf
   die Platte.
@@ -170,14 +171,18 @@ Der ausgeführte Stand und die offenen Abnahmen stehen im
 Das Repository enthält einen unvollständig integrierten Prototyp. Dateien,
 Typen und isolierte Tests sind kein Fertignachweis — führend bleibt der
 [Implementierungs-Audit](docs/production/ImplementationAudit_2026-07-24.md).
-Was stattdessen als Nachweis zählt, definiert [GOVERNANCE.md](GOVERNANCE.md):
-**grüne CI plus eine gespielte und protokollierte Runde.**
+Was stattdessen als Meilenstein-Nachweis zählt, definiert
+[GOVERNANCE.md](GOVERNANCE.md): **grüne CI plus eine gespielte und
+protokollierte Runde.** D-105 erlaubt, einen einzelnen grünen PR mit sichtbar
+zurückgestellter Spielabnahme zu mergen; er gilt dann nicht als spielerisch
+abgenommen und liefert noch keinen Meilenstein-Nachweis.
 
 Seit D-091 gilt **Governance-Tier 2**: Externe Beiträge kommen ausschließlich
-aus Forks, und nur Dennis Westermann (`@cubetribe`) und Michael Falk
-(`@travelhawk`) dürfen nach `main` mergen. Nach dem Tier-2-Remote-Rollout braucht
-jeder PR eine Freigabe des jeweils anderen Maintainers. Das Gate-Regime G0–G5
-mit Evidence- und Receipt-Verträgen blockiert nichts mehr; es ist vollständig
+aus Forks. Seit D-105 ist Dennis Westermann (`@cubetribe`) alleiniger
+Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter; externe PRs
+brauchen weiterhin CLA und seine Freigabe auf dem aktuellen Head. Michael Falk
+(`@travelhawk`) hat keine Projekt-Governance-Rolle mehr. Das Gate-Regime G0–G5
+mit Evidence- und Receipt-Verträgen blockiert in Tier 2 nichts; es ist vollständig
 erhalten und ruht bis Tier 3 — siehe
 [quality/README.md](quality/README.md).
 
@@ -280,10 +285,9 @@ Runde*.
 - **Netzwerk und Gefechtsdichte sind noch nicht vollständig manuell
   abgenommen.** A8 Stufen 2–4 sowie die 60-Einheiten-Sicht-/Gegenhörprüfung
   bleiben offen.
-- **Strang C ist offen.** Wirtschaftsdruck, Low Power und die ausstehenden
-  Gebäude- und Platzierungsregeln fehlen noch.
-- **Lager und Radar kosten Geld und tun nichts.** Zwei von neun Gebäuden warten
-  noch auf ihre Wirkung.
+- **Strang C ist nicht manuell abgenommen.** Die technische Umsetzung
+  einschließlich Blocker-, Energie- und Stop-Feedback ist vollständig; offen
+  bleibt der menschliche Durchlauf auf dem aktuellen Stand.
 
 Die vollständigen Grenzen stehen im aktuellen
 [Sprintbericht](docs/production/hashkrieg/12_Sprint_Zu_Zweit.md).
@@ -430,7 +434,9 @@ nicht rückwirkend übertragen.
 
 ## Offene Punkte
 
-- **Die Wirtschaftsfrage aus §2** ist die wichtigste offene Entscheidung.
+- **Die manuelle Strang-C-Abnahme** muss Blocker-, Energie- und Stop-Feedback
+  im laufenden Spiel prüfen; die technische Umsetzung von Paket 16.10 ist
+  abgeschlossen.
 - Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses Repositories
   noch nicht vollzogen — Repo, Code und Wiki laufen weiter unter *Project Nova*.
 - Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
@@ -443,12 +449,12 @@ Zur Bewertung, in dieser Reihenfolge:
    2–4; Linux/systemd und der Live-Workflow müssen ebenfalls real laufen.
 2. **Gefechtsfeedback manuell abnehmen** — ungefähr 60 feuernde Einheiten,
    SFX-Regler, Klangbalance und Kamera-Listener gegenhören und ansehen.
-3. **Wirtschaftsdruck** — endliche Aetheriumfelder geben der Runde einen Bogen und
-   einen Grund, um Gebiet zu kämpfen.
+3. **Strang C manuell abnehmen** — Blocker-, Energie- und Stop-Feedback im
+   laufenden Spiel lesen und bedienen; die Implementierung ist abgeschlossen.
 4. **Attack-Move** — Truppen sollen unterwegs Gegner bekämpfen, ohne jeden
    Kontakt einzeln befohlen zu bekommen.
-5. **Gebäude mit Wirkung und KI-Ausbau** — Lager und Radar warten auf ihre
-   Funktion; der Gegner spielt, aber schlicht.
+5. **KI-Ausbau** — der Gegner spielt, aber weiterhin schlicht; die neuen
+   Wirtschaftsregeln müssen später auch in sein strategisches Verhalten einfließen.
 
 Die Gate-Kette G0–G5 ruht unter Tier 2 und wird erst wieder aufgenommen, wenn das
 Projekt ein Publikum hat.
@@ -460,6 +466,12 @@ Projekt ein Publikum hat.
 | 0.18.0 | 2026-08-08 | Sprint 11 und Sprint 12 A/B in Projektstatus, Spielanleitung, Grenzen und nächste Schritte übernommen; Truppenführung, TCP-Relay sowie VFX/SFX nicht länger als fehlend bezeichnet; macOS-Testbuild korrekt als universell und ad-hoc-signiert dokumentiert | Technical Writer |
 | 0.19.0 | 2026-08-08 | D-091: Source-available Lizenz, CLA und Tier-2-Beitragsmodell ergänzt; die zwei Maintainer mit Merge-Recht und die Asset-/Markenabgrenzung klar benannt | Technical Writer |
 | 0.19.1 | 2026-08-08 | CLA-Wirkung auf Beiträge mit dokumentierter Zustimmung begrenzt; keine rückwirkende Rechteübertragung unterstellt | Technical Writer |
+| 0.20.0 | 2026-08-10 | D-105: alleinige Projektleitung und Merge-Autorität von `@cubetribe`, externe aktuelle Inhaberfreigabe sowie die ehrliche Zurückstellung manueller Spielabnahmen dokumentiert | Technical Writer |
+| 0.21.0 | 2026-08-10 | Strang-C-Status auf #73/#77/#78/#80 nachgezogen: Lagergrenze, Radar, Low Power und fünf endliche Aetheriumfelder sind umgesetzt; die tatsächlich verbleibenden Pakete bleiben offen | Codex / Dennis Westermann |
+| 0.22.0 | 2026-08-10 | Strang-C-Status auf D-103/D-104/D-107 nachgezogen: All-of-Voraussetzungen, footprintbasierte Platzierung, bezahlte Reparatur und faire Glutrinne-Startgeometrie sind umgesetzt; nur Paket 16.10 bleibt offen | Codex / Dennis Westermann |
+| 0.22.1 | 2026-08-10 | Die veraltete Unity-Baseline durch die tatsächlich gelaufenen Nachweise 586/586 EditMode und 3/3 fokussierte Graybox-PlayMode-Tests ersetzt und klar von einer manuellen Spielabnahme getrennt | Codex / Dennis Westermann |
+| 0.22.2 | 2026-08-10 | Nach dem Snapshot-Restore-Fix die erneut gelaufenen Nachweise auf 706/706 Headless- und 587/587 EditMode-Tests fortgeschrieben | Codex / Dennis Westermann |
+| 0.23.0 | 2026-08-10 | Paket 16.10 technisch abgeschlossen: All-of-Blocker, Strombilanz und Gebäudeleistung am Entscheidungspunkt sowie Stop-Löschung des Angriffsziels dokumentiert; 707/707 Headless- und 591/591 EditMode-Nachweise von der weiter offenen manuellen Abnahme getrennt | Codex / Dennis Westermann |
 | 0.7.1 | 2026-07-24 | Recovery-Baseline nach Implementierungs-Audit | Executive Producer / Lead Technical Director |
 | 0.8.0 | 2026-07-24 | Closed-Core MS-1, exakten Engine-Pin, G0-offenen Status und Quality-Verträge D-056–D-061 aufgenommen | Executive Producer / Technical Writer |
 | 0.8.1 | 2026-07-24 | Evidence-Semantikvalidator ergänzt und Dokumentstruktur korrigiert | Technical Writer / Lead QA Engineer |

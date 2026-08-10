@@ -1,6 +1,6 @@
 # Karten (Maps)
 
-**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Level Designer | **Sprint:** 2
+**Version:** 0.4.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Level Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -8,7 +8,7 @@ Definiert das Layout-Regelwerk für alle Project-Nova-Karten: Größenklassen, S
 
 ## Abhängigkeiten
 
-- [../production/DecisionLog.md](../production/DecisionLog.md) – D-010 (Aetherium-Hybridwirtschaft, Matchdauer 20–35 Min), D-012 (zerstörbare Elemente), D-013 (Wasser nur Terrain-Feature), D-016 (Neutrale), D-017 (Biome/Karten-Roadmap), D-018 (Modi-Staffelung), D-019 (Kamera/Lesbarkeit), D-022 (Capture-Kanal, Brücken-Reparatur), D-025 (FFA-Klarstellung), D-028 (Karten-/Biome-Festlegungen: Hazards, Doppelbelegung, Eisbruch-Fallback, Brücken reparierbar, Survival auf Standard-Karten)
+- [../production/DecisionLog.md](../production/DecisionLog.md) – D-010 (Aetherium-Hybridwirtschaft, Matchdauer 20–35 Min), D-012 (zerstörbare Elemente), D-013 (Wasser nur Terrain-Feature), D-016 (Neutrale), D-017 (Biome/Karten-Roadmap), D-018 (Modi-Staffelung), D-019 (Kamera/Lesbarkeit), D-022 (Capture-Kanal, Brücken-Reparatur), D-025 (FFA-Klarstellung), D-028 (Karten-/Biome-Festlegungen), D-102 (fünf endliche Glutrinne-Felder), D-107 (kanonische Glutrinne-Layoutachse)
 - [./Biomes.md](./Biomes.md) – Biom-Profile, Wetter/Hazards, Biom-Modifikatoren
 - [./NeutralUnits.md](./NeutralUnits.md) – Regeln und Belohnungen für Critters, feindliche Lager, capturebare Geschütztürme
 - [./MultiplayerModes.md](./MultiplayerModes.md) – Modus-Regeln und -Staffelung (Survival-Anforderungen)
@@ -26,6 +26,15 @@ bei 1 m/Zelle, klares Wetter und zwei symmetrische Hauptangriffswege.
 | Startfeld | 2 | 9.000 AE |
 | natürliche Expansion | 2 | 9.000 AE |
 | zentrales Feld | 1 | 15.000 AE |
+
+Die ausgelieferte Glutrinne bewahrt gemäß D-102/D-107 ihre Layoutachse durch
+Zelle `(62,62)`: Punkte spiegeln als `(x,y) → (124-x,124-y)`, die unteren
+linken Ursprünge der einheitlichen 3×3-MS-1-Gebäude als
+`(x,y) → (122-x,122-y)`. Deshalb liegen die beiden HQ-Ursprünge bei `(4,4)`
+und `(118,118)`. Diese MS-1-Festlegung ist eine bewusste Ausnahme vom
+nachfolgenden generischen Vollspielziel einer Spiegelung an der physischen
+Kartenmitte; eine spätere Rezentrierung wäre eine eigene Karten- und
+Balanceentscheidung.
 
 Es gibt keine Neutralen, Brücken, Capture-Ziele, Wettereffekte, Hazards oder
 Umgebungszerstörung; nur Aetherium darf sich verändern beziehungsweise
@@ -166,3 +175,4 @@ Jede Karte ist ein flacher Datensatz (ScriptableObject-tauglich): `MapId, BiomeI
 | 0.1.0 | 2026-07-21 | Erstfassung: Größenklassen, Layout-Regeln, Feld-Mengengerüst, Roadmap, Produktionsprozess | Lead Level Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030) | Lead Level Designer |
 | 0.3.0 | 2026-07-24 | Glutrinne mit Raster, Feldern, Routen und expliziten Nicht-Zielen als einzige MS-1-Karte gemäß D-056 festgelegt | Lead Level Designer |
+| 0.4.0 | 2026-08-10 | D-102/D-107-Override ergänzt: fünf endliche Felder, Glutrinne-Layoutachse durch `(62,62)` und abgeleitete Spiegelung der einheitlichen 3×3-MS-1-Footprints | Agent (unter Delegation) / Dennis Westermann |

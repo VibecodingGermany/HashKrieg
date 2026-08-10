@@ -1,6 +1,6 @@
 # Project Nova – Entwicklungs-Wiki
 
-**Version:** 0.18.0 | **Status:** unveröffentlichter Arbeitsstand – Lobby (Sprint 14) client- und relay-seitig implementiert und getestet; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 14
+**Version:** 0.21.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 16 technisch umgesetzt; manuelle Strang-C-, Netzwerk-, Gefechts- und Lobby-Abnahmen offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -24,7 +24,7 @@ Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 
 | Stufe | Status |
 |---|---|
-| Governance | **Tier 2** – externe Beitragende, zwei Maintainer (D-091) |
+| Governance | **Tier 2** – externe Beitragende, ein Projektinhaber (`@cubetribe`, D-105) |
 | Sprint 12 | Strang A A1–A7 umgesetzt, A8 Stufe 1 nachgewiesen und Stufen 2–4 offen (D-089); Strang B technisch umgesetzt, 60-Einheiten-Gegenhör-/Sichtabnahme offen (D-090) |
 | Spielbar | lokales 1v1 auf der Glutrinne-Graybox (Ablauf: `production/DemoRunbook.md`) |
 | MS-0 | offen – Kern läuft, Cross-Plattform- und Perf-Nachweise stehen aus |
@@ -183,7 +183,7 @@ gelisteten Kernverträge.
 - [RiskAnalysis](production/RiskAnalysis.md)
 - [GrayboxLog](production/GrayboxLog.md) – Sitzungsprotokoll der Graybox-Spur (D-067, Entwurf)
 - [ScopeLedger](production/ScopeLedger.md) – Zurückstellungen der Graybox-Spur, verweist auf Manifest-Schlüsselpfade
-- [DemoRunbook](production/DemoRunbook.md) (0.1.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, bekannte Grenzen, Asset-Ablage
+- [DemoRunbook](production/DemoRunbook.md) (0.6.0, Entwurf) – erste Demo-Runde: Ablauf, Steuerung, fünf endliche Aetheriumfelder, bekannte Grenzen und Asset-Ablage
 - [StatusSnapshot 2026-08-05](production/StatusSnapshot_2026-08-05.md) (0.1.0) – datierter Projektstand vor dem Eintreffen der ersten 3D-Assets
 - [Hashkrieg-Planungsmappe](production/hashkrieg/README.md) und
   [Sprint 12 „Zu zweit"](production/hashkrieg/12_Sprint_Zu_Zweit.md) –
@@ -233,9 +233,8 @@ kann keine Datei einen Gate-Pass erzeugen.
 - Q-018 und Q-019 bleiben offen und nicht MS-1-blockierend.
 - Sprint 12 A8 Stufen 2–4 (zwei Unity-Fenster, LAN, VPS) sind nicht gespielt.
 - Für Strang B fehlt die manuelle Sicht-/Gegenhörabnahme mit einem dichten
-  Gefecht; der automatisierte PlayMode-Gesamtlauf bleibt wegen des bestehenden
-  headless `RenderTexture.Create`-Fehlers in `BarracksSpawnDiagnosisTests` bei
-  8/9, während der neue Slot-Reuse-Test grün ist.
+  Gefecht. Die 591/591 EditMode- und 3/3 fokussierten Graybox-PlayMode-Tests
+  ersetzen diese menschliche Prüfung nicht.
 - Die vier Suno-Musikdatensätze benennen echte, noch fehlende Ursprungs- oder
   Konvertierungsbelege und bleiben bis zu deren Lieferung `incomplete`.
 
@@ -243,8 +242,8 @@ kann keine Datei einen Gate-Pass erzeugen.
 
 1. Den vorliegenden macOS-Build visuell und auditiv im dichten Gefecht prüfen.
 2. A8 mit zwei Unity-Fenstern, danach im LAN und auf dem VPS spielen.
-3. Erst danach den Gesamt-Sprint als gespielt beziehungsweise DoD-fertig
-   bezeichnen; Strang C bleibt ein eigener offener Simulationsumfang.
+3. Sprint 16 im laufenden Spiel abnehmen; Strang C ist technisch umgesetzt,
+   aber ohne diesen Durchlauf weder gespielt noch vollständig DoD-fertig.
 
 ## Änderungsverlauf
 
@@ -272,3 +271,6 @@ kann keine Datei einen Gate-Pass erzeugen.
 | 0.16.0 | 2026-08-07 | D-089-Netzprofil, RelayServer-Runbook und Sprint-12-Strang-A-Stand indexiert; manuelle Netzwerkabnahme ausdrücklich offen | Technical Writer |
 | 0.17.0 | 2026-08-08 | D-091 und Sprint 13.0 indexiert: Tier-2-Beitragsmodell, Lizenz- und Merge-Schutz vorbereitet | Technical Writer |
 | 0.18.0 | 2026-08-09 | Sprint-14-Lobby indexiert: LobbySupabase.md (Vertrag, Schema, Edge-Function-Referenzen, Betriebspfad) und RelayServer.md 1.1.0 (kurzlebige Lobby-Tokens) aufgenommen, D-092 bis D-094; Supabase-Anlage, Relay-Redeploy und gespielte Abnahme ausdrücklich offen | Agent (Umsetzung) |
+| 0.19.0 | 2026-08-10 | D-105 indexiert: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 und die externen CLA-/Review-Regeln bleiben aktiv | Technical Writer |
+| 0.20.0 | 2026-08-10 | DemoRunbook 0.6.0 indexiert: D-102/Sprint 16.7 ersetzt die alte Zwei-Feld-Demo durch fünf endliche, sichtbare Aetheriumfelder | Codex / Dennis Westermann |
+| 0.21.0 | 2026-08-10 | Sprint 16 technisch bis Paket 16.10 abgeschlossen und die 707/707 Headless-, 591/591 EditMode- und fokussierten 3/3 PlayMode-Nachweise klar von der offenen manuellen Strang-C-Abnahme getrennt | Codex / Dennis Westermann |

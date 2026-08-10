@@ -60,7 +60,9 @@ namespace Nova.AI.Data
         /// Free power kept in reserve: a power-drawing building is placed only
         /// while the committed margin covers its draw plus this reserve. 0
         /// means "place a Power plant when the margin would go negative" — the
-        /// D-077 opening rule the game ships with.
+        /// D-077 margin rule the game ships with. Independently, D-103 forces
+        /// a Power plant whenever the planned building names Power as a still
+        /// missing prerequisite.
         /// </summary>
         public int PowerReserve { get; }
 

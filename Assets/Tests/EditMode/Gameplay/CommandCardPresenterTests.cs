@@ -11,8 +11,8 @@ namespace Nova.Gameplay.Tests
     /// <summary>
     /// Contract tests for the role-aware command-card mapping of
     /// <see cref="CommandCardPresenter"/>: which buttons a selection shows
-    /// (presence), the blocker evaluation order that greys them
-    /// (availability — the mirror of the executor's own validation order),
+    /// (presence), the blocker evaluation priorities that grey them
+    /// (availability — documented separately for each surface),
     /// the producer/content listing and the building-side repair-actor
     /// convention. The legacy count-only overload is pinned by
     /// SelectionManagerTests and deliberately not duplicated here.
@@ -193,7 +193,7 @@ namespace Nova.Gameplay.Tests
         }
 
         // ----------------------------------------------------------------
-        // Availability evaluation (mirrors the executor's validation order)
+        // Availability evaluation (documented per-surface priorities)
         // ----------------------------------------------------------------
 
         [Test]
@@ -241,7 +241,7 @@ namespace Nova.Gameplay.Tests
         }
 
         [Test]
-        public void EvaluateBuildingPlacementBlocker_FollowsExecutorOrder()
+        public void EvaluateBuildingPlacementBlocker_FollowsBuildMenuPriority()
         {
             Assert.IsTrue(SimDefinitions.TryGetBuilding(
                 FactionId.Alliance, UnitRole.VehicleFactory, out SimBuildingDefinition factory));
@@ -251,7 +251,7 @@ namespace Nova.Gameplay.Tests
                 CommandCardPresenter.EvaluateBuildingPlacementBlocker(
                     in factory, prerequisiteMet: false, credits: 0,
                     powerProvided: 0, powerRequired: 0, activeSiteCount: ConstructionSystem.MaxSites),
-                "the prerequisite wins when every blocker applies");
+                "the build menu prioritizes the actionable prerequisite chain when every blocker applies");
             Assert.AreEqual(
                 BuildingPlacementBlocker.InsufficientCredits,
                 CommandCardPresenter.EvaluateBuildingPlacementBlocker(

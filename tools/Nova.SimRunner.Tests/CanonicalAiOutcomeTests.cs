@@ -43,17 +43,18 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class CanonicalAiOutcomeTests
     {
-        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 16.2 (#46). Previous value: 2548 (Sprint 16.1).</summary>
-        private const uint PinnedDecidedTick = 2546u;
+        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 16.9 / D-104 and D-107 placement geometry. Previous value: 2705 (Sprint 16.8).</summary>
+        private const uint PinnedDecidedTick = 2726u;
 
         /// <summary>
         /// End-state hash of the canonical AI match, last moved by: Sprint 16
-        /// package 16.2 (#46) — produced units spawn at the building footprint
-        /// and walk to their rally point. The AI itself is unchanged:
-        /// AiBehaviorId stayed r5.779A1B5B.
-        /// Previous value: 0x8C0B54F31F2986B7 (Sprint 16.1).
+        /// package 16.9 / D-104 and D-107. The footprint placement rules and
+        /// corrected mirrored HQ geometry move the simulated match without
+        /// changing the AI implementation.
+        /// AiBehaviorId is r7.E34435F9.
+        /// Previous value: 0x28F2CC571BCE6B76 (Sprint 16.8).
         /// </summary>
-        private const string PinnedEndState = "0x9F93097AD526B6F7";
+        private const string PinnedEndState = "0x10B83E94F86F2E55";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()
