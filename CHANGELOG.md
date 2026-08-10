@@ -65,6 +65,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Behoben
+- **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
+  Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
+  Waffentabelle greift nicht mehr, und `CombatSystem` schliesst zusätzlich jede aktive
+  Baustelle als Angreifer und Ziel aus — auch die Verteidigungsplattform feuert
+  vor Fertigstellung nicht. Strombilanz, Skirmish-KI, kanonisches
+  Determinismus-Szenario und HQ-Siegprüfung behandeln Sites ebenfalls nicht als
+  fertige Gebäude; `UnitViewManager` behält die Baustellenoptik bis zur
+  Fertigstellung. Die minimale AI-/Combat-Integrationsreparatur ist nach D-105
+  dokumentiert und ändert die dauerhafte Stranghoheit nicht
 - **#54: Das Radar wird ein Gebäude (C3/D-096)** — die Minimap ist jetzt eine
   Radar-Funktion: `MinimapHud` zeichnet (Panel und Trefferfläche) nur noch,
   solange der lokale Slot ein fertiges Radar besitzt; der Bauknopf sagt es im

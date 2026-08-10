@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.0.0 | **Status:** geplant | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.1.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -67,12 +67,21 @@ sondern ein Platzierungsfehler.** Das ändert den Aufwand, nicht die Dringlichke
 | `Scripts/Gameplay/UI/CommandCardPresenter.cs` | 16.10 — Strombedarf am angeklickten Gebäude |
 | `tools/Nova.SimRunner/Determinism10000Scenario.cs`, `tools/Nova.SimRunner.Tests/CanonicalMatchSetupTests.cs`, `Assets/Tests/EditMode/Gameplay/CanonicalMatchSetupTests.cs` | 16.7 — Drehbuch und beide Spiegel |
 
-**Keine Datei unter** `Scripts/Simulation/Combat/`, `Movement/`, `Factions/`,
+**Grundsätzlich keine Datei unter** `Scripts/Simulation/Combat/`, `Movement/`, `Factions/`,
 `Pathfinding/`, `Scripts/AI/`, `AI.Data/`, `Presentation/UI/DebugHud.cs`. Das ist
 der Einheitenstrang. Disjunkt gegen [13B](13B_Sprint_Einheitenverhalten.md) —
 **ausser an zwei Vertragsflächen:** `Simulation/Definitions/` ist geteilt
 (Absprache vor 16.8), und der `WeaponProfiles`-Slot `UnitRole.Unit`, den 16.3
 faktisch umwidmet, gehört 13B. **Beides wird vor dem PR angesagt, nicht danach.**
+
+**D-105-Integrationsausnahme für 16.3:** Die geänderte Rollendarstellung hat
+beim Zusammenführen zwei Fehler ausserhalb des ursprünglichen Schreibbereichs
+offengelegt. Der Projektinhaber darf dafür den kleinsten gebundenen Reparaturdiff
+führen: `CombatSystem` schliesst aktive Sites als Angreifer und Ziel aus;
+`SkirmishAiSystem` und das kanonische 10.000-Tick-Szenario unterscheiden Sites
+vor der Gebäuderolle von fertigen Gebäuden. Gespiegelte Regressionstests und
+die Benachrichtigung im PR sind Pflicht; die dauerhafte Stranghoheit ändert sich
+nicht.
 
 **Kein neuer `CommandKind`.** Das Register `Simulation/CommandsV1/` bleibt
 eingefroren; kein Paket dieses Sprints braucht einen neuen Befehlstyp.
@@ -125,7 +134,9 @@ nicht in eine Behebung.
 
 Die Baustelle bekommt bei `SpawnBuildingEntity(completed: false)` **`def.Role`
 statt `UnitRole.Unit`**. Unbewaffnete Gebäuderollen tragen `AttackDamage = 0`;
-damit fällt der Fallback-Schuss weg, ohne dass eine Zeile in `Combat/` nötig ist.
+damit fällt der Fallback-Schuss weg. Weil eine Verteidigungsplattform selbst
+als Gebäuderolle bewaffnet ist, schliesst `CombatSystem` zusätzlich jede aktive
+Site als Angreifer und Ziel aus.
 
 Drei Stellen, die das mitzieht:
 
@@ -135,6 +146,11 @@ Drei Stellen, die das mitzieht:
 | `UnitViewManager` (`IsBuildingRole`, Prefab / Größe / Rotationssperre) | eine Baustelle würde als fertiges Gebäude gerendert. Optik von `ConstructionSiteMarkerView` mitprüfen |
 | `SelectionManager.CopyMobileSelection` | fällt in die andere Richtung: die Baustelle verschwindet aus dem Versand mobiler Befehle. Auswählbar ist sie heute schon — `SelectSingle` und `SelectBoxAdditive` prüfen nur `PlayerId`. Die Befehlskarte ist unbetroffen, `TryGetSite` greift vor `IsBuildingRole` |
 | `VictorySystem.IsBuilding` | prüft `IsBuildingRole` zuerst und liefert weiterhin `true` — hier ändert sich nichts |
+
+Zusätzlich müssen `SkirmishAiSystem` und das kanonische
+`Determinism10000Scenario` Sites vor jeder Rollenauswertung über das
+Baustellenregister ausfiltern. Sonst gilt eine unfertige Raffinerie bereits als
+Produzent und die KI reicht Folgeaufträge zu früh ein.
 
 `ConstructionSystem.HasFinishedBuilding` ist **nicht** betroffen: es iteriert
 `_buildings[]`, das nur `CompleteSite` und `PlaceCompletedBuilding` schreiben.
@@ -354,4 +370,5 @@ Die Baseline-Neusetzung ist Zweck der Tests, kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-10 | D-105-Integrationsausnahme für 16.3 dokumentiert: aktive Sites sind keine Kampfteilnehmer oder fertigen KI-Produzenten | Codex / Dennis Westermann |
 | 1.0.0 | 2026-08-09 | Erstfassung: Strang C aus Sprint 12 und die acht Betatest-Befunde im selben Schreibbereich zu einem Sprint zusammengeführt, am Code geprüft und nach Kosten sortiert | Orchestrator |

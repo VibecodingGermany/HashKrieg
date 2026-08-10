@@ -333,7 +333,7 @@ namespace Nova.SimRunner.Tests
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
@@ -408,7 +408,7 @@ namespace Nova.SimRunner.Tests
                 var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
                 var production = new ProductionSystem(entities, economy, construction);
                 var fogOfWar = new FogOfWarSystem(entities, construction, teamCount: 2, 128, 128);
-                var combat = new CombatSystem(entities, fogOfWar, economy);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(economy);
                 kernel.RegisterSystem(construction);

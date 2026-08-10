@@ -147,6 +147,15 @@ namespace Nova.Simulation.Economy
         private int _fieldCount;
         private SimulationKernel _kernel;
 
+        /// <summary>
+        /// Construction-site lookup bound by the ConstructionSystem
+        /// constructor (16.3, #44): a site entity carries its definition role
+        /// now, so the power recompute needs the site's own register to tell
+        /// "unfinished" from "completed". Null in a rig without construction
+        /// — every building-role entity then counts, the pre-16.3 behaviour.
+        /// </summary>
+        private Func<EntityId, bool> _isSiteLookup;
+
         public string Name => "EconomySystem";
 
         public ushort StateBlockId => SnapshotBlockIds.Economy;
@@ -176,6 +185,18 @@ namespace Nova.Simulation.Economy
             _kernel = kernel;
             kernel?.Logger.LogInfo(
                 $"[{Name}] Initialized canonical economy ({MaxPlayers} slots, harvest rate {HarvestRateAE} AE/tick).");
+        }
+
+        /// <summary>
+        /// Binds the construction site's own register as the "is this entity
+        /// an unfinished site" lookup (16.3, #44). Called ONCE by the
+        /// ConstructionSystem constructor — hosts never wire this themselves.
+        /// The lookup is read-only against the site table and moves no state
+        /// into the economy, so the snapshot layout is untouched.
+        /// </summary>
+        public void BindSiteLookup(Func<EntityId, bool> isSiteLookup)
+        {
+            _isSiteLookup = isSiteLookup;
         }
 
         /// <summary>Mutable access to one slot's economy state (slot must be in [0, MaxPlayers)).</summary>
@@ -334,8 +355,10 @@ namespace Nova.Simulation.Economy
         /// canonical definition table (<see cref="Definitions.SimDefinitions"/>)
         /// and are FACTION-RESOLVED: the entity's owner slot selects the row
         /// (a Legion Schwerer Generator feeds 80, an Alliance Fusionsreaktor
-        /// 100). Mobile roles and construction sites (role
-        /// <see cref="UnitRole.Unit"/>) draw nothing.
+        /// 100). Mobile roles draw nothing, and an unfinished construction
+        /// site — which carries its definition role since 16.3 (#44) — is
+        /// skipped exactly like the generic role before it: it neither
+        /// provides nor draws power until completion.
         /// </summary>
         private void RecomputePower()
         {
@@ -355,6 +378,14 @@ namespace Nova.Simulation.Economy
                 if (Definitions.SimDefinitions.TryGetBuilding(
                         _players[unit.PlayerId].Faction, unit.Role, out Definitions.SimBuildingDefinition building))
                 {
+                    // A site must not power itself up (a Power site feeding
+                    // its own grid) or drain the grid it is only starting to
+                    // join. The lookup knows the site's own register; without
+                    // it (construction-free rigs) every role entity counts.
+                    if (_isSiteLookup != null && _isSiteLookup(unit.Id))
+                    {
+                        continue;
+                    }
                     _players[unit.PlayerId].PowerProvided += building.PowerProvided;
                     _players[unit.PlayerId].PowerRequired += building.PowerRequired;
                 }
@@ -487,7 +518,7 @@ namespace Nova.Simulation.Economy
         }
 
         /// <summary>
-        /// True when an active own refinery stands in reach of the unit
+        /// True when a completed own refinery stands in reach of the unit
         /// (ascending entity-index scan, first hit decides). Reach is measured
         /// against the building FOOTPRINT, not its entity cell: the entity
         /// sits at the footprint centre (ConstructionSystem.SpawnBuildingEntity
@@ -512,6 +543,9 @@ namespace Nova.Simulation.Economy
                 ref readonly UnitState candidate = ref units[i];
                 if (!candidate.IsActive || candidate.Role != UnitRole.Refinery) continue;
                 if (candidate.PlayerId != unit.PlayerId) continue;
+                // 16.3 (#44): a site already carries the Refinery role, but
+                // it is not a cargo drop-off until completion.
+                if (_isSiteLookup != null && _isSiteLookup(candidate.Id)) continue;
 
                 int rx = Math.Max(0, SimFixed.WorldToGrid(candidate.Transform.PositionX));
                 int ry = Math.Max(0, SimFixed.WorldToGrid(candidate.Transform.PositionY));

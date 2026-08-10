@@ -324,7 +324,7 @@ namespace Nova.Simulation.Tests
                 var factions = new EconomySystem(entities);
                 var construction = new Nova.Simulation.Construction.ConstructionSystem(entities, factions);
                 var fog = new FogOfWarSystem(entities, construction, teamCount: 2, 64, 64);
-                var combat = new CombatSystem(entities, fog, factions);
+                var combat = new CombatSystem(entities, fog, factions, construction);
 
                 var kernel = new SimulationKernel(new SimRandom(Seed));
                 kernel.RegisterSystem(pathfinding);
