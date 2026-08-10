@@ -136,7 +136,8 @@ namespace Nova.SimRunner
     /// MS-1 manifest start state of quality/content/mvp-v1.json
     /// (startStatePerPlayer) per slot — a COMPLETED HQ, ONE Builder and
     /// 3.000 AE (EconomySystem.CanonicalMatchStartingCreditsAE, wired by
-    /// <see cref="BuildHost"/>) — plus one Aetherium field per slot. Nothing
+    /// <see cref="BuildHost"/>) — plus five finite canonical Aetherium fields.
+    /// Nothing
     /// else is spawned: the script then drives the opening exactly like a
     /// player, for BOTH slots — walk the Builder to the future site, place
     /// the Refinery once it is affordable and the committed grid covers its
@@ -184,7 +185,30 @@ namespace Nova.SimRunner
         private const byte HumanSlot = 0;
         private const byte AiSlot = 1;
         private const int EntityCapacity = 1024;
-        private const long FieldReserveAE = 2000000L;
+        /// <summary>One Aetherium field of the canonical map (16.7, C1).</summary>
+        private struct FieldLayout
+        {
+            public ushort Id;
+            public int X, Y;
+            public long ReserveAE;
+        }
+
+        /// <summary>
+        /// The five canonical fields (16.7, C1 — MVPContentManifest section 5):
+        /// two start fields and two natural expansions at 9.000 AE each, one
+        /// contested centre at 15.000. Every slot-1 coordinate is the point
+        /// mirror of slot 0 through the map centre ((x, y) -&gt;
+        /// (124 - x, 124 - y)). Registration in ascending id order is part of
+        /// the canonical initial state.
+        /// </summary>
+        private static readonly FieldLayout[] FieldLayouts =
+        {
+            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+        };
 
         /// <summary>
         /// Faction-resolved definition id of a role for the given slot
@@ -601,25 +625,26 @@ namespace Nova.SimRunner
             RefineryRallyX = 7, RefineryRallyY = 6,
         };
 
-        /// <summary>Slot 1 base layout (top-right), the 180-degree mirror of slot 0.</summary>
+        /// <summary>Slot 1 base layout (top-right), the exact centre mirror of slot 0.</summary>
         private static readonly SlotLayout Slot1Layout = new SlotLayout
         {
-            FieldId = 2, FieldX = 119, FieldY = 119,
+            FieldId = 2, FieldX = 117, FieldY = 117,
             HqOriginX = 120, HqOriginY = 120,
-            BuilderSpawnX = 113, BuilderSpawnY = 119,
-            RefineryOriginX = 116, RefineryOriginY = 120, RefineryBuildX = 116, RefineryBuildY = 119,
-            RefineryRallyX = 119, RefineryRallyY = 120,
+            BuilderSpawnX = 111, BuilderSpawnY = 117,
+            RefineryOriginX = 114, RefineryOriginY = 118, RefineryBuildX = 114, RefineryBuildY = 117,
+            RefineryRallyX = 117, RefineryRallyY = 118,
         };
 
         /// <summary>
-        /// Applies the deterministic match setup to a fresh host: per slot
-        /// the D-077 start state of quality/content/mvp-v1.json
+        /// Applies the deterministic match setup to a fresh host: the five
+        /// canonical fields in ascending id order, then per slot the D-077
+        /// start state of quality/content/mvp-v1.json
         /// (startStatePerPlayer) — a COMPLETED HQ, ONE Builder and the 3.000
         /// AE of <see cref="EconomySystem.CanonicalMatchStartingCreditsAE"/>
-        /// (wired by <see cref="BuildHost"/>) — plus one Aetherium field. No
+        /// (wired by <see cref="BuildHost"/>). No
         /// pre-placed Refinery, no Harvesters, no skirmish squad: the loop
-        /// start is scripted, not spawned. Deterministic spawn order (field,
-        /// HQ, Builder; slot 0 first) means identical entity ids on every
+        /// start is scripted, not spawned. Deterministic entity order (HQ,
+        /// Builder; slot 0 first) means identical entity ids on every
         /// host and platform. The slot factions are already bound —
         /// <see cref="BuildHost"/> assigns them before <c>Kernel.Start()</c>,
         /// which the <see cref="EconomySystem.SetSlotFaction"/> guard
@@ -628,13 +653,17 @@ namespace Nova.SimRunner
         private static SlotState[] SetupMatch(Host host)
         {
             var slots = new[] { new SlotState(), new SlotState() };
+            for (int f = 0; f < FieldLayouts.Length; f++)
+            {
+                FieldLayout field = FieldLayouts[f];
+                if (!host.Economy.TryAddField(field.Id, new GridPos2D(field.X, field.Y), field.ReserveAE))
+                {
+                    throw new InvalidOperationException($"field {field.Id} could not be registered");
+                }
+            }
             for (byte slot = 0; slot < 2; slot++)
             {
                 SlotLayout c = slot == HumanSlot ? Slot0Layout : Slot1Layout;
-                if (!host.Economy.TryAddField(c.FieldId, new GridPos2D(c.FieldX, c.FieldY), FieldReserveAE))
-                {
-                    throw new InvalidOperationException($"field {c.FieldId} could not be registered");
-                }
                 if (!host.Construction.PlaceCompletedBuilding(slot, DefId(host, slot, UnitRole.HQ), c.HqOriginX, c.HqOriginY).IsValid)
                 {
                     throw new InvalidOperationException("HQ placement failed");

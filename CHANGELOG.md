@@ -64,6 +64,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   das Tor identisch zur Kopfzahl. Die Partie bestätigt damit die Neutralität;
   sie belegt keine Verbesserung.
 
+### Geändert
+- **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
+  zwei praktisch endlosen Startfelder werden durch zwei symmetrische
+  Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes
+  Zentrum mit 15.000 AE ersetzt. Alle fünf Startaufstellungs-Spiegel und die
+  Kartenmarker folgen derselben Reihenfolge; `HarvestRateAE` bleibt bewusst
+  bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
+
 ### Behoben
 - **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
   fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
