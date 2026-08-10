@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.7.1 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.8.0 | **Status:** technisch umgesetzt – manuelle Spielabnahme zurückgestellt | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -350,18 +350,19 @@ in Changelog und PR statt in einem erfundenen Artefakt.
 - **Integrierter Ausgang:** Mit D-104 und der D-107-HQ-Korrektur entscheidet die
   kanonische KI-Partie auf Tick 2.726 mit `0x10B83E94F86F2E55`. Die Kennung
   bleibt `r7.E34435F9`: bewegt hat sich die Simulation, nicht die KI. Die
-  vollständige lokale .NET-Suite ist auf diesem Integrationsstand mit 706/706
+  vollständige lokale .NET-Suite ist auf diesem Integrationsstand mit 707/707
   grün.
 
 ### 16.10 · Ehrliche Rückmeldung am Entscheidungspunkt (#47, #48, #45)
 
-Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühren:
+Drei kleine Eingriffe sind gemeinsam umgesetzt, weil sie dasselbe Regelwerk
+berühren:
 
 - **#47 Der Blockergrund wird hergeleitet, nicht gemeldet.**
-  `BuildMenuHud.BlockerReason` kennt heute zwei Ursachen (fehlende Voraussetzung,
-  zu wenig Aetherium) und wird um **Energie** und **volles Baustellenkontingent**
-  ergänzt. **Nicht** über einen neuen `CommandResultCode` — `CommandsV1/` ist
-  eingefroren.
+  `BuildMenuHud.BlockerReason` leitet All-of-Voraussetzungen, zu wenig
+  Aetherium, **Energie** und ein **volles Baustellenkontingent** aus dem
+  aktuellen Simulationszustand her. Dafür gibt es keinen neuen
+  `CommandResultCode` — `CommandsV1/` bleibt eingefroren.
   > **Energie darf nicht in `IsAvailable`.** Sonst wird der Knopf ausgegraut und
   > der Platzierungsmodus ist gar nicht mehr erreichbar. *Grund anzeigen* ist
   > nicht *Knopf sperren*.
@@ -371,8 +372,8 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
   Gebäude Bedarf beziehungsweise Erzeugung (`CommandCardPresenter`). Die
   bestehende Anzeige in `DebugHud.DrawStatusBar` bleibt, wo sie ist.
 - **#45 „Stoppen" löscht auch den Angriffsbefehl.** `UnitCommandStateView`
-  räumt bei `CommandKind.Stop` zusätzlich `AttackTarget` ab. Heute löscht Stop
-  Bewegung, Ernte und Reparatur — nur den Angriff nicht.
+  räumt bei `CommandKind.Stop` zusätzlich `AttackTarget` ab. Vor Paket 16.10
+  löschte Stop Bewegung, Ernte und Reparatur, aber nicht den Angriff.
   > **Was das nicht leistet:** Die Einheit erfasst im nächsten Tick automatisch
   > ein neues Ziel (D-087). Ein echtes „Feuer einstellen" braucht einen
   > Haltezustand in `Simulation/Combat/` und gehört damit dem Einheitenstrang.
@@ -404,7 +405,9 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
 
 ## Fertig wenn
 
-1. `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore` ist lokal und **in der CI** grün — ohne
+1. `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore`
+   ist lokal mit 707/707 grün; Unity EditMode steht bei 591/591. Zusätzlich
+   bleibt grüne Pflicht-CI auf dem aktuellen PR-Head Merge-Gate — ohne
    Baseline-Neusetzung im selben PR wie eine Verhaltensänderung.
 2. Ein Mensch hat eine Runde gespielt und dabei gesehen:
    - der Sammler fährt nach der ersten Raffinerie von allein los,
@@ -419,9 +422,11 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
 3. Der Ablauf steht im [GrayboxLog](../GrayboxLog.md) mit Commit und Endzustand.
 4. Die abgeworfenen Pakete stehen mit Begründung im [ScopeLedger](../ScopeLedger.md).
 
-Punkt 2 ist nicht durch Punkt 1 ersetzbar. `Gameplay/` und `Presentation/` sind
-in **keinem** CI-Testlauf enthalten; für 16.10 gibt es ausser der gespielten
-Runde keinen Nachweis.
+Punkt 2 ist nicht durch Punkt 1 ersetzbar. Die automatisierten Läufe decken den
+Unity-freien Stop-Vertrag, den Blocker-Evaluator, die Power-Formatter und die
+Kompilierung der Präsentationsschicht ab; sie belegen nicht, dass ein Mensch
+Hovertext, Stromzeile und Stop-Wirkung im laufenden Spiel gelesen und bedient
+hat. Diese Spielabnahme wurde zurückgestellt.
 
 ## Abwurfliste
 
@@ -471,6 +476,7 @@ Tests, kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.8.0 | 2026-08-10 | Paket 16.10 technisch abgeschlossen: All-of-/AE-/Energie-/Baustellenblocker, Stromanzeige am Baupunkt und Stop-Löschung des Angriffsziels umgesetzt; 707/707 Headless und 591/591 EditMode belegt, manuelle Spielabnahme ausdrücklich zurückgestellt | Codex / Dennis Westermann |
 | 1.7.1 | 2026-08-10 | Snapshot-Restore ersetzt nun auch den dynamischen CostField-Footprintzustand eines abweichenden Zielhosts; gespiegelter Regressionstest und finaler 706/706-Nachweis ergänzt | Agent (unter Delegation) / Dennis Westermann |
 | 1.7.0 | 2026-08-10 | D-107 und den integrierten 16.9-Vertrag ergänzt: Glutrinne-Layoutachse, HQ-Ursprung `(118,118)`, 45/45 Folge-Raffinerieplätze, dichte Snapshot-Reihenfolgen, Rules-Revision 3 und finaler r7-Ausgangspin | Agent (unter Delegation) / Dennis Westermann |
 | 1.6.0 | 2026-08-10 | Paket 16.9 mit D-104 konkretisiert: footprintbasierte Einfluss-, Feld-, Gelände- und Gebäudeabstände sowie zustandslose kumulative 30-Prozent-Reparaturkosten und Ziel-Deduplikation festgeschrieben | Project Owner / Agent (unter Delegation) |

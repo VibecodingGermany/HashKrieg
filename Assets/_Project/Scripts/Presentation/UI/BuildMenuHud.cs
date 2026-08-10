@@ -26,8 +26,9 @@ namespace Nova.Presentation.UI
     /// the bar, where it appears while the entry is hovered.
     /// </para>
     /// <para>
-    /// THE STATUS LINE above the bar serves three masters in priority order:
-    /// the hovered entry's blocker reason, then the D-085 builder warning
+    /// THE STATUS LINE above the bar always carries the live power balance on
+    /// the left. Its right side serves three masters in priority order: the
+    /// hovered entry's blocker or power value, then the D-085 builder warning
     /// ("Kein Builder — Bau pausiert…") shown as long as any own construction
     /// site has no living Builder — the visible warning instead of the silent
     /// dead end —, then the onboarding hint below.
@@ -38,9 +39,11 @@ namespace Nova.Presentation.UI
     /// alternative BuildingRegistrySO has no asset instances in the project
     /// and is not wired at runtime, so SimDefinitions is the honest source:
     /// the bar cannot drift from the executor. Availability mirrors the
-    /// executor's own rule precisely — the prerequisite check is the sim's
-    /// <see cref="ConstructionSystem.HasFinishedBuildings"/> and the credit
-    /// check is the balance the executor charges at placement.
+    /// prerequisite, credit and global site-capacity gates; the prerequisite
+    /// check is the sim's all-of
+    /// <see cref="ConstructionSystem.HasFinishedBuildings"/> rule. Power is
+    /// derived and shown too, but deliberately does not disable entering
+    /// placement mode — the target-cell decision still belongs to placement.
     /// </para>
     /// <para>
     /// Clicking an available entry calls
@@ -90,9 +93,6 @@ namespace Nova.Presentation.UI
         /// <summary>Horizontal gap between two buttons (explicit rects, so the gap is exactly this, not a GUILayout margin guess).</summary>
         private const float ButtonSpacing = 4f;
 
-        /// <summary>Width of the status line above the bar (centered on the zone), same measure the onboarding hint had.</summary>
-        private const float StatusLineWidth = 640f;
-
         [Header("Wiring (scene generator)")]
         [SerializeField] private MatchRunner _runner;
         [SerializeField] private RtsDeviceInput _input;
@@ -114,6 +114,7 @@ namespace Nova.Presentation.UI
         private readonly StringBuilder _builder = new StringBuilder(64);
         private GUIStyle _buttonStyle;
         private GUIStyle _statusStyle;
+        private GUIStyle _powerStatusStyle;
         private bool _hintDismissed;
         private float _hintShownAt = -1f;
 
@@ -121,8 +122,7 @@ namespace Nova.Presentation.UI
         // the status line and the buttons.
         private bool _siteLacksBuilder;
         private int _siteLacksBuilderFrame = -1;
-        private string _hoveredBlockerReason;
-        private string _hoveredRadarHint;
+        private string _hoveredStatusText;
         private string _transientNotice;
         private float _transientNoticeUntil;
 
@@ -281,7 +281,9 @@ namespace Nova.Presentation.UI
             if (economy == null || construction == null) return; // match not initialized yet
 
             byte slot = _runner.Session != null ? _runner.Session.LocalSlot : (byte)0;
-            long credits = economy.GetPlayerEconomy(slot).AetheriumCredits;
+            ref readonly PlayerEconomyState playerEconomy = ref economy.GetPlayerEconomy(slot);
+            long credits = playerEconomy.AetheriumCredits;
+            int activeSiteCount = construction.SiteCount;
             FactionId faction = economy.GetSlotFaction(slot);
 
             Rect zone = ComputeBarZone();
@@ -295,8 +297,7 @@ namespace Nova.Presentation.UI
             // is exactly why they are explicit.
             float scale = Mathf.Max(1f, _uiScale);
             Vector2 guiMouse = HudLayout.RawMouseToGui(Input.mousePosition, scale);
-            _hoveredBlockerReason = null;
-            _hoveredRadarHint = null;
+            _hoveredStatusText = null;
             for (int i = 0; i < BuildableRoles.Length; i++)
             {
                 UnitRole role = BuildableRoles[i];
@@ -306,29 +307,42 @@ namespace Nova.Presentation.UI
                     buttonsRect.x + i * (buttonWidth + ButtonSpacing), buttonsRect.y, buttonWidth, _buttonHeight);
                 if (!rect.Contains(guiMouse)) continue;
 
-                if (!IsAvailable(in def, slot, credits, construction))
+                UnitRoleMask missingPrerequisites =
+                    construction.GetMissingPrerequisiteRoles(slot, def.PrerequisiteRoles);
+                bool prerequisiteMet = missingPrerequisites == UnitRoleMask.None;
+                BuildingPlacementBlocker blocker = CommandCardPresenter.EvaluateBuildingPlacementBlocker(
+                    in def, prerequisiteMet, credits,
+                    playerEconomy.PowerProvided, playerEconomy.PowerRequired, activeSiteCount);
+                _hoveredStatusText = BlockerReason(
+                    role, in def, blocker, missingPrerequisites, credits,
+                    playerEconomy.PowerProvided, playerEconomy.PowerRequired, activeSiteCount);
+                if (_hoveredStatusText == null)
                 {
-                    _hoveredBlockerReason = BlockerReason(role, in def, slot, credits, construction);
-                }
-                else if (role == UnitRole.Radar)
-                {
-                    // 16.5 (#54, C3): the button says in plain text what it
-                    // unlocks — the minimap is a Radar function now, and
-                    // losing the building takes the map away again.
-                    _hoveredRadarHint = "Radar: schaltet die Minimap frei — ohne Radar keine Karte";
+                    _hoveredStatusText = $"{CommandCardPresenter.BuildingDisplayName(role)}: "
+                        + CommandCardPresenter.FormatBuildingPower(in def);
+                    if (role == UnitRole.Radar)
+                    {
+                        // 16.5 (#54, C3): keep the minimap unlock explicit
+                        // while 16.10 adds the building's power draw.
+                        _hoveredStatusText += " · schaltet Minimap frei";
+                    }
                 }
             }
 
             // Chrome and status line paint BEFORE the buttons — IMGUI paints
             // in call order and later calls sit on top.
-            DrawChromeAndStatusLine(zone, buttonsRect);
+            DrawChromeAndStatusLine(
+                zone, buttonsRect,
+                CommandCardPresenter.FormatPowerBalance(
+                    playerEconomy.PowerProvided, playerEconomy.PowerRequired));
 
             for (int i = 0; i < BuildableRoles.Length; i++)
             {
                 UnitRole role = BuildableRoles[i];
                 if (!SimDefinitions.TryGetBuilding(faction, role, out SimBuildingDefinition def)) continue;
 
-                bool available = IsAvailable(in def, slot, credits, construction);
+                bool prerequisiteMet = PrerequisiteMet(in def, slot, construction);
+                bool available = IsAvailable(in def, prerequisiteMet, credits, activeSiteCount);
                 var rect = new Rect(
                     buttonsRect.x + i * (buttonWidth + ButtonSpacing), buttonsRect.y, buttonWidth, _buttonHeight);
 
@@ -343,29 +357,50 @@ namespace Nova.Presentation.UI
             }
         }
 
-        /// <summary>Entry availability, the executor's own rule: prerequisite finished (if any) and enough credits.</summary>
-        private static bool IsAvailable(in SimBuildingDefinition def, byte slot, long credits, ConstructionSystem construction)
+        private static bool PrerequisiteMet(
+            in SimBuildingDefinition def, byte slot, ConstructionSystem construction)
         {
-            bool prerequisiteMet = construction.HasFinishedBuildings(slot, def.PrerequisiteRoles);
-            return prerequisiteMet && credits >= def.CostAE;
+            return construction.HasFinishedBuildings(slot, def.PrerequisiteRoles);
+        }
+
+        /// <summary>
+        /// Whether the button may enter placement mode. Energy is
+        /// deliberately absent: its blocker is visible on hover, but the
+        /// player must still be able to inspect terrain in placement mode.
+        /// </summary>
+        private static bool IsAvailable(
+            in SimBuildingDefinition def, bool prerequisiteMet, long credits, int activeSiteCount)
+        {
+            return prerequisiteMet
+                && credits >= def.CostAE
+                && activeSiteCount < ConstructionSystem.MaxSites;
         }
 
         /// <summary>
         /// The chrome frame and the status line. IMGUI paints in call order,
         /// so this runs BEFORE the buttons and the box stays behind them.
         /// </summary>
-        private void DrawChromeAndStatusLine(Rect zone, Rect buttonsRect)
+        private void DrawChromeAndStatusLine(Rect zone, Rect buttonsRect, string powerBalance)
         {
             GUI.Box(
                 new Rect(buttonsRect.x - 4f, buttonsRect.y - 4f, buttonsRect.width + 8f, buttonsRect.height + 8f),
                 GUIContent.none, HudChrome.PanelStyle);
 
-            string statusText = ResolveStatusLineText();
-            if (statusText == null) return;
-
-            var rect = new Rect(zone.center.x - StatusLineWidth * 0.5f, zone.y, StatusLineWidth, StatusLineHeight);
+            var rect = new Rect(buttonsRect.x, zone.y, buttonsRect.width, StatusLineHeight);
             GUI.Box(rect, GUIContent.none, HudChrome.PanelStyle);
-            GUI.Label(rect, statusText, _statusStyle);
+
+            float powerWidth = Mathf.Min(260f, rect.width * 0.36f);
+            GUI.Label(
+                new Rect(rect.x + 8f, rect.y, powerWidth - 8f, rect.height),
+                powerBalance, _powerStatusStyle);
+
+            string statusText = ResolveStatusLineText();
+            if (statusText != null)
+            {
+                GUI.Label(
+                    new Rect(rect.x + powerWidth, rect.y, rect.width - powerWidth - 8f, rect.height),
+                    statusText, _statusStyle);
+            }
         }
 
         /// <summary>
@@ -373,12 +408,12 @@ namespace Nova.Presentation.UI
         /// blocker reason (the player is interrogating that button right
         /// now), then the D-085 builder warning while any own site lacks a
         /// Builder, then the onboarding hint until it dismisses itself.
-        /// Null = the line stays empty (and unpainted).
+        /// Null leaves the contextual right side empty; the power balance on
+        /// the left remains visible.
         /// </summary>
         private string ResolveStatusLineText()
         {
-            if (_hoveredBlockerReason != null) return _hoveredBlockerReason;
-            if (_hoveredRadarHint != null) return _hoveredRadarHint;
+            if (_hoveredStatusText != null) return _hoveredStatusText;
             if (_transientNotice != null && Time.unscaledTime < _transientNoticeUntil) return _transientNotice;
             if (_siteLacksBuilder) return ConstructionSiteStatus.NoBuilderWarning;
             if (!_hintDismissed && _runner.IsRunning) return HintText;
@@ -424,36 +459,52 @@ namespace Nova.Presentation.UI
             return nameLine + "\n" + costLine;
         }
 
-        /// <summary>The hovered entry's blocker, in the executor's own check order — prerequisite first, then affordability.</summary>
+        /// <summary>The hovered entry's first blocker in the build bar's documented UI priority.</summary>
         private string BlockerReason(
-            UnitRole role, in SimBuildingDefinition def, byte slot, long credits, ConstructionSystem construction)
+            UnitRole role, in SimBuildingDefinition def, BuildingPlacementBlocker blocker,
+            UnitRoleMask missingPrerequisites, long credits,
+            int powerProvided, int powerRequired, int activeSiteCount)
         {
-            UnitRoleMask missing = construction.GetMissingPrerequisiteRoles(slot, def.PrerequisiteRoles);
-            if (missing != UnitRoleMask.None)
+            string name = CommandCardPresenter.BuildingDisplayName(role);
+            string buildingPower = CommandCardPresenter.FormatBuildingPower(in def);
+            switch (blocker)
             {
-                _builder.Clear();
-                _builder.Append(CommandCardPresenter.BuildingDisplayName(role)).Append(": benötigt ");
-                bool appended = false;
-                UnitRoleMask remaining = missing;
-                for (int i = 0; i < PrerequisiteDisplayOrder.Length; i++)
-                {
-                    UnitRole prerequisiteRole = PrerequisiteDisplayOrder[i];
-                    UnitRoleMask roleMask = (UnitRoleMask)(1u << (int)prerequisiteRole);
-                    if ((missing & roleMask) == UnitRoleMask.None) continue;
+                case BuildingPlacementBlocker.MissingPrerequisite:
+                    _builder.Clear();
+                    _builder.Append(name).Append(": benötigt ");
+                    bool appended = false;
+                    UnitRoleMask remaining = missingPrerequisites;
+                    for (int i = 0; i < PrerequisiteDisplayOrder.Length; i++)
+                    {
+                        UnitRole prerequisiteRole = PrerequisiteDisplayOrder[i];
+                        UnitRoleMask roleMask = (UnitRoleMask)(1u << (int)prerequisiteRole);
+                        if ((missingPrerequisites & roleMask) == UnitRoleMask.None) continue;
 
-                    if (appended) _builder.Append(" + ");
-                    _builder.Append(CommandCardPresenter.BuildingDisplayName(prerequisiteRole));
-                    appended = true;
-                    remaining &= ~roleMask;
-                }
-                if (remaining != UnitRoleMask.None)
-                {
-                    if (appended) _builder.Append(" + ");
-                    _builder.Append("unbekannte Voraussetzung 0x").Append(((uint)remaining).ToString("X8"));
-                }
-                return _builder.ToString();
+                        if (appended) _builder.Append(" + ");
+                        _builder.Append(CommandCardPresenter.BuildingDisplayName(prerequisiteRole));
+                        appended = true;
+                        remaining &= ~roleMask;
+                    }
+                    if (remaining != UnitRoleMask.None)
+                    {
+                        if (appended) _builder.Append(" + ");
+                        _builder.Append("unbekannte Voraussetzung 0x")
+                            .Append(((uint)remaining).ToString("X8"));
+                    }
+                    _builder.Append(" · ").Append(buildingPower);
+                    return _builder.ToString();
+                case BuildingPlacementBlocker.InsufficientCredits:
+                    return $"{name}: nicht genug Aetherium ({credits}/{def.CostAE} AE)"
+                        + $" · {buildingPower}";
+                case BuildingPlacementBlocker.InsufficientPower:
+                    return $"{name}: benötigt {def.PowerRequired} Strom · "
+                        + $"{Mathf.Max(0, powerProvided - powerRequired)} frei";
+                case BuildingPlacementBlocker.SiteCapacityReached:
+                    return $"{name}: Baustellenlimit erreicht ({activeSiteCount}/{ConstructionSystem.MaxSites})"
+                        + $" · {buildingPower}";
+                default:
+                    return null;
             }
-            return $"{CommandCardPresenter.BuildingDisplayName(role)}: nicht genug Aetherium";
         }
 
         /// <summary>
@@ -507,9 +558,19 @@ namespace Nova.Presentation.UI
             {
                 _statusStyle = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 13,
+                    fontSize = 9,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.MiddleCenter,
+                    alignment = TextAnchor.MiddleRight,
+                    wordWrap = false
+                };
+            }
+            if (_powerStatusStyle == null)
+            {
+                _powerStatusStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 10,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleLeft,
                     wordWrap = false
                 };
             }

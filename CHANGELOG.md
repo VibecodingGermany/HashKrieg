@@ -13,7 +13,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.20.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.21.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
@@ -73,6 +73,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **#45/#47/#48: Entscheidungspunkt und „Stoppen“ melden jetzt die Wahrheit (D-097):** Die Baubar zeigt dauerhaft die Strombilanz samt Low-Power-Folge, nennt beim Überfahren Bedarf beziehungsweise Erzeugung und leitet den ersten Blocker in der ausdrücklich festgelegten HUD-Priorität Voraussetzung, AE, freie Energie und Baustellenlimit her; diese Priorität ist nicht die globale Executor-Reihenfolge. Energie sperrt den Eintritt in den Platzierungsmodus bewusst nicht. Die Befehlskarte zeigt den Stromwert des gewählten Gebäudes, und ein angewandter Stop-Befehl räumt zusätzlich `AttackTarget` ab. Ein echtes Halte-Feuer bleibt ausserhalb dieses Pakets, weil D-087 im nächsten Combat-Tick wieder ein Ziel erfassen darf
 - **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
   fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
   (Economy als Pflicht-Abhängigkeit), und die Minimap geht mit aus (dieselbe

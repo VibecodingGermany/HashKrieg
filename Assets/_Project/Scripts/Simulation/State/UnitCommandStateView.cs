@@ -275,8 +275,9 @@ namespace Nova.Simulation.State
                         {
                             ref UnitState unit = ref _entityManager.GetUnitRef(id);
                             unit.Stop();
-                            // Stop cancels every standing order, economy and
-                            // repair orders included; the unit keeps its cargo.
+                            unit.AttackTarget = EntityId.Invalid;
+                            // Stop cancels every standing order: attack,
+                            // economy and repair included; the unit keeps its cargo.
                             unit.HarvestFieldId = 0;
                             unit.IsReturningCargo = false;
                             _constructionSystem?.ClearRepairOrder(stop.EntityIds[i]);

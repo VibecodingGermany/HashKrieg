@@ -28,7 +28,8 @@ namespace Nova.Presentation.UI
     /// or when no Builder exists), plus — for producers — one production
     /// button per unit the building builds (from
     /// <see cref="SimDefinitions.AllUnits"/> filtered by faction and producer
-    /// role, the table the executor validates against), greyed WITH the
+    /// role, the table the executor validates against), plus the selected
+    /// building's power draw or generation from the same definition, greyed WITH the
     /// reason (benötigt Forschungslabor / Warteschlange voll / nicht genug
     /// Aetherium — the executor's own validation order, so the reason the
     /// player reads is the one the executor would reject with). The queue is
@@ -114,6 +115,8 @@ namespace Nova.Presentation.UI
             public bool Visible;
             public string Title = string.Empty;
             public EntityId LeadId;
+            /// <summary>Generation or draw of a completed building; null on unit and site cards.</summary>
+            public string BuildingPowerText;
             public readonly List<CardButton> Buttons = new List<CardButton>(16);
             public string QueueHeader;
             public readonly List<QueueRow> QueueRows = new List<QueueRow>(ProductionSystem.MaxQueueEntries);
@@ -130,6 +133,7 @@ namespace Nova.Presentation.UI
                 Visible = false;
                 Title = string.Empty;
                 LeadId = EntityId.Invalid;
+                BuildingPowerText = null;
                 Buttons.Clear();
                 QueueHeader = null;
                 QueueRows.Clear();
@@ -274,6 +278,10 @@ namespace Nova.Presentation.UI
 
             CommandButtonType commands = _presenter.GetBuildingCommands(building.Role);
             bool definitionKnown = SimDefinitions.TryGetBuilding(faction, building.Role, out SimBuildingDefinition def);
+            if (definitionKnown)
+            {
+                model.BuildingPowerText = CommandCardPresenter.FormatBuildingPower(in def);
+            }
 
             if (commands.HasFlag(CommandButtonType.Sell))
             {
@@ -481,6 +489,10 @@ namespace Nova.Presentation.UI
             GUILayout.BeginVertical(HudChrome.PanelStyle);
 
             GUILayout.Label(model.Title, _titleStyle, GUILayout.Height(TitleHeight));
+            if (model.BuildingPowerText != null)
+            {
+                GUILayout.Label(model.BuildingPowerText, _rowStyle, GUILayout.Height(RowHeight));
+            }
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
             if (model.SiteStatusText != null)
             {
@@ -581,6 +593,7 @@ namespace Nova.Presentation.UI
         {
             float height = HudChrome.PanelStyle.padding.vertical;
             height += TitleHeight + _titleStyle.margin.vertical;
+            if (model.BuildingPowerText != null) height += RowHeight + _rowStyle.margin.vertical;
             if (model.ProgressBar01 >= 0f) height += ProgressHeight; // GUIStyle.none: no margin
             if (model.SiteStatusText != null) height += SiteStatusHeight + _siteStatusStyle.margin.vertical;
             for (int i = 0; i < model.Buttons.Count; i++)

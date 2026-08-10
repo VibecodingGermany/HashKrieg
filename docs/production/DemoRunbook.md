@@ -1,6 +1,6 @@
 # Demo-Runbook – erste spielbare Runde (Glutrinne-Graybox)
 
-**Version:** 0.6.0 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
+**Version:** 0.6.1 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -152,16 +152,20 @@ steht davor und dauert so lange, wie man ihn zeigen will.
    Details (Tick, Census, Sieg-Code) zeigen. Zurück ins Menü führt kein Weg —
    die Runde endet mit dem Beenden des Spiels (§5).
 
-## 5. Bekannte Grenzen (ehrlich, Stand GB-005)
+## 5. Bekannte Grenzen (ehrlich, aktueller technischer Stand; manuelle Abnahme offen)
 
 - **Die KI ist bewusst einfach:** feste Build-Order, nur Infanterie-Wellen,
   kein Nachschub-Management jenseits der Grundregeln, kein Reagieren auf den
   Spieler (kein Konter, kein Rückzug). Ihre Peer-Session ist nicht
   snapshot-serialisiert.
-- **Keine Zielerfassung:** Einheiten erwidern kein Feuer; die
-  Verteidigungsplattform kann nie schießen; A ohne Gegner unter dem Cursor
-  ist ein schlichtes Move. (Die KI umgeht das mit expliziten Attack-Orders.)
-- `Stop` löscht das Angriffsziel nicht; Angriffe auf eigene Einheiten sind zulässig.
+- **Zielerfassung bleibt schlicht:** Bewaffnete Einheiten und fertige
+  Verteidigungsplattformen erfassen Ziele automatisch und erwidern Feuer. Ein
+  A-Befehl ohne Gegner unter dem Cursor bleibt jedoch ein schlichtes Move;
+  Attack-Move und Zielerfassung bei der Ankunft sind nicht implementiert.
+- `Stop` löscht Bewegung und das aktuelle Angriffsziel. Die automatische
+  Zielerfassung darf im nächsten Combat-Tick erneut ein Ziel setzen; ein echtes
+  Halte-Feuer ist weiterhin nicht implementiert. Angriffe auf eigene Einheiten
+  sind zulässig.
 - Nach Siegentscheid tickt der Host weiter; es gibt keinen Ergebnisbildschirm
   (nur die Statusleiste / F3) **und keinen Rückweg ins Hauptmenü**.
 - **„Laden" im Menü ist ohne Funktion** und deshalb ausgegraut. Die
@@ -275,3 +279,4 @@ der Editor in der Konsole, wenn das Schreiben fehlschlägt.
 | 0.4.0 | 2026-08-06 | Hauptmenü (D-083): §1 korrigiert – Play zeigt das Menü, das Match startet über „Neues Spiel" (`AutoStart = false`), nicht mehr von selbst; §2 um Menü, Key Art und Menümusik ergänzt; §4 um einen Menüschritt vorangestellt und durchnummeriert (Zeitmarken zählen ab Matchstart); §5 um „Laden" ausgegraut, wirkungslosen SFX-Regler, gemeinsames URP-Asset über alle sechs Render-Detail-Stufen und fehlenden Rückweg ins Menü erweitert; neues §7 zu `settings.json` in `Application.persistentDataPath` (Inhalt, Zurücksetzen, Verhalten bei kaputter Datei) | Agent |
 | 0.5.0 | 2026-08-06 | Bedienbares HUD (D-084): §2 um Bauleiste/Ghost-Platzierung, Command Card, Minimap, sichtbaren Nebel und Selektionsmarker ergänzt; §3 um MMB-Drag-Rotation, Space-Reset und die tastaturfreien Wege über Bauleiste/Command Card erweitert | Agent |
 | 0.6.0 | 2026-08-10 | D-102/Sprint 16.7 nachgezogen: fünf endliche Aetheriumfelder samt Markerpositionen und Reserven ersetzen die alte Zwei-Feld-Beschreibung; Angriffswege bleiben G4-Scope | Codex / Dennis Westermann |
+| 0.6.1 | 2026-08-10 | D-097/Paket 16.10 nachgezogen: Stop löscht das aktuelle Angriffsziel; automatische Neuerfassung im Folgetick und das weiterhin fehlende Halte-Feuer ehrlich abgegrenzt; die benachbarte überholte Behauptung fehlender Auto-Zielerfassung auf den aktuellen Combat-Stand korrigiert | Codex / Dennis Westermann |

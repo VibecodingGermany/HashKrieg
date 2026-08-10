@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.8.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.8.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -256,8 +256,10 @@ Module werden auf dem fertigen Podest installiert (nicht als separates Gebäude)
   mindestens 2 zu jedem Feld. Erschöpfte Felder zählen weiterhin.
 - **Gebäudering:** Abstand mindestens 2 zu jeder aktiven Baustelle und jedem
   lebenden fertigen Gebäude; damit bleibt ein voller Zellenring leer.
-- Die Platzierungsvorschau zeigt valide (grün) und invalide (rot) Zellen. Der
-  exakte Sperrgrund am Bauknopf gehört zu Paket 16.10.
+- Die Platzierungsvorschau zeigt valide (grün) und invalide (rot) Zellen. Paket
+  16.10 leitet am Bauknopf All-of-Voraussetzungen, AE, freie Energie und das
+  Baustellenlimit her; Energie bleibt ein sichtbarer Hinweis und sperrt den
+  Eintritt in den Platzierungsmodus bewusst nicht.
 - **Vollspielziel:** variable 2×2- bis 4×4-Footprints, Rotation, Evolvierte-
   Einfluss und weitere Terrain-/Neutralregeln werden erst außerhalb von MS-1
   entschieden und implementiert.
@@ -325,3 +327,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.6.0 | 2026-08-10 | MS-1-Startwert (D-077) und Lagervertrag (D-106) nachgezogen: eine 2.000-AE-HQ-Basis je Konto, +2.000 je fertigem Lager und periodischer 25-%-Abbau des aktuellen Überhangs statt separatem Zerstörungsabzug | Codex / Dennis Westermann |
 | 0.7.0 | 2026-08-10 | Die neun fraktionsgleichen All-of-Platzierungsvoraussetzungen samt Trennung von Plattformbasis und Modulen gemäß D-103 festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
 | 0.8.0 | 2026-08-10 | D-104-MS-1-Override ergänzt: einheitliche 3×3-Footprints, footprintbasierte Einfluss-, Gelände-, Gebäude- und Feldabstände sowie kumulative 30-%-Reparaturkosten mit 10/5 TP pro Tick; nicht implementierte Vollspielziele klar abgegrenzt | Agent (unter Delegation) / Dennis Westermann |
+| 0.8.1 | 2026-08-10 | Paket 16.10 nachgezogen: der Bauknopf erklärt All-of-Voraussetzungen, AE, Energie und Baustellenlimit; Energie bleibt informativ und blockiert den Platzierungsmodus nicht | Codex / Dennis Westermann |
