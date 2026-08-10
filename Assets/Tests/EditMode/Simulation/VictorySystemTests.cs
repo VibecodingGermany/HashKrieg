@@ -31,9 +31,9 @@ namespace Nova.Simulation.Tests
         private const int Capacity = 64;
         private const ushort MapSize = 64;
 
-        /// <summary>Power plant / Barracks definition ids (SimDefinitions MS-1 table).</summary>
+        /// <summary>Power plant / DefensePlatform definition ids (SimDefinitions MS-1 table).</summary>
         private const ushort DefPower = 5;
-        private const ushort DefBarracks = 7;
+        private const ushort DefDefensePlatform = 11;
 
         /// <summary>
         /// Minimal canonical host: the systems the victory contract actually
@@ -401,13 +401,15 @@ namespace Nova.Simulation.Tests
         {
             TestHost host = NewHost();
 
-            // Slot 0 gets a real construction site: power provider + builder
-            // + credits are the placement prerequisites.
+            // Slot 0 gets a real DefensePlatform site: power provider + builder
+            // + credits are the placement prerequisites. It deliberately has
+            // no HQ, so D-077's separate last-HQ defeat trigger cannot mask
+            // the D-056 site-counting behavior under test.
             EntityId power = host.Construction.PlaceCompletedBuilding(0, DefPower, 40, 40);
             Assert.That(power.IsValid, Is.True, "power provider");
             EntityId builder = host.SpawnUnit(0, 19, 20, UnitRole.Builder);
             host.Step(1);
-            Assert.That(host.Construction.TryPlaceBuilding(0, DefBarracks, 20, 20), Is.True, "Barracks site");
+            Assert.That(host.Construction.TryPlaceBuilding(0, DefDefensePlatform, 20, 20), Is.True, "DefensePlatform site");
             Assert.That(host.Construction.SiteCount, Is.EqualTo(1));
 
             // Slot 1 is the opponent that keeps the match two-sided.

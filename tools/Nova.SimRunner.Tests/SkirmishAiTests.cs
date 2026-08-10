@@ -51,7 +51,7 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// End-to-end tick budget: this suite's deterministic match decides
-        /// at tick 2242, so 6.000 ticks is a ~2.7x margin — comfortably sane,
+        /// at tick 2705, so 6.000 ticks is a ~2.2x margin — comfortably sane,
         /// and exact because the whole loop is deterministic.
         /// </summary>
         internal const int EndToEndBudgetTicks = 6000;
@@ -312,16 +312,31 @@ namespace Nova.SimRunner.Tests
         // ----------------------------------------------------------------
 
         [Test]
-        public void SkirmishAi_PlacesRefineryThenBarracks_ThroughTheSealedCommandPath()
+        public void SkirmishAi_PlacesRefineryPowerThenBarracks_ThroughTheSealedCommandPath()
         {
             AiHost host = BuildMatch(Seed);
 
-            host.Run(800);
+            uint refineryTick = 0;
+            uint powerTick = 0;
+            uint barracksTick = 0;
+            for (int i = 0; i < 1000 && barracksTick == 0; i++)
+            {
+                host.Step();
+                uint tick = host.Kernel.CurrentTick.Value;
+                if (refineryTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery)) refineryTick = tick;
+                if (powerTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power)) powerTick = tick;
+                if (barracksTick == 0 && host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks)) barracksTick = tick;
+            }
 
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.True,
-                "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
-            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.True,
-                "the AI must follow up with the Barracks once the Refinery stands");
+            Assert.Multiple(() =>
+            {
+                Assert.That(refineryTick, Is.GreaterThan(0u),
+                    "the AI must place and complete its Refinery (D-077: no prerequisite) through PlaceBuilding intents");
+                Assert.That(powerTick, Is.GreaterThan(refineryTick),
+                    "D-103 requires the AI to complete a Power plant after the Refinery and before its Barracks");
+                Assert.That(barracksTick, Is.GreaterThan(powerTick),
+                    "the AI must complete the Barracks only after its required Power plant stands");
+            });
             Assert.That(host.Construction.HasFinishedBuilding(HumanSlot, UnitRole.Refinery), Is.False,
                 "slot 0 is the passive fixture: nobody issues orders for it");
 
@@ -340,12 +355,13 @@ namespace Nova.SimRunner.Tests
             // The tick-20 decision submits the Refinery, tick 21 creates its
             // site, and tick 40 is the first decision that must classify that
             // definition-role entity through the site register. A bare role
-            // check queues a second (Barracks) site for tick 41.
+            // check queues a second (Power) site for tick 41 under D-103.
             host.Run(41);
 
             Assert.That(host.Construction.SiteCount, Is.EqualTo(1),
                 "an unfinished Refinery is the active build, not a completed producer that unlocks Barracks");
             Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Refinery), Is.False);
+            Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Power), Is.False);
             Assert.That(host.Construction.HasFinishedBuilding(AiSlot, UnitRole.Barracks), Is.False);
 
             UnitState[] units = host.Entities.RawUnits;
@@ -497,7 +513,7 @@ namespace Nova.SimRunner.Tests
             // outcome unmoved is exactly the "declared change, no effect yet"
             // case — under the old coupled pin it was indistinguishable from a
             // simulation change.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r6.E34435F9"),
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r7.E34435F9"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 

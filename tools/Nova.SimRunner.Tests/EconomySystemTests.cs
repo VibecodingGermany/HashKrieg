@@ -505,6 +505,9 @@ namespace Nova.SimRunner.Tests
             kernel.Start();
             Assert.That(construction.PlaceCompletedBuilding(
                 0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Refinery), 36, 40).IsValid, Is.True,
+                "the completed Refinery satisfies the Storage prerequisite");
             kernel.StepTick(); // commit the grid (30 provided) for the placement power rule
 
             // A storage SITE holds nothing yet.

@@ -13,7 +13,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 
 ## [Unreleased]
 
-> **Dokumentationsstand 0.17.0 (unveröffentlicht):** Dieses Rebaseline ist ein
+> **Dokumentationsstand 0.20.0 (unveröffentlicht):** Dieses Rebaseline ist ein
 > Wiki-/Vertrags-Minor und kein Game-Release. Es wird kein Tag oder Release
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
@@ -101,9 +101,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   2.000/2.000/25/10 erstmals in `RulesHash64`: alte Dateien bleiben lesbar,
   eine Wiedergabe oder ein Lockstep-Start mit dem alten leeren Rules-Stub wird
   vor Tick 1 abgelehnt. Der kanonische KI-Endzustand
-  bleibt bei Tick 2.546 entschieden und bewegt sich durch diese Wirtschaftsregel
+  blieb auf dem Stand von Paket 16.4 bei Tick 2.546 entschieden und bewegte
+  sich durch diese Wirtschaftsregel
   von `0x9F93097AD526B6F7` auf `0xE784E6184AD16081`; die KI-Kennung bleibt
-  unverändert `r6.E34435F9`
+  dort unverändert `r6.E34435F9` (der spätere D-103-Handoff ist separat unter
+  „Geändert“ dokumentiert)
 - **#44: Baustellen schiessen nicht mehr** — die Baustelle trägt jetzt ihre
   Definitionsrolle statt `UnitRole.Unit`; der bewaffnete Fallback-Slot der
   Waffentabelle greift nicht mehr, und `CombatSystem` schliesst zusätzlich jede aktive
@@ -214,6 +216,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   gespulte Partie ohne dieses Etikett nichts wert ist.
 
 ### Geändert
+- **16.8/D-103: Bauvoraussetzungen sind jetzt echte All-of-Ketten.** Eine
+  separate `UnitRoleMask` ersetzt das singuläre `PrerequisiteRole`, beide
+  Fraktionen verwenden dieselbe neun Rollen umfassende Kette, und Executor wie
+  Baubar leiten alle fehlenden fertigen eigenen Gebäude aus derselben
+  fail-closed Maske ab. Die Maske ist vollständig vom `DefinitionsHash64`
+  gedeckt; Relay und Clients müssen daher aus demselben Commit stammen. Kein
+  Zustands- oder Befehlsformat und keine Golden-Baseline wurde geändert. Die
+  nach D-105 begrenzte KI-Integrationsreparatur lässt die Legion das von D-103
+  verlangte Kraftwerk zwischen Raffinerie und Kaserne fertigstellen; die
+  Verhaltenskennung steigt deshalb von `r6.E34435F9` auf `r7.E34435F9`. Der
+  kanonische Ausgang bewegt sich auf dem integrierten Head von Tick 2.546 /
+  `0xE784E6184AD16081` auf Tick 2.705 / `0x28F2CC571BCE6B76`. Der in den
+  KI-Kommentaren vorgeschriebene externe Pfad
+  `tools/Nova.AiLab/reports/behavior-log.md` ist in diesem Repository nicht
+  vorhanden; die Messung wird deshalb ehrlich hier und im PR dokumentiert,
+  statt einen nicht existierenden Journalnachweis zu behaupten. Die dauerhafte
+  Schreibhoheit des Einheitenstrangs bleibt unverändert.
 - **Der Ausgangspin der kanonischen KI-Partie ist vom Identitätspin getrennt
   (D-101).** `SkirmishAiTests` pinnte Kennung, Entscheidungstick und
   Endzustands-Hash in einer Zusicherung. Die beiden Zahlen bewegen sich aber bei

@@ -107,8 +107,16 @@ namespace Nova.AI.Data
         /// a copied number, and goes red either way.
         /// </para>
         /// </para>
+        /// <para>
+        /// r7 keeps the D-077 strategic opening but makes its prerequisite
+        /// handoff explicit: after the Refinery, the AI completes the Power
+        /// plant required by D-103 before attempting its Barracks. The old
+        /// margin-only rule happened to do that for Alliance, but Legion's
+        /// 15-point margin covered the Barracks' 10-point draw and therefore
+        /// retried an illegal placement forever once the all-of gate shipped.
+        /// </para>
         /// </summary>
-        public const int Revision = 6;
+        public const int Revision = 7;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like

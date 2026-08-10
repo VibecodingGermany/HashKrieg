@@ -36,7 +36,7 @@ namespace Nova.Simulation.Construction
     /// mutates). The state-dependent validation order is fixed and
     /// deterministic: unknown definition, footprint outside the 128x128
     /// grid or occupied cells (RejectedInvalidTarget), then missing
-    /// prerequisite role and the power rule (RejectedPrerequisitesNotMet).
+    /// prerequisite roles and the power rule (RejectedPrerequisitesNotMet).
     /// The power rule: a building with PowerRequired &gt; 0 may only be
     /// placed while the owner's last committed balance
     /// (previous tick's phase-2 recompute) covers the additional draw:
@@ -44,9 +44,10 @@ namespace Nova.Simulation.Construction
     /// building. The Refinery carries NO prerequisite since D-077 (the
     /// classic loop start — quality/content/mvp-v1.json
     /// startStatePerPlayer): placed through the command path it is gated
-    /// only by funds, footprint and the power rule. The remaining
-    /// prerequisite roles (VehicleFactory needs a Refinery, ResearchLab a
-    /// Barracks, Radar and DefensePlatform a Power plant) are unchanged.
+    /// only by funds, footprint and the power rule. D-103 represents every
+    /// other prerequisite as a fail-closed all-of mask over completed own
+    /// roles (for example Barracks needs HQ + Power, VehicleFactory needs
+    /// Refinery + Barracks, and Radar needs Power + Barracks).
     /// <see cref="PlaceCompletedBuilding"/> bypasses placement validation
     /// entirely — it is the direct write the match start is placed with.
     /// </para>
@@ -318,21 +319,47 @@ namespace Nova.Simulation.Construction
             return IndexOfSite(UnitCommandStateView.ToRawEntityId(id)) >= 0;
         }
 
-        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
-        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        /// <summary>
+        /// Missing completed own building roles for an all-of prerequisite.
+        /// Unknown bits stay missing (fail closed).
+        /// </summary>
+        public UnitRoleMask GetMissingPrerequisiteRoles(byte playerSlot, UnitRoleMask requiredRoles)
         {
+            if (requiredRoles == UnitRoleMask.None) return UnitRoleMask.None;
+
+            UnitRoleMask completedRoles = UnitRoleMask.None;
             for (int i = 0; i < MaxBuildings; i++)
             {
                 if (!_buildings[i].IsActive) continue;
                 if (!SimDefinitions.TryGetBuilding(_buildings[i].BuildingDefId, out SimBuildingDefinition def)) continue;
-                if (def.Role != role) continue;
+
                 EntityId id = UnitCommandStateView.ToEntityId(_buildings[i].RawEntityId);
-                if (_entityManager.TryGetUnit(id, out UnitState unit) && unit.PlayerId == playerSlot)
-                {
-                    return true;
-                }
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+
+                completedRoles |= RoleMask(def.Role);
             }
-            return false;
+            return requiredRoles & ~completedRoles;
+        }
+
+        /// <summary>True when the slot owns every COMPLETED building role in the all-of mask.</summary>
+        public bool HasFinishedBuildings(byte playerSlot, UnitRoleMask requiredRoles)
+        {
+            return GetMissingPrerequisiteRoles(playerSlot, requiredRoles) == UnitRoleMask.None;
+        }
+
+        /// <summary>True when the slot owns a COMPLETED building of the given role (prerequisite scans).</summary>
+        public bool HasFinishedBuilding(byte playerSlot, UnitRole role)
+        {
+            UnitRoleMask roleMask = RoleMask(role);
+            return roleMask != UnitRoleMask.None && HasFinishedBuildings(playerSlot, roleMask);
+        }
+
+        private static UnitRoleMask RoleMask(UnitRole role)
+        {
+            int bit = (int)role;
+            return bit >= 0 && bit < 32
+                ? (UnitRoleMask)(1u << bit)
+                : UnitRoleMask.None;
         }
 
         // ------------------------------------------------------------------
@@ -343,7 +370,7 @@ namespace Nova.Simulation.Construction
         /// <summary>
         /// Full state-dependent placement validation in fixed order: unknown
         /// definition, foreign-faction definition, out-of-map footprint and
-        /// occupied cells (RejectedInvalidTarget), then prerequisite role,
+        /// occupied cells (RejectedInvalidTarget), then prerequisite roles,
         /// power rule and site capacity (RejectedPrerequisitesNotMet). Cost
         /// is the executor's separate check (RejectedInsufficientResources)
         /// and runs BEFORE this.
@@ -366,7 +393,7 @@ namespace Nova.Simulation.Construction
             {
                 return CommandResultCode.RejectedInvalidTarget;
             }
-            if (def.HasPrerequisite && !HasFinishedBuilding(playerSlot, def.PrerequisiteRole))
+            if (!HasFinishedBuildings(playerSlot, def.PrerequisiteRoles))
             {
                 return CommandResultCode.RejectedPrerequisitesNotMet;
             }

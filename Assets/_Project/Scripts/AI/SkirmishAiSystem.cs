@@ -49,9 +49,10 @@ namespace Nova.AI
     /// <para>
     /// DECISION LOOP (fixed cadence <see cref="DecisionTickInterval"/> = 20
     /// ticks = 2.0 s, ascending-index scans only, no PRNG): (1) build order —
-    /// Refinery first (no prerequisite since D-077), then Barracks, one site
-    /// at a time, a Power plant first whenever the committed margin would
-    /// drop below the profile reserve, the spot picked by a deterministic
+    /// Refinery first (no prerequisite since D-077), then the Power plant
+    /// required by D-103, then Barracks, one site at a time; Power also
+    /// preempts whenever the committed margin would drop below the profile
+    /// reserve, the spot picked by a deterministic
     /// search validated through <see cref="ConstructionSystem.ValidatePlacement"/>
     /// — the identical rules the command executor applies; (2) the Builder is
     /// moved next to an unfinished site when it is out of the documented
@@ -293,11 +294,11 @@ namespace Nova.AI
             // slot that owns nothing is defeated anyway): stay idle.
             if (hqRaw == 0) return;
 
-            // ---- (1) Build order: Refinery, then Barracks, one site at a
-            // time (a single Builder cannot progress two sites). A Power
-            // plant preempts whenever the committed margin would drop below
-            // the profile reserve — "when the margin would go negative" with
-            // the demo profile's reserve of 0. ----
+            // ---- (1) Build order: Refinery, required Power plant, then
+            // Barracks, one site at a time (a single Builder cannot progress
+            // two sites). Power also preempts whenever the committed margin
+            // would drop below the profile reserve — "when the margin would
+            // go negative" with the demo profile's reserve of 0. ----
             if (sites.Count == 0)
             {
                 UnitRole next = refineryRaw == 0
@@ -306,8 +307,13 @@ namespace Nova.AI
                 if (next != UnitRole.Unit
                     && SimDefinitions.TryGetBuilding(faction, next, out SimBuildingDefinition nextDef))
                 {
-                    if (nextDef.PowerRequired > 0 && !powerCompleted
-                        && powerMargin < nextDef.PowerRequired + _profile.TargetPowerMargin)
+                    UnitRoleMask missingPrerequisites = _construction.GetMissingPrerequisiteRoles(
+                        _aiPlayerId,
+                        nextDef.PrerequisiteRoles);
+                    bool missingRequiredPower = (missingPrerequisites & UnitRoleMask.Power) != 0;
+                    bool needsPowerMargin = nextDef.PowerRequired > 0
+                        && powerMargin < nextDef.PowerRequired + _profile.TargetPowerMargin;
+                    if (!powerCompleted && (missingRequiredPower || needsPowerMargin))
                     {
                         next = UnitRole.Power;
                     }

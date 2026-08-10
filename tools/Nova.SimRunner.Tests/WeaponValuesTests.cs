@@ -233,6 +233,23 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void DefinitionsHash64_ChangesWhenPrerequisiteMaskChanges()
+        {
+            ulong canonical = SimDefinitions.ComputeDefinitionsHash64();
+            var buildings = SimDefinitions.AllBuildings.ToArray();
+            SimBuildingDefinition source = buildings[0];
+            buildings[0] = new SimBuildingDefinition(
+                source.DefinitionId, source.Faction, source.Role,
+                source.CostAE, source.BuildTicks, source.PowerProvided, source.PowerRequired,
+                source.PrerequisiteRoles | UnitRoleMask.Power, source.MaxHealth,
+                source.ArmorClass, source.DamageType, source.AttackDamage,
+                source.AttackRangeTiles, source.AttackCooldownTicks);
+
+            Assert.That(SimDefinitions.ComputeDefinitionsHash64(buildings, SimDefinitions.AllUnits),
+                Is.Not.EqualTo(canonical), "all-of prerequisite bits are fingerprint-covered");
+        }
+
+        [Test]
         public void DefinitionsHash64_ChangesWhenAnyWeaponValueChanges()
         {
             // The fingerprint contract (SimulationCore.md section 6): a replay
@@ -264,7 +281,7 @@ namespace Nova.SimRunner.Tests
                     buildings[i] = new SimBuildingDefinition(
                         buildings[i].DefinitionId, buildings[i].Faction, buildings[i].Role,
                         buildings[i].CostAE, buildings[i].BuildTicks, buildings[i].PowerProvided, buildings[i].PowerRequired,
-                        buildings[i].HasPrerequisite, buildings[i].PrerequisiteRole, buildings[i].MaxHealth,
+                        buildings[i].PrerequisiteRoles, buildings[i].MaxHealth,
                         buildings[i].ArmorClass, buildings[i].DamageType,
                         attackDamage: buildings[i].AttackDamage + 1, buildings[i].AttackRangeTiles, buildings[i].AttackCooldownTicks);
                 }
@@ -280,7 +297,7 @@ namespace Nova.SimRunner.Tests
                 buildings[index].DefinitionId, buildings[index].Faction, buildings[index].Role,
                 costAE: buildings[index].CostAE + 1, buildings[index].BuildTicks,
                 buildings[index].PowerProvided, buildings[index].PowerRequired,
-                buildings[index].HasPrerequisite, buildings[index].PrerequisiteRole, buildings[index].MaxHealth,
+                buildings[index].PrerequisiteRoles, buildings[index].MaxHealth,
                 buildings[index].ArmorClass, buildings[index].DamageType,
                 buildings[index].AttackDamage, buildings[index].AttackRangeTiles, buildings[index].AttackCooldownTicks);
             return SimDefinitions.ComputeDefinitionsHash64(buildings, SimDefinitions.AllUnits);

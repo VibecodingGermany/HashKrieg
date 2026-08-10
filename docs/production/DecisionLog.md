@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.36.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.37.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
 
 ## Zweck
 
@@ -3051,6 +3051,70 @@ Zeitkurve und bleibt bis dahin offen.
 
 ---
 
+### D-103 | verbindlich | Sprint 16 (Bauvoraussetzungen werden eine All-of-Bitmaske)
+
+**Status:** Am 2026-08-09 vom Agenten unter ausdrücklicher Inhaberdelegation
+entschieden; überstimmbar. Umsetzung und Integrationsnachweis in Paket 16.8.
+
+**Kontext:** `SimBuildingDefinition.PrerequisiteRole` konnte genau eine fertige
+Gebäuderolle ausdrücken. Der verbindliche Gebäudeentwurf nennt dagegen für
+Kaserne, Fahrzeugfabrik und Radar mehrere gleichzeitige Voraussetzungen. Eine
+zweite Spezialprüfung pro Rolle würde Definitionstabelle, Executor und UI
+auseinanderlaufen lassen. Das Feld ist außerdem Teil von `DefinitionsHash64`;
+seine Darstellung ist deshalb Match- und Relay-Kompatibilität, nicht nur eine
+lokale C#-Signatur.
+
+**Alternativen:**
+
+1. Das einzelne Feld behalten und Mehrfachregeln im `ConstructionSystem`
+   hartcodieren — verworfen, weil Definition, Executor und Baubar dann drei
+   Wahrheiten pflegen.
+2. Eine variable Liste je Definition — verworfen, weil sie Allokation,
+   Ordnungsregeln und eine längere Hash-Kodierung einführt, obwohl höchstens
+   neun stabile Rollen abzubilden sind.
+3. **Gewählt: eine `uint`-Bitmaske über die unveränderten `UnitRole`-Wirewerte.**
+   Bit `n` steht für Rollenwert `n`; die Prüfung verlangt alle gesetzten Bits.
+
+**Entscheidung:**
+
+1. `UnitRole` bleibt unverändert. `UnitRoleMask` ist ein separates
+   `[Flags]`-Enum; `SimBuildingDefinition.PrerequisiteRoles` ersetzt das
+   singuläre Feld. `HasPrerequisite` bleibt abgeleitet (`mask != 0`).
+2. Allianz und Legion verwenden identisch: HQ keine; Kraftwerk HQ; Raffinerie
+   keine; Lager Raffinerie; Kaserne HQ + Kraftwerk; Fahrzeugfabrik Raffinerie +
+   Kaserne; Forschungslabor Fahrzeugfabrik; Radar Kraftwerk + Kaserne;
+   Verteidigungsplattform Kraftwerk.
+3. Die Raffinerie bleibt gemäß D-077 voraussetzungslos. Bei der
+   Verteidigungsplattform betrifft die Kraftwerk-Voraussetzung nur die Basis;
+   Modulfreischaltungen bleiben ein getrennter Vertrag.
+4. Nur eigene, fertiggestellte Gebäude erfüllen Bits. Baustellen, fremde
+   Gebäude und unbekannte Bits erfüllen nichts; unbekannte Bits scheitern damit
+   geschlossen.
+5. `DefinitionsHash64` schreibt weiterhin den abgeleiteten
+   `hasPrerequisite u8` und danach die vollständige Maske als `u32`. Der Hash
+   bewegt sich absichtlich; Relay und Clients müssen aus demselben Commit
+   stammen. Zustands-, Befehls- und Relay-Protokollversionen ändern sich nicht.
+
+**Begründung:** Die Maske ist die kleinste tabellarische Darstellung, die
+All-of vollständig ausdrückt, ohne `UnitRole` oder persistenten Zustand zu
+verändern. Eine gemeinsame Missing-Mask-Abfrage lässt Executor und UI exakt
+dieselbe Semantik verwenden und kann alle fehlenden Rollen stabil benennen.
+
+**Konsequenzen:** Die Skirmish-KI muss vor der Kaserne ein Kraftwerk planen.
+Der Eingriff liegt im fremden `Scripts/AI*`-Bereich und wird nach D-105 als
+kleinste gebundene Integrationsreparatur im selben Paket geführt: Kennung r7,
+gespiegelter Baufolgetest und frisch gemessener kanonischer Ausgang sind
+Pflicht; die dauerhafte Schreibhoheit ändert sich nicht. Der in den
+KI-Kommentaren referenzierte externe Pfad
+`tools/Nova.AiLab/reports/behavior-log.md` existiert in diesem Repository
+nicht. Messwerte und fehlender Journalpfad werden deshalb offen in Changelog
+und PR dokumentiert, statt einen Nachweis zu erfinden. Paket 16.8 wird ohne
+grünen Integrationslauf nicht gemergt. Der Definitions-Hash macht alte
+Relay-/Client-Builds bewusst inkompatibel. Keine Golden-Baseline und kein
+persistentes Zustandsformat wird in diesem Paket geändert.
+
+---
+
 ### D-105 | verbindlich | Sprint 16 (alleinige Projektleitung und Merge-Autorität)
 
 **Status:** unmittelbar wirksame Inhaberentscheidung vom 2026-08-10 (Dennis
@@ -3310,6 +3374,7 @@ Konvergenz, `long.MaxValue` und die Ablehnung des alten Rules-Stubs ab.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.37.0 | 2026-08-10 | D-103 aufgenommen: Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske über unveränderte `UnitRole`-Wirewerte; Hash-, Fail-Closed-, Plattformmodul- und KI-Handoff-Folgen festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
 | 1.36.0 | 2026-08-10 | D-102 aufgenommen: fünf symmetrische endliche Aetheriumfelder werden geliefert, die mangels belastbarer Zielkurve unveränderte Ernterate von 2 AE/Tick wird ausdrücklich getrennt kalibriert | Project Owner / Agent |
 | 1.35.0 | 2026-08-10 | D-106 aufgenommen: einmalige 2.000-AE-HQ-Basis, +2.000 je fertigem Lager, sofort gedeckelte Einzahlungen, zustandsloser 25-%-Abbau des aktuellen Überhangs je Sekunde und kanonischer Rules-Hash; D-024/D-096 in Verlustausformung, HQ-Stapelung und Replay-Kompatibilität teilweise ersetzt; Fehlverweise der Lobbyfamilie D-095–D-097 auf D-092–D-094 berichtigt | Agent (unter Delegation) / Dennis Westermann |
 | 1.34.0 | 2026-08-10 | D-105 aufgenommen: Dennis Westermann ist alleiniger Projektinhaber, Tier-Entscheider und Mergeberechtigter; Tier 2 bleibt mit CLA und aktueller Inhaberfreigabe aktiv, Inhaber-PRs dürfen nach grüner Pflicht-CI und unabhängigem Review selbst gemergt werden, und manuelle Spielabnahme darf ehrlich zurückgestellt, aber nicht als gelaufen behauptet werden | Project Owner / Orchestrator |

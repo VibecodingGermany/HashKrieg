@@ -1,6 +1,6 @@
 # Sprint 16: Die Wirtschaft trägt sich selbst — kein Gebäude kostet Geld, ohne etwas zu tun
 
-**Version:** 1.4.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
+**Version:** 1.5.0 | **Status:** in Umsetzung | **Verantwortungsbereich:** Netzstrang (Maintainer) | **Sprint:** 16 | **Vorgänger:** [12_Sprint_Zu_Zweit.md](12_Sprint_Zu_Zweit.md) Strang C | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** ein Gebäude, das Strom zieht und nichts tut, ist kein Platzhalter, sondern ein Schaden
 
 ## Zweck
 
@@ -30,7 +30,7 @@ Sprint 16 vorzuziehen. Die beiden dort offenen Wirtschaftsfragen (#53 Lager,
 - [16-19_Betatest_Einordnung.md](16-19_Betatest_Einordnung.md) — Herkunft der Issues #43–#58
 - [../MVPContentManifest.md](../MVPContentManifest.md) — Feldreserve-Sollwerte
 
-## Ausgangslage — am Code geprüft, nicht aus dem Masterplan übernommen
+## Ausgangslage am 2026-08-09 — am damaligen Code geprüft, nicht aus dem Masterplan übernommen
 
 | Befund | Beleg |
 |---|---|
@@ -60,7 +60,7 @@ sondern ein Platzierungsfehler.** Das ändert den Aufwand, nicht die Dringlichke
 | `Scripts/Simulation/Production/` | 16.2 |
 | `Scripts/Simulation/Vision/FogOfWarSystem.cs` | 16.5 — Vertragsfläche, `GetTeamView` bleibt unverändert |
 | `Scripts/Simulation/State/UnitCommandStateView.cs` | 16.10 — **nur Befehlsanwendung**, kein Feld, keine Reihenfolge, kein `StateVersion` |
-| `Scripts/Simulation/Definitions/SimDefinitions.cs` | 16.8 — `PrerequisiteRole`. **Geteilt mit 13B, Absprache vor dem PR** |
+| `Scripts/Simulation/Definitions/SimDefinitions.cs` | 16.8 — `PrerequisiteRoles`. **Geteilt mit 13B, Absprache vor dem PR** |
 | `Scripts/Gameplay/Match/MatchBootstrap.cs` | 16.7 — Startaufstellung |
 | `Scripts/Presentation/Maps/GlutrinneBlockoutView.cs` | 16.7 — Feldmarker und Steinstreu-Ausschluss |
 | `Scripts/Presentation/UI/` (`BuildMenuHud`, `MinimapHud`, `MatchFrameHud`) | 16.5, 16.10 |
@@ -261,14 +261,42 @@ Knappheitskorrektur ausdrücklich von der noch unbelegten Ernteraten-Kalibrierun
 
 ### 16.8 · Die Bauvoraussetzungs-Kette (C5) — **fasst `SimDefinitions` an**
 
-`SimBuildingDefinition.PrerequisiteRole` ist ein **einzelnes** Feld; das Design
-nennt für sechs von neun Rollen Mehrfachvoraussetzungen. Eine Bitmaske über
-`UnitRole` reicht.
+`SimBuildingDefinition.PrerequisiteRole` war ein **einzelnes** Feld. D-103
+ersetzt es durch `UnitRoleMask PrerequisiteRoles`; `UnitRole` selbst bleibt als
+Wire-Enum unverändert. Die Prüfung ist All-of und scheitert bei unbekannten Bits
+geschlossen. Für Allianz und Legion gilt dieselbe Tabelle:
 
-> **`PrerequisiteRole` geht in `DefinitionsHash64` ein**
-> (`hash.WriteUInt8((byte)def.PrerequisiteRole)`). Eine Formatänderung bewegt den
-> Definitions-Hash, und der Relay vergleicht ihn serverseitig. Deshalb liegt
-> dieses Paket **vor** dem VPS-Rollout, nicht danach.
+| Rolle | Fertige eigene Voraussetzungen |
+|---|---|
+| HQ | keine |
+| Kraftwerk | HQ |
+| Raffinerie | keine |
+| Lager | Raffinerie |
+| Kaserne | HQ + Kraftwerk |
+| Fahrzeugfabrik | Raffinerie + Kaserne |
+| Forschungslabor | Fahrzeugfabrik |
+| Radar | Kraftwerk + Kaserne |
+| Verteidigungsplattform | Kraftwerk |
+
+Die Baubar zählt alle aktuell fehlenden Rollen in stabiler Reihenfolge auf.
+Die singuläre Abfrage bleibt für Radar-/Onboarding-Verbraucher erhalten und
+delegiert auf dieselbe Maskenprüfung.
+
+> **`PrerequisiteRoles` geht in `DefinitionsHash64` ein**
+> (`hasPrerequisite u8`, danach `prerequisiteRoles u32`). Die Formatänderung
+> bewegt den Definitions-Hash, und der Relay vergleicht ihn serverseitig.
+> Deshalb müssen Relay und beide Clients aus demselben Commit ausgerollt werden;
+> das Paket liegt **vor** dem VPS-Rollout, nicht danach.
+
+Die ausgelieferte Skirmish-KI plante bislang Raffinerie → Kaserne. Das neue
+Kraftwerk-Tor wird nach D-105 durch eine begrenzte Integrationsreparatur im
+fremden `Scripts/AI*`-Schreibbereich bedient: r7 plant Raffinerie → Kraftwerk →
+Kaserne, beide Testspiegel sichern die Reihenfolge. Der kanonische Ausgang wurde
+auf dem integrierten Head mit Tick 2.705 und `0x28F2CC571BCE6B76` frisch
+gemessen; die lokale Gesamtsuite ist mit 685/685 grün. Der Merge wartet danach
+noch auf die grüne PR-CI. Der referenzierte externe AiLab-Journalpfad ist in
+diesem Repository nicht vorhanden, daher stehen Messung und Restrisiko ehrlich
+in Changelog und PR statt in einem erfundenen Artefakt.
 
 ### 16.9 · Platzierungsregeln und Reparaturkosten (C6)
 
@@ -327,17 +355,17 @@ Drei kleine Eingriffe, die zusammengehören, weil sie dasselbe Regelwerk berühr
 
 | Risiko | Umgang |
 |---|---|
-| **Der Relay lehnt nach 16.8 alle Clients ab** | `PrerequisiteRole` bewegt `DefinitionsHash64`, der Relay vergleicht ihn serverseitig. 16.8 liegt **vor** dem VPS-Rollout; danach kostet dieselbe Änderung einen Serverzugang. 16.7 ist davon **nicht** betroffen |
+| **Der Relay lehnt nach 16.8 alle alten Clients ab** | `PrerequisiteRoles` bewegt `DefinitionsHash64`, der Relay vergleicht ihn serverseitig. 16.8 liegt **vor** dem VPS-Rollout; danach kostet dieselbe Änderung einen Serverzugang. 16.7 ist davon **nicht** betroffen |
 | **Vier von fünf Spiegeln der Startaufstellung gepflegt** | roter Test, der wie ein Determinismusfehler aussieht — oder drei Aetherium-Felder ohne sichtbaren Marker. Die fünf Stellen stehen in 16.7 |
 | **Baseline und Verhalten im selben PR** | wird nicht gemergt. `Determinism10000Scenario.cs` liegt ausserhalb der Guard-Präfixe und darf im selben PR nachgezogen werden — `Determinism10000Tests.cs` nicht |
 | **Ein 13B-Merge im selben Fenster** | ein Fenster hat einen Strang (Regelwerk, Merge-Fenster) |
 | **Die Minimap-Sperre wird als Rückschritt gelesen** | der Bauknopf erklärt, was das Radar freischaltet; der Befund geht in die nächste Testrunde |
-| **`dotnet test` läuft auf der Arbeitsmaschine nicht** | `global.json` pinnt `8.0.318` mit `rollForward: disable`, installiert ist 10.0.302. Der Nachweis läuft über die CI im PR |
+| **Lokales SDK wird übersehen** | Das Repository enthält `.dotnet/sdk/8.0.318`; der kanonische lokale Lauf ist `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore`, anschließend bestätigt die PR-CI denselben Umfang |
 | **Reparaturkosten machen Verteidigung unbezahlbar** | 30 % ist ein Startwert, kein Beschluss. Er kommt mit der ersten gespielten Runde auf den Prüfstand |
 
 ## Fertig wenn
 
-1. `dotnet test tools/Nova.SimRunner.Tests` ist **in der CI** grün — ohne
+1. `./.dotnet/dotnet test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release --no-restore` ist lokal und **in der CI** grün — ohne
    Baseline-Neusetzung im selben PR wie eine Verhaltensänderung.
 2. Ein Mensch hat eine Runde gespielt und dabei gesehen:
    - der Sammler fährt nach der ersten Raffinerie von allein los,
@@ -371,18 +399,21 @@ dann **16.6**. Jeder Abwurf mit Begründung in den
 | D-096 | Lager erhält eine **abgeleitete** AE-Obergrenze (kein Zustandsfeld); Radar schaltet die Minimap frei und leitet seine Abdeckung vom Gebäude ab | Inhaber (Richtung) / Agent (Ausformung) |
 | D-097 | „Stoppen" löscht den Angriffsbefehl; ein Halte-Feuer bleibt beim Einheitenstrang | Inhaber |
 | D-102 | Fünf endliche, punktgespiegelte Aetheriumfelder; `HarvestRateAE` bleibt bis zur gespielten Kalibrierung bei 2 AE/Tick | Inhaber / Agent |
+| D-103 | Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske; unbekannte Bits scheitern geschlossen | Agent unter Inhaberdelegation |
 | D-106 | AE-Kontobasis gilt einmalig je Slot; vorhandener Überhang zerfällt zustandslos pro Sekunde und die Regelrevision wird im Match-Fingerprint gebunden | Agent unter Inhaberdelegation |
 
-D-096, D-097, D-102 und D-106 sind im [DecisionLog](../DecisionLog.md) eingetragen. D-098
-(Entwurf) und D-099 stehen dort für [Sprint 17](17_Sprint_Zugangsprotokoll.md),
-D-100 bleibt für dessen Paket B vorgemerkt, D-098 gehört zu
-[Sprint 14](14_Sprint_Lobby.md). Keine dieser Nummern darf hier verbraucht
-werden.
+D-096, D-097, D-102, D-103 und D-106 sind im [DecisionLog](../DecisionLog.md)
+eingetragen. D-098 (Entwurf) und D-099 stehen dort für
+[Sprint 17](17_Sprint_Zugangsprotokoll.md); D-092 bis D-094 gehören zu
+[Sprint 14](14_Sprint_Lobby.md). D-100 wird hier mangels eigenem
+DecisionLog-Eintrag keinem Paket zugeordnet. Keine dieser Nummern darf hier
+verbraucht werden.
 
 ## Changelog-Notiz
 
 Die Wirtschaft trägt sich selbst: Aetherium wird knapp, Lager begrenzt das Konto,
-Radar schaltet die Minimap frei, Strommangel schaltet Radar und Verteidigung ab,
+Radar schaltet die Minimap frei, Strommangel schaltet Radar und Minimap ab und
+halbiert Produktion, Bau und Reparatur,
 Bauvoraussetzungen greifen mehrfach, Platzierung und Reparatur kosten. Dazu die
 Betatest-Behebungen: der erste Sammler erntet von allein, Einheiten fahren aus
 dem Gebäude, Baustellen schiessen nicht mehr, und der gesperrte Bauknopf nennt
@@ -399,6 +430,7 @@ kein Bruch.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.5.0 | 2026-08-10 | D-103 für Paket 16.8 ergänzt: fraktionsgleiche All-of-Voraussetzungen, fail-closed Maskenvertrag, Definitions-Hash-Grenze und koordinierter KI-Handoff | Agent (unter Delegation) / Dennis Westermann |
 | 1.4.0 | 2026-08-10 | D-102 ergänzt: fünf endliche symmetrische Felder sind Paket 16.7; die Ernterate bleibt mangels gespielter Zielkurve ausdrücklich bei 2 AE/Tick und wird getrennt kalibriert | Project Owner / Agent |
 | 1.3.0 | 2026-08-10 | C4-Kompatibilitätsgrenze dokumentiert: Low-Power-Reparatur bindet Rules-Revision 2 und 10/5 HP pro Tick, ohne Zustands- oder Schema-Bump | Codex / Dennis Westermann |
 | 1.2.0 | 2026-08-10 | D-106 für 16.4 festgeschrieben: einmalige HQ-Kontobasis, periodischer 25-%-Abbau des aktuellen Überhangs und Rules-Hash-Kompatibilitätsgrenze | Codex / Dennis Westermann |
