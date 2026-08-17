@@ -170,6 +170,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **#85: Die KI erntet nicht länger endlos auf dem leeren Feld.** Aus dem
+  Betatest vom 10.08.2026: die KI kam nach Erschöpfung ihres Startvorkommens
+  wirtschaftlich zum Stillstand. Das war kein Strategiemangel, sondern ein
+  **Livelock aus einer fehlenden Prüfung** — `TryGetOwnFieldCell` wählte das
+  Erntefeld allein nach Distanz zum HQ und sah `IsExhausted` nicht an. Der
+  `EconomySystem` räumt beim leeren Feld `HarvestFieldId`, genau dieses Räumen
+  liess den Harvester in die Leerlaufliste der KI fallen, und die schickte ihn
+  auf dasselbe leere Feld zurück: jeden Entscheidungstick, bei Einkommen null,
+  während drei registrierte Felder mit zusammen 33.000 AE offenstanden. Die
+  Erntewahl überspringt erschöpfte Felder jetzt; ist keines mehr übrig, ruhen
+  Nachbestellung und Erntebefehle, **statt Kommandos ins Leere zu schicken**.
+  Der Spielerpfad filterte seit den endlichen Feldern (#80) bereits korrekt —
+  nachgezogen wurde nur eine der beiden Stellen. **Der Platzierungsanker filtert
+  bewusst weiterhin nicht:** er beantwortet „wo ist meine Basis", und ein
+  nachgebautes Refinery ans nächste Feld *mit* Reserve zu setzen hiesse auf
+  dieser Karte quer über das Feld — das ist eine strategische Entscheidung und
+  gehört nicht als Nebenwirkung in einen Livelock-Fix. **Die kanonische Partie
+  bleibt byte-identisch** (Entscheidung Tick 3.213, Endzustand
+  `0xE002DD893916967B`): dort erschöpft sich kein Feld, die Regel greift also
+  nicht — deshalb bleiben auch die vier Determinismus-Baselines grün.
+  **Im laufenden Spiel gesehen:** eine Partie auf diesem Stand gespielt — die
+  Harvester fahren nach dem Startvorkommen zu anderen Quellen, und es kommen
+  weiter neue Einheiten, bis alles zerstört ist. Der Bezeichner bleibt
+  `r7.E34435F9`: die kanonische Partie entscheidet unverändert, und `r8` ist
+  bereits an das Basisverteidigungs-Verhalten vergeben — zwei verschiedene
+  Stände dürfen sich keine Kennung teilen
 - **#45/#47/#48: Entscheidungspunkt und „Stoppen“ melden jetzt die Wahrheit (D-097):** Die Baubar zeigt dauerhaft die Strombilanz samt Low-Power-Folge, nennt beim Überfahren Bedarf beziehungsweise Erzeugung und leitet den ersten Blocker in der ausdrücklich festgelegten HUD-Priorität Voraussetzung, AE, freie Energie und Baustellenlimit her; diese Priorität ist nicht die globale Executor-Reihenfolge. Energie sperrt den Eintritt in den Platzierungsmodus bewusst nicht. Die Befehlskarte zeigt den Stromwert des gewählten Gebäudes, und ein angewandter Stop-Befehl räumt zusätzlich `AttackTarget` ab. Ein echtes Halte-Feuer bleibt ausserhalb dieses Pakets, weil D-087 im nächsten Combat-Tick wieder ein Ziel erfassen darf
 - **Low Power ist eine Waffe (C4, Sprint 16.6)** — bei Energiedefizit
   fällt Radar zuerst: `FogOfWarSystem.GetRadarSignatures` liefert nichts mehr
