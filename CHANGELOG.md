@@ -65,6 +65,103 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Die Skirmish-KI benennt, was eine Einheit vorhat — und verteidigt damit
+  ihre Basis (`GoalKind`, `r7` → `r8`)** — zwei Schritte, die zusammengehören
+  und deshalb zusammen kommen: erst bekommt die Entscheidung eine **Form**,
+  dann bekommt die Form ihre erste eigene **Regel**. Die Reihenfolge ist der
+  Punkt — wer zuerst eine Regel und dabei die Form ändert, kann hinterher
+  nicht sagen, welche der beiden gewirkt hat.
+
+  **Die Form, verhaltensneutral.** Der Armeeschritt entschied in einer
+  if-Kette, in der keine Verzweigung einen Namen hatte. Er wählt jetzt je
+  Einheit und Kadenz **ein** Goal aus einer festen Prioritätsliste und wendet
+  dessen Wirkung aus einer Tabelle an. Dieser Schritt für sich ist **keine**
+  Verhaltensänderung, und der Nachweis ist kein Test, sondern eine Zahl: die
+  kanonische Partie entscheidet auf demselben Tick mit demselben Endzustand,
+  die Artefakte eines Laborlaufs sind byte-identisch bis auf die gemessene
+  Laufzeit. Ein Goal ist **kein Zustand** — es wird je Kadenz neu abgeleitet
+  und nirgends gespeichert, die KI bleibt eine reine Funktion des committeten
+  Zustands, es entsteht kein Sidecar-Block. Dazu zwei optionale Nähte, die der
+  ausgelieferte Pfad nie füllt und die deshalb nichts kosten:
+  `IAiGoalObserver` lässt mitlesen, welches Goal eine Einheit bekommen hat und
+  mit welchen Zahlen die Bedingung entschieden hat, `IAiGoalOverride` erlaubt
+  es, einem Goal von aussen vorzugreifen — als **Eingabe** der Entscheidung,
+  nicht als gespeicherter Zustand. `MatchRunner` übergibt keine von beiden.
+
+  **Die Regel: `DefendHome`.** Eine Einheit, die am Sammelpunkt angekommen
+  ist, bekommt absichtlich **keinen** Befehl und hängt damit allein an der
+  D-087-Auto-Acquisition. Die reicht so weit wie die Waffe: sechs Zellen bei
+  der Legions-Infanterie, sieben beim Allianz-Schützen. Der Sammelpunkt liegt
+  **zwölf** Zellen vom eigenen HQ. Ein Angreifer an der Basis war damit
+  ausserhalb jeder Reichweite — die Wartenden haben ihn nicht ignoriert,
+  **sie haben ihn nicht gesehen**. Gemessen in der kanonischen Partie: das
+  Legions-HQ nimmt über **766 Ticks 327 Treffer**, während die eigenen
+  Einheiten im Median **13 Zellen** entfernt unter `Hold` stehen und **keine
+  einzige** angreift. Der Defekt ist so alt wie der Sammelpunkt (`r3`).
+  Neues Goal `DefendHome` mit dem Profilfeld `defendHomeCells` (ausgeliefert
+  **10**, **0 = aus**): wer noch **im Sammelring** steht, marschiert zum
+  eigenen HQ und zielt auf den nächsten sichtbaren bewaffneten Gegner. Wer
+  **draussen** ist, marschiert weiter — die `r3`-Regel „Einheiten draussen
+  werden nie zurückgerufen" bleibt, und die Welle wird **unterbrochen, nicht
+  freigegeben**. Das Ziel ist die **statische** HQ-Zelle und ausdrücklich
+  nicht der Gegner: genau daran ist `DefendBase` gescheitert (+23 % Intents,
+  schlechteres Spiel), weil ein bewegliches Ziel jede Kadenz einen neuen
+  Befehl für jede Einheit erzeugt.
+
+  **Zwei Korrekturen an `DefendHome`, bevor es ausgeliefert wird.** Beide
+  gefunden beim Prüfen der Begründung, nicht des Codes; beide bewegen
+  `ProfileHash` nicht, weil keine eine Zahl hinzufügt.
+
+  1. **Die statische Zielzelle allein trägt das Argument nicht.** Die
+     Re-Issue-Unterdrückung vergleicht den **stehenden** Befehl, und
+     `MovementSystem` **löscht** genau den bei der Ankunft
+     (`UnitState.Stop()`). Ein Verteidiger, der angekommen ist, hatte damit
+     nichts mehr zu vergleichen — die HQ-Zelle ging **jede Kadenz erneut
+     raus**, gemessen ein Move-Intent pro Kadenz für die Dauer der
+     Belagerung, mit acht stehenden Einheiten, die jedes Mal wieder in
+     `IsMoving` kippten. Das ist die `V002`-Form eine Nummer kleiner.
+     `DefendHome` schweigt jetzt selbst, sobald die Einheit daheim steht —
+     dieselbe Stille, die `Hold` am Sammelpunkt hat.
+  2. **Die Regel fragte, ob die Einheit gerade zurückzieht.** Diese Klausel
+     konnte nur Verwundete treffen, die **schon angekommen** waren —
+     Laufende nimmt `Retreat` eine Zeile früher. Ankommen **beendet** den
+     Rückzug aber nach der eigenen Regel der KI. Die Klausel hat also nichts
+     bewirkt ausser genau diese Einheiten an `Hold` zu geben: zwölf Zellen
+     draussen stehend, auf einen Verfolger zielend, den sie nicht erreichen,
+     während die Basis brennt, zu der sie zurückgelaufen waren.
+
+  **Was die Regel bringt und was sie kostet.** Der Verhaltensbezeichner bewegt
+  beide Hälften: die Revision, weil Entscheidungen sich ändern, und
+  `ProfileHash`, weil die Regel mit ihrer Aus-Stellung ausgeliefert wird.
+  `defendHomeCells: 0` auf beiden Sitzen ergibt **bitgenau** die Partie von
+  `r7` (Tick 3.213, `0xE002DD893916967B`) — der Aus-Pfad ist von den beiden
+  Korrekturen nicht berührt.
+
+  **Die Wirkungszahlen sind noch die von vor den Korrekturen und gelten
+  deshalb nicht mehr.** Gemessen wurde am unkorrigierten `DefendHome`:
+  Wehrlosigkeit im Beschussfenster **96 % → 60 %**, Partiedauer der Legion
+  **3.213 → 6.490** Ticks, eigene Verluste **18 → 60**, und sie gewinnt die
+  Partie trotzdem nicht. Beide Korrekturen ändern ausgegebene Befehle und
+  damit den Verlauf; die Zahlen werden **vor dem Merge neu gemessen** und
+  hier ersetzt. Sie stehen hier als das, was sie sind — die Grössenordnung
+  eines Vorläufers, kein Nachweis für den ausgelieferten Stand.
+
+  **Bekannte Lücke, nicht behoben:** unterhalb der Squad-Schwelle
+  (`attackSquadThreshold`, ausgeliefert 6) läuft der Armeeschritt gar nicht,
+  also verteidigt **niemand** — genau in dem Fenster, in dem die Basis am
+  schwächsten ist. Der Armeebericht meldet dabei `HomeThreatened: true`,
+  während nichts geschieht. Das zu ändern heisst, Einheiten unterhalb der
+  Schwelle überhaupt zu beurteilen, und das ist eine Verhaltensausweitung mit
+  eigener Messpflicht — sie gehört in einen eigenen PR, nicht in diesen.
+
+  **Am Player angesehen:** die Regel ist in der Laboraufnahme
+  `Nova.AiLab-goal-base-defense-r8-20260810` in Bewegung zu sehen — die
+  Wartenden lösen sich vom Sammelpunkt und marschieren zum eigenen HQ. Das ist
+  die Gegenaufnahme zu der, in der genau diese Einheiten weitersammeln, während
+  ihr Hauptquartier fällt. **Die Aufnahme zeigt den Stand vor den beiden
+  Korrekturen oben.**
+  **Im laufenden Spiel gesehen: nein.** Eine Aufzeichnung des Labors ist keine
+  gespielte Partie; alles oben ist gemessen, nicht gespielt.
 - **16.7/C1: Fünf endliche Aetheriumfelder schaffen Knappheit (D-102)** — die
   zwei praktisch endlosen Startfelder werden durch zwei symmetrische
   Startfelder und zwei Expansionen mit je 9.000 AE sowie ein umkämpftes

@@ -63,6 +63,47 @@ namespace Nova.AI.Data
         /// behaviour journal V003.
         /// </para>
         /// <para>
+        /// NOT bumped either for naming those branches <see cref="GoalKind"/>.
+        /// Same four conditions, same order, same orders out; the canonical
+        /// match decides on the same tick with the same end state and a lab
+        /// run's artifacts came out byte-identical bar the measured runtime.
+        /// The refactor deliberately adds NO profile field — priorities in the
+        /// profile would move <see cref="ProfileHash"/>, and with it this very
+        /// identifier, which would have made the neutrality unprovable in the
+        /// artifacts it is printed into. A goal module that earns an off switch
+        /// brings one in the pull request that gives it a rule.
+        /// </para>
+        /// <para>
+        /// r8 IS THAT PULL REQUEST, and the identifier moves twice over: the
+        /// revision here because decisions change, and
+        /// <see cref="ProfileHash"/> because the rule ships with the off switch
+        /// that makes it measurable one-sided at all (finding M001).
+        /// <c>DefendHome</c> is the first goal to carry a rule of its own — the
+        /// units still waiting in the staging ring break off and walk home when
+        /// a visible armed enemy comes within
+        /// <see cref="AiProfile.DefendHomeCells"/> of their headquarters. What
+        /// it fixes is a defect as old as the staging cell itself (r3), not one
+        /// r6 introduced: a unit that has arrived is deliberately given no
+        /// order, so it hangs entirely on an auto-acquisition that reaches six
+        /// or seven cells while the staging cell sits twelve from the base.
+        /// </para>
+        /// <para>
+        /// TWO CORRECTIONS WENT INTO r8 BEFORE IT SHIPPED, both found by
+        /// reviewing the claim rather than the code, and neither moves
+        /// <see cref="ProfileHash"/> because neither adds a number. First: the
+        /// argument "the destination is static, so the suppression swallows
+        /// every repeat" only holds WHILE the defender walks — arriving clears
+        /// the standing order the suppression compares against, so the
+        /// headquarters cell went out again every cadence, one intent per
+        /// cadence for the whole siege, with the standing defenders flipped back
+        /// into movement each time. <c>DefendHome</c> now falls silent once
+        /// home, the way <c>Hold</c> does at the staging cell. Second: the goal
+        /// asked not to be retreating, which could only ever exclude a wounded
+        /// unit that had ALREADY ARRIVED — and arriving ends the retreat by the
+        /// rule right above it. Those units fell to <c>Hold</c> and stood twelve
+        /// cells out while the base they had run to burned.
+        /// </para>
+        /// <para>
         /// r5 fixes two defects found in the review of r3/r4, both of which
         /// change decisions and therefore the end state: the wave now waits for
         /// what production can still deliver instead of a fixed cap (a single
@@ -116,7 +157,7 @@ namespace Nova.AI.Data
         /// retried an illegal placement forever once the all-of gate shipped.
         /// </para>
         /// </summary>
-        public const int Revision = 7;
+        public const int Revision = 8;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
@@ -167,6 +208,7 @@ namespace Nova.AI.Data
             writer.WriteInt32(profile.RetreatHealthPercent);
             writer.WriteInt32(profile.RetreatDangerCells);
             writer.WriteInt32(profile.WaveStrengthPoints);
+            writer.WriteInt32(profile.DefendHomeCells);
             return writer.Digest();
         }
     }

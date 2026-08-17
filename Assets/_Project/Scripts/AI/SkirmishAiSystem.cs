@@ -73,8 +73,11 @@ namespace Nova.AI
     /// Barracks stands, infantry is queued up to
     /// <see cref="AiFactionProfile.TargetArmySize"/> as funds allow;
     /// (5) the army resolves a POSTURE (does it act at all, which target,
-    /// which destination), then ONE ASSIGNMENT PER UNIT, then submission that
-    /// groups units sharing an order into a single intent: at
+    /// which destination), then ONE GOAL PER UNIT out of the fixed priority
+    /// list in <see cref="GoalKind"/> — <c>Retreat</c>, <c>DefendHome</c>,
+    /// <c>Attack</c>, <c>Hold</c>, <c>Advance</c> — whose effect is the unit's
+    /// orders, then
+    /// submission that groups units sharing an order into a single intent: at
     /// <see cref="AiFactionProfile.AttackSquadThreshold"/> living combat units
     /// the army is sent toward the enemy start area, and the best scored
     /// visible enemy receives an EXPLICIT AttackTarget intent from every unit.
@@ -141,6 +144,19 @@ namespace Nova.AI
         private readonly FogOfWarSystem _fogOfWar;
         private readonly VictorySystem _victory;
 
+        /// <summary>
+        /// Watches the decisions; null in the shipped game. Read-only from the
+        /// AI's side — an observer cannot change what is decided, and nothing it
+        /// is told is kept here.
+        /// </summary>
+        private readonly IAiGoalObserver _goalObserver;
+
+        /// <summary>
+        /// Goals forced from outside; null in the shipped game. An INPUT to the
+        /// decision, like the profile — never a memory of one.
+        /// </summary>
+        private readonly IAiGoalOverride _goalOverride;
+
         public string Name => $"SkirmishAi_{_profile.FactionName}_P{_aiPlayerId}";
         public byte AiPlayerId => _aiPlayerId;
 
@@ -150,6 +166,16 @@ namespace Nova.AI
         /// the human host ingress — that is what keeps the AI on the canonical
         /// intent path with an authority-assigned slot, sequence and target
         /// tick.
+        /// <para>
+        /// THE LAST TWO ARGUMENTS ARE OPTIONAL AND THE GAME PASSES NEITHER.
+        /// <paramref name="goalObserver"/> is told which goal each unit was
+        /// given, <paramref name="goalOverride"/> may name a goal for single
+        /// units before the decision is taken; both belong to the lab's admin
+        /// panel. They are constructor arguments rather than settable properties
+        /// so that neither can be swapped mid-match: the AI reads two references
+        /// that were fixed before the first tick, which is what lets the run
+        /// stay reproducible from its inputs.
+        /// </para>
         /// </summary>
         public SkirmishAiSystem(
             byte aiPlayerId,
@@ -160,8 +186,12 @@ namespace Nova.AI
             ConstructionSystem construction,
             ProductionSystem production,
             FogOfWarSystem fogOfWar,
-            VictorySystem victory)
+            VictorySystem victory,
+            IAiGoalObserver goalObserver = null,
+            IAiGoalOverride goalOverride = null)
         {
+            _goalObserver = goalObserver;
+            _goalOverride = goalOverride;
             _aiPlayerId = aiPlayerId;
             _profile = profile;
             _ingress = ingress ?? throw new ArgumentNullException(nameof(ingress));
@@ -189,7 +219,7 @@ namespace Nova.AI
         {
             if (tick.Value % DecisionTickInterval != 0) return;
             if (_victory.IsDecided) return;
-            Decide();
+            Decide(tick.Value);
         }
 
         public void Shutdown()
@@ -200,7 +230,7 @@ namespace Nova.AI
         // The decision loop (pure function of the committed state)
         // ------------------------------------------------------------------
 
-        private void Decide()
+        private void Decide(uint tick)
         {
             FactionId faction = _economy.GetSlotFaction(_aiPlayerId);
             ref readonly PlayerEconomyState eco = ref _economy.GetPlayerEconomy(_aiPlayerId);
@@ -499,33 +529,45 @@ namespace Nova.AI
                 }
             }
 
-            // ---- (6) Army: resolve one posture for the army, one assignment
-            // per unit, then submit the assignments grouped. See the three
-            // steps below; the rules are exactly the ones the previous
-            // whole-army block applied. ----
+            // Cells of the visible ARMED enemies, collected once per decision.
+            // A local list, not a field: the system stays a pure function of
+            // the committed state, and nothing survives the decision.
+            //
+            // IT IS COLLECTED BEFORE THE POSTURE, and it has to be. The posture
+            // now answers "is the base under attack", which is a question about
+            // this list — and gathering it inside the per-unit loop below, where
+            // it used to live, would have meant asking after the answer was
+            // needed.
+            //
+            // TWO RULES SHARE IT, SO TWO RULES OPEN IT. The gate used to read
+            // RetreatHealthPercent alone; leaving it that way would have let
+            // retreat-off switch the defence off in silence, and the lab's
+            // `retreat-off` candidate would then measure something other than
+            // its name.
+            List<long> threatCells = null;
+            List<uint> threatRaws = null;
+            if (_profile.Profile.RetreatHealthPercent > 0 || _profile.Profile.DefendHomeCells > 0)
+            {
+                threatCells = new List<long>();
+                threatRaws = new List<uint>();
+                CollectVisibleThreats(threatCells, threatRaws);
+            }
+
+            // ---- (6) Army: resolve one posture for the army, one GOAL per
+            // unit, then submit the resulting orders grouped. See the three
+            // steps below; the rules are the ones the previous whole-army
+            // block applied, plus the defence r8 adds to the catalogue. ----
             ArmyPosture posture = ResolveArmyPosture(
-                faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY);
+                faction, barracksRaw, combatCount, combatUnits, hqCellX, hqCellY, threatCells);
+            if (_goalObserver != null) ReportArmyGoal(tick, in posture);
             if (posture.Engages)
             {
-                // Cells of the visible ARMED enemies, collected once per
-                // decision and only while the retreat rule is on. A local
-                // list, not a field: the system stays a pure function of the
-                // committed state, and nothing survives the decision.
-                List<long> threatCells = null;
-                List<uint> threatRaws = null;
-                if (_profile.Profile.RetreatHealthPercent > 0)
-                {
-                    threatCells = new List<long>();
-                    threatRaws = new List<uint>();
-                    CollectVisibleThreats(threatCells, threatRaws);
-                }
-
                 var assignments = new List<UnitAssignment>(combatUnits.Count);
                 for (int i = 0; i < combatUnits.Count; i++)
                 {
                     UnitState unit = combatUnits[i];
                     assignments.Add(ResolveUnitAssignment(
-                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells, threatRaws));
+                        combatRaws[i], in unit, in posture, hqCellX, hqCellY, threatCells, threatRaws, tick));
                 }
                 SubmitAssignments(assignments, combatUnits);
             }
@@ -600,6 +642,48 @@ namespace Nova.AI
             /// own wave.
             /// </summary>
             public bool WaveReady;
+
+            /// <summary>
+            /// The own headquarters cell — where a defender walks. Static for
+            /// the whole match, which is the property the rule is built on: a
+            /// destination that does not move produces ONE order and not a
+            /// stream of them.
+            /// </summary>
+            public int HomeCellX;
+
+            /// <summary>See <see cref="HomeCellX"/>.</summary>
+            public int HomeCellY;
+
+            /// <summary>
+            /// A visible ARMED enemy stands within
+            /// <see cref="AiProfile.DefendHomeCells"/> of the headquarters, so
+            /// the units still waiting in the ring break off (r8). Always false
+            /// while the rule is off, which is what keeps that path identical.
+            /// </summary>
+            public bool HomeThreatened;
+
+            // ---- what the verdict above was reached FROM ----
+            //
+            // Not inputs to any rule: every one of these is already worked out
+            // where the gate is asked, and carrying it out of that method is
+            // what lets an observer say "1.060 of 1.200" instead of "waits".
+            // Nothing below is read by a decision, which is why adding them
+            // cannot move a single tick.
+
+            /// <summary>Which rule the gate answered with — the unit of measure of <see cref="WaveThreshold"/>.</summary>
+            public WaveGateMode WaveMode;
+
+            /// <summary>Living combat units inside the staging ring; 0 while waves are off.</summary>
+            public int Gathered;
+
+            /// <summary>Living combat units outside the ring — out with an earlier wave.</summary>
+            public int Committed;
+
+            /// <summary>Summed combat points of the gathered units.</summary>
+            public long GatheredStrength;
+
+            /// <summary>What the ring has to hold before the wave marches, already capped by what production can still deliver.</summary>
+            public long WaveThreshold;
         }
 
         /// <summary>
@@ -629,7 +713,7 @@ namespace Nova.AI
         /// </summary>
         private ArmyPosture ResolveArmyPosture(
             FactionId faction, uint barracksRaw, int combatCount, List<UnitState> combatUnits,
-            int hqCellX, int hqCellY)
+            int hqCellX, int hqCellY, List<long> threatCells)
         {
             var posture = new ArmyPosture
             {
@@ -639,6 +723,9 @@ namespace Nova.AI
                 StagingCellX = -1,
                 StagingCellY = -1,
                 WaveReady = true,
+                HomeCellX = hqCellX,
+                HomeCellY = hqCellY,
+                HomeThreatened = IsHomeThreatened(hqCellX, hqCellY, threatCells),
             };
             if (!posture.Engages) return posture;
 
@@ -670,6 +757,7 @@ namespace Nova.AI
             int waveSize = EffectiveWaveSize();
             if (waveSize <= 1) return posture;
 
+            posture.WaveMode = WaveGateMode.Count;
             int gathered = 0;
             int committed = 0;
             long gatheredStrength = 0;
@@ -710,11 +798,17 @@ namespace Nova.AI
             int producedStrength = wavePoints > 0
                 ? CombatStrength.OfFullHealth(faction, ProducedCombatRole)
                 : 0;
+            posture.Gathered = gathered;
+            posture.Committed = committed;
+            posture.GatheredStrength = gatheredStrength;
+
             if (wavePoints > 0 && producedStrength > 0)
             {
+                posture.WaveMode = WaveGateMode.Strength;
                 posture.WaveReady = WaveStrengthGate.IsReady(
                     wavePoints, gatheredStrength, gathered, committed, producedStrength,
-                    _profile.TargetArmySize, canProduce: barracksRaw != 0);
+                    _profile.TargetArmySize, canProduce: barracksRaw != 0,
+                    out posture.WaveThreshold);
                 return posture;
             }
 
@@ -739,6 +833,7 @@ namespace Nova.AI
             if (reachable < 1) reachable = 1;
             int threshold = waveSize < reachable ? waveSize : reachable;
 
+            posture.WaveThreshold = threshold;
             posture.WaveReady = gathered >= threshold;
             return posture;
         }
@@ -855,6 +950,42 @@ namespace Nova.AI
         }
 
         /// <summary>
+        /// Whether a visible ARMED enemy stands within
+        /// <see cref="AiProfile.DefendHomeCells"/> of the own headquarters — the
+        /// whole trigger of <see cref="GoalKind.DefendHome"/> (r8).
+        /// <para>
+        /// THREE PROPERTIES, EACH WITH A REASON. <b>Armed</b>, because a
+        /// harvester at the fence is not an attack, and reacting to anything
+        /// that moves is exactly what sank <c>DefendBase</c> (journal V002) —
+        /// <see cref="CollectVisibleThreats"/> filters that way already.
+        /// <b>Visible</b>, because anything else is a look through the fog.
+        /// <b>Around the headquarters</b>, not around any building: the entity
+        /// scan has that cell in hand, the observed and measured case is the one
+        /// at the headquarters, and "every building" would need a reason as well
+        /// as a wider scan. If the measurement later shows attacks on the
+        /// refinery going through the same way, that arrives as its own number.
+        /// </para>
+        /// <para>
+        /// A cheap ANY question, deliberately: which enemy is nearest is the
+        /// pursuer's business (<see cref="NearestThreatRaw"/>), and the trigger
+        /// does not need it.
+        /// </para>
+        /// </summary>
+        private bool IsHomeThreatened(int hqCellX, int hqCellY, List<long> threatCells)
+        {
+            int radius = _profile.Profile.DefendHomeCells;
+            if (radius <= 0 || threatCells == null) return false;
+
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int threatX = (int)(uint)threatCells[i];
+                int threatY = (int)(threatCells[i] >> 32);
+                if (Math.Abs(hqCellX - threatX) <= radius && Math.Abs(hqCellY - threatY) <= radius) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// The cells of every ARMED enemy in the team's committed view, packed
         /// as <c>(y &lt;&lt; 32) | x</c>. Unarmed entities are left out: a
         /// harvester at the fence is not a reason to run, and treating it as
@@ -874,10 +1005,19 @@ namespace Nova.AI
                 if (_construction.IsActiveSite(u.Id)) continue;
                 if (WeaponProfiles.Get(_economy.GetSlotFaction(u.PlayerId), u.Role).AttackDamage <= 0) continue;
 
+                // A handle the wire format cannot express is dropped here, the
+                // same way the own scan drops it. Zero is not a spare value in
+                // this list: it wins the tie-break on the lowest raw id in
+                // NearestThreatRaw, and an assignment carrying it submits NO
+                // attack intent — the threat would silence the pursuer instead
+                // of aiming it.
+                uint raw = UnitCommandStateView.ToRawEntityId(u.Id);
+                if (raw == 0) continue;
+
                 long x = GridCellOf(u.Transform.PositionX);
                 long y = GridCellOf(u.Transform.PositionY);
                 cells.Add((y << 32) | x);
-                raws.Add(UnitCommandStateView.ToRawEntityId(u.Id));
+                raws.Add(raw);
             }
         }
 
@@ -985,109 +1125,361 @@ namespace Nova.AI
         }
 
         /// <summary>
-        /// One unit's orders under the given posture. Today every combat unit
-        /// gets the same two — that IS the current behaviour, and this is the
-        /// one place a later rule (retreat below a health threshold, waiting
-        /// at a staging cell) has to change to break the uniformity.
+        /// One unit's orders under the given posture: pick the goal, apply it.
         /// <para>
-        /// Aiming BELOW the squad threshold was built here and measured back
-        /// out again — behaviour journal V003 carries the four variants and
-        /// the reason: an explicit order cannot be handed back to the D-087
-        /// auto-acquisition, because <c>AttackTarget</c> is released only by
-        /// the target's death (<c>UnitState.Stop()</c> leaves it untouched).
-        /// A standing unit that stops closing the distance therefore holds a
-        /// stale order, and holding beats aiming only while the unit walks
-        /// toward what it aims at.
+        /// THE TWO HALVES ARE SEPARATE ON PURPOSE. Picking is a chain of
+        /// conditions; applying is a table of effects. Kept together they read
+        /// as one if-cascade in which no branch has a name — and a rule without
+        /// a name can neither be switched off, nor tested on its own, nor drawn
+        /// in a panel. Split, the goal is a value: it can be recorded, forced
+        /// from outside, and told apart from the order it produced.
+        /// </para>
+        /// <para>
+        /// NOTHING ABOUT THE DECISION CHANGED when the names went in. The
+        /// conditions below are the same four the if-cascade tested, in the
+        /// order it tested them, and the canonical match runs tick for tick as
+        /// it did — which is the only acceptable proof for a refactor of a rule
+        /// engine, and the reason this step ships without a revision bump.
         /// </para>
         /// </summary>
         private UnitAssignment ResolveUnitAssignment(
             uint entityRaw, in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
-            List<long> threatCells, List<uint> threatRaws)
+            List<long> threatCells, List<uint> threatRaws, uint tick)
         {
-            // A wounded unit walks home, whatever the wave is doing. This test
-            // comes FIRST on purpose: retreat has to outrank "you are out with
-            // the wave, keep going", or it can never pull anybody back.
+            // The two facts every module below reads, worked out once. Both are
+            // pure functions of the committed state — "already walking home" is
+            // read off the standing order, which is the AI's only memory and one
+            // that survives save/restore because it is part of the world.
             bool retreats = IsRetreating(in unit, in posture, threatCells);
+            bool arrived = HasArrivedAtTheStagingCell(in unit, in posture);
 
-            bool marches = !retreats
-                && (posture.StagingCellX < 0                      // no staging cell resolved
-                || posture.WaveReady                              // the wave launches this decision
-                || IsCommittedToTheWave(in unit, hqCellX, hqCellY)); // already out with an earlier wave
+            GoalKind goal = ResolveGoal(in unit, in posture, hqCellX, hqCellY, retreats, arrived);
 
-            // The one order a retreating unit still needs: its pursuer.
-            // Zero does not clear the march target it is carrying — see
-            // NearestThreatRaw for why leaving it stale silenced the unit for
-            // the whole way home. A WAITING reinforcement keeps getting zero:
-            // it holds no stale order to overwrite (it never marched), and
-            // finding F001 is explicit that aiming while standing still is
-            // worse than letting D-087 acquire.
-            uint retreatTargetRaw = retreats
+            // The mask, if anybody handed one in. It replaces the pick and never
+            // the effect: a forced goal produces exactly the orders that goal
+            // always produces, so a panel cannot invent a behaviour the AI has
+            // no code for.
+            bool forced = false;
+            if (_goalOverride != null)
+            {
+                GoalKind wanted = _goalOverride.ResolveGoal(entityRaw);
+                if (wanted != GoalKind.None)
+                {
+                    forced = true;
+                    goal = wanted;
+                }
+            }
+
+            // The pursuer, and only for the goals that carry one.
+            //
+            // Zero does not CLEAR a march target a unit is carrying — see
+            // NearestThreatRaw for why leaving it stale silenced a retreating
+            // unit for the whole way home. So Retreat overwrites the stale order
+            // with the thing chasing it, and Hold does the same for a unit that
+            // ran home and is still under the rule. A fresh reinforcement gets
+            // zero and should: it holds no stale order to overwrite, and aiming
+            // while standing still is worse than letting D-087 acquire (F001).
+            uint pursuerRaw = goal == GoalKind.Retreat || goal == GoalKind.DefendHome
+                    || (goal == GoalKind.Hold && retreats)
                 ? NearestThreatRaw(in unit, threatCells, threatRaws)
                 : 0u;
 
-            if (marches)
-            {
-                return new UnitAssignment
-                {
-                    EntityRaw = entityRaw,
-                    AttackTargetRaw = posture.TargetRaw,
-                    MoveCellX = posture.MoveCellX,
-                    MoveCellY = posture.MoveCellY,
-                };
-            }
+            // Whether the defender is already standing at the base — the second
+            // caller-computed fact the table reads, for the same reason the
+            // pursuer is one: a defender that has arrived must fall silent, or
+            // the headquarters cell goes out again every cadence. See
+            // HasArrivedAtHome.
+            bool atHome = HasArrivedAtHome(in unit, in posture);
 
-            // Reinforcement that has ARRIVED: no order at all.
-            //
-            // This is not an optimisation, it is the difference between a wave
-            // and a stutter. Arrival clears TargetGridPos through Stop(), so
-            // the re-issue suppression in SubmitAssignments stops matching and
-            // the same move order goes out again every single cadence. Measured
-            // before this branch existed: 40 actions per minute against 23 for
-            // the shipped AI, for units that were standing still. Intent churn
-            // without a change of behaviour is exactly what sank DefendBase
-            // (journal V002), and the fix is to say nothing when there is
-            // nothing to say.
-            // "Arrived" means standing there, not merely being there. A unit
-            // that is inside the tolerance but still WALKING is walking
-            // somewhere else — saying nothing to it lets it carry on out of
-            // the ring, which is the opposite of what both rules want. A test
-            // found this: a wounded unit twelve cells from its HQ kept its
-            // march order and walked on toward the enemy, because it happened
-            // to pass within four cells of the staging cell.
-            if (!unit.IsMoving && IsAtTheStagingCell(in unit, in posture))
-            {
-                return new UnitAssignment
-                {
-                    EntityRaw = entityRaw,
-                    AttackTargetRaw = retreatTargetRaw,
-                    MoveCellX = -1,
-                    MoveCellY = -1,
-                };
-            }
+            UnitAssignment assignment = ApplyGoal(goal, entityRaw, in posture, pursuerRaw, atHome);
 
-            // Reinforcement still on its way: walk to the staging cell.
-            //
-            // NO EXPLICIT ATTACK TARGET while waiting, and that is a
-            // consequence of finding F001, not an oversight. An AttackTarget
-            // is released only by the target's death — Stop() leaves it
-            // standing — so a unit that is NOT closing the distance holds a
-            // stale order and stops firing, while the D-087 auto-acquisition
-            // would have shot at whatever came into range. Aiming is right
-            // while a unit walks toward what it aims at (journal V003), and a
-            // waiting unit does not.
-            //
-            // A RETREATING unit is the exception, and for the same reason
-            // rather than against it: it is not a fresh reinforcement, it is
-            // already carrying a march target it can no longer reach. Silence
-            // does not release that order, so silence is what kept it from
-            // firing. It gets its pursuer instead (retreatTargetRaw).
-            return new UnitAssignment
+            if (_goalObserver != null)
             {
-                EntityRaw = entityRaw,
-                AttackTargetRaw = retreatTargetRaw,
-                MoveCellX = posture.StagingCellX,
-                MoveCellY = posture.StagingCellY,
-            };
+                ReportUnitGoal(tick, in unit, in posture, in assignment,
+                    goal, forced, hqCellX, hqCellY, threatCells);
+            }
+            return assignment;
+        }
+
+        /// <summary>
+        /// WHICH GOAL THIS UNIT IS UNDER — the five conditions, in priority
+        /// order, exactly as <see cref="GoalKind"/> lists them.
+        /// <para>
+        /// THREE CLAUSES ARE NOT OBVIOUS AND ALL THREE ARE LOAD-BEARING.
+        /// </para>
+        /// <list type="number">
+        /// <item><b><c>Retreat</c> steps aside for a unit that has arrived.</b>
+        /// Getting home ENDS the retreat: from there it is an ordinary waiting
+        /// unit that leaves with the next wave, wounded or not. MS-1 units never
+        /// heal (<c>Repair</c> validates its target as a completed BUILDING), so
+        /// a rule that kept them under <c>Retreat</c> until they recovered would
+        /// pile the wounded up at home, occupy the army cap with them, and never
+        /// fill another wave. This clause is that rule, written where it can be
+        /// read.</item>
+        /// <item><b><c>Attack</c> asks not to be retreating.</b> A wounded unit
+        /// that is already outside the staging ring satisfies every other half
+        /// of the march test, so without this the pull-back could never reach
+        /// the one unit it exists for. Retreat has to outrank "you are out with
+        /// the wave, keep going".</item>
+        /// <item><b><c>DefendHome</c> sits between the two, and both sides of
+        /// that are load-bearing.</b> It gives way to <c>Retreat</c> because a
+        /// unit too wounded to fight is no defender — and it outranks
+        /// <c>Attack</c> because the units it is for would otherwise gather for
+        /// a wave that marches away from their burning base. It asks only about
+        /// units still INSIDE the ring: a wave that is already out keeps going,
+        /// which is the r3 rule that made a wave a wave and the V002 failure
+        /// mode if it were dropped.</item>
+        /// <item><b>It does NOT ask whether the unit is wounded.</b> It cannot,
+        /// and the first version that did was wrong: <c>Retreat</c> has already
+        /// returned above for every unit still running, so the only wounded unit
+        /// that reaches this line is one that HAS ARRIVED — and arriving ends
+        /// the retreat by the rule two clauses up. Asking again handed exactly
+        /// those units to <c>Hold</c>, so under siege the ones who were already
+        /// home stood twelve cells out at the staging cell, aiming at a pursuer
+        /// they could not reach, while the base they had run back to burned.
+        /// A unit that is home enough to leave with the next wave is home enough
+        /// to defend.</item>
+        /// </list>
+        /// </summary>
+        private GoalKind ResolveGoal(
+            in UnitState unit, in ArmyPosture posture, int hqCellX, int hqCellY,
+            bool retreats, bool arrived)
+        {
+            if (retreats && !arrived) return GoalKind.Retreat;
+
+            // Asked once and read twice — the defence needs to know that the
+            // unit is still gathering, and the march test needs the same fact.
+            bool committed = IsCommittedToTheWave(in unit, hqCellX, hqCellY);
+
+            if (posture.HomeThreatened && !committed) return GoalKind.DefendHome;
+            if (!retreats && IsFitToMarch(in posture, committed)) return GoalKind.Attack;
+            if (arrived) return GoalKind.Hold;
+            return GoalKind.Advance;
+        }
+
+        /// <summary>
+        /// Whether the wave carries this unit forward: no staging cell was
+        /// resolved at all, or the wave launches this decision, or the unit is
+        /// already out with an earlier one and is not called back.
+        /// </summary>
+        private static bool IsFitToMarch(in ArmyPosture posture, bool committed)
+        {
+            return posture.StagingCellX < 0
+                || posture.WaveReady
+                || committed;
+        }
+
+        /// <summary>
+        /// True when the unit is STANDING at the staging cell — not merely
+        /// standing near it while walking somewhere else.
+        /// <para>
+        /// The distinction was found by a test, not reasoned out: a wounded unit
+        /// twelve cells from its HQ kept its march order and walked on toward
+        /// the enemy, because its route happened to pass within four cells of
+        /// the staging point. "Is there" and "has arrived" are different
+        /// questions, and only the second one may buy silence.
+        /// </para>
+        /// </summary>
+        private bool HasArrivedAtTheStagingCell(in UnitState unit, in ArmyPosture posture)
+        {
+            return posture.StagingCellX >= 0 && !unit.IsMoving && IsAtTheStagingCell(in unit, in posture);
+        }
+
+        /// <summary>
+        /// True when a defender is HOME and standing — within
+        /// <see cref="AiProfile.StagingToleranceCells"/> of the headquarters and
+        /// not walking. <see cref="GoalKind.DefendHome"/> falls silent for it,
+        /// the way <see cref="GoalKind.Hold"/> is silent at the staging cell.
+        /// <para>
+        /// WITHOUT THIS THE STATIC DESTINATION DOES NOT HELP, and the argument
+        /// the rule was built on is only half true. The re-issue suppression in
+        /// <see cref="SubmitAssignments"/> compares the STANDING ORDER
+        /// (<c>UnitState.TargetGridPos</c>) — and <c>MovementSystem</c> calls
+        /// <c>UnitState.Stop()</c> on arrival, which invalidates exactly that
+        /// field. So a defender that has arrived has nothing left to compare
+        /// against, the suppression stops recognising the repeat, and the
+        /// headquarters cell goes out again every single cadence: measured, one
+        /// move intent per cadence for as long as the siege lasts, with eight
+        /// standing units flipped back into <c>IsMoving</c> each time. Static
+        /// destinations survive the suppression only WHILE THEY ARE BEING
+        /// WALKED TO; standing still needs the same silence <c>Hold</c> has.
+        /// </para>
+        /// <para>
+        /// The tolerance is the staging one and deliberately not a new profile
+        /// value: it is the same phenomenon (a group arriving spreads over
+        /// several cells, and the headquarters footprint is impassable, so ring
+        /// 0 is never claimed), and a new number would move
+        /// <c>AiProfile.ProfileHash</c> for a correction that changes no rule.
+        /// Four cells around the headquarters cannot collide with the staging
+        /// cell either — that one sits twelve cells out.
+        /// </para>
+        /// </summary>
+        private bool HasArrivedAtHome(in UnitState unit, in ArmyPosture posture)
+        {
+            if (unit.IsMoving) return false;
+            int distance = Chebyshev(
+                GridCellOf(unit.Transform.PositionX), GridCellOf(unit.Transform.PositionY),
+                posture.HomeCellX, posture.HomeCellY);
+            return distance <= _profile.Profile.StagingToleranceCells;
+        }
+
+        /// <summary>
+        /// THE EFFECT OF A GOAL — one table, five rows, no conditions.
+        /// <para>
+        /// Every row is a pure function of the goal, the posture and the two
+        /// facts the caller worked out (the pursuer, and whether a defender is
+        /// already home), which is what makes a forced goal safe: a panel that
+        /// names <c>Retreat</c> for a healthy unit gets the orders
+        /// <c>Retreat</c> always produces, not a state the AI has no code for.
+        /// </para>
+        /// <para>
+        /// The two "no order" values are a real part of the vocabulary and not
+        /// a missing case: attack target 0 submits no attack intent and leaves
+        /// the D-087 auto-acquisition its pick, move cell -1 leaves the unit
+        /// walking wherever it already was. <c>Hold</c> is built out of both,
+        /// and its silence is the whole reason a wave looks like a wave instead
+        /// of a stutter.
+        /// </para>
+        /// </summary>
+        private static UnitAssignment ApplyGoal(
+            GoalKind goal, uint entityRaw, in ArmyPosture posture, uint pursuerRaw, bool atHome)
+        {
+            switch (goal)
+            {
+                case GoalKind.Retreat:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = posture.StagingCellX,
+                        MoveCellY = posture.StagingCellY,
+                    };
+
+                case GoalKind.Attack:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = posture.TargetRaw,
+                        MoveCellX = posture.MoveCellX,
+                        MoveCellY = posture.MoveCellY,
+                    };
+
+                case GoalKind.Hold:
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = -1,
+                        MoveCellY = -1,
+                    };
+
+                case GoalKind.DefendHome:
+                    // The same shape Retreat has, aimed at the other static
+                    // cell: walk to the headquarters, shoot the nearest armed
+                    // enemy on the way. Static is the operative word — the
+                    // headquarters does not move all match, so while a defender
+                    // is WALKING the re-issue suppression in SubmitAssignments
+                    // swallows every repeat. DefendBase aimed at the ENEMY,
+                    // which moves, and paid a fresh order per unit per cadence
+                    // for it (journal V002).
+                    //
+                    // ONCE HOME IT FALLS SILENT, and that is not a nicety. The
+                    // suppression compares the standing order, MovementSystem
+                    // clears the standing order on arrival, and a defender that
+                    // has arrived would therefore be sent home AGAIN every
+                    // cadence — measured before this row existed: one move
+                    // intent per cadence for the whole siege and eight standing
+                    // units flipped back into IsMoving each time, which is the
+                    // V002 shape at a smaller size. Hold's silence, for the
+                    // other static cell. See HasArrivedAtHome.
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = pursuerRaw,
+                        MoveCellX = atHome ? -1 : posture.HomeCellX,
+                        MoveCellY = atHome ? -1 : posture.HomeCellY,
+                    };
+
+                default:
+                    // Advance — and GoalKind.None with it. A mask that names
+                    // None never reaches here (it means "leave it to the AI"),
+                    // so the fall-through is the walk to the staging cell.
+                    return new UnitAssignment
+                    {
+                        EntityRaw = entityRaw,
+                        AttackTargetRaw = 0u,
+                        MoveCellX = posture.StagingCellX,
+                        MoveCellY = posture.StagingCellY,
+                    };
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Reporting — reached only when somebody attached an observer, which
+        // the shipped game never does. Every measurement below is taken HERE
+        // and nowhere else on the decision path, so none of it can cost the
+        // delivered build anything.
+        // ------------------------------------------------------------------
+
+        private void ReportArmyGoal(uint tick, in ArmyPosture posture)
+        {
+            _goalObserver.OnArmyGoal(_aiPlayerId, tick, new AiArmyGoal(
+                posture.Engages, posture.TargetRaw, posture.MoveCellX, posture.MoveCellY,
+                posture.StagingCellX, posture.StagingCellY, posture.WaveReady, posture.WaveMode,
+                posture.Gathered, posture.Committed, posture.GatheredStrength, posture.WaveThreshold,
+                posture.HomeThreatened));
+        }
+
+        /// <summary>
+        /// The unit's goal together with the QUANTITIES its conditions weighed —
+        /// health against the retreat percentage, distances against the staging
+        /// tolerance and the ring. A reader with these four numbers and the
+        /// profile can work out how far the unit is from its next goal without
+        /// anybody re-implementing the rules beside the recording.
+        /// </summary>
+        private void ReportUnitGoal(
+            uint tick, in UnitState unit, in ArmyPosture posture, in UnitAssignment assignment,
+            GoalKind goal, bool forced, int hqCellX, int hqCellY, List<long> threatCells)
+        {
+            int cellX = GridCellOf(unit.Transform.PositionX);
+            int cellY = GridCellOf(unit.Transform.PositionY);
+
+            _goalObserver.OnUnitGoal(_aiPlayerId, tick, new AiUnitGoal(
+                assignment.EntityRaw,
+                goal,
+                forced,
+                assignment.AttackTargetRaw,
+                assignment.MoveCellX,
+                assignment.MoveCellY,
+                unit.MaxHealth > 0 ? (int)((long)unit.CurrentHealth * 100 / unit.MaxHealth) : 0,
+                NearestThreatDistance(cellX, cellY, threatCells),
+                posture.StagingCellX < 0
+                    ? -1
+                    : Chebyshev(cellX, cellY, posture.StagingCellX, posture.StagingCellY),
+                Chebyshev(cellX, cellY, hqCellX, hqCellY)));
+        }
+
+        /// <summary>
+        /// Cells to the nearest visible armed enemy, or -1 when none is visible
+        /// or the retreat rule never collected any. Report-only — the rule
+        /// itself asks a cheaper question (is ANY of them within the radius) and
+        /// keeps asking it.
+        /// </summary>
+        private static int NearestThreatDistance(int cellX, int cellY, List<long> threatCells)
+        {
+            if (threatCells == null) return -1;
+            int nearest = -1;
+            for (int i = 0; i < threatCells.Count; i++)
+            {
+                int distance = Chebyshev(cellX, cellY, (int)(uint)threatCells[i], (int)(threatCells[i] >> 32));
+                if (nearest < 0 || distance < nearest) nearest = distance;
+            }
+            return nearest;
+        }
+
+        private static int Chebyshev(int ax, int ay, int bx, int by)
+        {
+            return Math.Max(Math.Abs(ax - bx), Math.Abs(ay - by));
         }
 
         /// <summary>

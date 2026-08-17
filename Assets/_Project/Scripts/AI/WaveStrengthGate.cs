@@ -101,8 +101,41 @@ namespace Nova.AI
             int armyCap,
             bool canProduce)
         {
-            return gatheredStrength >= Threshold(
+            return IsReady(
+                wavePoints, gatheredStrength, gathered, committed, producedStrength, armyCap, canProduce,
+                out _);
+        }
+
+        /// <summary>
+        /// The same verdict, and the <paramref name="threshold"/> it was reached
+        /// against.
+        /// <para>
+        /// THE NUMBER IS WORTH HANDING OUT because it is the one thing "the wave
+        /// waits" does not say: how far off it is. The gap between what the ring
+        /// holds and this value is what the admin panel shows as "another 140
+        /// points before it marches", and it is exact rather than estimated —
+        /// every clause here is integer arithmetic.
+        /// </para>
+        /// <para>
+        /// It is an overload rather than a second computation at the call site
+        /// so the comparison operator still exists exactly once. Deleting the
+        /// clamp used to leave the whole suite green (see the class remarks);
+        /// two copies of the comparison would be the same trap one level up.
+        /// </para>
+        /// </summary>
+        public static bool IsReady(
+            int wavePoints,
+            long gatheredStrength,
+            int gathered,
+            int committed,
+            int producedStrength,
+            int armyCap,
+            bool canProduce,
+            out long threshold)
+        {
+            threshold = Threshold(
                 wavePoints, gatheredStrength, gathered, committed, producedStrength, armyCap, canProduce);
+            return gatheredStrength >= threshold;
         }
     }
 }

@@ -176,6 +176,52 @@ namespace Nova.AI.Data
         /// </summary>
         public int RetreatDangerCells { get; }
 
+        /// <summary>
+        /// How near a visible ARMED enemy has to come to the own headquarters
+        /// before the units still waiting in the staging ring break off and
+        /// walk home to fight. <b>0 means off.</b>
+        /// <para>
+        /// WHY THE RULE HAS TO EXIST. A unit that has ARRIVED at the staging
+        /// cell is given no order at all — deliberately, because an order per
+        /// cadence to a standing unit is intent churn without a change of
+        /// behaviour. It therefore depends entirely on the D-087
+        /// auto-acquisition, and that reaches exactly as far as its weapon:
+        /// six cells for Legion infantry, seven for an Alliance rifleman. The
+        /// staging cell sits <see cref="StagingDistanceCells"/> — twelve — from
+        /// the headquarters. An attacker at the base is outside every one of
+        /// those ranges, so the waiting units do not ignore it: they cannot see
+        /// it. Measured in the canonical match: the Legion headquarters takes
+        /// 327 hits over 766 ticks while its own units stand a median of
+        /// thirteen cells away under Hold, and not one of them is attacking.
+        /// </para>
+        /// <para>
+        /// WHY TEN. It is the radius B003 was measured with, and it sits
+        /// between <see cref="RetreatDangerCells"/> (eight, so inside the base)
+        /// and the staging ring (sixteen, so a defender is not summoned by a
+        /// skirmish at the gathering point).
+        /// </para>
+        /// <para>
+        /// THERE IS NO SECOND RADIUS. A hysteresis value — "stay home until the
+        /// enemy is fourteen cells out" — is the obvious second number and is
+        /// deliberately absent: both destinations are STATIC cells, a defender
+        /// that has arrived stops being ordered at all, and the re-issue
+        /// suppression swallows the rest, so whether the trigger flutters is a
+        /// question for the intent column and not for a precaution. That is the
+        /// correction over the discarded <c>DefendBase</c> (journal V002), which
+        /// handed the WHOLE army a new destination every cadence and paid 23 %
+        /// more intents for it.
+        /// </para>
+        /// <para>
+        /// THE STATIC CELL IS NOT ENOUGH ON ITS OWN, and the first version of
+        /// this rule assumed it was. The suppression compares the STANDING
+        /// order, and arriving clears it — so the silence a defender needs once
+        /// it is home is written out in <c>SkirmishAiSystem.HasArrivedAtHome</c>
+        /// rather than falling out of the geometry. Measured before that
+        /// existed: one move intent per cadence for as long as the siege ran.
+        /// </para>
+        /// </summary>
+        public int DefendHomeCells { get; }
+
         // ---- target scoring ----
         //
         // Four weights over ONE integer score, no scalar quality function:
@@ -219,7 +265,8 @@ namespace Nova.AI.Data
             int stagingToleranceCells,
             int retreatHealthPercent,
             int retreatDangerCells,
-            int waveStrengthPoints)
+            int waveStrengthPoints,
+            int defendHomeCells)
         {
             ProfileId = profileId ?? string.Empty;
             DecisionTickInterval = decisionTickInterval;
@@ -240,6 +287,7 @@ namespace Nova.AI.Data
             RetreatHealthPercent = retreatHealthPercent;
             RetreatDangerCells = retreatDangerCells;
             WaveStrengthPoints = waveStrengthPoints;
+            DefendHomeCells = defendHomeCells;
         }
 
         /// <summary>
@@ -272,7 +320,8 @@ namespace Nova.AI.Data
             && StagingToleranceCells == other.StagingToleranceCells
             && RetreatHealthPercent == other.RetreatHealthPercent
             && RetreatDangerCells == other.RetreatDangerCells
-            && WaveStrengthPoints == other.WaveStrengthPoints;
+            && WaveStrengthPoints == other.WaveStrengthPoints
+            && DefendHomeCells == other.DefendHomeCells;
 
         public override bool Equals(object obj) => obj is AiProfile other && Equals(other);
 
@@ -299,6 +348,7 @@ namespace Nova.AI.Data
                 hash = (hash * 397) ^ RetreatHealthPercent;
                 hash = (hash * 397) ^ RetreatDangerCells;
                 hash = (hash * 397) ^ WaveStrengthPoints;
+                hash = (hash * 397) ^ DefendHomeCells;
                 return hash;
             }
         }
