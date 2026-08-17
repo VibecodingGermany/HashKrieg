@@ -18,6 +18,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Entschieden
+- **D-108: Territorium wächst kriechend an jedem eigenen Bauanker.** Die Frage
+  aus Testbericht T-01 (#92) — erweitert ein zweites HQ den Baubereich? — war im
+  Code längst beantwortet und nie ausgesprochen:
+  `ConstructionSystem.BuildInfluenceRadiusCells = 8` misst ab **einem eigenen
+  Bauanker**, nicht ab dem HQ, also erweitert jedes fertige Gebäude die Zone um
+  seinen eigenen Radius. Das bleibt so und ist ab jetzt gewollte Mechanik: es ist
+  das klassische C&C-Verhalten und koppelt Expansion genau so an die Wirtschaft,
+  wie die Verknappung aus D-102 es verlangt. Die gemeldete Enge wird
+  **nicht** über den Radius beantwortet, sondern zuerst gemessen — Sprint 21
+  Paket 21.1 liefert als Test, wie viele Gebäude bei
+  `MinimumBuildingDistanceCells` 2 gegen 1 gegen 0 in die Startzone passen, weil
+  dieser Wert Zellen *innerhalb* der Zone sperrt und die plausiblere Ursache ist
+- **D-109: Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten.** Feld 5 liegt
+  bei (62, 62) und trägt mit 15.000 AE zwei Drittel mehr als jedes andere — die
+  Absicht „die Mitte ist wertvoll" war getroffen, nur nicht ausgespielt. Aus dem
+  einen Feld werden vier bis sechs, und das Gelände formt die Zufahrten.
+  Verbindliche Auflage: **Begehbarkeit und Optik stammen aus einer einzigen
+  Struktur.** Heute tun sie das nicht — `CostField` kann unbegehbare Zellen
+  (`ImpassableCost = 255`), aber es schreibt niemand hinein ausser
+  `ConstructionSystem` für Gebäude-Footprints, während `GlutrinneBlockoutView`
+  rund 84 Felsen streut und im eigenen Docstring zusichert, nie in den
+  Simulationszustand zu schreiben — die Felsen sind Deko und begehbar. Zwei
+  Quellen ergäben Einheiten, die durch Felsen laufen und an unsichtbaren Wänden
+  hängenbleiben. Die Umsetzung bleibt beim Maintainer-Strang:
+  `CostField.SetCost` ist bereits öffentlich und wird aus `Gameplay/Match/`
+  aufgerufen, `Simulation/Pathfinding/` wird nicht angefasst
 - **D-105: Dennis Westermann (`@cubetribe`) führt das Projekt allein.** Er ist
   alleiniger Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigter;
   Michael Falk (`@travelhawk`) bleibt historischer Autor und
@@ -30,6 +56,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Sprint 21 festgeplant und als Großauftrag erteilt.** Aus dem Vorschlag zu den
+  Verknappungsfolgen wird nach den Inhaberentscheidungen D-108 und D-109 die
+  Sprintdatei `docs/production/hashkrieg/21_Sprint_Verknappungsfolgen.md` mit
+  sieben Paketen (Restbestand sichtbar, Baubereich sichtbar, Auswahl ehrlich,
+  Startmenge gerechnet, Kartendichte, zentrale Zone) und der gebündelte Auftrag
+  `AUFTRAG_Verknappungsfolgen.md`, der Sprint 21 und danach Sprint 18 in eine
+  verbindliche Reihenfolge bringt. Beide sind gegen `main` @ `3e10c48` geprüft.
+  Nebenbei berichtigt: `AUFTRAG_Grossblock.md` behauptete, `dotnet test` laufe
+  lokal nicht — es läuft mit dem im Repo mitgelieferten `.dotnet/` (8.0.318,
+  exakt die in `global.json` gepinnte Version) in rund 14 Sekunden
 - **Testbericht T-01 vom 10.08.2026 (Build `4053c15`) zerlegt — zehn Issues
   (#85–#94) und ein Sprintvorschlag.** Der Bericht bewertet die mit #80
   eingeführte AE-Verknappung und zeigt, dass diese eine Änderung acht weitere

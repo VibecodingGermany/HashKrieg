@@ -1,6 +1,6 @@
 # Übergang Project Nova → Hashkrieg — Planungsmappe
 
-**Version:** 0.8.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 16 technisch umgesetzt, manuelle Spielabnahme offen; Sprint 13.2–13.5 warten weiter auf Zugangsdaten und zwei Menschen an zwei Rechnern | **Verantwortungsbereich:** Project Owner / Orchestrator / Producer | **Sprint:** 16
+**Version:** 0.9.0 | **Status:** fortgeschriebene Planungsmappe – Sprint 16 technisch umgesetzt und Sprint 21 festgeplant, manuelle Spielabnahme beider offen; Sprint 13.2–13.5 warten weiter auf Zugangsdaten und zwei Menschen an zwei Rechnern | **Verantwortungsbereich:** Project Owner / Orchestrator / Producer | **Sprint:** 21
 
 ## Zweck
 
@@ -51,9 +51,12 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
 | [15_Sprint_Netzstabilitaet.md](15_Sprint_Netzstabilitaet.md) | Sprint 15 (Maintainer); Reconnect, Desync-Erstbefund, adaptive Eingabeverzögerung, Dauerbetrieb des Relays |
 | [16-19_Betatest_Einordnung.md](16-19_Betatest_Einordnung.md) | **Einordnung des ersten Betatest-Berichts** in die Sprintfolge — Issues #43–#58, nach Schreibhoheit geschnitten, mit den offenen Inhaberentscheidungen |
 | [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | Sprint 16 (Netzstrang, **technisch umgesetzt; manuelle Spielabnahme offen**); Strang C aus Sprint 12 und die **acht** Betatest-Befunde (#43, #44, #45, #46, #47, #48, #53, #54) — Knappheit, Lager, Radar, Low Power, Bauvoraussetzungen, Platzierung, Reparaturkosten und Entscheidungsfeedback |
-| [17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md) | Sprint 17 (Maintainer); Zugriffsprotokoll, Sperrliste und Erstmeldung — Paket A läuft im Großauftrag als **Block 4 hinter der Lobby**, weil es die Lobby-Functions aus Sprint 14 voraussetzt; es liegt bis auf den `.partial`-Fix in `RelayServerCore.cs` ausserhalb des Repos |
+| [17_Sprint_Zugangsprotokoll.md](17_Sprint_Zugangsprotokoll.md) | Sprint 17 (Maintainer); Zugriffsprotokoll, Sperrliste und Erstmeldung — Paket A war **Block 3** des vorigen Großauftrags und ist als einziger Block daraus **noch offen**; es setzt die Lobby-Functions aus Sprint 14 voraus und liegt bis auf den `.partial`-Fix in `RelayServerCore.cs` ausserhalb des Repos |
 | [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md) | Sprint 18 (Netzstrang); Auswahl nach Rolle, sichtbares Angriffsziel mit Nachsetzen über zwei Intents, Formationsausrichtung — Eingabe und Darstellung, kein neuer `CommandKind` |
-| [AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md) | **Der gebündelte Arbeitsauftrag an den ausführenden Agenten, Blöcke 0 bis 4** — Auswahlrahmen, Sprint 16, Sprint 18, Sprint 14, Sprint 17 Paket A. Er ist die verbindliche Reihenfolge; wo er von einer Sprintdatei abweicht, gilt er |
+| [20_Vorschlag_Verknappungsfolgen.md](20_Vorschlag_Verknappungsfolgen.md) | Der Vorschlag zur Sprintbildung aus Testbericht T-01 (#85–#94), nach Schreibhoheit geschnitten — **historisch**, seit dem 2026-08-17 durch Sprint 21 festgeplant |
+| [21_Sprint_Verknappungsfolgen.md](21_Sprint_Verknappungsfolgen.md) | **Sprint 21 (Maintainer-Strang, geplant); die Folgen der endlichen Felder** — Restbestand und Baubereich sichtbar machen, Auswahl ehrlich machen, Startmenge rechnen, Kartendichte, und die Mitte als Gebiet mit Chokepoints (#86–#88, #91–#94; D-108, D-109) |
+| [AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md) | Der vorige Arbeitsauftrag, Blöcke 0 bis 3 — Auswahlrahmen, Sprint 16, Sprint 18, Sprint 17 Paket A. Codeseitig **abgeschlossen bis auf Block 3** (Sprint 17 Paket A) |
+| [AUFTRAG_Verknappungsfolgen.md](AUFTRAG_Verknappungsfolgen.md) | **Der aktuelle gebündelte Arbeitsauftrag, Blöcke 1 bis 2** — Sprint 21 und danach Sprint 18. Er ist die verbindliche Reihenfolge; wo er von einer Sprintdatei abweicht, gilt er |
 | [Testberichte/](Testberichte/) | **Anonymisierte** Fassungen der eingegangenen Betatest-Berichte, je Build und Kennung — Ablauf: [../Nutzerfeedback_Ablauf.md](../Nutzerfeedback_Ablauf.md) |
 
 ## Das Wichtigste in fünf Sätzen
@@ -67,9 +70,11 @@ ausschließlich in [../MVPRecoveryPlan.md](../MVPRecoveryPlan.md) und
    einzige echte Blockade zwischen „Sandkasten" und „Spiel" — galt bis zum
    2026-08-06 und ist seitdem überholt. Was heute im Weg steht, steht in den
    Betatest-Befunden, nicht in der Systemregistrierung.
-3. **Zwei Gebäude sind Attrappen.** Lager und Radar kosten Geld und Strom und
-   tun nichts. Das ist die zutreffende Fassung der Vermutung „pro Fraktion
-   fehlen zwei Gebäude".
+3. ~~**Zwei Gebäude sind Attrappen.**~~ **Erledigt seit Sprint 16.** Lager und
+   Radar kosteten Geld und Strom und taten nichts — das war die zutreffende
+   Fassung der Vermutung „pro Fraktion fehlen zwei Gebäude". Seit den Paketen
+   16.4 (#53, abgeleitete AE-Obergrenze) und 16.5 (#54, Radarabdeckung schaltet
+   die Minimap frei) wirken beide.
 4. **Die halbe fertige Arbeit ist unerreichbar.** Alle 17 Legion-Definitionen
    und -Assets sind fertig, aber es gibt keine Fraktionswahl — der Mensch kann
    nur Allianz spielen.
@@ -182,29 +187,37 @@ Masterplans grundlegend — sonst nichts.
    zum Server. 13.4 und 13.5 brauchen zwei Menschen an zwei Rechnern. Sie warten
    auf den Inhaber, nicht auf Arbeitskraft — und sie halten deshalb nichts auf,
    was daneben laufen kann.
-3. **Als nächstes läuft der Großauftrag**
-   ([AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md)), fünf Blöcke am Stück:
-   - **Block 0 — Auswahlrahmen** (#49): eine Konstante in
-     `GroundMarkerVisuals.cs`, Wirkung sofort sichtbar.
-   - **Block 1 — [Sprint 16](16_Sprint_Wirtschaft.md): technisch umgesetzt.**
-     Die Wirtschaft trägt sich selbst; die manuelle Spielabnahme bleibt offen.
+3. **Der vorige Großauftrag** ([AUFTRAG_Grossblock.md](AUFTRAG_Grossblock.md))
+   ist codeseitig abgearbeitet: Block 0 (Auswahlrahmen, #49) und Block 1
+   ([Sprint 16](16_Sprint_Wirtschaft.md), Pakete 16.1–16.10) liegen auf `main`,
+   Sprint 14 war bereits gebaut. **Offen bleibt allein sein Block 3** —
+   [Sprint 17](17_Sprint_Zugangsprotokoll.md) Paket A samt dem `.partial`-Leck
+   in `Assets/_Project/Scripts/Networking/RelayServerCore.cs`: `ResetMatch`
+   verwirft den Aufzeichnungsstrom und merkt sich den Pfad, löscht die Datei
+   aber nie. Paket B wartet weiterhin auf Sprint 15.
+4. **Als nächstes läuft der Großauftrag Verknappungsfolgen**
+   ([AUFTRAG_Verknappungsfolgen.md](AUFTRAG_Verknappungsfolgen.md)), zwei Blöcke
+   am Stück:
+   - **Block 1 — [Sprint 21](21_Sprint_Verknappungsfolgen.md):** die Folgen der
+     endlichen Felder aus Testbericht T-01. Restbestand und Baubereich sichtbar,
+     Auswahl ehrlich, Startmenge gerechnet, mehr Felder auf der Karte, und die
+     Mitte wird ein Gebiet mit Chokepoints (D-108, D-109).
    - **Block 2 — [Sprint 18](18_Sprint_Befehl_und_Auswahl.md):** Befehl und
-     Auswahl werden lesbar.
-   - **Block 3 — [Sprint 14](14_Sprint_Lobby.md):** Match per Code über
-     Supabase, Fraktionswahl, Build-Abgleich.
-   - **Block 4 — [Sprint 17](17_Sprint_Zugangsprotokoll.md) Paket A:** liegt bis
-     Es läuft als **Block 3 des Großauftrags**, weil es die Lobby-Functions
-     aus Sprint 14 voraussetzt — die seit `b4e75e5` auf `main` liegen.
-     `.partial`-Leck in `Assets/_Project/Scripts/Networking/RelayServerCore.cs`.
-     `ResetMatch` verwirft den Aufzeichnungsstrom und merkt sich den Pfad,
-     löscht die Datei aber nie. Paket B wartet weiterhin auf Sprint 15.
-4. **Die `SimDefinitions`-Pakete wurden vor dem VPS-Rollout integriert.**
+     Auswahl werden lesbar. Direkt hinter Sprint 21, weil beide dieselben zwei
+     Dateien anfassen — Befehlskarte und Auswahl.
+5. **Der Einheitenstrang läuft parallel und ist eingeholt.** Die KI erntet seit
+   [#97](https://github.com/VibecodingGermany/HashKrieg/pull/97) nicht mehr
+   endlos auf dem leeren Feld (#85 geschlossen), und
+   [#96](https://github.com/VibecodingGermany/HashKrieg/pull/96) hat den
+   Goal-Katalog samt `DefendHome` gebracht (`r8`). Beides ist gemergt, aber
+   **nicht gespielt abgenommen**.
+6. **Die `SimDefinitions`-Pakete wurden vor dem VPS-Rollout integriert.**
    Sprint 16.7 (Feldwerte und Feldanzahl) und 16.8
    (Bauvoraussetzungs-Bitmaske) sind abgeschlossen. Der Relay vergleicht den
    Definitions-Hash **serverseitig**; spätere Zahlenänderungen kosten deshalb
    Serverzugang und Redeploy
    ([13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md), §Definitions-Hash).
-5. **Sprint 19 bleibt danach und ist kein Codeauftrag.** Die beiden Art-Befunde
+7. **Sprint 19 bleibt danach und ist kein Codeauftrag.** Die beiden Art-Befunde
    #57 (Gebäude durchsichtig und hohl) und #58 (Maßstab des Radarturms) sind
    Arbeit am Asset; #58 hängt zusätzlich an der offenen Frage #19. Sprint 16
    Paket 16.2 macht #57 sichtbarer, behebt es aber ausdrücklich nicht.
@@ -219,4 +232,5 @@ Masterplans grundlegend — sonst nichts.
 | 0.7.0 | 2026-08-09 | Nach der Inhaberentscheidung zum ersten Betatest: **Sprint 16 vorgezogen**, [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) und [18_Sprint_Befehl_und_Auswahl.md](18_Sprint_Befehl_und_Auswahl.md) in die Mappe aufgenommen, Regelwerk als Parallelbetrieb 13–18 mit Trennung über Dateihoheit (**D-095**) fortgeschrieben, Großauftrag mit den Blöcken 0 bis 4 eingehängt. „Nächste Schritte" neu geschrieben: Sprint 13 halb gemergt (`e15f5e6`), 13.2–13.5 nicht durch einen Agenten erledigbar, `SimDefinitions`-Pakete vor dem VPS-Rollout. Punkt 2 der Fünf-Sätze-Zusammenfassung nach **D-077** berichtigt — die Skirmish-KI ist registriert und spielt | Orchestrator |
 | 0.7.1 | 2026-08-09 | Index gegen den Großauftrag und die Sprintdateien nachgezogen: Sprint 17 Paket A ist nicht „sofort vorziehbar", sondern läuft als **Block 3 hinter der Lobby**, die seit `b4e75e5` auf `main` gebaut ist, und es berührt mit dem `.partial`-Fix in `RelayServerCore.cs` genau **eine** Datei unter `Assets/`. Sprint 16 trägt **acht** Betatest-Befunde (#43, #44, #45, #46, #47, #48, #53, #54), nicht sechs. Alle Markdown-Links dieser Datei gegen das Dateisystem geprüft — kein toter Link | Orchestrator |
 | 0.7.2 | 2026-08-10 | D-105 nachgezogen: alleinige Projektleitung, sichtbare Spielabnahme-Zurückstellung und den historischen Charakter des D-091-Zwei-Maintainer-Rollouts im Index kenntlich gemacht | Project Owner / Orchestrator |
+| 0.9.0 | 2026-08-17 | Sprint 21 aus dem Vorschlag zu den Verknappungsfolgen festgeplant und der [Großauftrag Verknappungsfolgen](AUFTRAG_Verknappungsfolgen.md) (Sprint 21 → Sprint 18) eingehängt; **D-108** (Territorium wächst kriechend an jedem Bauanker) und **D-109** (die Mitte wird ein Gebiet mit Chokepoints, Begehbarkeit und Optik aus einer Quelle) getroffen. „Nächste Schritte" neu geschrieben: der vorige Großauftrag ist codeseitig bis auf Sprint 17 Paket A abgearbeitet, der Einheitenstrang ist mit #96 und #97 eingeholt. #85 geschlossen | Project Owner / Orchestrator |
 | 0.8.0 | 2026-08-10 | Sprint 16 als technisch umgesetzt markiert, Paket 16.10 und die vor dem VPS-Rollout integrierten Definitionsänderungen nachgezogen; manuelle Spielabnahme bleibt ausdrücklich offen | Codex / Dennis Westermann |
