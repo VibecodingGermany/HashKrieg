@@ -333,6 +333,13 @@ namespace Nova.Editor
             PlacementGhostView ghost = uiObject.AddComponent<PlacementGhostView>();
             WireReference(ghost, "_input", input);
 
+            // #91: the build-zone overlay — asks the construction system's
+            // own placement reads, so only the data source (runner) and the
+            // visibility state (input) are wired here.
+            BuildZoneOverlayView buildZone = uiObject.AddComponent<BuildZoneOverlayView>();
+            WireReference(buildZone, "_runner", runner);
+            WireReference(buildZone, "_input", input);
+
             ConstructionSiteMarkerView siteMarkers = uiObject.AddComponent<ConstructionSiteMarkerView>();
             WireReference(siteMarkers, "_runner", runner);
 

@@ -1114,8 +1114,15 @@ namespace Nova.Simulation.Construction
         /// accepted (D-108): a chain of cheap buildings can push the build
         /// zone across the map — that coupling of expansion to the economy
         /// is the decided behavior, not a defect.
+        /// <para>
+        /// THIS METHOD IS THE RULE, and it is public so that the build-zone
+        /// overlay can ASK it per cell instead of re-deriving the radius or
+        /// the anchor list on its own. That is what let the anchor list open
+        /// (D-108) without the overlay being touched at all. Pure read, no
+        /// mutation — consumed by <see cref="ValidatePlacement"/>.
+        /// </para>
         /// </summary>
-        private bool IsInsideBuildInfluence(byte playerSlot, int originX, int originY)
+        public bool IsInsideBuildInfluence(byte playerSlot, int originX, int originY)
         {
             for (int i = 0; i < MaxBuildings; i++)
             {
@@ -1133,7 +1140,18 @@ namespace Nova.Simulation.Construction
             return false;
         }
 
-        private bool HasMinimumBuildingSpacing(int originX, int originY)
+        /// <summary>
+        /// The D-104 clearance read: true when a 3x3 footprint with its
+        /// origin at (originX, originY) keeps
+        /// <see cref="MinimumBuildingDistanceCells"/> from every site and
+        /// every completed placement (any owner). This is the check that
+        /// rejects cells INSIDE the build zone — the build-zone overlay
+        /// paints exactly the pair (IsInsideBuildInfluence,
+        /// HasMinimumBuildingSpacing) as its two distinguishable states.
+        /// Consumed by <see cref="ValidatePlacement"/>. Pure read, no
+        /// mutation.
+        /// </summary>
+        public bool HasMinimumBuildingSpacing(int originX, int originY)
         {
             for (int i = 0; i < MaxSites; i++)
             {

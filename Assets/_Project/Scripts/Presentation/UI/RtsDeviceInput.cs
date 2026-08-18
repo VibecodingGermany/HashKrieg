@@ -168,6 +168,11 @@ namespace Nova.Presentation.UI
         private int _placementOriginY;
         private bool _placementValid;
 
+        // Build-zone overlay pin (O key, #91): pure view state read by
+        // BuildZoneOverlayView — placement mode shows the overlay regardless,
+        // the pin keeps it visible without a build intent.
+        private bool _buildZoneOverlayPinned;
+
         // Order target-pick mode state (command card): the armed order whose
         // target the next LMB world click resolves. Mutually exclusive with
         // placement mode (one gesture owns the next click).
@@ -214,6 +219,14 @@ namespace Nova.Presentation.UI
 
         /// <summary>True while a building placement ghost is armed (build bar click or building hotkey).</summary>
         public bool PlacementModeActive => _placementMode;
+
+        /// <summary>
+        /// True while the build-zone overlay is pinned visible by the O key
+        /// (placement mode shows it regardless). Read by
+        /// <see cref="BuildZoneOverlayView"/>; pure view state, no command
+        /// and no simulation read is involved in the toggle itself.
+        /// </summary>
+        public bool BuildZoneOverlayPinned => _buildZoneOverlayPinned;
 
         /// <summary>Definition the armed placement ghost currently carries.</summary>
         public ushort PlacementDefId => _placementDefId;
@@ -406,7 +419,8 @@ namespace Nova.Presentation.UI
             _legend =
                 "LMB click/drag select | RMB move — with an own producer building selected: set its rally point | S stop | " +
                 "A attack enemy under cursor (else plain move; armed units auto-acquire visible in-range enemies, D-087) | " +
-                "H harvest nearest field | R return cargo | P pause/resume (local match only)\n" +
+                "H harvest nearest field | R return cargo | P pause/resume (local match only) | " +
+                "O build zone overlay on/off (shows on its own while a placement ghost is armed)\n" +
                 "Build (build bar below or hotkey — a ghost follows the cursor; LMB place | RMB/ESC cancel): " +
                 $"B {_buildingDefId} | Shift+B {_altBuildingDefId} | C {_storageDefId} | V {_vehicleFactoryDefId} | " +
                 $"T {_researchLabDefId} | G {_radarDefId} | F {_defensePlatformDefId} | Y {_refineryDefId}\n" +
@@ -425,6 +439,7 @@ namespace Nova.Presentation.UI
 
             Vector2 mouse = Input.mousePosition;
             UpdatePlacementHover(mouse);
+            HandleBuildZoneOverlayToggle();
             UpdateHarvesterEscort();
             HudPointerLink.Publish(IsPointerOverHud(mouse));
             HandleSelection(mouse);
@@ -500,6 +515,22 @@ namespace Nova.Presentation.UI
             _placementValid = affordable
                 && _runner.Construction.ValidatePlacement(
                     slot, _placementDefId, _placementOriginX, _placementOriginY) == CommandResultCode.Applied;
+        }
+
+        /// <summary>
+        /// The O key pins the build-zone overlay on/off (#91). Handled here,
+        /// not in HandleOrders, so the toggle stays live while a placement
+        /// ghost or an order pick is armed — the overlay shows during
+        /// placement anyway, and the pin simply survives the placement. Pure
+        /// view state: no command, no simulation read.
+        /// </summary>
+        private void HandleBuildZoneOverlayToggle()
+        {
+            if (!Input.GetKeyDown(KeyCode.O)) return;
+            _buildZoneOverlayPinned = !_buildZoneOverlayPinned;
+            _lastCommandStatus = _buildZoneOverlayPinned
+                ? "Build zone overlay pinned on (O hides it again)"
+                : "Build zone overlay off";
         }
 
         /// <summary>
