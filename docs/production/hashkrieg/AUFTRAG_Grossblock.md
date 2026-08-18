@@ -282,9 +282,18 @@ Es gibt zwei Bedingungen, und **beide** müssen zutreffen:
 
 Zwei Dinge, die du dazu wissen musst:
 
-- **Lokal läuft `dotnet test` nicht.** `global.json` pinnt SDK `8.0.318` mit
-  `rollForward: disable`; auf der Arbeitsmaschine liegt nur `10.0.302`. Der
-  Nachweis läuft über die CI im PR. Behaupte keinen grünen lokalen Lauf.
+- **Lokal läuft `dotnet test` sehr wohl — aber nur mit dem Repo-lokalen SDK.**
+  *(Berichtigt am 2026-08-17; hier stand vorher das Gegenteil.)* Im Repo-Root
+  liegt ein mitgeliefertes `.dotnet/` mit exakt der in `global.json` gepinnten
+  Version `8.0.318`; der vollständige Lauf dauert rund 14 Sekunden:
+
+  ```
+  "$PWD/.dotnet/dotnet" test tools/Nova.SimRunner.Tests/Nova.SimRunner.Tests.csproj -c Release
+  ```
+
+  Das systemweite `dotnet` (`10.0.302`) scheitert an `rollForward: disable` —
+  nimm **immer** den Repo-lokalen Pfad. Prüfe lokal, bevor du einen PR
+  aufmachst, und behaupte weiterhin keinen Lauf, den du nicht gesehen hast.
 - **Für Block 0, Block 2 und die HUD-Teile von Block 1 führt kein CI-Lauf
   Gameplay- oder Presentation-Code aus,** und die Unity-EditMode-Tests laufen
   mangels Lizenz nicht (`505 Unsupported protocol version`). Die Quelltext-Wächter

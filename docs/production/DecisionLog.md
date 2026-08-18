@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.39.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 16
+**Version:** 1.40.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3429,6 +3429,113 @@ selbst.
 und Befehlsschemata bleiben unverändert. D-102 bleibt für Feldanzahl,
 Koordinaten, Reserven, Reihenfolge und Ernterate vollständig verbindlich.
 
+### D-108 | verbindlich | Sprint 21 (Territorium wächst kriechend an jedem Bauanker)
+
+**Status:** Inhaberentscheidung vom 2026-08-17.
+
+**Kontext:** Testbericht T-01 (#92) fragt, wie der Spieler sein Territorium
+erweitert — ob ein zweites HQ die Bauzone vergrößert, ob es später eigene
+Erweiterungsgebäude gibt, ob Bauzonen sich überschneiden dürfen. Der Code
+beantwortet die Frage bereits, ausgesprochen wurde sie nie:
+`ConstructionSystem.BuildInfluenceRadiusCells = 8` misst die maximale
+footprint-bewusste Chebyshev-Distanz **von einem eigenen Bauanker**, nicht vom
+HQ. Damit erweitert jedes fertiggestellte Gebäude das erlaubte Feld um seinen
+eigenen Radius; die Zone kriecht mit der Basis mit, statt sprunghaft an einem
+zweiten HQ zu wachsen. Der Bericht meldet zugleich, der Platz sei „nach einigen
+Kraftwerken relativ schnell ausgeschöpft" — wofür `MinimumBuildingDistanceCells = 2`
+die wahrscheinlichere Ursache ist als der Radius, weil dieser Wert Zellen
+*innerhalb* der Zone sperrt.
+
+**Alternativen:**
+
+1. Die bestehende Regel festschreiben: jedes eigene Gebäude bleibt Bauanker.
+2. Nur ausgewiesene Gebäude (HQ, Raffinerie, ein künftiger Expansionsposten)
+   werden Anker; alle übrigen erweitern die Zone nicht.
+3. Die Regel beibehalten und den Radius über 8 anheben.
+
+**Entscheidung:** Alternative 1. **Jedes eigene Gebäude bleibt Bauanker**, das
+Kriechen ist gewollt und ab sofort ausgesprochene Mechanik. Die gemeldete Enge
+wird **nicht** über den Radius beantwortet, sondern zuerst gemessen: Sprint 21
+Paket 21.1 liefert als Test, wie viele Gebäude welcher Footprintgröße bei
+`MinimumBuildingDistanceCells` 2 gegen 1 gegen 0 in die Startzone passen. Erst
+gegen diese Zahl wird über den Wert entschieden.
+
+**Begründung:** Das kriechende Wachstum ist das klassische C&C-Verhalten und
+koppelt Expansion genau so an die Wirtschaft, wie die Verknappung aus D-102 es
+verlangt: Wer ein entferntes Feld erschließen will, muss sich baulich dorthin
+arbeiten. Alternative 2 wäre eine echte Designerweiterung mit eigenem
+Gebäudetyp und gehört nicht in einen Sprint, der Bestehendes lesbar macht.
+Alternative 3 behebt möglicherweise das falsche Problem — der Radius ist nicht
+belegt als Ursache, die Mindestdistanz ist es plausibel.
+
+**Konsequenzen:** Der Docstring an `BuildInfluenceRadiusCells` wird so
+umgeschrieben, dass die Ankerregel nicht mehr nur ein Nebensatz ist. Das
+Baubereichs-Overlay (#91, Paket 21.4) färbt die **tatsächlich baubaren Zellen**
+für den gewählten Footprint ein, nicht einen Radius-Ring — ein Ring wäre
+unehrlich, weil er die innerhalb gesperrten Zellen verschweigt. Fällt
+`MinimumBuildingDistanceCells` später nach der Messung, ist das ein eigener PR
+mit eigener D-ID und bewegt `RulesHash64`. Die Kartendichte (#93, Paket 21.6)
+hängt an dieser Festlegung und läuft danach.
+
+### D-109 | verbindlich | Sprint 21 (Die Kartenmitte wird ein Gebiet mit Chokepoints)
+
+**Status:** Inhaberentscheidung vom 2026-08-17.
+
+**Kontext:** Testbericht T-01 (#94) schlägt vor, im Zentrum eine größere
+abgeschlossene Zone mit vier bis sechs Aetheriumvorkommen anzulegen, von allen
+vier Seiten erreichbar, aber jeweils über schmale Zufahrten. Wer die Mitte
+kontrolliert, erhält einen wirtschaftlichen Vorteil und kann die Position
+befestigen — die Karte erzeugt damit einen Konfliktpunkt, ohne ihn
+vorzuschreiben. Die Absicht ist bereits getroffen und nur nicht ausgespielt:
+Feld 5 liegt bei (62, 62) und trägt mit 15.000 AE zwei Drittel mehr als jedes
+andere Feld. Ein einzelnes Feld ist aber kein Gebiet, und ohne Chokepoints ist
+es auch keine haltbare Position.
+
+Am Code geprüft (`main` @ `3e10c48`): `CostField` unterstützt unbegehbares
+Gelände vollständig (`OpenCost = 1`, `ImpassableCost = 255`, Zwischenwerte für
+schweren Grund), aber der Konstruktor füllt alles mit `OpenCost` und es schreibt
+**niemand** hinein außer `ConstructionSystem` für Gebäude-Footprints. Die Optik
+weiß davon nichts: `GlutrinneBlockoutView` streut rund 84 Felsen mit festem Seed
+und sichert im eigenen Docstring zu, nie in den Simulationszustand zu schreiben —
+die Felsen sind Deko und begehbar.
+
+**Alternativen:**
+
+1. Zone und Chokepoints bauen, mit einer autoritativen Geländequelle für
+   Simulation und Optik.
+2. Nur die Kartenlage ändern (vier bis sechs Felder gruppieren), auf Gelände
+   verzichten.
+3. Zurückstellen, bis die KI ein Gebiet bestreiten kann.
+
+**Entscheidung:** Alternative 1. Die Mitte wird ein Gebiet mit schmalen
+Zufahrten. Verbindliche Auflage: **Begehbarkeit und Optik stammen aus einer
+einzigen Struktur** — die kanonische Kartenlage in `MatchBootstrap` hält das
+Gelände so, wie sie heute schon die fünf Aetheriumfelder hält; die Simulation
+schreibt es über die bestehende öffentliche `CostField.SetCost`, die
+Blockout-View baut sich daraus. Zwei getrennte Quellen sind ausdrücklich
+untersagt.
+
+**Begründung:** Zwei Quellen ergeben Einheiten, die durch sichtbare Felsen
+laufen und an unsichtbaren Wänden hängenbleiben — ein Fehlerbild, das später
+niemand mehr der Kartenarbeit zuordnet. Alternative 2 nimmt dem Vorschlag genau
+das, was ihn trägt: ohne Chokepoints ist eine reiche Mitte kein Halteproblem,
+sondern nur ein größerer Wettlauf. Alternative 3 verschiebt die Kartenarbeit
+hinter fremde Sprintplanung, obwohl die Karte auch ohne kluge KI zwischen zwei
+Menschen gespielt wird.
+
+**Konsequenzen:** Die Umsetzung bleibt in der Schreibhoheit des
+Maintainer-Strangs: `Gameplay/Match/` und `Presentation/Maps/` werden
+bearbeitet, `Simulation/Pathfinding/` **nicht** — `CostField.SetCost` ist
+bereits öffentlich und wird von `Gameplay/Match/` aus aufgerufen, wie
+`PathfindingTestBootstrap` es vorführt. Die Symmetrieauflage aus D-107 gilt
+unverändert. Ein Erreichbarkeitstest über das `FlowField` gehört in
+`tools/Nova.SimRunner.Tests/`, damit eine spätere Kartenänderung keine Basis
+unbemerkt einsperrt. Die Änderung bewegt die Determinismus-Baselines **und** den
+gepinnten Ausgang der kanonischen KI-Partie, der dem Einheitenstrang gehört —
+sie braucht deshalb ein eigenes, mit dem Einheitenstrang abgestimmtes
+Merge-Fenster. Verteidigungsbalance an den Zufahrten und KI-Verhalten in der
+Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3509,6 +3616,7 @@ Koordinaten, Reserven, Reihenfolge und Ernterate vollständig verbindlich.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.40.0 | 2026-08-17 | D-108 und D-109 aufgenommen (Sprint 21, aus Testbericht T-01): Territorium wächst **kriechend an jedem eigenen Bauanker** — die bestehende Regel wird festgeschrieben statt geändert, und die gemeldete Enge wird an `MinimumBuildingDistanceCells` gemessen, bevor ein Wert fällt. Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten, mit der verbindlichen Auflage, dass Begehbarkeit und Optik aus **einer** Struktur stammen — heute streut `GlutrinneBlockoutView` begehbare Deko-Felsen, während niemand ausser `ConstructionSystem` in das `CostField` schreibt | Dennis Westermann / Orchestrator |
 | 1.39.0 | 2026-08-10 | D-107 aufgenommen: Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge abgeleitet um 122; der zweite HQ-Ursprung wird von `(120,120)` auf `(118,118)` korrigiert | Agent (unter Delegation) / Dennis Westermann |
 | 1.38.0 | 2026-08-10 | D-104 aufgenommen: footprintbasierte Chebyshev-Platzierung mit Einfluss-, Feld-, Gelände- und Gebäudeabständen, zustandslose kumulative Reparaturkosten von 30 Prozent, kanonisch dichte Reparaturreihenfolge und Rules-Revision V3 | Project Owner / Agent (unter Delegation) |
 | 1.37.0 | 2026-08-10 | D-103 aufgenommen: Bauvoraussetzungen werden eine fraktionsgleiche All-of-Maske über unveränderte `UnitRole`-Wirewerte; Hash-, Fail-Closed-, Plattformmodul- und KI-Handoff-Folgen festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
