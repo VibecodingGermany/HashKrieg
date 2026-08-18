@@ -64,9 +64,9 @@ namespace Nova.Presentation.UI
         private void Awake()
         {
             if (_document == null) _document = GetComponent<UIDocument>();
-            if (_document != null && _document.sortOrder < BadgeSortOrder)
+            if (_document != null && _document.sortingOrder < BadgeSortOrder)
             {
-                _document.sortOrder = BadgeSortOrder;
+                _document.sortingOrder = BadgeSortOrder;
             }
         }
 

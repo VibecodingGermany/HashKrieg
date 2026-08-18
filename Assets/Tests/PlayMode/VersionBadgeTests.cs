@@ -49,7 +49,7 @@ namespace Nova.PlayMode.Tests
                 "every return (MainMenuController.BuildTree), and the IMGUI cockpit is toggled " +
                 "across the menu/match transition (#102) — a label in either layer would " +
                 "vanish with it");
-            Assert.Greater(badgeDocument.sortOrder, menuDocument.sortOrder,
+            Assert.Greater(badgeDocument.sortingOrder, menuDocument.sortingOrder,
                 "the badge's document must sort above the menu's: the menu paints full-screen " +
                 "key art plus scrim, and a badge under them is invisible exactly where the " +
                 "sprint wants it seen");
