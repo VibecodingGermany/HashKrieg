@@ -17,9 +17,11 @@ namespace Nova.Presentation.UI
     /// scene-flow layer — bought for nothing.
     /// <see cref="MatchBootstrap.AutoStart"/> is off (the scene generator
     /// writes it), so the scene loads into an idle host: the kernel is not
-    /// running, every HUD component checks for a running match and draws
-    /// nothing, and "Neues Spiel" calls the idempotent
-    /// <see cref="MatchBootstrap.StartGrayboxMatch"/> and hides this overlay.
+    /// running, and Start() switches the whole gameplay HUD root off in one
+    /// <see cref="SetGameplayLayerActive"/> call before the first frame
+    /// draws. "Neues Spiel" calls the idempotent
+    /// <see cref="MatchBootstrap.StartGrayboxMatch"/>, switches the root back
+    /// on and hides this overlay.
     /// </para>
     /// <para>
     /// UI TOOLKIT, NOT uGUI, and built in C# rather than from UXML. uGUI would
@@ -65,8 +67,11 @@ namespace Nova.Presentation.UI
                  "The scene generator wires the concrete component.")]
         [SerializeField] private Behaviour _cameraRig;
 
-        [Tooltip("Debug HUD. Its status bar draws before its own visibility check, so it would sit on the key art.")]
-        [SerializeField] private DebugHud _debugHud;
+        [Tooltip("The UI root GameObject the scene generator puts EVERY in-match HUD component on " +
+                 "(input, markers, build bar, command card, fog, minimap, health bars, match frame, " +
+                 "pause menu, debug HUD). Switched as ONE object, so a HUD added to the root later is " +
+                 "covered without ever being named here — a component catalogue would rot with the next one.")]
+        [SerializeField] private GameObject _gameplayHudRoot;
 
         [Header("Content (scene generator)")]
         [SerializeField] private Texture2D _keyArt;
@@ -131,9 +136,10 @@ namespace Nova.Presentation.UI
 
         /// <summary>
         /// True while the menu overlay owns the screen (initial state, and
-        /// after MatchFrameHud's "Hauptmenü"). Read by the input component to
-        /// suspend world gestures while the menu is up — a click on a menu
-        /// button must never also select or order in the world behind it.
+        /// after the match frame's "Hauptmenü" or the pause menu's "Zum
+        /// Hauptmenü"). Read by the input component to suspend world gestures
+        /// while the menu is up — a click on a menu button must never also
+        /// select or order in the world behind it.
         /// </summary>
         public bool IsMenuVisible { get; private set; }
 
@@ -143,6 +149,14 @@ namespace Nova.Presentation.UI
             if (_music == null) _music = GetComponent<MenuMusicPlayer>();
             if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
             if (_views == null) _views = FindAnyObjectByType<UnitViewManager>();
+            if (_gameplayHudRoot == null)
+            {
+                // Self-heal for scenes generated before the root switch
+                // existed: the root is by definition the GameObject the input
+                // component lives on (BootstrapSceneGenerator.CreateUiObject).
+                RtsDeviceInput input = FindAnyObjectByType<RtsDeviceInput>();
+                if (input != null) _gameplayHudRoot = input.gameObject;
+            }
         }
 
         private void Start()
@@ -199,11 +213,12 @@ namespace Nova.Presentation.UI
                     "[MainMenuController] No camera rig wired — the RTS camera keeps reading edge pan and " +
                     "scroll wheel while the menu is up, so the match will open on a drifted camera.");
             }
-            if (_debugHud == null)
+            if (_gameplayHudRoot == null)
             {
                 Debug.LogError(
-                    "[MainMenuController] No DebugHud wired — its always-on status bar will draw on top of " +
-                    "the main menu.");
+                    "[MainMenuController] No gameplay HUD root wired (and none found via RtsDeviceInput) — " +
+                    "the cockpit will keep drawing over the menu. Re-run " +
+                    "Tools/Project Nova/Create Bootstrap Scene.");
             }
         }
 
@@ -714,22 +729,30 @@ namespace Nova.Presentation.UI
             if (_music != null) _music.FadeOutAndStop();
             if (_screen != null) _screen.style.display = DisplayStyle.None;
 
-            // Nothing left to drive — until a match ends: MatchFrameHud's
-            // "Hauptmenü" button re-enters through ReturnToMenu below.
+            // Nothing left to drive — until a match ends or is abandoned:
+            // MatchFrameHud's "Hauptmenü" and the pause menu's "Zum
+            // Hauptmenü" re-enter through ReturnToMenu below.
             enabled = false;
         }
 
         /// <summary>
-        /// The way back from a finished match (MatchFrameHud's "Hauptmenü"
-        /// button): pause the host, hide the cockpit layer, bring the menu
-        /// screen and its music back. The match state itself is left for the
-        /// NEXT "Neues Spiel", which restarts it via
-        /// <see cref="MatchBootstrap.RestartMatch"/> — the menu does not
-        /// demolish what it may never need again.
+        /// The way back from a finished or abandoned match (MatchFrameHud's
+        /// "Hauptmenü" button, the pause menu's "Zum Hauptmenü"): pause the
+        /// host, hide the cockpit layer, bring the menu screen and its music
+        /// back. The match state itself is left for the NEXT "Neues Spiel",
+        /// which restarts it via <see cref="MatchBootstrap.RestartMatch"/> —
+        /// the menu does not demolish what it may never need again.
         /// </summary>
         public void ReturnToMenu()
         {
-            if (_bootstrap != null && _bootstrap.Runner != null && _bootstrap.Runner.IsRunning)
+            // A relay kernel cannot pause independently of its peer
+            // (PauseMatch logs an error and refuses) — and with the pause
+            // menu, "leave a RUNNING relay match" is now a reachable path,
+            // so the refusal must not be triggered on purpose. The relay
+            // match keeps ticking behind the menu until the next start
+            // restarts it, exactly as a locally paused match does.
+            if (_bootstrap != null && _bootstrap.Runner != null
+                && _bootstrap.Runner.IsRunning && !_bootstrap.Runner.IsRelayMatch)
             {
                 _bootstrap.Runner.PauseMatch();
             }
@@ -753,7 +776,12 @@ namespace Nova.Presentation.UI
             enabled = true;
         }
 
-        private void Quit()
+        /// <summary>
+        /// Quits the application after flushing any unsaved settings. Public
+        /// so the pause menu's "Spiel beenden" runs the exact same exit as
+        /// this menu's "Beenden" — one quit path, no copy.
+        /// </summary>
+        public void Quit()
         {
             FlushSettings();
 #if UNITY_EDITOR
@@ -766,24 +794,35 @@ namespace Nova.Presentation.UI
         }
 
         /// <summary>
-        /// Silences (or restores) the two scene components that do NOT guard
-        /// themselves against "no match yet". The list is short on purpose:
-        /// every other HUD component already returns early without a running
-        /// match, and a catalogue of every HUD in the scene would rot with
-        /// the next one added.
+        /// Silences (or restores) everything that must not run while the menu
+        /// owns the screen. TWO switches, by construction:
         /// <list type="bullet">
-        /// <item>The camera rig has no guard at all — its LateUpdate reads
-        /// scroll wheel, MMB, Z/X, arrow keys and the screen-edge pan every
-        /// frame. Awake has already applied the start framing, so a disabled
-        /// rig sits exactly where the match wants it.</item>
-        /// <item>The debug HUD draws its always-on status bar BEFORE its own
-        /// visibility check, so its text would sit on top of the key art.</item>
+        /// <item>The camera rig — a plain component toggle. It lives on "Main
+        /// Camera", not on the HUD root, and has no "no match yet" guard: its
+        /// LateUpdate reads scroll wheel, MMB, Z/X, arrow keys and the
+        /// screen-edge pan every frame. Awake has already applied the start
+        /// framing, so a disabled rig sits exactly where the match wants
+        /// it.</item>
+        /// <item>The gameplay HUD ROOT — the one GameObject the scene
+        /// generator puts every in-match HUD component on. Switching the root
+        /// instead of a component list is what keeps this method correct
+        /// forever: a catalogue would rot with the next HUD added, while
+        /// whatever the generator places on the root is covered from the day
+        /// it lands, without ever being named here. Deactivation IS the
+        /// gate — OnGUI, Update and the hit-tests of every child die with
+        /// it, including the debug HUD whose always-on status bar would
+        /// otherwise sit on the key art (behaviour identical to the old
+        /// per-component toggle; the F3 state survives SetActive).</item>
         /// </list>
+        /// The in-match PAUSE menu is a different case and is deliberately
+        /// NOT this switch: it keeps the root on (the world stays visible
+        /// under the panel) and gates only the input, through
+        /// ModalSurfaceLink — see PauseMenuHud.
         /// </summary>
         private void SetGameplayLayerActive(bool active)
         {
             if (_cameraRig != null) _cameraRig.enabled = active;
-            if (_debugHud != null) _debugHud.enabled = active;
+            if (_gameplayHudRoot != null) _gameplayHudRoot.SetActive(active);
         }
 
         // --- settings persistence ----------------------------------------

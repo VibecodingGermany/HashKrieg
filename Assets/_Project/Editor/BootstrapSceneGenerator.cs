@@ -307,11 +307,17 @@ namespace Nova.Editor
 
         /// <summary>
         /// Input sampling, the world-space HUD markers (selection, rally
-        /// flags, placement ghost), the build bar, the command card and the
+        /// flags, placement ghost), the build bar, the command card, the
+        /// match frame (result/network panels), the pause menu and the
         /// read-only debug overlay. The build bar and the command card are
         /// additionally wired INTO the input component: clicks landing on a
         /// HUD rect belong to the HUD and must not start a world selection
-        /// drag, place a building or resolve an order pick behind it.
+        /// drag, place a building or resolve an order pick behind it. The
+        /// pause menu is wired into the input's counterpart direction: it
+        /// reads the gesture-cancel stamp so ESC peels one layer at a time.
+        /// Everything lands on ONE GameObject so the main menu can silence
+        /// the whole cockpit with a single root switch — a component added
+        /// here is covered by that switch from the day it lands.
         /// </summary>
         private static GameObject CreateUiObject(MatchRunner runner, Camera camera)
         {
@@ -375,6 +381,13 @@ namespace Nova.Editor
             // _menu is wired in CreateMainMenuObject — the menu object does
             // not exist yet at this point in the generation order.
 
+            PauseMenuHud pauseMenu = uiObject.AddComponent<PauseMenuHud>();
+            WireReference(pauseMenu, "_runner", runner);
+            WireReference(pauseMenu, "_matchFrame", frame);
+            WireReference(pauseMenu, "_input", input);
+            // _menu is wired in CreateMainMenuObject — same ordering reason
+            // as the match frame above.
+
             DebugHud hud = uiObject.AddComponent<DebugHud>();
             WireReference(hud, "_runner", runner);
             WireReference(hud, "_input", input);
@@ -389,15 +402,17 @@ namespace Nova.Editor
         /// CreateMatchObject) and MainMenuController starts the match from
         /// "Neues Spiel".
         /// <para>
-        /// The camera rig and the debug HUD are wired INTO the menu because
-        /// they are the only two components in this scene without a "no match
-        /// yet" guard: the rig would edge-pan and zoom while the player moves
-        /// the pointer over the menu, and the HUD's always-on status bar draws
-        /// before its own visibility check. The menu switches both off while
-        /// it is up. On the receiving side the rig is typed as Behaviour
-        /// (Nova.Presentation.UI may not reference Nova.Presentation), which
-        /// WireReference handles — it assigns object references, not typed
-        /// fields.
+        /// TWO things are wired INTO the menu because they are the scene's
+        /// only parts without a "no match yet" guard: the camera rig (it
+        /// would edge-pan and zoom while the player moves the pointer over
+        /// the menu) and the gameplay HUD ROOT — this one GameObject carries
+        /// every in-match HUD component, so the menu silences the whole
+        /// cockpit (including the debug HUD's always-on status bar, which
+        /// draws before its own visibility check) with a single root switch
+        /// that can never rot the way a component catalogue would. On the
+        /// receiving side the rig is typed as Behaviour (Nova.Presentation.UI
+        /// may not reference Nova.Presentation), which WireReference handles
+        /// — it assigns object references, not typed fields.
         /// </para>
         /// </summary>
         private static void CreateMainMenuObject(
@@ -430,7 +445,7 @@ namespace Nova.Editor
             WireReference(menu, "_bootstrap", runner.GetComponent<MatchBootstrap>());
             WireReference(menu, "_music", music);
             WireReference(menu, "_cameraRig", camera.GetComponent<RtsCameraController>());
-            WireReference(menu, "_debugHud", uiObject.GetComponent<DebugHud>());
+            WireReference(menu, "_gameplayHudRoot", uiObject);
             WireReference(menu, "_keyArt",
                 MenuAssetSetup.LoadRequired<Texture2D>(MenuAssetSetup.KeyArtPath));
             WireReference(menu, "_titleFont",
@@ -438,11 +453,17 @@ namespace Nova.Editor
             WireReference(menu, "_bodyFont",
                 MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.BodyFontPath));
 
-            // The match frame's "Hauptmenü" button calls back into this menu.
+            // The match frame's "Hauptmenü" and the pause menu's "Zum
+            // Hauptmenü"/"Spiel beenden" call back into this menu.
             MatchFrameHud frame = uiObject.GetComponent<MatchFrameHud>();
             if (frame != null)
             {
                 WireReference(frame, "_menu", menu);
+            }
+            PauseMenuHud pauseMenu = uiObject.GetComponent<PauseMenuHud>();
+            if (pauseMenu != null)
+            {
+                WireReference(pauseMenu, "_menu", menu);
             }
 
             CreateIngameMusicObject(runner, menu, musicGroup);
