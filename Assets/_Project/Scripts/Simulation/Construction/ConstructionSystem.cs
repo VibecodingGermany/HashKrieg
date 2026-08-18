@@ -174,7 +174,15 @@ namespace Nova.Simulation.Construction
         /// <summary>Full rebuild-equivalent repair price as a percentage of the building's new price (D-104).</summary>
         public const int RepairCostPercent = 30;
 
-        /// <summary>Maximum footprint-aware Chebyshev distance from an own construction anchor (D-104).</summary>
+        /// <summary>
+        /// Maximum footprint-aware Chebyshev distance from an own construction
+        /// anchor (D-104). Construction anchors are exactly the own, living and
+        /// COMPLETED HQ, Storage and Power buildings — every other role does NOT
+        /// extend the build zone (see IsInsideBuildInfluence). The corrected
+        /// D-108 opens this anchor list to every own completed building; that
+        /// rule change is a separate PR (RulesHash64 moves) and is NOT yet
+        /// reflected here.
+        /// </summary>
         public const int BuildInfluenceRadiusCells = 8;
 
         /// <summary>Minimum footprint-aware Chebyshev distance between construction footprints (D-104).</summary>

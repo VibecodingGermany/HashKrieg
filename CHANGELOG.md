@@ -85,7 +85,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   unverändert**: die Zahl weist die im Testbericht gemeldete Enge nicht als
   Abstandsproblem aus, und die 15 sind ohnehin nur eine untere Schranke für die
   Anfangszone, weil jeder Anker die Grenze mitschiebt. Der Test pinnt alle drei
-  Konstanten und macht das Paket erneut auf, falls eine davon fällt
+  Konstanten und macht das Paket erneut auf, falls eine davon fällt. Zum selben
+  Paket: der Docstring von `BuildInfluenceRadiusCells` nennt jetzt die
+  Ankerrollen (HQ, Lager, Kraftwerk — D-104) statt nur „einen eigenen
+  Bauanker", damit die Mehrdeutigkeit hinter der D-108-Fehlprämisse nicht
+  weiter im Code steht; die korrigierte D-108-Regeländerung (jedes eigene
+  fertiggestellte Gebäude wird Anker) ist ein eigener PR und hier bewusst
+  noch nicht umgesetzt
 - **Sprint 21 festgeplant und als Großauftrag erteilt.** Aus dem Vorschlag zu den
   Verknappungsfolgen wird nach den Inhaberentscheidungen D-108 und D-109 die
   Sprintdatei `docs/production/hashkrieg/21_Sprint_Verknappungsfolgen.md` mit
