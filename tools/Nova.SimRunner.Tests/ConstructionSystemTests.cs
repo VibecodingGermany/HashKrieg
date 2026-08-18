@@ -392,6 +392,36 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void ValidatePlacement_EveryCompletedBuildingExtendsTheZone_ItsSiteDoesNot()
+        {
+            // Corrected D-108: the anchor list is open. A completed Barracks —
+            // a role the old HQ/Storage/Power list excluded — pushes the zone
+            // outward by its own radius, so the probe at footprint distance 6
+            // is placeable even though no HQ/Storage/Power anchor reaches it.
+            var completed = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(completed.Construction.PlaceCompletedBuilding(0, 3, 0, 0).IsValid, Is.True,
+                "far-away HQ prerequisite; its own radius never reaches the probe area");
+            Assert.That(completed.Construction.PlaceCompletedBuilding(0, 7, 30, 30).IsValid, Is.True,
+                "completed Barracks outside every old-list anchor radius");
+            Assert.That(completed.Construction.ValidatePlacement(0, 5, 38, 30), Is.EqualTo(CommandResultCode.Applied),
+                "footprint distance 6 to the completed Barracks is inside influence (corrected D-108)");
+
+            // The SAME building as an active site does not: create the site
+            // next to a bootstrap anchor, remove the anchor, and the probe at
+            // the identical distance must fall out of the zone again.
+            var siteOnly = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));
+            Assert.That(siteOnly.Construction.PlaceCompletedBuilding(0, 3, 0, 0).IsValid, Is.True, "HQ prerequisite");
+            Assert.That(siteOnly.Construction.PlaceCompletedBuilding(0, 5, 0, 4).IsValid, Is.True, "Power prerequisite");
+            EntityId bootstrap = siteOnly.Construction.PlaceCompletedBuilding(0, 3, 24, 30);
+            Assert.That(bootstrap.IsValid, Is.True, "bootstrap anchor so the Barracks site validates at all");
+            siteOnly.Step(1); // commit the balance (the Barracks power draw is evaluated)
+            Assert.That(siteOnly.Construction.TryPlaceBuilding(0, 7, 30, 30), Is.True, "create the active Barracks site");
+            Assert.That(siteOnly.Entities.DespawnUnit(bootstrap), Is.True, "remove the bootstrap anchor");
+            Assert.That(siteOnly.Construction.ValidatePlacement(0, 5, 38, 30), Is.EqualTo(CommandResultCode.RejectedInvalidTarget),
+                "the Barracks SITE supplies spacing, never construction influence");
+        }
+
+        [Test]
         public void ValidatePlacement_RequiresOneEmptyRingAroundBuildingsAndSites()
         {
             var buildings = new Fixture(configure: e => e.TryAddField(1, new GridPos2D(60, 60), 9000));

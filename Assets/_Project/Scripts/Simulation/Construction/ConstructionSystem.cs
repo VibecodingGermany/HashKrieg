@@ -176,12 +176,12 @@ namespace Nova.Simulation.Construction
 
         /// <summary>
         /// Maximum footprint-aware Chebyshev distance from an own construction
-        /// anchor (D-104). Construction anchors are exactly the own, living and
-        /// COMPLETED HQ, Storage and Power buildings — every other role does NOT
-        /// extend the build zone (see IsInsideBuildInfluence). The corrected
-        /// D-108 opens this anchor list to every own completed building; that
-        /// rule change is a separate PR (RulesHash64 moves) and is NOT yet
-        /// reflected here.
+        /// anchor (D-104). Under the corrected D-108 every own, living and
+        /// COMPLETED building is an anchor and pushes the build zone outward
+        /// by its own radius — construction sites never do (see
+        /// IsInsideBuildInfluence). Deliberately accepted (D-108): a chain of
+        /// cheap buildings can push the zone across the map; expansion is
+        /// meant to be coupled to the economy.
         /// </summary>
         public const int BuildInfluenceRadiusCells = 8;
 
@@ -1103,16 +1103,27 @@ namespace Nova.Simulation.Construction
             return true;
         }
 
+        /// <summary>
+        /// Corrected D-108 anchor rule: EVERY own, living and completed
+        /// building extends the build zone by its own
+        /// <see cref="BuildInfluenceRadiusCells"/> — no role list. A
+        /// construction site is NOT an anchor even though it already carries
+        /// its definition role (16.3, #44), so the finished-only rule is
+        /// checked explicitly through <see cref="IsActiveSite"/>, the same
+        /// register the economy's power and capacity scans use. Deliberately
+        /// accepted (D-108): a chain of cheap buildings can push the build
+        /// zone across the map — that coupling of expansion to the economy
+        /// is the decided behavior, not a defect.
+        /// </summary>
         private bool IsInsideBuildInfluence(byte playerSlot, int originX, int originY)
         {
             for (int i = 0; i < MaxBuildings; i++)
             {
                 ref readonly PlacementState placement = ref _buildings[i];
                 if (!placement.IsActive) continue;
-                if (!SimDefinitions.TryGetBuilding(placement.BuildingDefId, out SimBuildingDefinition def)) continue;
-                if (def.Role != UnitRole.HQ && def.Role != UnitRole.Storage && def.Role != UnitRole.Power) continue;
 
                 EntityId id = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                if (IsActiveSite(id)) continue; // finished only: a site never extends the zone
                 if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
                 if (FootprintDistance(originX, originY, placement.OriginX, placement.OriginY) <= BuildInfluenceRadiusCells)
                 {
