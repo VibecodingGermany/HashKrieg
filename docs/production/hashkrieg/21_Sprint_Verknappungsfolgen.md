@@ -1,6 +1,6 @@
 # Sprint 21: Die Folgen der Verknappung — endliche Felder werden lesbar und bespielbar
 
-**Version:** 1.1.0 | **Status:** in Arbeit (21.1 läuft) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
+**Version:** 1.2.0 | **Status:** in Arbeit (21.1a und 21.2 fertig; 21.1b, 21.4, 21.8 laufen) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
 
 ## Zweck
 
@@ -332,6 +332,44 @@ Zusätzlich zu prüfen und in der PR zu beantworten:
 das Verhalten der KI in der Mitte. Die KI kann heute nicht um ein Gebiet
 kämpfen; das ist Sache des Einheitenstrangs und keine Bringschuld dieses Sprints.
 
+### 21.8 · Man kommt aus dem Spiel heraus (#105, #102, #103) — **Beta-Tor**
+
+**Abhängigkeitsfrei, und der einzige Punkt, ohne den kein Betatest stattfindet.**
+Nachgetragen nach der Spielabnahme T-02 vom 2026-08-18; der Sprint war da schon
+geschnitten.
+
+Drei Befunde, ein Bauwerk — sie hängen an derselben Frage: *welche Komponente
+muss aufhören zu arbeiten, wenn das Match nicht die aktive Oberfläche ist?*
+
+1. **Es gibt kein Pausemenü (#105).** Wer spielt, sitzt fest; der einzige Weg
+   hinaus ist, die Anwendung zu beenden. `MatchRunner.PauseMatch()` existiert
+   und wird von `ReturnToMenu` bereits benutzt — dem Zustand fehlt nur die
+   Oberfläche. ESC, vier Einträge: Fortsetzen, Einstellungen, Hauptmenü, Beenden.
+2. **Das Cockpit überlebt den Rückweg ins Hauptmenü (#102).**
+   `MainMenuController.SetGameplayLayerActive` blendet genau zwei Dinge aus,
+   Kamera und DebugHud, und verlässt sich im Docstring darauf, dass jede andere
+   HUD-Komponente „ohne laufendes Match früh zurückkehrt". Beim **Rückweg**
+   stimmt das nicht: `ReturnToMenu` pausiert das Match, es beendet es nicht —
+   Runner, Entitäten und Auswahl leben weiter, und die Baukarte zeichnet über
+   das Menü.
+3. **Nirgends steht, welche Version läuft (#103).** Ein Befund gegen den
+   falschen Build kostet doppelt. `bundleVersion` steht unangetastet auf `1.0`,
+   die gepflegte Zahl lebt nur in `docs/README.md`.
+
+> **Ein Riegel, kein Katalog.** Der Docstring in `SetGameplayLayerActive`
+> begründet die kurze Ausblendliste damit, dass „a catalogue of every HUD in the
+> scene would rot with the next one added" — die Sorge ist berechtigt und bleibt
+> es. Zu liefern ist deshalb **ein** Zustand, den alle Komponenten lesen, gesetzt
+> an genau einer Stelle. Drei Zustände sind zu unterscheiden, nicht zwei: *kein
+> Match*, *Match pausiert*, *Match gelaufen und zurück im Menü*. Der dritte ist
+> der, der heute falsch läuft, weil er wie der erste behandelt wird.
+
+Die Versionsanzeige gehört ausdrücklich **nicht** in die HUD-Schicht, die dieser
+Riegel schaltet — sie ist in jedem Zustand sichtbar.
+
+**Nicht in diesem Paket:** Speicherstände, Wiederaufnahme einer Runde nach dem
+Beenden, Tastenbelegung konfigurierbar machen.
+
 ## Bewusst nicht in diesem Sprint
 
 | Was | Warum |
@@ -396,6 +434,9 @@ verschwinden. Der getrackte Weg ist ausschließlich `tools/packaging/`.
 - [ ] Die Mitte ist ein Gebiet mit schmalen Zufahrten, Optik und Begehbarkeit
       stammen aus **einer** Quelle, und ein Erreichbarkeitstest sichert, dass
       keine Basis eingesperrt ist (21.7)
+- [ ] Ein Spieler kann eine Runde per ESC anhalten und sauber ins Hauptmenü
+      verlassen, ohne dass das Cockpit über dem Menü stehenbleibt, und liest
+      in jedem Zustand unten links, welcher Stand läuft (21.8)
 - [ ] `dotnet test tools/Nova.SimRunner.Tests` grün, Baselines in eigenen PRs
       bewegt
 - [ ] **Eine gespielte Runde** — dieser Sprint ist überwiegend Oberfläche und
@@ -423,5 +464,6 @@ die neue Feldlage in den Eintrag, nicht nur „mehr Felder".
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.2.0 | 2026-08-18 | **Paket 21.8 nachgetragen** aus der Spielabnahme T-02: Pausemenü (#105), das über dem Hauptmenü stehenbleibende Cockpit (#102) und die fehlende Versionsanzeige (#103). Drei Befunde, ein Bauwerk — alle drei hängen an der Frage, welche Komponente aufhören muss zu arbeiten, wenn das Match nicht die aktive Oberfläche ist. Als Beta-Tor eingestuft: ohne sauberes Verlassen einer Runde findet kein Betatest statt. 21.2 ist fertig (PR #104) | Orchestrator |
 | 1.1.0 | 2026-08-18 | **Paket 21.1 neu gefasst.** Die Erstfassung hielt das Kriechen über jedes Gebäude für den Ist-Zustand; `IsInsideBuildInfluence` prüft seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch gefunden und angehalten, der Inhaber hat D-108 in Kenntnis der Lage neu getroffen: die Ankerliste wird geöffnet. 21.1 ist damit eine Verhaltensänderung mit `RulesHash64`-Bewegung und eigenem Merge-Fenster; die Messung (15/23/23) ist erledigt und `MinimumBuildingDistanceCells` bleibt bei 2. R-2, R-3, Versionsrelevanz und „Fertig wenn" nachgezogen | Orchestrator |
 | 1.0.0 | 2026-08-17 | Erstfassung aus [20_Vorschlag_Verknappungsfolgen.md](20_Vorschlag_Verknappungsfolgen.md) nach den Inhaberentscheidungen D-108 und D-109. #85 als vom Einheitenstrang erledigt ausgetragen, #89/#90 als Vertragsflächen ausgeschlossen | Orchestrator |
