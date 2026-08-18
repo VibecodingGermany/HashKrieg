@@ -98,6 +98,8 @@ namespace Nova.Presentation.UI
         [SerializeField] private float _dragThresholdPixels = 8f;
         [Tooltip("Click-select radius in world units (= cells).")]
         [SerializeField] private float _pickRadiusWorld = 1.5f;
+        [Tooltip("Click-select radius for Aetherium fields in world units (= cells). Wider than the unit pick radius because the marker is a seven-shard cluster; exhausted fields stay clickable for their readout (21.2, #86).")]
+        [SerializeField] private float _fieldPickRadiusWorld = 2f;
 
         [Header("Canonical Alliance definition ids (resolved to the local slot faction at runtime)")]
         [Tooltip("B: Power — Alliance defId 5, 450 AE, prerequisite-free.")]
@@ -412,7 +414,8 @@ namespace Nova.Presentation.UI
                 $"E {_scoutDefId} | Shift+E {_lightTankDefId} | D {_battleTankDefId} | Shift+D {_artilleryDefId}\n" +
                 "Command card (bottom right): LMB an order button, then LMB its target in the world (RMB/ESC cancels the pick)\n" +
                 "Groups: Ctrl+1..9 save selection, 1..9 recall | Shift+LMB/drag adds to the selection\n" +
-                "Camera: arrow keys / screen edge pan | wheel zoom | Z,X rotate | MMB drag rotate | Space reset rotation";
+                "Camera: arrow keys / screen edge pan | wheel zoom | Z,X rotate | MMB drag rotate | Space reset rotation\n" +
+                "Linksklick auf ein Vorkommen: Restbestand anzeigen";
         }
 
         private void Update()
@@ -460,6 +463,8 @@ namespace Nova.Presentation.UI
                 _runner.Construction, _runner.Production);
             _dispatcher = new RtsIntentDispatcher(ingress, stateView);
             _boundIngress = ingress;
+            // ClearSelection also drops the selected field (21.2): a rebinding
+            // means a fresh match, and its ids belong to the old one.
             _selection.ClearSelection();
             return true;
         }
@@ -1298,6 +1303,14 @@ namespace Nova.Presentation.UI
         /// Box select over the ground-projected AABB of all four drag corners.
         /// Four, not two: under a tilted camera the screen rectangle projects
         /// to a trapezoid, and two corners would clip the selection.
+        /// <para>
+        /// A non-additive box that catches NO units falls through to the field
+        /// pick at the box centre (21.2, #86): on a trackpad a plain "click" is
+        /// a micro-drag past the threshold, and without this fallback that
+        /// gesture over a field read as "clear selection" — the field readout
+        /// was unreachable in the T-02 play observation, while the same gesture
+        /// over a unit still selected it.
+        /// </para>
         /// </summary>
         private void SelectBox(Vector2 a, Vector2 b, bool additive)
         {
@@ -1315,30 +1328,61 @@ namespace Nova.Presentation.UI
             int count = additive
                 ? _selection.SelectBoxAdditive(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY)
                 : _selection.SelectBox(_runner.Entities, _dispatcher.LocalSlot, minX, minY, maxX, maxY);
-            _lastCommandStatus = additive ? $"Box select (added): {count} unit(s) selected" : $"Box select: {count} unit(s)";
-            if (count > 0) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+            if (count > 0)
+            {
+                _lastCommandStatus = additive ? $"Box select (added): {count} unit(s) selected" : $"Box select: {count} unit(s)";
+                AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                return;
+            }
+
+            if (!additive)
+            {
+                var centre = new Vector3((minX + maxX) * 0.5f, 0f, (minY + maxY) * 0.5f);
+                if (TryPickField(centre, out ushort fieldId))
+                {
+                    _selection.SelectField(fieldId);
+                    _lastCommandStatus = $"Selected Aetherium field #{fieldId}";
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                    return;
+                }
+            }
+
+            _lastCommandStatus = additive ? "Box select (added): 0 unit(s) selected" : "Box select: 0 unit(s)";
         }
 
-        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>; additive with Shift, else replace (a plain click on empty ground clears).</summary>
+        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>, else — non-additive only — the field under the cursor within <see cref="_fieldPickRadiusWorld"/> for its reserve readout (21.2, #86); additive with Shift, else replace (a plain click on empty ground clears).</summary>
         private void SelectSingle(Vector2 screenPoint, bool additive)
         {
             if (_runner.Entities == null) return;
-            if (TryScreenPointToGround(screenPoint, out Vector3 world)
-                && TryPickUnit(world, ownedByLocalSlot: true, out EntityId picked))
+            if (TryScreenPointToGround(screenPoint, out Vector3 world))
             {
-                if (additive)
+                if (TryPickUnit(world, ownedByLocalSlot: true, out EntityId picked))
                 {
-                    bool added = _selection.AddSingle(picked);
-                    _lastCommandStatus = $"Added entity {picked.Index} ({_selection.SelectedCount} selected)";
-                    if (added) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                    if (additive)
+                    {
+                        bool added = _selection.AddSingle(picked);
+                        _lastCommandStatus = $"Added entity {picked.Index} ({_selection.SelectedCount} selected)";
+                        if (added) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                    }
+                    else
+                    {
+                        _selection.SelectSingle(picked);
+                        _lastCommandStatus = $"Selected entity {picked.Index}";
+                        AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                    }
+                    return;
                 }
-                else
+
+                // The field pick sits BEHIND the unit pick: a harvester
+                // standing on its field stays selectable. Additive clicks
+                // never pick a field — a field cannot join a unit selection.
+                if (!additive && TryPickField(world, out ushort fieldId))
                 {
-                    _selection.SelectSingle(picked);
-                    _lastCommandStatus = $"Selected entity {picked.Index}";
+                    _selection.SelectField(fieldId);
+                    _lastCommandStatus = $"Selected Aetherium field #{fieldId}";
                     AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+                    return;
                 }
-                return;
             }
 
             if (!additive)
@@ -1401,6 +1445,39 @@ namespace Nova.Presentation.UI
                 if (!economy.TryGetField(id, out AetheriumField field)) continue;
                 found++;
                 if (field.IsExhausted) continue;
+
+                float dx = field.GridPos.X + 0.5f - world.x;
+                float dy = field.GridPos.Y + 0.5f - world.z;
+                float distanceSq = dx * dx + dy * dy;
+                if (distanceSq >= best) continue;
+
+                best = distanceSq;
+                fieldId = field.FieldId;
+            }
+            return fieldId != 0;
+        }
+
+        /// <summary>
+        /// The field under a click (21.2, #86): nearest registered field
+        /// whose centre lies within <see cref="_fieldPickRadiusWorld"/> of
+        /// the ground point. Same id-probe pattern as
+        /// <see cref="TryResolveNearestField"/>, but bounded by the pick
+        /// radius and WITHOUT the exhausted filter — a depleted field must
+        /// stay clickable so its readout (0 AE, erschöpft) remains
+        /// reachable.
+        /// </summary>
+        private bool TryPickField(Vector3 world, out ushort fieldId)
+        {
+            fieldId = 0;
+            EconomySystem economy = _runner.Economy;
+            if (economy == null) return false;
+
+            float best = _fieldPickRadiusWorld * _fieldPickRadiusWorld;
+            int found = 0;
+            for (ushort id = 1; id <= EconomySystem.MaxFields && found < economy.FieldCount; id++)
+            {
+                if (!economy.TryGetField(id, out AetheriumField field)) continue;
+                found++;
 
                 float dx = field.GridPos.X + 0.5f - world.x;
                 float dy = field.GridPos.Y + 0.5f - world.z;

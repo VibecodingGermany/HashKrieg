@@ -7,6 +7,7 @@ using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.Production;
 using Nova.Simulation.State;
 using EntityId = Nova.Core.EntityId;
@@ -36,6 +37,10 @@ namespace Nova.Presentation.UI
     /// shown with the head entry's progress (Q16.16 ticks against
     /// BuildTicks&lt;&lt;16) and a per-entry cancel. A construction site gets
     /// its progress and CancelConstruction (75% refund).
+    /// A selected Aetherium FIELD (21.2, #86) gets no buttons at all — just
+    /// its title plus one row, the remaining reserve against the canonical
+    /// initial reserve from the map layout ("6.420 / 9.000 AE", exhausted
+    /// fields named in the title).
     /// </para>
     /// <para>
     /// REPAIR FLOW (decided, GB-006): the sim issues repair as a BUILDER-side
@@ -117,6 +122,8 @@ namespace Nova.Presentation.UI
             public EntityId LeadId;
             /// <summary>Generation or draw of a completed building; null on unit and site cards.</summary>
             public string BuildingPowerText;
+            /// <summary>The field card's reserve line ("6.420 / 9.000 AE"); null on every entity card.</summary>
+            public string FieldReserveText;
             public readonly List<CardButton> Buttons = new List<CardButton>(16);
             public string QueueHeader;
             public readonly List<QueueRow> QueueRows = new List<QueueRow>(ProductionSystem.MaxQueueEntries);
@@ -134,6 +141,7 @@ namespace Nova.Presentation.UI
                 Title = string.Empty;
                 LeadId = EntityId.Invalid;
                 BuildingPowerText = null;
+                FieldReserveText = null;
                 Buttons.Clear();
                 QueueHeader = null;
                 QueueRows.Clear();
@@ -149,6 +157,8 @@ namespace Nova.Presentation.UI
         [SerializeField] private RtsDeviceInput _input;
         [Tooltip("Build bar; the card docks directly above it.")]
         [SerializeField] private BuildMenuHud _buildMenu;
+        [Tooltip("Match bootstrap; the canonical map layout carries each field's initial reserve (21.2, #86).")]
+        [SerializeField] private MatchBootstrap _bootstrap;
 
         [Header("Presentation")]
         [Tooltip("Whole panel is scaled by this factor, matching the BuildMenuHud/DebugHud convention for Retina displays.")]
@@ -176,6 +186,7 @@ namespace Nova.Presentation.UI
             if (_runner == null) _runner = FindAnyObjectByType<MatchRunner>();
             if (_input == null) _input = FindAnyObjectByType<RtsDeviceInput>();
             if (_buildMenu == null) _buildMenu = FindAnyObjectByType<BuildMenuHud>();
+            if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
         }
 
         /// <summary>
@@ -216,6 +227,16 @@ namespace Nova.Presentation.UI
             EntityManager entities = _runner.Entities;
             if (entities == null || _input == null) return;
 
+            // A selected Aetherium field (21.2, #86) owns the card BEFORE any
+            // entity readout: fields are not entities, so the whole entity
+            // path below does not apply to them.
+            ushort selectedFieldId = _input.Selection.SelectedFieldId;
+            if (selectedFieldId != 0)
+            {
+                BuildFieldModel(model, selectedFieldId);
+                return;
+            }
+
             ReadOnlySpan<EntityId> selected = _input.Selection.SelectedEntities;
             if (selected.Length == 0) return;
             if (!entities.TryGetUnit(selected[0], out UnitState lead)) return; // stale handle
@@ -249,6 +270,30 @@ namespace Nova.Presentation.UI
             {
                 model.FooterHint = "Ziel wählen — LMB bestätigen | RMB Abbruch";
             }
+        }
+
+        /// <summary>
+        /// The field card (21.2, #86): the remaining reserve against the
+        /// canonical initial reserve from the map layout. No buttons — a
+        /// field takes no orders; harvesting stays the Harvester's H
+        /// gesture. An unknown field id or an unwired bootstrap leaves the
+        /// model empty instead of crashing the card on a stale selection.
+        /// </summary>
+        private void BuildFieldModel(CardModel model, ushort fieldId)
+        {
+            if (_runner.Economy == null
+                || !_runner.Economy.TryGetField(fieldId, out AetheriumField field)
+                || _bootstrap == null
+                || !_bootstrap.TryGetFieldInitialReserve(fieldId, out long initialReserveAE))
+            {
+                return;
+            }
+
+            model.Title = field.IsExhausted
+                ? "Aetherium-Vorkommen — erschöpft"
+                : "Aetherium-Vorkommen";
+            model.FieldReserveText = CommandCardPresenter.FormatFieldReserveAE(field.RemainingAE, initialReserveAE);
+            model.Visible = true;
         }
 
         /// <summary>The unit card: the lead unit's role decides the buttons (armed? harvester? builder?).</summary>
@@ -493,6 +538,10 @@ namespace Nova.Presentation.UI
             {
                 GUILayout.Label(model.BuildingPowerText, _rowStyle, GUILayout.Height(RowHeight));
             }
+            if (model.FieldReserveText != null)
+            {
+                GUILayout.Label(model.FieldReserveText, _rowStyle, GUILayout.Height(RowHeight));
+            }
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
             if (model.SiteStatusText != null)
             {
@@ -594,6 +643,7 @@ namespace Nova.Presentation.UI
             float height = HudChrome.PanelStyle.padding.vertical;
             height += TitleHeight + _titleStyle.margin.vertical;
             if (model.BuildingPowerText != null) height += RowHeight + _rowStyle.margin.vertical;
+            if (model.FieldReserveText != null) height += RowHeight + _rowStyle.margin.vertical;
             if (model.ProgressBar01 >= 0f) height += ProgressHeight; // GUIStyle.none: no margin
             if (model.SiteStatusText != null) height += SiteStatusHeight + _siteStatusStyle.margin.vertical;
             for (int i = 0; i < model.Buttons.Count; i++)

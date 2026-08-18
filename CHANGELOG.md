@@ -73,6 +73,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Restbestand der Vorkommen anklickbar und sichtbar (Paket 21.2, #86).**
+  Ein Linksklick auf ein Aetherium-Vorkommen (auch ein erschöpftes) zeigt in der
+  Befehlskarte Restbestand und Anfangsreserve („Aetherium-Vorkommen — 6.420 /
+  9.000 AE", erschöpfte Felder ausdrücklich im Titel markiert), und der
+  Kristallstand jedes Feldes folgt dem Bestand stufenweise bis zum abgedunkelten
+  Stumpf. Reine Präsentation: die Anfangsreserve wird aus der kanonischen
+  Kartenlage (`MatchBootstrap.FieldLayouts`) gelesen, der Simulationszustand
+  bleibt unverändert. Nachklang aus der ersten Spielabnahme: eine leere,
+  nicht-additive Ziehbox fällt jetzt auf den Feld-Pick am Boxzentrum zurück —
+  auf Trackpads ist ein „Klick" ein Mikro-Drag über die 8-px-Schwelle, und ohne
+  den Fallback las die Geste über einem Vorkommen nur „Auswahl leeren"
 - **Die Startzone ist gemessen statt geschätzt (Paket 21.1).**
   `tools/Nova.SimRunner.Tests/BuildZoneCapacityTests.cs` beziffert in zwei Spuren,
   wie viele Gebäude in die Bauzone des kanonischen HQ-Ankers passen: eine echte

@@ -378,5 +378,34 @@ namespace Nova.Gameplay.Tests
             // Fallback for roles outside the named roster stays the enum name.
             Assert.AreEqual(UnitRole.Unit.ToString(), CommandCardPresenter.UnitDisplayName(FactionId.Alliance, UnitRole.Unit));
         }
+
+        // ----------------------------------------------------------------
+        // Field reserve line (21.2, #86)
+        // ----------------------------------------------------------------
+
+        [Test]
+        public void FormatFieldReserveAE_GroupsThousandsGermanStyle()
+        {
+            // The report's own example from sprint package 21.2.
+            Assert.AreEqual("6.420 / 9.000 AE", CommandCardPresenter.FormatFieldReserveAE(6420, 9000));
+            Assert.AreEqual("0 / 15.000 AE", CommandCardPresenter.FormatFieldReserveAE(0, 15000));
+            Assert.AreEqual("12.345.678 / 12.345.678 AE", CommandCardPresenter.FormatFieldReserveAE(12345678, 12345678));
+        }
+
+        [Test]
+        public void FormatFieldReserveAE_SmallValuesStayUngrouped()
+        {
+            Assert.AreEqual("642 / 900 AE", CommandCardPresenter.FormatFieldReserveAE(642, 900));
+            Assert.AreEqual("1 / 1 AE", CommandCardPresenter.FormatFieldReserveAE(1, 1));
+        }
+
+        [Test]
+        public void FormatFieldReserveAE_NonPositiveValuesRenderAsZero()
+        {
+            // Reserve values are never negative in the sim; a hostile input
+            // must still render sanely instead of producing "-6.420".
+            Assert.AreEqual("0 / 0 AE", CommandCardPresenter.FormatFieldReserveAE(0, 0));
+            Assert.AreEqual("0 / 9.000 AE", CommandCardPresenter.FormatFieldReserveAE(-5, 9000));
+        }
     }
 }

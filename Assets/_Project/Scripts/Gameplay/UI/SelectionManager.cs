@@ -28,6 +28,13 @@ namespace Nova.Gameplay
         public int SelectedCount => _selectedCount;
         public ReadOnlySpan<EntityId> SelectedEntities => _selectedIds.AsSpan(0, _selectedCount);
 
+        /// <summary>
+        /// The selected Aetherium field (21.2, #86), 0 = none. Fields are not
+        /// entities, so their id lives BESIDE the entity list, never inside
+        /// it — same UI-only character, no simulation contact.
+        /// </summary>
+        public ushort SelectedFieldId { get; private set; }
+
         public SelectionManager()
         {
             _selectedIds = new EntityId[MaxSelectedEntities];
@@ -40,6 +47,14 @@ namespace Nova.Gameplay
         public void ClearSelection()
         {
             _selectedCount = 0;
+            SelectedFieldId = 0;
+        }
+
+        /// <summary>Selects a field for its reserve readout; clears the entity selection (a field takes no entity orders).</summary>
+        public void SelectField(ushort fieldId)
+        {
+            ClearSelection();
+            SelectedFieldId = fieldId;
         }
 
         public bool SelectSingle(EntityId id)
@@ -60,6 +75,8 @@ namespace Nova.Gameplay
             {
                 if (_selectedIds[i] == id) return false;
             }
+            // An entity joining the selection ends any field selection.
+            SelectedFieldId = 0;
             _selectedIds[_selectedCount++] = id;
             return true;
         }
