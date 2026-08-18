@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &318030897
+--- !u!1 &128460811
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,627 +127,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 318030902}
-  - component: {fileID: 318030899}
-  - component: {fileID: 318030898}
-  - component: {fileID: 318030901}
-  - component: {fileID: 318030900}
-  m_Layer: 0
-  m_Name: Match
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &318030898
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 318030897}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0543a6c6c2d8cbd976ba484a58c2ddc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.MatchBootstrap
-  AutoStart: 0
-  _seed: 16032251723485610609
-  _mapWidth: 128
-  _mapHeight: 128
-  _entityCapacity: 1024
-  UseDefinitionStats: 1
---- !u!114 &318030899
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 318030897}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b9301a799fe64f85afe9906dc15bc39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.MatchRunner
-  _seed: 12345
-  _mapWidth: 128
-  _mapHeight: 128
-  _maxUnits: 2048
---- !u!114 &318030900
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 318030897}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bad3b0760ec204c94bb15e3918bbc921, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.UnitViewManager
-  _matchRunner: {fileID: 318030899}
-  _unitPrefab: {fileID: 0}
-  _combatEffects: {fileID: 318030901}
-  _assetMappings: {fileID: 11400000, guid: 54dfdf235acc54eecbef61df13a6b356, type: 2}
-  _interpolationSpeed: 25
-  _viewerTeamOverride: -1
-  _unknownPlayerColor: {r: 0.62, g: 0.62, b: 0.62, a: 1}
-  _damagedColor: {r: 0.42, g: 0.05, b: 0.05, a: 1}
-  _healthTintFloor: 0.25
---- !u!114 &318030901
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 318030897}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4cba4e364582443899c3490f303f72f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.CombatFeedback.CombatEffectController
---- !u!4 &318030902
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 318030897}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &595700764
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 595700767}
-  - component: {fileID: 595700766}
-  - component: {fileID: 595700765}
-  m_Layer: 0
-  m_Name: VersionBadge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &595700765
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 595700764}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b5291f1c2dd449aea7a5874cd8d818bb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.VersionBadge
-  _document: {fileID: 595700766}
-  _font: {fileID: 12800000, guid: f028379ddea954641b86d6e9d5be7473, type: 3}
-  _fontSize: 12
-  _marginLeft: 10
-  _marginBottom: 8
-  _textColor: {r: 0.88, g: 0.91, b: 0.95, a: 1}
-  _opacity: 0.55
---- !u!114 &595700766
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 595700764}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: db0593cf705514e1aa6af7b41cca6743, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 0}
-  m_SortingOrder: 0
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
---- !u!4 &595700767
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 595700764}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &712913255
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 712913258}
-  - component: {fileID: 712913257}
-  - component: {fileID: 712913256}
-  m_Layer: 0
-  m_Name: IngameMusic
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &712913256
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 712913255}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cdcf36c4668804ae6a8c2889ba4c9d33, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MusicDirector
-  _source: {fileID: 712913257}
-  _runner: {fileID: 318030899}
-  _bootstrap: {fileID: 318030898}
-  _menu: {fileID: 766640420}
-  _playlist:
-  - {fileID: 8300000, guid: 3c291cb887cd427f8fe213d0cc97e7ba, type: 3}
-  - {fileID: 8300000, guid: 159885d03b3d4674a15ae77a1275fd85, type: 3}
-  - {fileID: 8300000, guid: 8605bd0c749044cbaaa4a64ec990b5b5, type: 3}
-  _fadeSeconds: 1.25
-  _trackGapSeconds: 2
---- !u!82 &712913257
-AudioSource:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 712913255}
-  m_Enabled: 1
-  serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -161172014317909320, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 0}
-  m_PlayOnAwake: 1
-  m_Volume: 1
-  m_Pitch: 1
-  Loop: 0
-  Mute: 0
-  Spatialize: 0
-  SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 1
-  MinDistance: 1
-  MaxDistance: 500
-  Pan2D: 0
-  rolloffMode: 0
-  BypassEffects: 0
-  BypassListenerEffects: 0
-  BypassReverbZones: 0
-  rolloffCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  panLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  spreadCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  reverbZoneMixCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!4 &712913258
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 712913255}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &766640419
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 766640424}
-  - component: {fileID: 766640423}
-  - component: {fileID: 766640422}
-  - component: {fileID: 766640421}
-  - component: {fileID: 766640420}
-  m_Layer: 0
-  m_Name: MainMenu
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &766640420
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 766640419}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e77b731ae61b8471192a9ee5a7727fdb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MainMenuController
-  _document: {fileID: 766640423}
-  _bootstrap: {fileID: 318030898}
-  _music: {fileID: 766640421}
-  _cameraRig: {fileID: 1208129614}
-  _debugHud: {fileID: 1729466583}
-  _keyArt: {fileID: 2800000, guid: 0f0988a5c327e451a990f97269d3ceee, type: 3}
-  _titleFont: {fileID: 12800000, guid: b95db3c2c8b9045b683866f321683fad, type: 3}
-  _bodyFont: {fileID: 12800000, guid: f028379ddea954641b86d6e9d5be7473, type: 3}
-  _title: HASHKRIEG
-  _titleFontSize: 92
-  _titleLetterSpacing: 14
-  _titleRuleWidth: 420
-  _contentPadding: 120
-  _buttonFontSize: 30
-  _buttonWidth: 340
-  _buttonHeight: 56
-  _fieldFontSize: 17
-  _fieldLabelWidth: 190
-  _settingsWidth: 680
-  _settingsScrollHeight: 480
-  _titleColor: {r: 0.92, g: 0.96, b: 1, a: 1}
-  _accentColor: {r: 0.35, g: 0.78, b: 0.92, a: 1}
-  _bodyColor: {r: 0.88, g: 0.91, b: 0.95, a: 1}
-  _panelFill: {r: 0.05, g: 0.06, b: 0.08, a: 0.82}
-  _panelEdge: {r: 0.55, g: 0.62, b: 0.72, a: 0.5}
-  _buttonFill: {r: 0.08, g: 0.1, b: 0.13, a: 0.85}
-  _buttonHoverFill: {r: 0.16, g: 0.26, b: 0.32, a: 0.92}
-  _scrimColor: {r: 0.02, g: 0.03, b: 0.05, a: 0.42}
-  _disabledTextColor: {r: 0.52, g: 0.55, b: 0.6, a: 1}
-  _disabledEdgeColor: {r: 0.34, g: 0.38, b: 0.44, a: 0.45}
-  _saveIntervalSeconds: 0.35
---- !u!114 &766640421
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 766640419}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bccc1231bdd82465fa987e6ad5bb61e2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MenuMusicPlayer
-  _source: {fileID: 766640422}
-  _clip: {fileID: 8300000, guid: 85a05f77cb9f94a3684e85a7325e0184, type: 3}
-  _fadeOutSeconds: 1.25
---- !u!82 &766640422
-AudioSource:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 766640419}
-  m_Enabled: 1
-  serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -161172014317909320, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 0}
-  m_PlayOnAwake: 1
-  m_Volume: 1
-  m_Pitch: 1
-  Loop: 0
-  Mute: 0
-  Spatialize: 0
-  SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 1
-  MinDistance: 1
-  MaxDistance: 500
-  Pan2D: 0
-  rolloffMode: 0
-  BypassEffects: 0
-  BypassListenerEffects: 0
-  BypassReverbZones: 0
-  rolloffCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  panLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  spreadCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  reverbZoneMixCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!114 &766640423
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 766640419}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: db0593cf705514e1aa6af7b41cca6743, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 0}
-  m_SortingOrder: 0
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
---- !u!4 &766640424
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 766640419}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &796025941
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 796025944}
-  - component: {fileID: 796025943}
-  - component: {fileID: 796025942}
-  m_Layer: 0
-  m_Name: Audio
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &796025942
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 796025941}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 209209a86486d4b3a8bed38f9ae33c50, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.SfxSettingsBridge
---- !u!114 &796025943
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 796025941}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5dc2508a98b444101ad6cef0e77cec67, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Audio.UnityAudioService
-  _events:
-  - {fileID: 11400000, guid: 4562b900c5298413cbfc21877b6e8973, type: 2}
-  - {fileID: 11400000, guid: 50956c73644694a85aeb0f9ab4176e92, type: 2}
-  - {fileID: 11400000, guid: 3c51dacc3290d4d749bd40a890be6a53, type: 2}
-  - {fileID: 11400000, guid: 2bc49b01e7d6e47f982653071ce36102, type: 2}
-  - {fileID: 11400000, guid: 355b00418653f4193be5d800970afe74, type: 2}
-  - {fileID: 11400000, guid: b4848700a00484367b6d63d821e67b6b, type: 2}
-  - {fileID: 11400000, guid: e49a81764832f45b780fe6e9cd2efeae, type: 2}
-  - {fileID: 11400000, guid: efbf467f6757c4a958133487a54de5a4, type: 2}
-  - {fileID: 11400000, guid: 9b0189faed8e34382a38fa3de76def75, type: 2}
-  - {fileID: 11400000, guid: 5802479c3f7224da0b4746eabd6bf25e, type: 2}
-  - {fileID: 11400000, guid: 080ba28977a154f9a883ca323fa016be, type: 2}
-  - {fileID: 11400000, guid: dd9a6b896d7974a3b99c8f35849da3cd, type: 2}
-  _mixer: {fileID: 24100000, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  _sfxGroup: {fileID: -430844113525612453, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  _weaponsGroup: {fileID: -2573851237862643720, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  _unitsGroup: {fileID: -3201287591632689540, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
-  _uiGroup: {fileID: 2761139959417956413, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
---- !u!4 &796025944
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 796025941}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1208129612
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1208129616}
-  - component: {fileID: 1208129613}
-  - component: {fileID: 1208129614}
-  - component: {fileID: 1208129615}
+  - component: {fileID: 128460815}
+  - component: {fileID: 128460813}
+  - component: {fileID: 128460812}
+  - component: {fileID: 128460814}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -755,13 +138,41 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &1208129613
+--- !u!114 &128460812
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 128460811}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e207447d841f8c67cd26bb722acdaf5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation::Nova.Presentation.RtsCameraController
+  _mapWidth: 128
+  _mapHeight: 128
+  _panSpeed: 18
+  _panSpeedHeightScale: 3
+  _edgePanEnabled: 1
+  _edgePanMargin: 12
+  _zoomSpeed: 60
+  _minHeight: 12
+  _maxHeight: 90
+  _pitchDegrees: 55
+  _rotationSpeed: 90
+  _middleDragDegreesPerPixel: 0.35
+  _startFocusX: 8
+  _startFocusZ: 6
+  _startHeight: 42
+  _startYawDegrees: 45
+--- !u!20 &128460813
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1208129612}
+  m_GameObject: {fileID: 128460811}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -806,49 +217,21 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!114 &1208129614
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1208129612}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7e207447d841f8c67cd26bb722acdaf5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation::Nova.Presentation.RtsCameraController
-  _mapWidth: 128
-  _mapHeight: 128
-  _panSpeed: 18
-  _panSpeedHeightScale: 3
-  _edgePanEnabled: 1
-  _edgePanMargin: 12
-  _zoomSpeed: 60
-  _minHeight: 12
-  _maxHeight: 90
-  _pitchDegrees: 55
-  _rotationSpeed: 90
-  _middleDragDegreesPerPixel: 0.35
-  _startFocusX: 8
-  _startFocusZ: 6
-  _startHeight: 42
-  _startYawDegrees: 45
---- !u!81 &1208129615
+--- !u!81 &128460814
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1208129612}
+  m_GameObject: {fileID: 128460811}
   m_Enabled: 1
---- !u!4 &1208129616
+--- !u!4 &128460815
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1208129612}
+  m_GameObject: {fileID: 128460811}
   serializedVersion: 2
   m_LocalRotation: {x: 0.5, y: 0, z: 0, w: 0.8660254}
   m_LocalPosition: {x: 64, y: 60, z: -20}
@@ -857,7 +240,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1239032164
+--- !u!1 &214746646
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -865,41 +248,315 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1239032166}
-  - component: {fileID: 1239032165}
+  - component: {fileID: 214746661}
+  - component: {fileID: 214746660}
+  - component: {fileID: 214746659}
+  - component: {fileID: 214746658}
+  - component: {fileID: 214746657}
+  - component: {fileID: 214746656}
+  - component: {fileID: 214746655}
+  - component: {fileID: 214746654}
+  - component: {fileID: 214746653}
+  - component: {fileID: 214746652}
+  - component: {fileID: 214746651}
+  - component: {fileID: 214746650}
+  - component: {fileID: 214746649}
+  - component: {fileID: 214746648}
+  - component: {fileID: 214746647}
   m_Layer: 0
-  m_Name: Map
+  m_Name: UI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1239032165
+--- !u!114 &214746647
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1239032164}
+  m_GameObject: {fileID: 214746646}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9b36a2ce3f98b46249dd0de03a577164, type: 3}
+  m_Script: {fileID: 11500000, guid: 743caecd4c5e6831d67dc968613cbfc6, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation::Nova.Presentation.Maps.GlutrinneBlockoutView
-  _bootstrap: {fileID: 318030898}
-  _groundRenderer: {fileID: 1688916558}
-  _sandColor: {r: 0.72, g: 0.6, b: 0.42, a: 1}
-  _crystalColor: {r: 0.2, g: 0.85, b: 0.9, a: 1}
-  _edgeColor: {r: 0.28, g: 0.24, b: 0.2, a: 1}
-  _rockColor: {r: 0.36, g: 0.31, b: 0.26, a: 1}
-  _groundTextureTiling: {x: 32, y: 32}
---- !u!4 &1239032166
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.DebugHud
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _visible: 0
+  _uiScale: 1.5
+  _fontSize: 13
+--- !u!114 &214746648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4839e6caa28240839b51760036ea05f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.PauseMenuHud
+  _runner: {fileID: 2042920973}
+  _menu: {fileID: 1629940937}
+  _matchFrame: {fileID: 214746649}
+  _input: {fileID: 214746660}
+  _uiScale: 1.5
+  _panelWidth: 340
+--- !u!114 &214746649
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a8f5ae5c96d7491494f6d2974f32f3b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MatchFrameHud
+  _runner: {fileID: 2042920973}
+  _bootstrap: {fileID: 2042920972}
+  _menu: {fileID: 1629940937}
+  _views: {fileID: 2042920974}
+  _uiScale: 1.5
+  _panelWidth: 340
+--- !u!114 &214746650
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fbdd2dfe068b4dc0a6f71442dc18c31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.HealthBarHud
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _uiScale: 1.5
+  _barWidth: 26
+  _barHeight: 4
+  _unitHeightOffset: 1.6
+  _buildingHeightOffset: 3.4
+--- !u!114 &214746651
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 885e2e9fac8724df08b326c82e983510, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MinimapHud
+  _runner: {fileID: 2042920973}
+  _buildMenu: {fileID: 214746654}
+  _uiScale: 1.5
+  _mapSize: 168
+  _margin: 8
+  _terrainColor: {r: 0.72, g: 0.6, b: 0.42, a: 1}
+  _exploredBrightness: 0.45
+  _unexploredBrightness: 0.15
+  _unitDotSize: 3
+  _buildingDotSize: 4.5
+  _radarPingColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+--- !u!114 &214746652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 956e9df8ef76b491abc04e94045ee0d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.FogOfWarOverlayView
+  _runner: {fileID: 2042920973}
+  _unexploredAlpha: 0.85
+  _exploredAlpha: 0.45
+  _overlayHeight: 0.04
+--- !u!114 &214746653
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79cf751f533e746e993958254d4d427e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.CommandCardHud
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _buildMenu: {fileID: 214746654}
+  _bootstrap: {fileID: 2042920972}
+  _uiScale: 1.5
+  _panelWidth: 236
+  _panelMargin: 8
+--- !u!114 &214746654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22628296e159b4d5a8e9c701b125cee0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.BuildMenuHud
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _uiScale: 1.5
+  _buttonWidth: 108
+  _buttonHeight: 62
+  _barMargin: 8
+  _hintMinSeconds: 6
+  _hintMaxSeconds: 90
+--- !u!114 &214746655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2b97178f25d64f78897be61bbbb70dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.ConstructionSiteMarkerView
+  _runner: {fileID: 2042920973}
+  _markerHeight: 0.07
+  _buildingColor: {r: 0.35, g: 0.9, b: 0.55, a: 0.55}
+  _pausedColor: {r: 1, g: 0.62, b: 0.15, a: 1}
+  _pulseSpeed: 4
+--- !u!114 &214746656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60b14ad0059d4ecbb3bb0f16e8f28aaf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.BuildZoneOverlayView
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _buildableColor:
+    serializedVersion: 2
+    rgba: 442164806
+  _spacingBlockedColor:
+    serializedVersion: 2
+    rgba: 740857599
+  _overlayHeight: 0.05
+  _repaintIntervalSeconds: 0.25
+--- !u!114 &214746657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cef43f34213c4155a30156e42d58fa4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.PlacementGhostView
+  _input: {fileID: 214746660}
+  _ghostHeight: 0.09
+  _validColor: {r: 0.3, g: 1, b: 0.4, a: 1}
+  _invalidColor: {r: 1, g: 0.3, b: 0.25, a: 1}
+--- !u!114 &214746658
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f602abebcfdbc4649af799cbeddc3fcc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.RallyFlagView
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _markerHeight: 0.07
+  _flagSize: 1
+  _lineWidth: 0.18
+  _rallyColor: {r: 1, g: 0.82, b: 0.25, a: 1}
+--- !u!114 &214746659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc78ab4760d9d417bb2865e8edf60d3d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.SelectionMarkerView
+  _runner: {fileID: 2042920973}
+  _input: {fileID: 214746660}
+  _views: {fileID: 2042920974}
+  _markerHeight: 0.06
+  _unitMarkerSize: 2.4
+  _buildingMarkerMargin: 0.4
+  _selectionColor: {r: 0.35, g: 1, b: 0.4, a: 1}
+--- !u!114 &214746660
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 214746646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39a0624d641e60a06323d84ab3edc209, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.RtsDeviceInput
+  _runner: {fileID: 2042920973}
+  _camera: {fileID: 128460813}
+  _buildMenu: {fileID: 214746654}
+  _commandCard: {fileID: 214746653}
+  _minimap: {fileID: 0}
+  _menu: {fileID: 0}
+  _groundPlaneY: 0
+  _dragThresholdPixels: 8
+  _pickRadiusWorld: 1.5
+  _fieldPickRadiusWorld: 2
+  _buildingDefId: 5
+  _altBuildingDefId: 7
+  _unitDefId: 2
+  _altUnitDefId: 12
+  _storageDefId: 6
+  _vehicleFactoryDefId: 8
+  _researchLabDefId: 9
+  _radarDefId: 10
+  _defensePlatformDefId: 11
+  _refineryDefId: 4
+  _builderDefId: 1
+  _antiArmorDefId: 13
+  _scoutDefId: 14
+  _lightTankDefId: 15
+  _battleTankDefId: 16
+  _artilleryDefId: 17
+--- !u!4 &214746661
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1239032164}
+  m_GameObject: {fileID: 214746646}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -908,7 +565,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1688916557
+--- !u!1 &526112586
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -916,10 +573,288 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1688916561}
-  - component: {fileID: 1688916560}
-  - component: {fileID: 1688916559}
-  - component: {fileID: 1688916558}
+  - component: {fileID: 526112589}
+  - component: {fileID: 526112588}
+  - component: {fileID: 526112587}
+  m_Layer: 0
+  m_Name: IngameMusic
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &526112587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526112586}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdcf36c4668804ae6a8c2889ba4c9d33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MusicDirector
+  _source: {fileID: 526112588}
+  _runner: {fileID: 2042920973}
+  _bootstrap: {fileID: 2042920972}
+  _menu: {fileID: 1629940937}
+  _playlist:
+  - {fileID: 8300000, guid: 3c291cb887cd427f8fe213d0cc97e7ba, type: 3}
+  - {fileID: 8300000, guid: 159885d03b3d4674a15ae77a1275fd85, type: 3}
+  - {fileID: 8300000, guid: 8605bd0c749044cbaaa4a64ec990b5b5, type: 3}
+  _fadeSeconds: 1.25
+  _trackGapSeconds: 2
+--- !u!82 &526112588
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526112586}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: -161172014317909320, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!4 &526112589
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 526112586}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &802321239
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 802321242}
+  - component: {fileID: 802321241}
+  - component: {fileID: 802321240}
+  m_Layer: 0
+  m_Name: Audio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &802321240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802321239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 209209a86486d4b3a8bed38f9ae33c50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.SfxSettingsBridge
+--- !u!114 &802321241
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802321239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dc2508a98b444101ad6cef0e77cec67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Audio.UnityAudioService
+  _events:
+  - {fileID: 11400000, guid: 4562b900c5298413cbfc21877b6e8973, type: 2}
+  - {fileID: 11400000, guid: 50956c73644694a85aeb0f9ab4176e92, type: 2}
+  - {fileID: 11400000, guid: 3c51dacc3290d4d749bd40a890be6a53, type: 2}
+  - {fileID: 11400000, guid: 2bc49b01e7d6e47f982653071ce36102, type: 2}
+  - {fileID: 11400000, guid: 355b00418653f4193be5d800970afe74, type: 2}
+  - {fileID: 11400000, guid: b4848700a00484367b6d63d821e67b6b, type: 2}
+  - {fileID: 11400000, guid: e49a81764832f45b780fe6e9cd2efeae, type: 2}
+  - {fileID: 11400000, guid: efbf467f6757c4a958133487a54de5a4, type: 2}
+  - {fileID: 11400000, guid: 9b0189faed8e34382a38fa3de76def75, type: 2}
+  - {fileID: 11400000, guid: 5802479c3f7224da0b4746eabd6bf25e, type: 2}
+  - {fileID: 11400000, guid: 080ba28977a154f9a883ca323fa016be, type: 2}
+  - {fileID: 11400000, guid: dd9a6b896d7974a3b99c8f35849da3cd, type: 2}
+  _mixer: {fileID: 24100000, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  _sfxGroup: {fileID: -430844113525612453, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  _weaponsGroup: {fileID: -2573851237862643720, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  _unitsGroup: {fileID: -3201287591632689540, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  _uiGroup: {fileID: 2761139959417956413, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+--- !u!4 &802321242
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802321239}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &954524122
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 954524124}
+  - component: {fileID: 954524123}
+  m_Layer: 0
+  m_Name: Map
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &954524123
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 954524122}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b36a2ce3f98b46249dd0de03a577164, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation::Nova.Presentation.Maps.GlutrinneBlockoutView
+  _bootstrap: {fileID: 2042920972}
+  _groundRenderer: {fileID: 1162144974}
+  _sandColor: {r: 0.72, g: 0.6, b: 0.42, a: 1}
+  _crystalColor: {r: 0.2, g: 0.85, b: 0.9, a: 1}
+  _edgeColor: {r: 0.28, g: 0.24, b: 0.2, a: 1}
+  _rockColor: {r: 0.36, g: 0.31, b: 0.26, a: 1}
+  _groundTextureTiling: {x: 32, y: 32}
+--- !u!4 &954524124
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 954524122}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1162144973
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1162144977}
+  - component: {fileID: 1162144976}
+  - component: {fileID: 1162144975}
+  - component: {fileID: 1162144974}
   m_Layer: 0
   m_Name: Ground
   m_TagString: Untagged
@@ -927,13 +862,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 2147483647
   m_IsActive: 1
---- !u!23 &1688916558
+--- !u!23 &1162144974
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1688916557}
+  m_GameObject: {fileID: 1162144973}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -976,13 +911,13 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &1688916559
+--- !u!64 &1162144975
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1688916557}
+  m_GameObject: {fileID: 1162144973}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -998,21 +933,21 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
---- !u!33 &1688916560
+--- !u!33 &1162144976
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1688916557}
+  m_GameObject: {fileID: 1162144973}
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
---- !u!4 &1688916561
+--- !u!4 &1162144977
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1688916557}
+  m_GameObject: {fileID: 1162144973}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 64, y: 0, z: 64}
@@ -1021,7 +956,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1729466582
+--- !u!1 &1309622895
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1029,271 +964,65 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1729466595}
-  - component: {fileID: 1729466584}
-  - component: {fileID: 1729466594}
-  - component: {fileID: 1729466593}
-  - component: {fileID: 1729466592}
-  - component: {fileID: 1729466591}
-  - component: {fileID: 1729466586}
-  - component: {fileID: 1729466585}
-  - component: {fileID: 1729466590}
-  - component: {fileID: 1729466589}
-  - component: {fileID: 1729466588}
-  - component: {fileID: 1729466587}
-  - component: {fileID: 1729466583}
+  - component: {fileID: 1309622898}
+  - component: {fileID: 1309622897}
+  - component: {fileID: 1309622896}
   m_Layer: 0
-  m_Name: UI
+  m_Name: VersionBadge
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1729466583
+--- !u!114 &1309622896
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
+  m_GameObject: {fileID: 1309622895}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 743caecd4c5e6831d67dc968613cbfc6, type: 3}
+  m_Script: {fileID: 11500000, guid: b5291f1c2dd449aea7a5874cd8d818bb, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.DebugHud
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _visible: 0
-  _uiScale: 1.5
-  _fontSize: 13
---- !u!114 &1729466584
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.VersionBadge
+  _document: {fileID: 1309622897}
+  _font: {fileID: 12800000, guid: f028379ddea954641b86d6e9d5be7473, type: 3}
+  _fontSize: 12
+  _marginLeft: 10
+  _marginBottom: 8
+  _textColor: {r: 0.88, g: 0.91, b: 0.95, a: 1}
+  _opacity: 0.55
+--- !u!114 &1309622897
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
+  m_GameObject: {fileID: 1309622895}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 39a0624d641e60a06323d84ab3edc209, type: 3}
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.RtsDeviceInput
-  _runner: {fileID: 318030899}
-  _camera: {fileID: 1208129613}
-  _buildMenu: {fileID: 1729466586}
-  _commandCard: {fileID: 1729466585}
-  _minimap: {fileID: 0}
-  _menu: {fileID: 0}
-  _groundPlaneY: 0
-  _dragThresholdPixels: 8
-  _pickRadiusWorld: 1.5
-  _buildingDefId: 5
-  _altBuildingDefId: 7
-  _unitDefId: 2
-  _altUnitDefId: 12
-  _storageDefId: 6
-  _vehicleFactoryDefId: 8
-  _researchLabDefId: 9
-  _radarDefId: 10
-  _defensePlatformDefId: 11
-  _refineryDefId: 4
-  _builderDefId: 1
-  _antiArmorDefId: 13
-  _scoutDefId: 14
-  _lightTankDefId: 15
-  _battleTankDefId: 16
-  _artilleryDefId: 17
---- !u!114 &1729466585
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 79cf751f533e746e993958254d4d427e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.CommandCardHud
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _buildMenu: {fileID: 1729466586}
-  _uiScale: 1.5
-  _panelWidth: 236
-  _panelMargin: 8
---- !u!114 &1729466586
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 22628296e159b4d5a8e9c701b125cee0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.BuildMenuHud
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _uiScale: 1.5
-  _buttonWidth: 108
-  _buttonHeight: 62
-  _barMargin: 8
-  _hintMinSeconds: 6
-  _hintMaxSeconds: 90
---- !u!114 &1729466587
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9a8f5ae5c96d7491494f6d2974f32f3b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MatchFrameHud
-  _runner: {fileID: 318030899}
-  _bootstrap: {fileID: 318030898}
-  _menu: {fileID: 766640420}
-  _views: {fileID: 318030900}
-  _uiScale: 1.5
-  _panelWidth: 340
---- !u!114 &1729466588
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3fbdd2dfe068b4dc0a6f71442dc18c31, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.HealthBarHud
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _uiScale: 1.5
-  _barWidth: 26
-  _barHeight: 4
-  _unitHeightOffset: 1.6
-  _buildingHeightOffset: 3.4
---- !u!114 &1729466589
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 885e2e9fac8724df08b326c82e983510, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MinimapHud
-  _runner: {fileID: 318030899}
-  _buildMenu: {fileID: 1729466586}
-  _uiScale: 1.5
-  _mapSize: 168
-  _margin: 8
-  _terrainColor: {r: 0.72, g: 0.6, b: 0.42, a: 1}
-  _exploredBrightness: 0.45
-  _unexploredBrightness: 0.15
-  _unitDotSize: 3
-  _buildingDotSize: 4.5
-  _radarPingColor: {r: 1, g: 0.55, b: 0.1, a: 1}
---- !u!114 &1729466590
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 956e9df8ef76b491abc04e94045ee0d7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.FogOfWarOverlayView
-  _runner: {fileID: 318030899}
-  _unexploredAlpha: 0.85
-  _exploredAlpha: 0.45
-  _overlayHeight: 0.04
---- !u!114 &1729466591
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a2b97178f25d64f78897be61bbbb70dd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.ConstructionSiteMarkerView
-  _runner: {fileID: 318030899}
-  _markerHeight: 0.07
-  _buildingColor: {r: 0.35, g: 0.9, b: 0.55, a: 0.55}
-  _pausedColor: {r: 1, g: 0.62, b: 0.15, a: 1}
-  _pulseSpeed: 4
---- !u!114 &1729466592
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2cef43f34213c4155a30156e42d58fa4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.PlacementGhostView
-  _input: {fileID: 1729466584}
-  _ghostHeight: 0.09
-  _validColor: {r: 0.3, g: 1, b: 0.4, a: 1}
-  _invalidColor: {r: 1, g: 0.3, b: 0.25, a: 1}
---- !u!114 &1729466593
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f602abebcfdbc4649af799cbeddc3fcc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.RallyFlagView
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _markerHeight: 0.07
-  _flagSize: 1
-  _lineWidth: 0.18
-  _rallyColor: {r: 1, g: 0.82, b: 0.25, a: 1}
---- !u!114 &1729466594
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bc78ab4760d9d417bb2865e8edf60d3d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.SelectionMarkerView
-  _runner: {fileID: 318030899}
-  _input: {fileID: 1729466584}
-  _views: {fileID: 318030900}
-  _markerHeight: 0.06
-  _unitMarkerSize: 2.4
-  _buildingMarkerMargin: 0.4
-  _selectionColor: {r: 0.35, g: 1, b: 0.4, a: 1}
---- !u!4 &1729466595
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: db0593cf705514e1aa6af7b41cca6743, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &1309622898
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1729466582}
+  m_GameObject: {fileID: 1309622895}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1302,7 +1031,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2086866621
+--- !u!1 &1521561486
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1310,8 +1039,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2086866623}
-  - component: {fileID: 2086866622}
+  - component: {fileID: 1521561488}
+  - component: {fileID: 1521561487}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -1319,13 +1048,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &2086866622
+--- !u!108 &1521561487
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2086866621}
+  m_GameObject: {fileID: 1521561486}
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
@@ -1384,15 +1113,330 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &2086866623
+--- !u!4 &1521561488
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2086866621}
+  m_GameObject: {fileID: 1521561486}
   serializedVersion: 2
   m_LocalRotation: {x: 0.12450414, y: -0.8617815, z: 0.25527132, w: 0.42031893}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1629940936
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1629940941}
+  - component: {fileID: 1629940940}
+  - component: {fileID: 1629940939}
+  - component: {fileID: 1629940938}
+  - component: {fileID: 1629940937}
+  m_Layer: 0
+  m_Name: MainMenu
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1629940937
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1629940936}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e77b731ae61b8471192a9ee5a7727fdb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MainMenuController
+  _document: {fileID: 1629940940}
+  _bootstrap: {fileID: 2042920972}
+  _music: {fileID: 1629940938}
+  _cameraRig: {fileID: 128460812}
+  _gameplayHudRoot: {fileID: 214746646}
+  _keyArt: {fileID: 2800000, guid: 0f0988a5c327e451a990f97269d3ceee, type: 3}
+  _titleFont: {fileID: 12800000, guid: b95db3c2c8b9045b683866f321683fad, type: 3}
+  _bodyFont: {fileID: 12800000, guid: f028379ddea954641b86d6e9d5be7473, type: 3}
+  _title: HASHKRIEG
+  _titleFontSize: 92
+  _titleLetterSpacing: 14
+  _titleRuleWidth: 420
+  _contentPadding: 120
+  _buttonFontSize: 30
+  _buttonWidth: 340
+  _buttonHeight: 56
+  _fieldFontSize: 17
+  _fieldLabelWidth: 190
+  _settingsWidth: 680
+  _settingsScrollHeight: 480
+  _titleColor: {r: 0.92, g: 0.96, b: 1, a: 1}
+  _accentColor: {r: 0.35, g: 0.78, b: 0.92, a: 1}
+  _bodyColor: {r: 0.88, g: 0.91, b: 0.95, a: 1}
+  _panelFill: {r: 0.05, g: 0.06, b: 0.08, a: 0.82}
+  _panelEdge: {r: 0.55, g: 0.62, b: 0.72, a: 0.5}
+  _buttonFill: {r: 0.08, g: 0.1, b: 0.13, a: 0.85}
+  _buttonHoverFill: {r: 0.16, g: 0.26, b: 0.32, a: 0.92}
+  _scrimColor: {r: 0.02, g: 0.03, b: 0.05, a: 0.42}
+  _disabledTextColor: {r: 0.52, g: 0.55, b: 0.6, a: 1}
+  _disabledEdgeColor: {r: 0.34, g: 0.38, b: 0.44, a: 0.45}
+  _saveIntervalSeconds: 0.35
+--- !u!114 &1629940938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1629940936}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bccc1231bdd82465fa987e6ad5bb61e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Presentation.UI::Nova.Presentation.UI.MenuMusicPlayer
+  _source: {fileID: 1629940939}
+  _clip: {fileID: 8300000, guid: 85a05f77cb9f94a3684e85a7325e0184, type: 3}
+  _fadeOutSeconds: 1.25
+--- !u!82 &1629940939
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1629940936}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: -161172014317909320, guid: 7831b040d10e94eb9bddf12783bcee5e, type: 2}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &1629940940
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1629940936}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: db0593cf705514e1aa6af7b41cca6743, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &1629940941
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1629940936}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2042920971
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2042920976}
+  - component: {fileID: 2042920973}
+  - component: {fileID: 2042920972}
+  - component: {fileID: 2042920975}
+  - component: {fileID: 2042920974}
+  m_Layer: 0
+  m_Name: Match
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2042920972
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2042920971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0543a6c6c2d8cbd976ba484a58c2ddc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.MatchBootstrap
+  AutoStart: 0
+  _seed: 16032251723485610609
+  _mapWidth: 128
+  _mapHeight: 128
+  _entityCapacity: 1024
+  UseDefinitionStats: 1
+--- !u!114 &2042920973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2042920971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b9301a799fe64f85afe9906dc15bc39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.MatchRunner
+  _seed: 12345
+  _mapWidth: 128
+  _mapHeight: 128
+  _maxUnits: 2048
+--- !u!114 &2042920974
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2042920971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bad3b0760ec204c94bb15e3918bbc921, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.Match.UnitViewManager
+  _matchRunner: {fileID: 2042920973}
+  _unitPrefab: {fileID: 0}
+  _combatEffects: {fileID: 2042920975}
+  _assetMappings: {fileID: 11400000, guid: 54dfdf235acc54eecbef61df13a6b356, type: 2}
+  _interpolationSpeed: 25
+  _viewerTeamOverride: -1
+  _unknownPlayerColor: {r: 0.62, g: 0.62, b: 0.62, a: 1}
+  _damagedColor: {r: 0.42, g: 0.05, b: 0.05, a: 1}
+  _healthTintFloor: 0.25
+--- !u!114 &2042920975
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2042920971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4cba4e364582443899c3490f303f72f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Nova.Gameplay::Nova.Gameplay.CombatFeedback.CombatEffectController
+--- !u!4 &2042920976
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2042920971}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1403,13 +1447,13 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1208129616}
-  - {fileID: 2086866623}
-  - {fileID: 1688916561}
-  - {fileID: 796025944}
-  - {fileID: 318030902}
-  - {fileID: 1239032166}
-  - {fileID: 1729466595}
-  - {fileID: 766640424}
-  - {fileID: 712913258}
-  - {fileID: 595700767}
+  - {fileID: 128460815}
+  - {fileID: 1521561488}
+  - {fileID: 1162144977}
+  - {fileID: 802321242}
+  - {fileID: 2042920976}
+  - {fileID: 954524124}
+  - {fileID: 214746661}
+  - {fileID: 1629940941}
+  - {fileID: 526112589}
+  - {fileID: 1309622898}

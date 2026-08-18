@@ -33,12 +33,35 @@ namespace Nova.PlayMode.Tests
             bootstrap.StartGrayboxMatch();
             Assert.IsTrue(bootstrap.IsMatchReady, "match did not start");
 
-            // Two frames: let every Awake/Start and the first model rebuilds settle.
+            // Two frames: let every Awake/Start and the first model rebuilds
+            // settle. MainMenuController.Start is among them, and it is the
+            // one that matters below.
             yield return null;
             yield return null;
 
             MonoBehaviour input = FindByTypeName("RtsDeviceInput");
             Assert.NotNull(input, "scene contains no RtsDeviceInput");
+
+            // THE COCKPIT HAS TO BE SWITCHED ON, and this test has to do it
+            // itself. Since package 21.8 the whole HUD root is inactive while
+            // the main menu owns the screen (#102), and the thing that turns
+            // it back on is MainMenuController.StartMatch — which this test
+            // deliberately bypasses by driving MatchBootstrap directly. Left
+            // off, RtsDeviceInput never runs a single Update, never binds its
+            // dispatcher, and every pick path below dereferences null.
+            //
+            // The OFF assertion keeps this line honest: it must run AFTER the
+            // two frames above, because the switch-off happens in
+            // MainMenuController.Start, not during scene activation — asserted
+            // one frame earlier it reads the scene file's default and passes
+            // for the wrong reason.
+            Assert.IsFalse(input.gameObject.activeInHierarchy,
+                "the HUD root is expected to be off while the main menu owns the screen — if this " +
+                "fails, the menu/match switch moved and the SetActive below is papering over it");
+            input.gameObject.SetActive(true);
+
+            // One more frame so the freshly enabled input binds its dispatcher.
+            yield return null;
 
             // The serialized scene predates the 21.2 field: a missing YAML
             // entry must materialise the C# default 2f — pin that assumption,

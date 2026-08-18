@@ -26,10 +26,12 @@ namespace Nova.PlayMode.Tests
     /// rank-4 assemblies, and quality/scripts/run_gate_check.py:183-188 forbids
     /// any test assembly from referencing one — Nova.Presentation.Tests was
     /// dissolved for exactly that reason in 5cdb0ce. The menu's contract with
-    /// those three components (it switches two of them off while it is up and
-    /// back on when the match starts) is still worth a test, so they are found
-    /// by type name. A name that no longer resolves fails loudly here; the
-    /// alternative was not testing the behaviour at all.
+    /// those components (it switches the camera rig off while it is up, and
+    /// the whole gameplay HUD ROOT with it — the one GameObject every
+    /// in-match HUD component, DebugHud included, lives on) is still worth a
+    /// test, so they are found by type name. A name that no longer resolves
+    /// fails loudly here; the alternative was not testing the behaviour at
+    /// all.
     /// </para>
     /// <para>
     /// Run headless-with-graphics, never with -quit (same lane as
@@ -135,9 +137,14 @@ namespace Nova.PlayMode.Tests
                 "this scene with no 'no match yet' guard: its LateUpdate reads scroll wheel, MMB, " +
                 "Z/X and the screen-edge pan every frame, so a pointer resting near an edge would " +
                 "pan the camera away from the HQ before the match even starts.");
-            Assert.IsFalse(DebugHudBehaviour().enabled,
-                "the debug HUD must be silent while the menu is up: its always-on status bar draws " +
-                "BEFORE its own F3 visibility check, so it would sit on top of the key art");
+            Behaviour debugHud = DebugHudBehaviour();
+            Assert.IsFalse(debugHud.gameObject.activeInHierarchy,
+                "the gameplay HUD root must be OFF while the menu is up: the menu switches the one " +
+                "GameObject every in-match HUD component lives on (MainMenuController.SetGameplayLayerActive), " +
+                "so the whole cockpit — including the debug HUD's always-on status bar, which draws " +
+                "BEFORE its own F3 visibility check — stays silent instead of sitting on the key art. " +
+                "The check goes through activeInHierarchy because the switch is the root's SetActive, " +
+                "not a per-component enabled toggle.");
         }
 
         // ------------------------------------------------------------------
@@ -213,11 +220,12 @@ namespace Nova.PlayMode.Tests
             Assert.IsTrue(CameraRig().enabled,
                 "the RTS camera must take over as the match starts; it was switched off only for " +
                 "as long as the menu was up");
-            Assert.IsTrue(DebugHudBehaviour().enabled,
-                "the status bar belongs to the cockpit and must come back with the match");
+            Assert.IsTrue(DebugHudBehaviour().gameObject.activeInHierarchy,
+                "the gameplay HUD root must come back with the match — the status bar and the whole " +
+                "cockpit ride on the one root object the menu switches");
             Assert.IsFalse(MenuController().enabled,
-                "the menu switches itself off after starting: this sprint has no pause menu and no " +
-                "restart, so there is deliberately no way back into it");
+                "the menu switches itself off after starting; the way back in is a match-end or " +
+                "pause-menu button (ReturnToMenu re-enables it), not the start click itself");
 
             uint tickAtStart = runner.Session.CurrentTick;
             yield return new WaitForSeconds(2f);

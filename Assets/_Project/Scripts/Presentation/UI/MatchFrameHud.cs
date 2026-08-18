@@ -9,22 +9,32 @@ using Nova.Simulation.Victory;
 namespace Nova.Presentation.UI
 {
     /// <summary>
-    /// The match frame (sprint 09 §6): the two modal panels that close a
-    /// round — the RESULT screen once <see cref="VictorySystem"/> latches an
-    /// outcome ("Sieg" / "Niederlage" / "Unentschieden" with the decided-tick
-    /// timestamp), and the PAUSE overlay while the kernel clock is stopped
-    /// (a paused match and a broken one used to look identical). Both offer
-    /// "Neue Runde" and/or "Hauptmenü", so quitting the application is no
-    /// longer the only way out of a finished round.
+    /// The match frame (sprint 09 §6): the modal panels that close a round —
+    /// the RESULT screen once <see cref="VictorySystem"/> latches an outcome
+    /// ("Sieg" / "Niederlage" / "Unentschieden" with the decided-tick
+    /// timestamp), and the NETWORK status panels for a relay match that
+    /// ended or stalls. Both offer a way out ("Neue Runde" and/or
+    /// "Hauptmenü"), so quitting the application is no longer the only exit
+    /// from a finished round. The PAUSE surface no longer lives here: since
+    /// sprint 21.8 it is <see cref="PauseMenuHud"/> (ESC/P), which also owns
+    /// the kernel clock.
     /// <para>
     /// "Neue Runde" runs <see cref="MatchBootstrap.RestartMatch"/> (the sim
     /// side is rebuilt wholesale) and then resets the presentation side:
     /// views via <see cref="UnitViewManager.ResetViews"/>, the camera through
     /// <see cref="MinimapCameraLink.RequestStartFocusReset"/> — the rig owns
     /// the reset itself because Nova.Presentation.UI may not reference
-    /// Nova.Presentation (same rank). The selection clears itself on the
-    /// ingress rebind (RtsDeviceInput.EnsureDispatcher), and the fog overlay
-    /// plus minimap self-heal through their fog-instance guards.
+    /// Nova.Presentation (same rank). The selection and any armed gesture
+    /// clear themselves on the ingress rebind (RtsDeviceInput.EnsureDispatcher),
+    /// and the fog overlay plus minimap self-heal through their fog-instance
+    /// guards.
+    /// </para>
+    /// <para>
+    /// <see cref="ModalOpen"/> reports once per frame whether one of these
+    /// panels is up; PauseMenuHud aggregates it into
+    /// <see cref="ModalSurfaceLink"/>, the channel that tells the input
+    /// component "a modal owns every click" — a click on "Hauptmenü" must
+    /// never fall through the panel and select a unit behind it.
     /// </para>
     /// <para>
     /// READ-ONLY toward the simulation: this panel polls the victory system's
@@ -48,6 +58,21 @@ namespace Nova.Presentation.UI
         private GUIStyle _bodyStyle;
         private GUIStyle _buttonStyle;
 
+        // The panel state, derived once per frame in Update: OnGUI draws from
+        // it (possibly several passes per frame) and PauseMenuHud reads
+        // ModalOpen for the ModalSurfaceLink publish — one derivation, no
+        // drift between "is a panel up" and "which panel is drawn".
+        private VictorySystem _panelVictory;
+        private string _panelNetworkReason;
+        private int _panelStalledSlot;
+
+        /// <summary>
+        /// True while one of this component's modal panels (result or
+        /// network status) is up. Computed once per frame in Update;
+        /// PauseMenuHud aggregates it into <see cref="ModalSurfaceLink"/>.
+        /// </summary>
+        public bool ModalOpen { get; private set; }
+
         private void Awake()
         {
             if (_runner == null) _runner = FindAnyObjectByType<MatchRunner>();
@@ -56,20 +81,42 @@ namespace Nova.Presentation.UI
             if (_views == null) _views = FindAnyObjectByType<UnitViewManager>();
         }
 
-        private void OnGUI()
+        private void Update()
         {
-            if (_runner == null || _bootstrap == null) return;
-            if (_menu != null && _menu.IsMenuVisible) return;
+            ModalOpen = ComputeModalState();
+        }
+
+        /// <summary>
+        /// The modal verdict and the panel payload behind it. "Modal" means
+        /// the decided-result screen, a relay end reason or a stalled relay
+        /// handshake — the paused-with-victory-pending state is deliberately
+        /// absent: it belongs to the pause menu now.
+        /// </summary>
+        private bool ComputeModalState()
+        {
+            _panelVictory = null;
+            _panelNetworkReason = null;
+            _panelStalledSlot = -1;
+            if (_runner == null || _bootstrap == null) return false;
+            if (_menu != null && _menu.IsMenuVisible) return false;
 
             bool isMatchReady = _bootstrap.IsMatchReady;
-            VictorySystem victory = isMatchReady ? _runner.Victory : null;
-            string networkEndReason = isMatchReady
+            _panelVictory = isMatchReady ? _runner.Victory : null;
+            _panelNetworkReason = isMatchReady
                 ? _runner.RelayEndReason
                 : _bootstrap.NetworkStatusReason;
-            int stalledOnSlot = isMatchReady && _runner.IsRelayMatch && _runner.RelayCommandsAllowed
+            _panelStalledSlot = isMatchReady && _runner.IsRelayMatch && _runner.RelayCommandsAllowed
                 ? _bootstrap.NetworkStalledOnSlot
                 : -1;
-            if (victory == null && string.IsNullOrEmpty(networkEndReason) && stalledOnSlot < 0) return;
+
+            return (_panelVictory != null && _panelVictory.IsDecided)
+                || !string.IsNullOrEmpty(_panelNetworkReason)
+                || _panelStalledSlot >= 0;
+        }
+
+        private void OnGUI()
+        {
+            if (!ModalOpen) return;
 
             EnsureStyles();
 
@@ -77,23 +124,19 @@ namespace Nova.Presentation.UI
             Matrix4x4 previousMatrix = GUI.matrix;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            if (victory != null && victory.IsDecided)
+            if (_panelVictory != null && _panelVictory.IsDecided)
             {
-                DrawResultPanel(victory);
+                DrawResultPanel(_panelVictory);
             }
-            else if (!string.IsNullOrEmpty(networkEndReason))
+            else if (!string.IsNullOrEmpty(_panelNetworkReason))
             {
-                DrawNetworkStatusPanel("NETZWERKFEHLER", networkEndReason);
+                DrawNetworkStatusPanel("NETZWERKFEHLER", _panelNetworkReason);
             }
-            else if (stalledOnSlot >= 0)
+            else if (_panelStalledSlot >= 0)
             {
                 DrawNetworkStatusPanel(
                     "VERBINDUNG",
-                    $"Warte auf Spieler {stalledOnSlot + 1} … {_bootstrap.NetworkStallSeconds:0.0}s");
-            }
-            else if (victory != null && !_runner.IsRunning)
-            {
-                DrawPausePanel();
+                    $"Warte auf Spieler {_panelStalledSlot + 1} … {_bootstrap.NetworkStallSeconds:0.0}s");
             }
 
             GUI.matrix = previousMatrix;
@@ -147,28 +190,6 @@ namespace Nova.Presentation.UI
                 RestartRound();
             }
             if (GUILayout.Button("Hauptmenü", _buttonStyle, GUILayout.Height(30f)))
-            {
-                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
-                ReturnToMenu();
-            }
-            GUILayout.EndArea();
-        }
-
-        private void DrawPausePanel()
-        {
-            Rect rect = CenteredRect(150f);
-            GUI.Box(rect, GUIContent.none, HudChrome.OpaquePanelStyle);
-            GUILayout.BeginArea(rect);
-            GUILayout.Space(HudChrome.OpaquePanelStyle.padding.top);
-            GUILayout.Label("PAUSE", _headlineStyle);
-            GUILayout.Label("Die Simulation steht — P oder der Knopf setzt fort.", _bodyStyle);
-            GUILayout.Space(10f);
-            if (GUILayout.Button("Fortsetzen (P)", _buttonStyle, GUILayout.Height(30f)))
-            {
-                AudioServiceLocator.Play2D(SoundEventId.UI_Click);
-                _runner.StartMatch();
-            }
-            if (GUILayout.Button("Hauptmenü", _buttonStyle, GUILayout.Height(26f)))
             {
                 AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                 ReturnToMenu();

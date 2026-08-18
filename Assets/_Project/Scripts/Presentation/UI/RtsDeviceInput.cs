@@ -69,6 +69,21 @@ namespace Nova.Presentation.UI
     /// the Builder actually walks into reach.
     /// </para>
     /// <para>
+    /// MODAL GATE (sprint 21.8): while <see cref="ModalSurfaceLink.Open"/>
+    /// — published once per frame by PauseMenuHud, which aggregates every
+    /// modal surface (pause menu, result and network panels) — this
+    /// component's Update suspends ALL world gestures: no selection, no
+    /// orders, no hotkeys, no harvester escort into a stopped kernel, and no
+    /// click falling through a panel onto the unit behind it. The camera's
+    /// edge-pan strip is covered by re-publishing "pointer over HUD"
+    /// (<see cref="HudPointerLink"/>) instead of growing a second reader.
+    /// Any armed gesture (placement ghost, order pick) is disarmed when the
+    /// gate engages, so a modal never inherits one — and the ingress rebind
+    /// clears them too, so an armed ghost never survives into the next
+    /// match (#102). Pause/resume itself moved out of here: ESC/P and the
+    /// pause menu live in <see cref="PauseMenuHud"/>.
+    /// </para>
+    /// <para>
     /// World mapping (identical to UnitViewManager / FlowFieldDebugView /
     /// RtsCameraController): sim X -&gt; Unity x, sim Y -&gt; Unity z, ground
     /// plane at y = <see cref="_groundPlaneY"/> (0). Cell (gx, gy) covers the
@@ -227,6 +242,16 @@ namespace Nova.Presentation.UI
         /// and no simulation read is involved in the toggle itself.
         /// </summary>
         public bool BuildZoneOverlayPinned => _buildZoneOverlayPinned;
+
+        /// <summary>
+        /// The frame (<see cref="Time.frameCount"/>) ESC last cancelled an
+        /// armed gesture here (placement ghost or order pick). PauseMenuHud
+        /// reads it to peel exactly one layer per press: this component runs
+        /// at -200, so its consumption is already stamped when the menu's
+        /// Update looks at the same ESC press — the gesture cancels first,
+        /// the menu opens on the NEXT press.
+        /// </summary>
+        public int LastGestureCancelFrame { get; private set; } = -1;
 
         /// <summary>Definition the armed placement ghost currently carries.</summary>
         public ushort PlacementDefId => _placementDefId;
@@ -419,7 +444,7 @@ namespace Nova.Presentation.UI
             _legend =
                 "LMB click/drag select | RMB move — with an own producer building selected: set its rally point | S stop | " +
                 "A attack enemy under cursor (else plain move; armed units auto-acquire visible in-range enemies, D-087) | " +
-                "H harvest nearest field | R return cargo | P pause/resume (local match only) | " +
+                "H harvest nearest field | R return cargo | ESC/P pause menu (clock stops in local matches only)\n" +
                 "O build zone overlay on/off (shows on its own while a placement ghost is armed)\n" +
                 "Build (build bar below or hotkey — a ghost follows the cursor; LMB place | RMB/ESC cancel): " +
                 $"B {_buildingDefId} | Shift+B {_altBuildingDefId} | C {_storageDefId} | V {_vehicleFactoryDefId} | " +
@@ -436,6 +461,26 @@ namespace Nova.Presentation.UI
         {
             if (!EnsureDispatcher()) return;
             if (_menu != null && _menu.IsMenuVisible) return; // the overlay owns every click
+
+            if (ModalSurfaceLink.Open)
+            {
+                // A modal surface (pause menu, result or network panel) owns
+                // the input: no selection, no orders, no hotkeys, no escort
+                // moves into a stopped kernel — and no click falling through
+                // the panel onto the world behind it. "Pointer over HUD" is
+                // published so the camera's edge-pan strip stops too, without
+                // a second reader. An in-flight drag or armed gesture dies
+                // here instead of resolving behind the panel.
+                HudPointerLink.Publish(true);
+                _dragActive = false;
+                if (_placementMode || _pendingOrder != PendingOrder.None)
+                {
+                    _placementMode = false;
+                    _pendingOrder = PendingOrder.None;
+                    _lastCommandStatus = "Gesture cancelled — a modal surface owns the input";
+                }
+                return;
+            }
 
             Vector2 mouse = Input.mousePosition;
             UpdatePlacementHover(mouse);
@@ -481,6 +526,13 @@ namespace Nova.Presentation.UI
             // ClearSelection also drops the selected field (21.2): a rebinding
             // means a fresh match, and its ids belong to the old one.
             _selection.ClearSelection();
+            // Armed gestures are input state tied to the OLD match's world:
+            // an armed placement ghost or order pick must never survive the
+            // ingress rebind into the next round (#102 — the ghost used to
+            // stay armed through "Hauptmenü" → "Neues Spiel").
+            _placementMode = false;
+            _pendingOrder = PendingOrder.None;
+            _dragActive = false;
             return true;
         }
 
@@ -541,8 +593,12 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void HandlePlacementModeInput(Vector2 mouse, bool shift)
         {
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+            bool escape = Input.GetKeyDown(KeyCode.Escape);
+            if (escape || Input.GetMouseButtonDown(1))
             {
+                // Stamp the ESC consumption: the pause menu peels one layer
+                // per press and must not open on this same press.
+                if (escape) LastGestureCancelFrame = Time.frameCount;
                 _placementMode = false;
                 _lastCommandStatus = "Placement cancelled";
                 return;
@@ -935,26 +991,11 @@ namespace Nova.Presentation.UI
 
             if (Input.GetKeyDown(KeyCode.R)) OrderReturnCargo();
 
-            // Pause/resume toggles the kernel clock only — simulation state is
-            // untouched, so this needs no command. StartMatch after PauseMatch
-            // simply restarts the tick pump.
-            if (Input.GetKeyDown(KeyCode.P))
-            {
-                if (_runner.IsRelayMatch)
-                {
-                    _lastCommandStatus = "Pause/resume is unavailable in a relay match";
-                }
-                else if (_runner.IsRunning)
-                {
-                    _runner.PauseMatch();
-                    _lastCommandStatus = "Match paused (P resumes)";
-                }
-                else
-                {
-                    _runner.StartMatch();
-                    _lastCommandStatus = "Match resumed";
-                }
-            }
+            // Pause/resume no longer lives here: ESC/P and the pause menu
+            // belong to PauseMenuHud, which pauses the kernel clock directly
+            // (no command involved). While its modal is up, the gate in
+            // Update keeps every hotkey above from firing into the stopped
+            // kernel.
 
             // Control groups 1-9 (sprint 09 §7): Ctrl/Cmd+Digit stores the
             // current selection, the bare digit recalls it.
@@ -1150,8 +1191,11 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void HandleOrderPickInput(Vector2 mouse)
         {
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+            bool escape = Input.GetKeyDown(KeyCode.Escape);
+            if (escape || Input.GetMouseButtonDown(1))
             {
+                // Same one-layer-per-press contract as the placement cancel.
+                if (escape) LastGestureCancelFrame = Time.frameCount;
                 _pendingOrder = PendingOrder.None;
                 _lastCommandStatus = "Order pick cancelled";
                 return;
