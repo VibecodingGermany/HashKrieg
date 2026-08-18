@@ -247,6 +247,27 @@ namespace Nova.Gameplay.Match
         public ushort LocalFieldId => LocalPlayerLayout.FieldId;
         public ushort EnemyFieldId => EnemyPlayerLayout.FieldId;
 
+        /// <summary>
+        /// The initial reserve of a canonical field (21.2, #86). It lives in
+        /// the canonical map layout, NOT in simulation state —
+        /// <c>AetheriumField</c> deliberately carries no InitialReserve field
+        /// because the Simulation/State/ layout is frozen. Returns false for
+        /// an unknown id.
+        /// </summary>
+        public bool TryGetFieldInitialReserve(ushort fieldId, out long reserveAE)
+        {
+            for (int i = 0; i < FieldLayouts.Length; i++)
+            {
+                if (FieldLayouts[i].Id == fieldId)
+                {
+                    reserveAE = FieldLayouts[i].ReserveAE;
+                    return true;
+                }
+            }
+            reserveAE = 0L;
+            return false;
+        }
+
         /// <summary>Aetherium field cell of the human player (7, 7).</summary>
         public Vector2Int LocalFieldCell => new Vector2Int(LocalPlayerLayout.FieldX, LocalPlayerLayout.FieldY);
 

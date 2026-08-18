@@ -345,6 +345,7 @@ namespace Nova.Editor
             WireReference(card, "_runner", runner);
             WireReference(card, "_input", input);
             WireReference(card, "_buildMenu", menu);
+            WireReference(card, "_bootstrap", runner.GetComponent<MatchBootstrap>());
 
             WireReference(input, "_commandCard", card);
 

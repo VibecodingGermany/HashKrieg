@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
+using Nova.Gameplay;
 using Nova.Gameplay.Match;
+using Nova.Simulation.Economy;
 
 namespace Nova.Presentation.Maps
 {
@@ -24,6 +27,16 @@ namespace Nova.Presentation.Maps
     /// is gitignored, so a downloaded texture would vanish in every fresh
     /// clone; the procedural desert is the permanent baseline a CC0 drop-in
     /// may later decorate, never a prerequisite.
+    /// </para>
+    /// <para>
+    /// RESERVE STAGES (21.2, #86): the crystal cluster of each field follows
+    /// its remaining reserve — the shards go out one by one as the field is
+    /// worked (<see cref="FieldCrystalStages"/> owns the staging rule), and
+    /// an exhausted field keeps a single flattened, darkened stump, so it
+    /// reads as burnt-out rather than simply empty. The readout runs on a
+    /// half-second cadence over the same read-only economy API the HUD
+    /// uses — never a per-frame simulation query — and a match restart
+    /// simply re-reads the refilled reserves and restores every shard.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -79,6 +92,22 @@ namespace Nova.Presentation.Maps
             1.10f, 0.65f, 0.80f, 0.55f, 0.70f, 0.50f, 0.60f,
         };
 
+        /// <summary>Reserve readout cadence (21.2): the shard stages follow RemainingAE on the HUD's read rail — the harvester-escort interval of RtsDeviceInput, never a per-frame query.</summary>
+        private const float ReserveReadIntervalSeconds = 0.5f;
+
+        /// <summary>Height of the one flattened stump an exhausted field keeps (the burnt-out read instead of bare ground).</summary>
+        private const float ExhaustedStumpHeight = 0.12f;
+
+        // Shard cache per field, built once in Start: index f holds the
+        // shards of field id f + 1, because AllFieldCells iterates the
+        // canonical layout in ascending id order. A match restart does NOT
+        // rebuild the scene, so the markers survive — the cadence re-reads
+        // the fresh economy and restores the full clusters itself.
+        private readonly List<GameObject[]> _fieldShards = new List<GameObject[]>();
+        private readonly List<int> _fieldStages = new List<int>();
+        private float _reserveNextReadTime;
+        private MaterialPropertyBlock _propertyBlock;
+
         private void Start()
         {
             if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
@@ -95,7 +124,39 @@ namespace Nova.Presentation.Maps
             BuildWeatheredEdge(_bootstrap.MapSize);
             for (int i = 0; i < fieldCells.Length; i++)
             {
-                BuildFieldMarker(fieldCells[i], $"Field_{i + 1}");
+                _fieldShards.Add(BuildFieldMarker(fieldCells[i], $"Field_{i + 1}"));
+                // Full reserve until the first readout: the clusters are
+                // built lit, so nothing flickers while no economy exists yet.
+                _fieldStages.Add(ClusterOffsets.Length);
+            }
+        }
+
+        /// <summary>
+        /// The reserve readout (21.2, #86): each field's shard stage follows
+        /// its RemainingAE, applied ONLY on a stage change (the health-tint
+        /// bucket precedent of UnitViewManager — a full match costs no more
+        /// than before). No runner or no economy yet (menu, network
+        /// handshake) means no read: the markers keep their full look.
+        /// </summary>
+        private void Update()
+        {
+            if (Time.time < _reserveNextReadTime) return;
+            _reserveNextReadTime = Time.time + ReserveReadIntervalSeconds;
+
+            MatchRunner runner = _bootstrap != null ? _bootstrap.Runner : null;
+            EconomySystem economy = runner != null ? runner.Economy : null;
+            if (economy == null) return;
+
+            for (int f = 0; f < _fieldShards.Count; f++)
+            {
+                ushort fieldId = (ushort)(f + 1);
+                if (!economy.TryGetField(fieldId, out AetheriumField field)) continue;
+                if (!_bootstrap.TryGetFieldInitialReserve(fieldId, out long initialReserveAE)) continue;
+
+                int stage = FieldCrystalStages.VisibleShards(field.RemainingAE, initialReserveAE, _fieldShards[f].Length);
+                if (stage == _fieldStages[f]) continue;
+                _fieldStages[f] = stage;
+                ApplyFieldStage(_fieldShards[f], stage, field.IsExhausted);
             }
         }
 
@@ -255,13 +316,14 @@ namespace Nova.Presentation.Maps
             }
         }
 
-        private void BuildFieldMarker(Vector2Int cell, string label)
+        private GameObject[] BuildFieldMarker(Vector2Int cell, string label)
         {
             var marker = new GameObject($"AetheriumField_{label}_{cell.x}_{cell.y}");
             marker.transform.SetParent(transform, false);
             marker.transform.position = new Vector3(cell.x + 0.5f, 0f, cell.y + 0.5f);
 
             Material crystalMaterial = CreateRuntimeMaterial(_crystalColor);
+            var shards = new GameObject[ClusterOffsets.Length];
             for (int i = 0; i < ClusterOffsets.Length; i++)
             {
                 float height = ClusterHeights[i];
@@ -275,7 +337,64 @@ namespace Nova.Presentation.Maps
                 // Pure marker: no collider, so nothing can ever pick or block a crystal.
                 Destroy(shard.GetComponent<Collider>());
                 shard.GetComponent<Renderer>().sharedMaterial = crystalMaterial;
+                shards[i] = shard;
             }
+            return shards;
+        }
+
+        /// <summary>
+        /// Applies one reserve stage: the first <paramref name="stage"/>
+        /// shards stand lit, the rest go dark — except on an exhausted field,
+        /// where shard 0 survives as the flattened, darkened stump that reads
+        /// "burnt-out" instead of "there was never anything here".
+        /// </summary>
+        private void ApplyFieldStage(GameObject[] shards, int stage, bool exhausted)
+        {
+            for (int i = 0; i < shards.Length; i++)
+            {
+                if (i < stage)
+                {
+                    RestoreShard(shards[i], i);
+                }
+                else if (exhausted && i == 0)
+                {
+                    ApplyExhaustedStump(shards[i]);
+                }
+                else
+                {
+                    shards[i].SetActive(false);
+                }
+            }
+        }
+
+        /// <summary>The lit look of one shard: its literal cluster shape — and no property block, dropping any exhausted darkening (a match restart refills every reserve).</summary>
+        private void RestoreShard(GameObject shard, int clusterIndex)
+        {
+            float height = ClusterHeights[clusterIndex];
+            shard.transform.localPosition = new Vector3(ClusterOffsets[clusterIndex].x, height * 0.5f, ClusterOffsets[clusterIndex].y);
+            shard.transform.localScale = new Vector3(0.35f, height, 0.35f);
+            shard.GetComponent<Renderer>().SetPropertyBlock(null);
+            shard.SetActive(true);
+        }
+
+        /// <summary>
+        /// The exhausted stump: shard 0 flattened and darkened to a third of
+        /// the crystal tone via MaterialPropertyBlock (both colour
+        /// properties, the FactionTint idiom) — the shared cluster material
+        /// itself stays untouched, or every field would darken together.
+        /// </summary>
+        private void ApplyExhaustedStump(GameObject shard)
+        {
+            shard.transform.localPosition = new Vector3(ClusterOffsets[0].x, ExhaustedStumpHeight * 0.5f, ClusterOffsets[0].y);
+            shard.transform.localScale = new Vector3(0.45f, ExhaustedStumpHeight, 0.45f);
+
+            if (_propertyBlock == null) _propertyBlock = new MaterialPropertyBlock();
+            _propertyBlock.Clear();
+            Color darkened = _crystalColor * 0.30f;
+            darkened.a = 1f;
+            FactionTint.ApplyToPropertyBlock(_propertyBlock, darkened);
+            shard.GetComponent<Renderer>().SetPropertyBlock(_propertyBlock);
+            shard.SetActive(true);
         }
     }
 }

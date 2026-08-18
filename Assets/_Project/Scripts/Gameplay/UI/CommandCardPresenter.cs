@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Nova.Core;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
@@ -307,6 +308,42 @@ namespace Nova.Gameplay
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// The field card's reserve line (21.2, #86): "6.420 / 9.000 AE" —
+        /// German thousands grouping, assembled digit by digit so the output
+        /// is identical under ANY ambient culture (a build on an en-US host
+        /// must not render "6,420").
+        /// </summary>
+        public static string FormatFieldReserveAE(long remainingAE, long initialReserveAE)
+        {
+            var builder = new StringBuilder(24);
+            AppendGroupedDe(builder, remainingAE);
+            builder.Append(" / ");
+            AppendGroupedDe(builder, initialReserveAE);
+            builder.Append(" AE");
+            return builder.ToString();
+        }
+
+        /// <summary>Decimal digits with the German '.' group separator; reserve values are never negative, so a non-positive input renders as "0".</summary>
+        private static void AppendGroupedDe(StringBuilder builder, long value)
+        {
+            if (value <= 0)
+            {
+                builder.Append('0');
+                return;
+            }
+
+            int digitCount = 1;
+            for (long rest = value; rest >= 10; rest /= 10) digitCount++;
+            for (int i = 0; i < digitCount; i++)
+            {
+                if (i > 0 && (digitCount - i) % 3 == 0) builder.Append('.');
+                long divisor = 1;
+                for (int d = 1; d < digitCount - i; d++) divisor *= 10;
+                builder.Append((char)('0' + (int)(value / divisor % 10)));
+            }
         }
 
         /// <summary>

@@ -152,5 +152,66 @@ namespace Nova.Gameplay.Tests
             Assert.IsFalse(selection.HasControlGroup(5));
             Assert.AreEqual(0, selection.RecallControlGroup(5, entities, playerId: 0));
         }
+
+        // ------------------------------------------------------------------
+        // Sprint 21.2 (#86): field selection — UI-only, coupled both ways
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void SelectionManager_SelectField_ClearsEntitySelection()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+            selection.SelectSingle(u1);
+            selection.AddSingle(u2);
+
+            selection.SelectField(3);
+
+            Assert.AreEqual(0, selection.SelectedCount, "a field takes no entity orders — the entity selection goes");
+            Assert.AreEqual((ushort)3, selection.SelectedFieldId);
+        }
+
+        [Test]
+        public void SelectionManager_EntitySelection_ClearsSelectedField()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+
+            selection.SelectField(2);
+            selection.SelectSingle(u1);
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId, "SelectSingle replaces the field");
+            Assert.AreEqual(1, selection.SelectedCount);
+
+            selection.SelectField(2);
+            selection.AddSingle(u2);
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId, "an additive entity pick ends the field selection too");
+            Assert.AreEqual(1, selection.SelectedCount);
+
+            selection.SelectField(2);
+            selection.SelectBox(entities, playerId: 0, minX: 0f, minY: 0f, maxX: 20f, maxY: 20f);
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId, "a box selection replaces the field");
+            Assert.AreEqual(2, selection.SelectedCount);
+        }
+
+        [Test]
+        public void SelectionManager_ClearSelection_ClearsFieldAndEntities()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            selection.SelectSingle(u1);
+
+            selection.ClearSelection();
+            Assert.AreEqual(0, selection.SelectedCount);
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId);
+
+            selection.SelectField(5);
+            selection.ClearSelection();
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId, "the ingress rebind relies on ClearSelection dropping the field too");
+        }
     }
 }
