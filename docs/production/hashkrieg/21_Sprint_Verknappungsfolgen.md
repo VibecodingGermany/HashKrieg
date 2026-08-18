@@ -1,6 +1,6 @@
 # Sprint 21: Die Folgen der Verknappung — endliche Felder werden lesbar und bespielbar
 
-**Version:** 1.0.0 | **Status:** geplant | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
+**Version:** 1.1.0 | **Status:** in Arbeit (21.1 läuft) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
 
 ## Zweck
 
@@ -131,35 +131,60 @@ Simulation/State/          Layout und Serialisierung
 Die Reihenfolge ist nach Abhängigkeit sortiert, nicht nach Aufwand. Jedes Paket
 ist ein eigener PR und für sich abnehmbar.
 
-### 21.1 · Die Territoriumsregel wird ausgesprochen und gemessen (#92 → D-108)
+### 21.1 · Jedes Gebäude wird Bauanker (#92 → D-108) — **Verhaltensänderung**
 
-**Kein Overlay, keine Regeländerung — erst eine Festlegung und eine Zahl.**
+> **Diese Beschreibung ist am 2026-08-18 neu gefasst worden.** Sie stand vorher
+> auf einer falschen Prämisse: die Erstfassung von D-108 hielt das Kriechen über
+> *jedes* Gebäude für den Ist-Zustand und wollte es nur aussprechen. Der Code
+> prüft seit D-104 auf HQ, Lager und Kraftwerk. Der Inhaber hat daraufhin in
+> Kenntnis der Lage neu entschieden — die Ankerliste wird **geöffnet**. Das
+> Paket ist damit kein Dokumentationspaket mehr, sondern das einzige der ersten
+> fünf, das Simulationsverhalten ändert.
 
-Die Entscheidung ist getroffen (D-108): **jedes eigene Gebäude bleibt Bauanker**,
-die Zone kriecht mit der Basis mit. Das ist klassisches C&C und koppelt Expansion
-genau so an die Wirtschaft, wie die Verknappung es will. Was fehlt, ist, dass es
-irgendwo steht.
+**a) Die Messung — erledigt.** `tools/Nova.SimRunner.Tests/BuildZoneCapacityTests.cs`
+beziffert die Startzone des HQ-Ankers in zwei Spuren: die echte Systemspur über
+`ValidatePlacement` + `PlaceCompletedBuilding`, und ein Geometriemodell, das die
+Systemspur beim heutigen Wert zellgenau reproduzieren muss, bevor seine
+Variantenzahlen gelten.
 
-Zu liefern:
+| `MinimumBuildingDistanceCells` | Gebäude in der Startzone |
+|---|---|
+| **2** (Ist, D-104) | **15** |
+| 1 | 23 (+53 %) |
+| 0 | 23 — identisch zu 1, weil die Footprint-Belegung Abstand unter 1 ohnehin verbietet |
 
-1. Den Docstring an `BuildInfluenceRadiusCells` so umschreiben, dass die Regel
-   *„ab jedem eigenen Bauanker"* nicht mehr nur ein Nebensatz ist, mit Verweis
-   auf D-108.
-2. **Die Enge messen, bevor irgendetwas gedreht wird.** Der Bericht sagt, der
-   Platz sei „nach einigen Kraftwerken relativ schnell ausgeschöpft". Die
-   Vermutung aus #91 ist, dass nicht der Radius 8 die Ursache ist, sondern
-   `MinimumBuildingDistanceCells = 2`, das Zellen *innerhalb* der Zone sperrt.
-   Liefere eine Zahl, kein Gefühl: **wie viele Gebäude welcher Footprintgrößen
-   passen in die Startzone**, bei `MinimumBuildingDistanceCells` 2 gegen 1
-   gegen 0? Als Test in `tools/Nova.SimRunner.Tests/`, damit die Zahl nicht
-   verfällt.
-3. **Erst dann** entscheiden, ob der Wert fällt. Fällt er, ist das eine
-   Simulationsänderung mit eigenem PR und eigener Baseline-Bewegung — und der
-   Grund steht in der PR-Beschreibung mit alter und neuer Zahl.
+Der einzige wirksame Hebel wäre 2 → 1. **Der Wert bleibt bei 2.** Die Messung
+weist die gemeldete Enge nicht als Abstandsproblem aus, und die 15 sind ohnehin
+nur eine untere Schranke für die *Anfangs*zone — Anker schieben die Grenze mit
+jedem Bau nach außen. Der Test pinnt alle drei Konstanten und macht dieses Paket
+erneut auf, falls eine davon später fällt.
 
-**Fertig wenn:** die Regel dokumentiert ist, die Kapazitätszahl als Test
-existiert, und die Entscheidung über `MinimumBuildingDistanceCells` mit Zahl
-begründet ist.
+**b) Die Regeländerung.** In `ConstructionSystem.IsInsideBuildInfluence` entfällt
+die Rollenprüfung:
+
+```csharp
+// entfällt:
+if (def.Role != UnitRole.HQ && def.Role != UnitRole.Storage && def.Role != UnitRole.Power) continue;
+```
+
+Jedes eigene, lebende und fertiggestellte Gebäude wird Anker. `BuildInfluenceRadiusCells`
+bleibt 8, `MinimumBuildingDistanceCells` bleibt 2.
+
+**c) Der Docstring wird zweimal nachgezogen.** Er sagt heute „from an own
+construction anchor" und nennt die Rollenliste nicht — genau diese Auslassung hat
+die falsche Erstfassung von D-108 erzeugt. Erst auf den Ist-Zustand *mit*
+Rollenliste (zusammen mit der Messung, damit der Fehler sofort aus dem Code
+verschwindet), dann mit der Regeländerung auf die neue Fassung.
+
+> **Verhalten und Baseline nie im selben PR.** Teil b bewegt `RulesHash64`, die
+> Determinismus-Baselines **und** den gepinnten Ausgang der kanonischen KI-Partie.
+> Also: ein PR für die Regel, ein zweiter für die Baselines — und vorher ein mit
+> dem Einheitenstrang abgestimmtes Merge-Fenster, weil `CanonicalAiOutcomeTests`
+> arn gehört.
+
+**Fertig wenn:** die Messung als Test liegt, der Docstring die geltende Regel
+nennt, jedes Gebäude ankert, und die Baselines in einem eigenen PR nachgezogen
+sind.
 
 ### 21.2 · Der Restbestand wird sichtbar (#86) — **kritisch**
 
@@ -207,7 +232,8 @@ davor, und schreib die Rechnung in die PR-Beschreibung.
 
 ### 21.4 · Der Baubereich wird sichtbar (#91)
 
-**Erst nach 21.1**, sonst zeigt das Overlay eine Regel, die sich danach ändert.
+**Erst nach 21.1**, sonst zeigt das Overlay eine Regel, die sich danach ändert —
+und seit der Neufassung von D-108 ändert sie sich wirklich.
 
 Beim Anklicken des HQ und im Platzierungsmodus wird der erlaubte Bereich
 angezeigt. **Nicht als Radius-Ring** — der wäre unehrlich, weil
@@ -331,7 +357,7 @@ Drei von vier ergibt einen roten Test, der wie ein Determinismusfehler aussieht
 und keiner ist. Betrifft 21.3, 21.6 und 21.7.
 
 **R-2 · Verhalten und Baseline nie im selben PR.** Die wichtigste Regel des
-Parallelbetriebs. 21.3, 21.6 und 21.7 ändern Simulationsverhalten und lassen
+Parallelbetriebs. **21.1 Teil b**, 21.3, 21.6 und 21.7 ändern Simulationsverhalten und lassen
 `SnapshotGoldenBytesTests`, `CommandGoldenBytesTests`, `SimRandomGoldenTests`
 und `Determinism10000Tests` rot werden. Das ist ihr Zweck. Die Baseline wird in
 einem **eigenen** PR neu gesetzt, mit altem und neuem Wert im Text und der
@@ -339,9 +365,9 @@ Begründung, warum die Änderung gewollt ist. Das Drehbuch
 `Determinism10000Scenario.cs` ist davon **nicht** betroffen und darf im selben
 PR nachgezogen werden.
 
-**R-3 · 21.6 und 21.7 bewegen den gepinnten KI-Ausgang.** Eine andere Karte
-heißt eine andere kanonische Partie. `CanonicalAiOutcomeTests` gehört dem
-Einheitenstrang. **Vor** dem Merge von 21.6 mit arn abstimmen, in welchem
+**R-3 · 21.1 Teil b, 21.6 und 21.7 bewegen den gepinnten KI-Ausgang.** Eine
+andere Bauregel und eine andere Karte heißen eine andere kanonische Partie. `CanonicalAiOutcomeTests` gehört dem
+Einheitenstrang. **Vor** dem Merge von 21.1 Teil b und 21.6 mit arn abstimmen, in welchem
 Merge-Fenster das läuft — „ein Fenster hat einen Strang". Zwei Stränge in einem
 Fenster machen einen roten Test nicht zuordenbar.
 
@@ -355,6 +381,8 @@ verschwinden. Der getrackte Weg ist ausschließlich `tools/packaging/`.
 
 ## Fertig wenn
 
+- [ ] Jedes eigene fertiggestellte Gebäude erweitert die Bauzone, und der
+      Docstring nennt die geltende Regel statt eines vagen „anchor" (21.1)
 - [ ] Ein Spieler liest den Restbestand jedes Vorkommens ab, ohne das Debug-HUD
       zu öffnen — als Zahl und am Kristallstand auf der Karte (21.2)
 - [ ] Der Baubereich ist vor dem Klick sichtbar, inklusive der gesperrten Zellen
@@ -381,15 +409,19 @@ die neue Feldlage in den Eintrag, nicht nur „mehr Felder".
 ## Versionsrelevanz
 
 `minor`. Kein Vertrag bricht: kein neuer `CommandKind`, kein
-`StateVersion`-Bump, keine Änderung an `SimDefinitions`. Die Kartenlage bewegt
-Determinismus-Baselines, aber keine Schnittstelle.
+`StateVersion`-Bump, keine Änderung an `SimDefinitions`.
 
-> Falls 21.1 zu dem Ergebnis kommt, dass `MinimumBuildingDistanceCells` fällt,
-> bewegt das `RulesHash64` — dann ist das ein eigener PR mit eigener D-ID, und
-> die Versionsrelevanz dieses Pakets steigt auf die Regelrevision.
+> **`RulesHash64` bewegt sich aber**, und zwar durch 21.1 Teil b (Ankerliste).
+> Das ist eine Regelrevision und kein Schnittstellenbruch: alte und neue Builds
+> können nicht miteinander spielen, aber nichts an der Schnittstelle ändert
+> sich. Verteilte Testbuilds sind danach ungültig — siehe R-4.
+> `MinimumBuildingDistanceCells` und `BuildInfluenceRadiusCells` bleiben
+> unverändert; fällt später doch einer der beiden Werte, ist das ein eigener PR
+> mit eigener D-ID.
 
 ## Änderungsverlauf
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-18 | **Paket 21.1 neu gefasst.** Die Erstfassung hielt das Kriechen über jedes Gebäude für den Ist-Zustand; `IsInsideBuildInfluence` prüft seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch gefunden und angehalten, der Inhaber hat D-108 in Kenntnis der Lage neu getroffen: die Ankerliste wird geöffnet. 21.1 ist damit eine Verhaltensänderung mit `RulesHash64`-Bewegung und eigenem Merge-Fenster; die Messung (15/23/23) ist erledigt und `MinimumBuildingDistanceCells` bleibt bei 2. R-2, R-3, Versionsrelevanz und „Fertig wenn" nachgezogen | Orchestrator |
 | 1.0.0 | 2026-08-17 | Erstfassung aus [20_Vorschlag_Verknappungsfolgen.md](20_Vorschlag_Verknappungsfolgen.md) nach den Inhaberentscheidungen D-108 und D-109. #85 als vom Einheitenstrang erledigt ausgetragen, #89/#90 als Vertragsflächen ausgeschlossen | Orchestrator |

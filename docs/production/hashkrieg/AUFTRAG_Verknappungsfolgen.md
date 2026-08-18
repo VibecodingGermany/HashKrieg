@@ -1,6 +1,6 @@
 # Großauftrag: Die Folgen der Verknappung
 
-**Version:** 1.0.0 | **Status:** verbindlich | **Erteilt:** 2026-08-17 | **Auftraggeber:** Inhaber | **Ausführung:** Kimi (Maintainer-Seite) | **Umfang:** Blöcke 1–2, entspricht Sprint 21 und Sprint 18 | **Grundlage:** `main` @ `3e10c48` | **Leitsatz:** erst sichtbar machen, was die Simulation weiß, dann die Karte anfassen
+**Version:** 1.1.0 | **Status:** verbindlich | **Erteilt:** 2026-08-17 | **Auftraggeber:** Inhaber | **Ausführung:** Kimi (Maintainer-Seite) | **Umfang:** Blöcke 1–2, entspricht Sprint 21 und Sprint 18 | **Grundlage:** `main` @ `3e10c48` | **Leitsatz:** erst sichtbar machen, was die Simulation weiß, dann die Karte anfassen
 
 ## Vorrangregel
 
@@ -103,7 +103,7 @@ Abhängigkeit sortiert, nicht nach Aufwand:
 
 | | Paket | Issue | Hängt an |
 |---|---|---|---|
-| 21.1 | Territoriumsregel aussprechen und Enge messen | #92 → D-108 | — |
+| 21.1 | **Jedes Gebäude wird Bauanker** — Verhaltensänderung | #92 → D-108 | — |
 | 21.2 | **Restbestand sichtbar machen** (kritisch) | #86 | — |
 | 21.3 | Startmenge rechnen statt raten | #87 | 21.2 |
 | 21.4 | Baubereich sichtbar machen | #91 | 21.1 |
@@ -118,13 +118,20 @@ Abhängigkeit sortiert, nicht nach Aufwand:
 dieser Sprint existiert. Was fällt, kommt mit Begründung in den
 [ScopeLedger](../ScopeLedger.md).
 
-**Zwei Dinge, die du aus der Sprintdatei allein nicht siehst:**
+**Drei Dinge, die du aus der Sprintdatei allein nicht siehst:**
 
-- **21.6 und 21.7 bewegen den gepinnten Ausgang der kanonischen KI-Partie.** Eine
-  andere Karte heißt eine andere Partie. `CanonicalAiOutcomeTests` gehört dem
-  Einheitenstrang. Beide Pakete brauchen ein eigenes Merge-Fenster, abgestimmt
-  mit @arn-c0de — „ein Fenster hat einen Strang". Sag Bescheid, bevor du 21.6
-  aufmachst, statt danach.
+- **21.1 hat am 2026-08-18 die Richtung gewechselt.** Es war als reines
+  Dokumentationspaket geplant, weil D-108 in seiner Erstfassung eine Regel
+  festschreiben wollte, die der Code gar nicht hatte. Der Widerspruch wurde beim
+  Umsetzen gefunden und gemeldet — genau so, wie es die Vorrangregel oben
+  verlangt. Der Inhaber hat neu entschieden: die Ankerliste wird **geöffnet**,
+  jedes eigene fertiggestellte Gebäude wird Anker. Damit ist 21.1 das einzige der
+  ersten fünf Pakete, das Simulationsverhalten ändert.
+- **21.1 Teil b, 21.6 und 21.7 bewegen den gepinnten Ausgang der kanonischen
+  KI-Partie.** Eine andere Bauregel und eine andere Karte heißen eine andere
+  Partie. `CanonicalAiOutcomeTests` gehört dem Einheitenstrang. Alle drei
+  brauchen ein eigenes Merge-Fenster, abgestimmt mit @arn-c0de — „ein Fenster hat
+  einen Strang". Sag Bescheid, **bevor** du aufmachst, statt danach.
 - **21.2 legt kein Feld in den Zustand.** Die Anzeige „6.420 / 9.000" braucht die
   Anfangsreserve. Sie kommt aus der kanonischen Kartenlage, **nicht** aus einem
   neuen Feld in `AetheriumField` — das wäre `Simulation/State/`-Layout und damit
@@ -246,8 +253,9 @@ Entscheidung kurz im PR.
   „nur ein Feld" in `AetheriumField`
 - Die Tickreihenfolge in `MatchRunner` ändern oder ein neues System registrieren
 - Die Anzahl oder Lage der Aetheriumfelder ohne die Symmetrieprüfung aus D-107
-- `MinimumBuildingDistanceCells` oder `BuildInfluenceRadiusCells` ändern, bevor
-  die Messung aus 21.1 vorliegt
+- `MinimumBuildingDistanceCells` oder `BuildInfluenceRadiusCells` ändern. Die
+  Messung aus 21.1 liegt vor (15/23/23) und der Inhaber hat entschieden: **beide
+  Werte bleiben.** Wer sie doch bewegen will, braucht eine eigene D-ID
 - Ein Paket streichen, das nicht auf der Abwurfliste steht
 - Irgendetwas in fremdem Terrain, auch wenn es „nur eine Zeile" wäre
 
@@ -273,4 +281,5 @@ nötig wäre, und auf die Entscheidung warten.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-18 | Paket 21.1 nach der Neufassung von D-108 als Verhaltensänderung ausgewiesen: die Ankerliste in `IsInsideBuildInfluence` wird geöffnet, statt eine nicht existente Bestandsregel festzuschreiben. Merge-Fenster-Hinweis auf 21.1 Teil b erweitert, die Messung als erledigt und beide Konstanten als unverändert eingetragen | Orchestrator |
 | 1.0.0 | 2026-08-17 | Erstfassung: Sprint 21 und Sprint 18 gebündelt, gegen `main` @ `3e10c48` geprüft, Grenzen und stille Fallen benannt. Enthält die Berichtigung zur lokalen Testbarkeit gegenüber dem vorigen Auftrag | Orchestrator |

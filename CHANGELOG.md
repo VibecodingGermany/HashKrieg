@@ -18,6 +18,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Entschieden
+- **D-108 berichtigt und neu gefasst: jedes eigene Gebäude wird Bauanker.** Die
+  Erstfassung vom 2026-08-17 behauptete, der Code lasse *jedes* Gebäude als Anker
+  gelten, und wollte diesen Zustand nur aussprechen. Das war falsch:
+  `ConstructionSystem.IsInsideBuildInfluence` prüft seit D-104 auf **HQ, Lager
+  und Kraftwerk**, und D-104 Punkt 2 sagt das wörtlich. Der Fehler entstand, weil
+  der Docstring von `BuildInfluenceRadiusCells` und Issue #92 von einem „eigenen
+  Bauanker" sprechen, ohne die Rollenliste zu nennen, und die Implementierung vor
+  der Beschlussfassung nicht gelesen wurde. Gefunden hat ihn der ausführende
+  Agent beim Umsetzen von Paket 21.1, der angehalten und nachgefragt hat statt
+  den Widerspruch aufzulösen. Der Inhaber hat daraufhin **in Kenntnis der
+  tatsächlichen Lage neu entschieden**: nicht die Bestandsregel festschreiben,
+  sondern die Ankerliste öffnen. Damit ist D-108 eine Verhaltensänderung —
+  `RulesHash64`, Determinismus-Baselines und der gepinnte Ausgang der kanonischen
+  KI-Partie bewegen sich, es braucht einen eigenen Regel-PR, einen zweiten
+  Baseline-PR und ein mit dem Einheitenstrang abgestimmtes Merge-Fenster. Bewusst
+  in Kauf genommen: eine Kette billiger Gebäude kann sich damit über die Karte
+  schieben — in C&C etabliert und im Zusammenspiel mit 21.6/21.7 gewollt
 - **D-108: Territorium wächst kriechend an jedem eigenen Bauanker.** Die Frage
   aus Testbericht T-01 (#92) — erweitert ein zweites HQ den Baubereich? — war im
   Code längst beantwortet und nie ausgesprochen:
@@ -56,6 +73,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Die Startzone ist gemessen statt geschätzt (Paket 21.1).**
+  `tools/Nova.SimRunner.Tests/BuildZoneCapacityTests.cs` beziffert in zwei Spuren,
+  wie viele Gebäude in die Bauzone des kanonischen HQ-Ankers passen: eine echte
+  Systemspur über `ValidatePlacement` und `PlaceCompletedBuilding`, und ein
+  Geometriemodell, das die Systemspur beim geltenden Wert zellgenau reproduzieren
+  muss, bevor seine Variantenzahlen zählen. Ergebnis: **15** Gebäude bei
+  `MinimumBuildingDistanceCells = 2`, **23** bei 1, und bei 0 ebenfalls 23 — weil
+  die Footprint-Belegung jede Konfiguration mit Abstand unter 1 ohnehin verbietet.
+  Der einzige wirksame Hebel wäre 2 → 1, und **beide Konstanten bleiben
+  unverändert**: die Zahl weist die im Testbericht gemeldete Enge nicht als
+  Abstandsproblem aus, und die 15 sind ohnehin nur eine untere Schranke für die
+  Anfangszone, weil jeder Anker die Grenze mitschiebt. Der Test pinnt alle drei
+  Konstanten und macht das Paket erneut auf, falls eine davon fällt
 - **Sprint 21 festgeplant und als Großauftrag erteilt.** Aus dem Vorschlag zu den
   Verknappungsfolgen wird nach den Inhaberentscheidungen D-108 und D-109 die
   Sprintdatei `docs/production/hashkrieg/21_Sprint_Verknappungsfolgen.md` mit
