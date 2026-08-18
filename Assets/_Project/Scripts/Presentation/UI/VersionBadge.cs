@@ -122,9 +122,21 @@ namespace Nova.Presentation.UI
         /// </summary>
         private static string BuildDisplayText()
         {
+            // THE EDITOR NEVER BORROWS A BUILD'S IDENTITY, and the check
+            // comes FIRST for a reason found by a red test: the stamp file
+            // BuildCommitStamp writes is git-ignored and SURVIVES the build
+            // that wrote it, so an Editor session after any local player build
+            // reads that build's commit and would claim to be it. Asking
+            // BuildInfo.Commit alone is therefore not enough — its editor
+            // sentinel only appears when no stamp happens to be lying around.
+            if (Application.isEditor)
+            {
+                return $"v{Application.version} · {FallbackBuildId} (Editor)";
+            }
+
             string commit = BuildInfo.Commit;
             return commit == BuildInfo.EditorCommit
-                ? $"v{Application.version} · {FallbackBuildId} (Editor)"
+                ? $"v{Application.version} · {FallbackBuildId}"
                 : $"v{Application.version} · {commit}";
         }
     }
