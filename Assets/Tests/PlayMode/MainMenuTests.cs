@@ -361,16 +361,25 @@ namespace Nova.PlayMode.Tests
 
         private static UIDocument MenuDocument()
         {
-            var document = Object.FindAnyObjectByType<UIDocument>();
-            Assert.NotNull(document,
-                "no UIDocument in the Bootstrap scene: the MainMenu object is missing. The scene " +
+            // By GameObject name, not FindAnyObjectByType: the scene has TWO
+            // UIDocuments since the version badge (#103) — which one "any"
+            // returns is undefined, and the badge's document has neither a
+            // "menu-screen" nor an AudioSource.
+            UIDocument[] documents = Object.FindObjectsByType<UIDocument>(FindObjectsInactive.Include);
+            foreach (UIDocument document in documents)
+            {
+                if (document.gameObject.name != "MainMenu") continue;
+                Assert.NotNull(document.panelSettings,
+                    "the menu UIDocument has no PanelSettings, so it has no panel and draws nothing. " +
+                    "MenuAssetSetup.LoadOrCreatePanelSettings creates " +
+                    "Assets/_Project/UI/HashkriegPanelSettings.asset when the generator runs.");
+                return document;
+            }
+            Assert.Fail(
+                "no UIDocument on a 'MainMenu' object in the Bootstrap scene. The scene " +
                 "is machine output — run Tools/Project Nova/Create Bootstrap Scene " +
                 "(BootstrapSceneGenerator.CreateMainMenuObject).");
-            Assert.NotNull(document.panelSettings,
-                "the menu UIDocument has no PanelSettings, so it has no panel and draws nothing. " +
-                "MenuAssetSetup.LoadOrCreatePanelSettings creates " +
-                "Assets/_Project/UI/HashkriegPanelSettings.asset when the generator runs.");
-            return document;
+            return null;
         }
 
         private static VisualElement MenuRoot()
