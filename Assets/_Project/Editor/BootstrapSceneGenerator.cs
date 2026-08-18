@@ -70,6 +70,7 @@ namespace Nova.Editor
             CreateMapObject(runner, ground);
             GameObject ui = CreateUiObject(runner, camera);
             CreateMainMenuObject(runner, camera, ui, audio.MusicGroup);
+            CreateVersionBadgeObject();
             EnsureGlutrinneMapAsset();
 
             // The drop-in registry is rebuilt from whatever PF_* prefabs
@@ -438,6 +439,28 @@ namespace Nova.Editor
             }
 
             CreateIngameMusicObject(runner, menu, musicGroup);
+        }
+
+        /// <summary>
+        /// The always-on version badge (issue #103): its OWN GameObject and
+        /// UIDocument, so it survives both the menu's root rebuilds and the
+        /// IMGUI cockpit's menu/match visibility switches (issue #102). It
+        /// shares the menu's PanelSettings; the component sorts its document
+        /// above the menu's full-screen key art itself. No visualTreeAsset —
+        /// like the menu, the tree is built in C# so the generated scene
+        /// carries nothing this generator could not reproduce.
+        /// </summary>
+        private static void CreateVersionBadgeObject()
+        {
+            var badgeObject = new GameObject("VersionBadge");
+
+            UIDocument document = badgeObject.AddComponent<UIDocument>();
+            document.panelSettings = MenuAssetSetup.LoadOrCreatePanelSettings();
+
+            VersionBadge badge = badgeObject.AddComponent<VersionBadge>();
+            WireReference(badge, "_document", document);
+            WireReference(badge, "_font",
+                MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.BodyFontPath));
         }
 
         /// <summary>
