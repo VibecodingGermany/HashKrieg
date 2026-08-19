@@ -92,6 +92,12 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   eigene Bystander-Zeile ohne Befehlsbeitrag) und trägt bei einer
   beschädigten Einzelauswahl deren HP im Titel; rein sim-lesend, ohne
   Eingriff in die Simulation
+- **Einstellungen jetzt auch im Pausemenü.** Auf Inhaber-Wunsch nach der
+  T-03-Proberunde: das Pausemenü enthält dieselben Funktionen wie die
+  Hauptmenü-Maske — Musik und SFX jeweils mit An/Aus und Lautstärke, Vollbild
+  und Auflösungswechsel. Beide Oberflächen schreiben über dasselbe Gateway
+  (`GameSettingsStore.ApplyAndSave`): wirkt sofort, persistiert in dieselbe
+  `settings.json`, kein Zustands-Duplikat
 - **Restbestand der Vorkommen anklickbar und sichtbar (Paket 21.2, #86).**
   Ein Linksklick auf ein Aetherium-Vorkommen (auch ein erschöpftes) zeigt in der
   Befehlskarte Restbestand und Anfangsreserve („Aetherium-Vorkommen — 6.420 /
