@@ -104,5 +104,57 @@ namespace Nova.Simulation.Tests
                 Is.EqualTo(CommandResultCode.Applied),
                 "inside + unblocked validates");
         }
+
+        /// <summary>
+        /// The overlay's repaint reads MASKS, not per-cell queries (main-thread
+        /// hitch fix): the masks must equal the per-cell reads on EVERY origin
+        /// of the grid — the picture may never drift from the rule. The fixture
+        /// deliberately mixes the four register cases: a completed own anchor,
+        /// a second completed own building, an ACTIVE own site (blocks spacing,
+        /// never anchors — D-108) and an enemy building (blocks spacing for
+        /// everyone, anchors for nobody here).
+        /// </summary>
+        [Test]
+        public void FillBuildZoneMasks_MatchesThePerCellReads_OnEveryCell()
+        {
+            var entities = new EntityManager(64);
+            var economy = new EconomySystem(entities, 5000);
+            var costField = new CostField(ConstructionSystem.GridSize, ConstructionSystem.GridSize);
+            var construction = new ConstructionSystem(entities, economy, costField);
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            kernel.RegisterSystem(economy);
+            kernel.RegisterSystem(construction);
+            kernel.Start();
+
+            Assert.That(construction.PlaceCompletedBuilding(Slot, DefHQAlliance, 4, 4).IsValid, Is.True, "own HQ anchor");
+            Assert.That(construction.PlaceCompletedBuilding(Slot, DefPowerAlliance, 13, 13).IsValid, Is.True, "own completed Power anchor");
+            Assert.That(construction.TryPlaceBuilding(Slot, DefPowerAlliance, 20, 4), Is.True, "active own site");
+            Assert.That(construction.PlaceCompletedBuilding(1, 20, 40, 40).IsValid, Is.True, "enemy HQ (Legion def 20)");
+
+            int size = ConstructionSystem.GridSize;
+            var influence = new bool[size * size];
+            var spacingBlocked = new bool[size * size];
+            construction.FillBuildZoneMasks(Slot, influence, spacingBlocked);
+
+            int mismatches = 0;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    int cell = y * size + x;
+                    bool expectedInfluence = construction.IsInsideBuildInfluence(Slot, x, y);
+                    bool expectedBlocked = !construction.HasMinimumBuildingSpacing(x, y);
+                    if (influence[cell] != expectedInfluence || spacingBlocked[cell] != expectedBlocked)
+                    {
+                        if (mismatches++ < 5)
+                        {
+                            TestContext.Out.WriteLine(
+                                $"({x},{y}): mask=({influence[cell]},{spacingBlocked[cell]}) direct=({expectedInfluence},{expectedBlocked})");
+                        }
+                    }
+                }
+            }
+            Assert.That(mismatches, Is.EqualTo(0), "the repaint masks must equal the per-cell reads on every origin of the grid");
+        }
     }
 }
