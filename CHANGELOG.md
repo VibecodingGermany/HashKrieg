@@ -73,6 +73,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Tragzeit des Startfelds ist gemessen, nicht geraten (Paket 21.3, #87).**
+  `tools/Nova.SimRunner.Tests/StartFieldLongevityTests.cs` fährt den echten
+  Ernte-Auto-Zyklus auf der kanonischen Eröffnungsgeometrie (Feld (7,7) mit
+  9.000 AE, Raffinerie (9,5)) bis zur Erschöpfung: **7:33 min** mit einem
+  Harvester, **3:46 min** mit zweien, **2:31 min** mit dreien — die Ernterate
+  dominiert, der Laufweg entfällt über die Footprint-Reichweite. Nebenbefund,
+  durch Messung belegt: die Eröffnung trägt nur etwa drei *lauffreie*
+  Harvester je Feld; mehr brauchen Wegzeit. Der Wert 9.000 bleibt — die
+  Zahlen stützen den Expansionsdruck aus D-102 statt ihn zu schwächen, und
+  der T-01-Fehlschätzer war ein Sichtbarkeitsproblem (21.2), kein Mengenproblem
 - **Die Befehlskarte sagt die Wahrheit über die Auswahl (Paket 21.5, #88).**
   Bei Mehrfachauswahl bietet die Einheitenkarte nur noch Befehle an, die für
   **alle** markierten mobilen Einheiten gelten (Schnittmenge statt
