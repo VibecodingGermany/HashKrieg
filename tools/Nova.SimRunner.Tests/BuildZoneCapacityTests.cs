@@ -19,9 +19,11 @@ namespace Nova.SimRunner.Tests
     /// The start zone is the build-influence area of the canonical player-0
     /// HQ anchor alone (footprint origin (4,4), D-107): every 3x3 footprint
     /// whose footprint-aware Chebyshev distance to the HQ rectangle is at most
-    /// <see cref="ConstructionSystem.BuildInfluenceRadiusCells"/>. All five
-    /// canonical fields (D-102/D-107 layout) are registered, though only the
-    /// start field at (7,7) intersects the zone.
+    /// <see cref="ConstructionSystem.BuildInfluenceRadiusCells"/>. All eleven
+    /// canonical fields (21.6/#93 layout) are registered, though only the
+    /// start field at (7,7) intersects the zone — the next-nearest field sits
+    /// at (44,24), thirty cells past the zone boundary, so the pinned numbers
+    /// below are deliberately insensitive to the outfield layout.
     /// </para>
     /// <para>
     /// Two lanes keep the number honest. The REAL lane drives the untouched
@@ -48,7 +50,8 @@ namespace Nova.SimRunner.Tests
     {
         // Canonical player-0 start (D-107): HQ footprint origin (4,4), start
         // field point (7,7) with 9.000 AE. The remaining canonical fields
-        // (D-102/D-107) complete the field set the spacing rule iterates.
+        // (21.6/#93 layout, mirrored from MatchBootstrap.FieldLayouts like the
+        // four R-1 copies) complete the field set the spacing rule iterates.
         private const int HqOriginX = 4;
         private const int HqOriginY = 4;
         private const ushort DefHQAlliance = 3;
@@ -57,11 +60,17 @@ namespace Nova.SimRunner.Tests
 
         private static readonly (ushort Id, int X, int Y, long ReserveAE)[] CanonicalFields =
         {
-            (1, 7,   7,   9000L),
-            (2, 117, 117, 9000L),
-            (3, 24,  40,  9000L),
-            (4, 100, 84,  9000L),
-            (5, 62,  62,  15000L),
+            (1,  7,   7,   9000L),
+            (2,  117, 117, 9000L),
+            (3,  24,  40,  9000L),
+            (4,  100, 84,  9000L),
+            (5,  62,  62,  15000L),
+            (6,  44,  24,  9000L),
+            (7,  80,  100, 9000L),
+            (8,  44,  80,  12000L),
+            (9,  80,  44,  12000L),
+            (10, 24,  96,  12000L),
+            (11, 100, 28,  12000L),
         };
 
         private static int F => SimDefinitions.BuildingFootprintCells;

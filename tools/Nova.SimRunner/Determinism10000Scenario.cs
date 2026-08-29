@@ -136,8 +136,8 @@ namespace Nova.SimRunner
     /// MS-1 manifest start state of quality/content/mvp-v1.json
     /// (startStatePerPlayer) per slot — a COMPLETED HQ, ONE Builder and
     /// 3.000 AE (EconomySystem.CanonicalMatchStartingCreditsAE, wired by
-    /// <see cref="BuildHost"/>) — plus five finite canonical Aetherium fields.
-    /// Nothing
+    /// <see cref="BuildHost"/>) — plus eleven finite canonical Aetherium
+    /// fields (21.6, #93). Nothing
     /// else is spawned: the script then drives the opening exactly like a
     /// player, for BOTH slots — walk the Builder to the future site, place
     /// the Refinery once it is affordable and the committed grid covers its
@@ -194,20 +194,32 @@ namespace Nova.SimRunner
         }
 
         /// <summary>
-        /// The five canonical fields (16.7, C1 — MVPContentManifest section 5):
-        /// two start fields and two natural expansions at 9.000 AE each, one
-        /// contested centre at 15.000. Every slot-1 coordinate is the point
-        /// mirror of slot 0 across the D-102/D-107 Glutrinne layout axis ((x, y) -&gt;
-        /// (124 - x, 124 - y)). Registration in ascending id order is part of
-        /// the canonical initial state.
+        /// The eleven canonical fields (16.7/C1 layout as extended by sprint
+        /// 21.6, #93 — the T-01 report's "at least roughly twice as many"):
+        /// two start fields and TWO natural expansions per side at 9.000 AE
+        /// each, four contested flank fields at 12.000 and the contested
+        /// centre at 15.000 (a single field until 21.7 groups it). Every
+        /// slot-1 coordinate is the point mirror of slot 0 across the
+        /// D-102/D-107 Glutrinne layout axis ((x, y) -&gt; (124 - x, 124 - y)):
+        /// the pairs 1/2, 3/4, 6/7, 8/9 and 10/11 mirror exactly, the centre
+        /// (62,62) mirrors onto itself. Registration in ascending id order is
+        /// part of the canonical initial state. Mirror of
+        /// MatchBootstrap.FieldLayouts — a drift between the two is caught by
+        /// the CanonicalMatchSetupTests reference hash chain in BOTH lanes.
         /// </summary>
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
+            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
         };
 
         /// <summary>
@@ -636,7 +648,7 @@ namespace Nova.SimRunner
         };
 
         /// <summary>
-        /// Applies the deterministic match setup to a fresh host: the five
+        /// Applies the deterministic match setup to a fresh host: the eleven
         /// canonical fields in ascending id order, then per slot the D-077
         /// start state of quality/content/mvp-v1.json
         /// (startStatePerPlayer) — a COMPLETED HQ, ONE Builder and the 3.000

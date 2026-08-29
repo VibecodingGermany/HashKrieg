@@ -189,6 +189,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Die Karte trägt 11 Vorkommen statt 5 (Paket 21.6, #93).** Bisher lagen fünf
+  Aetheriumfelder auf 128×128, zwei davon als Startbasis gebunden — für zwei
+  Spieler blieben **drei** umkämpfte Felder, und daraus entsteht keine
+  Entscheidung, sondern ein Wettlauf zum jeweils nächstgelegenen. Neu sind vier
+  natürliche Erweiterungen à 9.000 AE und vier umkämpfte Flanken à 12.000 AE;
+  die Mitte bleibt in diesem Paket **ein** Feld à 15.000 (sie wird erst in 21.7
+  zum Gebiet). Gesamtreserve der Karte 117.000 AE, umkämpfte Felder für zwei
+  Spieler: neun statt drei. Die bindende Punktsymmetrie aus D-107
+  (`(x, y) → (124 − x, 124 − y)`) ist für jedes Paar nachgerechnet und als Test
+  gepinnt — Asymmetrie wäre hier kein Geschmacks-, sondern ein Balancefehler.
+  Nebenbefund beim Umsetzen: die kanonische Feldlage stand nicht wie in R-1
+  angenommen an **vier** Stellen literal im Repo, sondern an **sechs**; die
+  fünfte (`tools/Nova.SimRunner.Tests/BuildZoneCapacityTests.cs`) ist
+  mitgezogen, die sechste (`Assets/_Project/Editor/BootstrapSceneGenerator.cs`,
+  backt die alte Lage in `MapDefinitionSO`) liegt außerhalb der Schreibhoheit
+  dieses Pakets und ist heute folgenlos, weil kein Laufzeitkonsument sie liest
 - **Die Skirmish-KI benennt, was eine Einheit vorhat — und verteidigt damit
   ihre Basis (`GoalKind`, `r7` → `r8`)** — zwei Schritte, die zusammengehören
   und deshalb zusammen kommen: erst bekommt die Entscheidung eine **Form**,

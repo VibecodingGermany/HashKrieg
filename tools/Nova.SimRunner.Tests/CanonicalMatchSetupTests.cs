@@ -78,11 +78,17 @@ namespace Nova.SimRunner.Tests
 
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
+            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
         };
         // Faction-resolved opening placement ids (SimDefinitions id rule):
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
@@ -176,7 +182,8 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
-        /// five finite Aetherium fields in canonical id order, then per slot a
+        /// eleven finite Aetherium fields (21.6, #93) in canonical id order,
+        /// then per slot a
         /// completed HQ and ONE Builder — nothing else. Entity spawn order is
         /// load-bearing: EntityManager hands out ids from a deterministic free
         /// list, so any reordering shifts every id and therefore every hash.
@@ -294,7 +301,7 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void ReferenceOpeningPosition_RegistersFiveFiniteFields()
+        public void ReferenceOpeningPosition_RegistersElevenFiniteFields()
         {
             ReferenceHost host = BuildReferenceHost(CanonicalSeed);
             ApplyOpeningPosition(host);
@@ -319,12 +326,36 @@ namespace Nova.SimRunner.Tests
             Assert.That(Slot0Layout.BuilderX + Slot1Layout.BuilderX, Is.EqualTo(124),
                 "point coordinates mirror as p -> 124-p");
             Assert.That(Slot0Layout.BuilderY + Slot1Layout.BuilderY, Is.EqualTo(124));
-            Assert.That(FieldLayouts[0].X + FieldLayouts[1].X, Is.EqualTo(124));
-            Assert.That(FieldLayouts[0].Y + FieldLayouts[1].Y, Is.EqualTo(124));
-            Assert.That(FieldLayouts[2].X + FieldLayouts[3].X, Is.EqualTo(124));
-            Assert.That(FieldLayouts[2].Y + FieldLayouts[3].Y, Is.EqualTo(124));
+            // The eleven-field layout (21.6, #93): five mirrored pairs plus the
+            // self-mirroring centre. Every pair sums to 124 per axis.
+            AssertMirrorPair(0, 1, "start fields");
+            AssertMirrorPair(2, 3, "natural expansions");
+            AssertMirrorPair(5, 6, "second expansions");
+            AssertMirrorPair(7, 8, "near contested flanks");
+            AssertMirrorPair(9, 10, "far contested flanks");
             Assert.That(FieldLayouts[4].X, Is.EqualTo(62));
             Assert.That(FieldLayouts[4].Y, Is.EqualTo(62));
+            // Mirrored fields carry mirrored reserves, or the mirror is only
+            // geometric and the balance statement is false.
+            AssertMirroredReserves(0, 1);
+            AssertMirroredReserves(2, 3);
+            AssertMirroredReserves(5, 6);
+            AssertMirroredReserves(7, 8);
+            AssertMirroredReserves(9, 10);
+        }
+
+        private static void AssertMirrorPair(int first, int second, string label)
+        {
+            Assert.That(FieldLayouts[first].X + FieldLayouts[second].X, Is.EqualTo(124),
+                $"D-107: {label} must mirror as (x, y) -> (124 - x, 124 - y)");
+            Assert.That(FieldLayouts[first].Y + FieldLayouts[second].Y, Is.EqualTo(124),
+                $"D-107: {label} must mirror as (x, y) -> (124 - x, 124 - y)");
+        }
+
+        private static void AssertMirroredReserves(int first, int second)
+        {
+            Assert.That(FieldLayouts[first].ReserveAE, Is.EqualTo(FieldLayouts[second].ReserveAE),
+                "D-107 symmetry covers the reserve, not only the cell");
         }
 
         [Test]

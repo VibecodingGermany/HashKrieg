@@ -85,9 +85,10 @@ namespace Nova.Gameplay.Match
     /// quality/content/mvp-v1.json startStatePerPlayer): per slot ONLY a
     /// completed HQ, ONE Builder and 3.000 AE starting credits
     /// (EconomySystem.CanonicalMatchStartingCreditsAE, plumbed in by
-    /// <see cref="MatchRunner.InitializeMatch"/>'s default) — plus the five
-    /// finite canonical Aetherium fields (two starts, two expansions and the
-    /// contested centre). The Refinery is NO longer
+    /// <see cref="MatchRunner.InitializeMatch"/>'s default) — plus the
+    /// eleven finite canonical Aetherium fields (two starts, four natural
+    /// expansions, four contested flanks and the contested centre; 21.6,
+    /// #93). The Refinery is NO longer
     /// pre-placed: the player builds it (it has no Power-plant prerequisite
     /// since D-077), and the completed Refinery — not the HQ — produces the
     /// Harvesters.
@@ -150,22 +151,42 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// The five canonical fields (16.7, C1 — MVPContentManifest section 5,
-        /// mirror of Determinism10000Scenario.FieldLayouts): two start fields
-        /// and two natural expansions at 9.000 AE each, one contested centre
-        /// at 15.000. Symmetry is binding: point coordinates mirror as
-        /// (x, y) -&gt; (124 - x, 124 - y); a 3x3 footprint's lower-left
-        /// origin therefore mirrors as (x, y) -&gt; (122 - x, 122 - y).
-        /// D-107 maps HQ (4,4) to HQ (118,118), so both starts are equally
-        /// far from their expansion (34 cells) and from the centre (56).
+        /// The eleven canonical fields (21.6, #93 — the T-01 report's "at
+        /// least roughly twice as many", up from the five of 16.7/C1): two
+        /// start fields and TWO natural expansions per side at 9.000 AE
+        /// each, four contested flank fields at 12.000 and the contested
+        /// centre at 15.000. The centre deliberately stays a SINGLE field
+        /// here — 21.7 (D-109) turns it into the grouped zone; this package
+        /// only grows the count. Symmetry is binding (D-107): point
+        /// coordinates mirror as (x, y) -&gt; (124 - x, 124 - y); a 3x3
+        /// footprint's lower-left origin therefore mirrors as
+        /// (x, y) -&gt; (122 - x, 122 - y). The pairs 1/2, 3/4, 6/7, 8/9
+        /// and 10/11 are exact mirrors; the centre (62,62) mirrors onto
+        /// itself. Distances are Chebyshev from the HQ footprint's
+        /// centre-facing corner cell ((6,6) against (118,118) — the
+        /// convention behind the canonical 34/56): each start field sits 1
+        /// from its HQ, the naturals lie 34 and 38 out (two per side, so
+        /// the opening is a CHOICE, not a race), the near flank pair is
+        /// exactly equidistant (74/74), the far flank pair leans four
+        /// cells toward its side (90/94), the centre stays at 56.
+        /// Reserves: naturals match the start field (the 21.3 longevity
+        /// measurement), the flanks pay +33 % for the contested walk, the
+        /// centre keeps its premium. Total on the map: 117.000 AE (was
+        /// 51.000).
         /// </summary>
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1, X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2, X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3, X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4, X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5, X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
+            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
+            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
+            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
         };
 
         /// <summary>maxHealth stamped by SpawnUnit when no definition stats are applied.</summary>
@@ -275,9 +296,11 @@ namespace Nova.Gameplay.Match
         public Vector2Int EnemyFieldCell => new Vector2Int(EnemyPlayerLayout.FieldX, EnemyPlayerLayout.FieldY);
 
         /// <summary>
-        /// All five registered field cells in canonical id order: start 0/1,
-        /// expansion 0/1, contested centre. Presentation iterates this list so
-        /// marker and scatter geometry cannot silently omit a field.
+        /// All eleven registered field cells in canonical id order: start
+        /// 0/1, expansion 0/1, contested centre, second expansion 0/1,
+        /// contested near flank 0/1, contested far flank 0/1. Presentation
+        /// iterates this list so marker and scatter geometry cannot
+        /// silently omit a field.
         /// </summary>
         public Vector2Int[] AllFieldCells
         {
@@ -933,9 +956,9 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// Registers all five canonical fields in ascending id order. This is
-        /// the exact field pass mirrored by Determinism10000Scenario and both
-        /// CanonicalMatchSetupTests lanes.
+        /// Registers all eleven canonical fields in ascending id order. This
+        /// is the exact field pass mirrored by Determinism10000Scenario and
+        /// both CanonicalMatchSetupTests lanes.
         /// </summary>
         private void SetupFields()
         {
