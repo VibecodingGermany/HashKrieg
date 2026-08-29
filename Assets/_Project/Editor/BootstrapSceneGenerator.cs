@@ -286,22 +286,23 @@ namespace Nova.Editor
                 AssetDatabase.CreateAsset(map, mapPath);
             }
 
+            // Both lists are READ from MatchBootstrap, never restated here.
+            // They used to be literals, and they went stale: this baked the
+            // five-field layout with a comment claiming it was what
+            // MatchBootstrap registers, straight through the map changes of
+            // sprint 21 that took it to fifteen. Nobody caught it because
+            // MapDefinitionSO has no runtime consumer — which makes a wrong
+            // value cheap today and expensive on the day someone reads it.
+            Vector2Int[] hqCentres = MatchBootstrap.CanonicalHqCentreCells;
+            Vector2Int[] fieldCells = MatchBootstrap.CanonicalFieldCells;
+
             map.Initialize(
                 "Glutrinne",
                 MapBiomeType.Desert,
                 128,
                 128,
-                // D-107 HQ footprint centres: point mirror p -> 124-p.
-                new[] { new Vector2(5f, 5f), new Vector2(119f, 119f) },
-                // The five fields MatchBootstrap registers, in canonical id order.
-                new[]
-                {
-                    new Vector2(7f, 7f),
-                    new Vector2(117f, 117f),
-                    new Vector2(24f, 40f),
-                    new Vector2(100f, 84f),
-                    new Vector2(62f, 62f),
-                });
+                System.Array.ConvertAll(hqCentres, c => new Vector2(c.x, c.y)),
+                System.Array.ConvertAll(fieldCells, c => new Vector2(c.x, c.y)));
             EditorUtility.SetDirty(map);
         }
 

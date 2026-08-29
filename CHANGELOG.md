@@ -355,6 +355,34 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Das Architektur-Gate war auf unberührtem `main` rot, und niemand sah es (Paket 22.4).**
+  `run_gate_check.py` führte `Nova.AI.Data` auf Rang 2 neben `Nova.AI` — nach
+  dem Namen einsortiert, nicht nach der Abhängigkeitsrichtung. Die reale Kante
+  `Nova.AI → Nova.AI.Data` ist damit eine Kante innerhalb derselben Schicht, und
+  die verbietet D-061: das Kriterium **G0-B.3 meldete auf jedem Baum eine
+  Verletzung**. Aufgefallen ist es nur, weil das Gate ohnehin nicht läuft.
+  `Nova.AI.Data` referenziert nichts außer `Nova.Core` und wird sonst nur aus
+  Rang 4 gelesen — Rang 1 ist der einzige Rang, der den bestehenden Graphen
+  gültig macht, ohne eine Zeile Code zu bewegen. G0-B.3 ist damit erstmals grün
+- **Die Schichtenkarte des Gates führte zwei Assemblies, die es nicht gibt (Paket 22.4).**
+  `Nova.Presentation.Maps` und `Nova.Presentation.Shaders` haben seit der
+  Zusammenlegung der Präsentationsschicht keine `.asmdef` mehr. Tote Ränge sind
+  nicht harmlos: sie genehmigen einem künftigen Träger dieses Namens still eine
+  Schicht, statt die Entscheidung zu erzwingen. Beide Einträge sind raus, und
+  ein neuer Wächter macht die Klasse dicht — **ein Eintrag in der Karte ohne
+  zugehörige `.asmdef` lässt das Gate jetzt rot werden.** Die Gegenrichtung
+  (eine `.asmdef` ohne Rang) war bereits abgedeckt; niemand hatte je andersherum
+  geschaut
+- **Die sechste Kopie der kanonischen Feldlage ist beseitigt (Paket 22.3).**
+  `BootstrapSceneGenerator` backte eine eigene Fünferliste in `MapDefinitionSO`,
+  mit dem Kommentar „the five fields MatchBootstrap registers" — der seit Paket
+  21.7 falsch war, weil dort fünfzehn stehen. Statt die Literale nachzuziehen
+  (und damit die Kopie zu behalten) liest der Generator die Lage jetzt über die
+  neuen statischen Leseflächen `MatchBootstrap.CanonicalFieldCells` und
+  `CanonicalHqCentreCells`. Dasselbe gilt für die HQ-Mitten, die dort ebenfalls
+  ein zweites Mal literal standen. Risiko R-1 aus Sprint 21 zählt damit wieder
+  fünf statt sechs Stellen — und die verbleibenden fünf sind alle durch Tests
+  gepinnt
 - **Der Gate-Vertrag zeigte auf ein Repository, das es nicht mehr gibt (#14, Stufe 1).**
   Das GitHub-Repo heißt seit dem 09.08.2026 `VibecodingGermany/HashKrieg`;
   `GateEvidence.schema.json`, `GateAuthorization.schema.json` und
