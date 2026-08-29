@@ -1,6 +1,6 @@
 # Sprint 21: Die Folgen der Verknappung — endliche Felder werden lesbar und bespielbar
 
-**Version:** 1.2.0 | **Status:** in Arbeit (21.1a und 21.2 fertig; 21.1b, 21.4, 21.8 laufen) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
+**Version:** 1.3.0 | **Status:** done (alle acht Pakete auf `main`; eine gespielte Runde steht aus) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 21 | **Vorgänger:** [16_Sprint_Wirtschaft.md](16_Sprint_Wirtschaft.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **Regelwerk:** [13-15_Parallelbetrieb.md](13-15_Parallelbetrieb.md) | **UX-Gate:** human | **Leitsatz:** endliche Felder sind kein Wert, sondern ein Systemwechsel
 
 ## Zweck
 
@@ -419,28 +419,91 @@ verschwinden. Der getrackte Weg ist ausschließlich `tools/packaging/`.
 
 ## Fertig wenn
 
-- [ ] Jedes eigene fertiggestellte Gebäude erweitert die Bauzone, und der
+- [x] Jedes eigene fertiggestellte Gebäude erweitert die Bauzone, und der
       Docstring nennt die geltende Regel statt eines vagen „anchor" (21.1)
-- [ ] Ein Spieler liest den Restbestand jedes Vorkommens ab, ohne das Debug-HUD
+- [x] Ein Spieler liest den Restbestand jedes Vorkommens ab, ohne das Debug-HUD
       zu öffnen — als Zahl und am Kristallstand auf der Karte (21.2)
-- [ ] Der Baubereich ist vor dem Klick sichtbar, inklusive der gesperrten Zellen
+- [x] Der Baubereich ist vor dem Klick sichtbar, inklusive der gesperrten Zellen
       innerhalb des Radius (21.4)
-- [ ] Die Befehlskarte zeigt bei Mehrfachauswahl Typen, Anzahl und Zustand, und
+- [x] Die Befehlskarte zeigt bei Mehrfachauswahl Typen, Anzahl und Zustand, und
       bietet nur Befehle an, die für **alle** gewählten Einheiten gelten (21.5)
-- [ ] Die Startmenge steht auf einem gerechneten Wert, und die Rechnung ist
+- [x] Die Startmenge steht auf einem gerechneten Wert, und die Rechnung ist
       nachlesbar (21.3)
-- [ ] Die Karte trägt genug Felder, dass ein Spieler zwischen Alternativen
+- [x] Die Karte trägt genug Felder, dass ein Spieler zwischen Alternativen
       wählt statt zu rennen (21.6)
-- [ ] Die Mitte ist ein Gebiet mit schmalen Zufahrten, Optik und Begehbarkeit
+- [x] Die Mitte ist ein Gebiet mit schmalen Zufahrten, Optik und Begehbarkeit
       stammen aus **einer** Quelle, und ein Erreichbarkeitstest sichert, dass
       keine Basis eingesperrt ist (21.7)
-- [ ] Ein Spieler kann eine Runde per ESC anhalten und sauber ins Hauptmenü
+- [x] Ein Spieler kann eine Runde per ESC anhalten und sauber ins Hauptmenü
       verlassen, ohne dass das Cockpit über dem Menü stehenbleibt, und liest
       in jedem Zustand unten links, welcher Stand läuft (21.8)
-- [ ] `dotnet test tools/Nova.SimRunner.Tests` grün, Baselines in eigenen PRs
+- [x] `dotnet test tools/Nova.SimRunner.Tests` grün, Baselines in eigenen PRs
       bewegt
 - [ ] **Eine gespielte Runde** — dieser Sprint ist überwiegend Oberfläche und
       Kartengefühl; die CI kann davon fast nichts belegen
+
+## Ergebnis
+
+Abgeschlossen am 2026-08-29. **Alle acht Pakete liegen auf `main`.**
+
+| Paket | PR | Ergebnis |
+|---|---|---|
+| 21.1 Ankerregel | [#109](https://github.com/VibecodingGermany/HashKrieg/pull/109) | jedes eigene fertige Gebäude ankert; Messung 15/23/23 gepinnt, `MinimumBuildingDistanceCells` bleibt 2 |
+| 21.2 Restbestand | [#104](https://github.com/VibecodingGermany/HashKrieg/pull/104) | Vorkommen anklickbar, Kristallstand sinkt sichtbar |
+| 21.3 Startmenge | [#115](https://github.com/VibecodingGermany/HashKrieg/pull/115) | gemessen statt geraten: 7:33 / 3:46 / 2:31 min bei 1/2/3 Harvestern; **9.000 bleibt** |
+| 21.4 Baubereich | [#112](https://github.com/VibecodingGermany/HashKrieg/pull/112), [#116](https://github.com/VibecodingGermany/HashKrieg/pull/116) | Overlay vor dem Klick, Masken in einem Durchgang statt pro Texel |
+| 21.5 Auswahlwahrheit | [#114](https://github.com/VibecodingGermany/HashKrieg/pull/114) | Schnittmenge statt Anführer, Typenaufschlüsselung mit HP |
+| 21.6 Mehr Felder | [#119](https://github.com/VibecodingGermany/HashKrieg/pull/119) | 5 → 11 Vorkommen, Symmetrie testgepinnt |
+| 21.7 Mitte als Gebiet | [#122](https://github.com/VibecodingGermany/HashKrieg/pull/122) | 15 Vorkommen, Felsring aus **einer** Quelle für Sim und Optik, Kehle 4 Zellen |
+| 21.8 Beta-Tor | [#111](https://github.com/VibecodingGermany/HashKrieg/pull/111), [#113](https://github.com/VibecodingGermany/HashKrieg/pull/113), [#117](https://github.com/VibecodingGermany/HashKrieg/pull/117), [#118](https://github.com/VibecodingGermany/HashKrieg/pull/118) | Pausemenü, Riegel, Versionsanzeige, Einstellungen, Pause/Resume-Tick-Fix |
+
+Headless-Kette am Ende: **736/736 grün.**
+
+### Was der Sprint über sich selbst gelernt hat
+
+**R-1 war unterzählt.** Das Risiko nannte vier Stellen, an denen die kanonische
+Feldlage literal im Repo steht. Es sind **sechs**: dazu kommen
+`tools/Nova.SimRunner.Tests/BuildZoneCapacityTests.cs` (mitgezogen) und
+`Assets/_Project/Editor/BootstrapSceneGenerator.cs:296` (nicht mitgezogen, weil
+außerhalb der Schreibhoheit; heute folgenlos, weil `MapDefinitionSO` außerhalb
+von `Editor/` keinen Laufzeitkonsumenten hat). Als Paket 22.3 nachgezogen.
+
+**R-2 war falsch.** Der Sprint nahm an, 21.1b, 21.3, 21.6 und 21.7 machten vier
+Baseline-Gruppen rot, und leitete daraus die Regel „Verhalten und Baseline nie
+im selben PR" ab. Keine einzige Baseline hat sich bewegt — sie pinnen
+Wire-Formate und PRNG, keinen Karteninhalt, und die gepinnte KI-Partie spielt
+nicht auf der kanonischen Karte. Das ist bequem und zugleich ein Befund: **eine
+komplette Kartenneuschreibung samt unbegehbarem Gelände bewegt keinen einzigen
+Fingerabdruck.** Dieselbe Lücke wie [#108](https://github.com/VibecodingGermany/HashKrieg/issues/108)
+bei der Ankerregel, nur größer. Gehört in den ersten Sprint nach dem Betatest.
+
+**R-3 trat nicht ein.** Der gepinnte KI-Ausgang hat sich nicht bewegt; ein
+abgestimmtes Merge-Fenster mit dem Einheitenstrang war nicht nötig.
+
+**Dreimal hat ein Arbeiter angehalten statt zu raten, und dreimal war das die
+wertvollere Antwort:** die falsche Prämisse in D-108 (21.1), die sechste
+Spiegelstelle (21.6), und der nicht beobachtbare Reparaturzustand eines Pioniers
+(Sprint 22). Ein vierter, als Gegenleser angesetzter Lauf hat in der
+Geländequelle eine **sachlich falsche Begründung** gefunden — die Behauptung,
+eine einzellige Wand lecke diagonal. Sie ist rechnerisch widerlegt und vor dem
+Merge berichtigt worden. Genau diese Sorte Docstring hat D-108 erzeugt.
+
+### Was ausdrücklich offen bleibt
+
+- **Eine gespielte Runde.** Der Sprint verlangt sie in seinem eigenen „Fertig
+  wenn". Kein Arbeiter hatte Unity; die neue Karte hat noch nie jemand gesehen.
+- **Die Unity-Testspuren.** EditMode und PlayMode sind geschrieben, nicht
+  gelaufen. Erwartung: **PlayMode 13/13**. Batchmode **ohne** `-quit`.
+- **Die EditMode-Spur, die den Gameplay-Ausdruck der Geländetabelle pinnt, läuft
+  in keiner CI.** Eine einseitige Drift von `GlutrinneTerrainMap.cs` bliebe
+  dauerhaft grün. Das ist die konkrete Rechnung, die die offene Hälfte von
+  [#110](https://github.com/VibecodingGermany/HashKrieg/issues/110) aufmacht.
+- **`CostField`s Docstring** behauptet weiter, sein Inhalt folge vollständig aus
+  dem Bau-Snapshot. Seit 21.7 kommt statisches Gelände dazu. Die Datei gehört
+  dem Einheitenstrang — Nachzug ist Inhabersache.
+- **Der Erreichbarkeitstest verspricht mehr, als er hält:**
+  `IntegrationField.Generate` sät die Zielzelle ohne Begehbarkeitsprüfung, ein
+  Feld unter einer Wand läse als erreichbar. Heute liegt keines dort.
 
 ## Changelog-Notiz
 
@@ -464,6 +527,7 @@ die neue Feldlage in den Eintrag, nicht nur „mehr Felder".
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.3.0 | 2026-08-29 | **Sprint abgeschlossen.** 21.6 und 21.7 geliefert, Ergebnisabschnitt ergänzt. R-1 als unterzählt (sechs statt vier Spiegelstellen) und R-2 als falsch (keine Baseline bewegt sich) festgehalten — beides Befunde aus der Umsetzung, nicht aus der Planung | Orchestrator |
 | 1.2.0 | 2026-08-18 | **Paket 21.8 nachgetragen** aus der Spielabnahme T-02: Pausemenü (#105), das über dem Hauptmenü stehenbleibende Cockpit (#102) und die fehlende Versionsanzeige (#103). Drei Befunde, ein Bauwerk — alle drei hängen an der Frage, welche Komponente aufhören muss zu arbeiten, wenn das Match nicht die aktive Oberfläche ist. Als Beta-Tor eingestuft: ohne sauberes Verlassen einer Runde findet kein Betatest statt. 21.2 ist fertig (PR #104) | Orchestrator |
 | 1.1.0 | 2026-08-18 | **Paket 21.1 neu gefasst.** Die Erstfassung hielt das Kriechen über jedes Gebäude für den Ist-Zustand; `IsInsideBuildInfluence` prüft seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch gefunden und angehalten, der Inhaber hat D-108 in Kenntnis der Lage neu getroffen: die Ankerliste wird geöffnet. 21.1 ist damit eine Verhaltensänderung mit `RulesHash64`-Bewegung und eigenem Merge-Fenster; die Messung (15/23/23) ist erledigt und `MinimumBuildingDistanceCells` bleibt bei 2. R-2, R-3, Versionsrelevanz und „Fertig wenn" nachgezogen | Orchestrator |
 | 1.0.0 | 2026-08-17 | Erstfassung aus [20_Vorschlag_Verknappungsfolgen.md](20_Vorschlag_Verknappungsfolgen.md) nach den Inhaberentscheidungen D-108 und D-109. #85 als vom Einheitenstrang erledigt ausgetragen, #89/#90 als Vertragsflächen ausgeschlossen | Orchestrator |
