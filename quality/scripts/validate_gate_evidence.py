@@ -55,7 +55,15 @@ SCHEMA_VALIDATOR = ROOT / "quality/scripts/validate_evidence_schema.mjs"
 SCHEMA_VERSION = "1.4.0"
 RECEIPT_SCHEMA_VERSION = "gate-authorization-v1"
 SCENARIO_AUTHORIZATION_STATUS = "two-phase-receipt-d066"
-REPOSITORY = "VibecodingGermany/Project_Nova"
+# Canonical repository identity after the 2026-08-09 rename. Every address
+# the validator *emits* (GitHub API paths, the receipt "repository" field)
+# uses this name only.
+REPOSITORY = "VibecodingGermany/HashKrieg"
+# Transition: checks accept the pre-rename name as well, so evidence and
+# receipts archived under it stay valid. The legacy allowance can be dropped
+# in a dedicated PR once no one reads old evidence anymore.
+LEGACY_REPOSITORY = "VibecodingGermany/Project_Nova"
+REPOSITORY_NAMES = (REPOSITORY, LEGACY_REPOSITORY)
 WORKFLOW_NAME = "quality-gate.yml"
 AUTHORIZING_JOB = "gate-evidence-authorize"
 # D-064: the trust bundle binds every tool/contract component per subject and
@@ -1355,19 +1363,24 @@ def authorize_evidence(
         errors.append(
             ("E_TRUST_CONTEXT", "authorize requires the GitHub Actions runtime")
         )
-    if env.get("GITHUB_REPOSITORY") != REPOSITORY:
-        errors.append(
-            ("E_TRUST_CONTEXT", f"GITHUB_REPOSITORY must be {REPOSITORY!r}")
-        )
-    workflow_ref = env.get("GITHUB_WORKFLOW_REF") or ""
-    expected_workflow_ref = (
-        f"{REPOSITORY}/.github/workflows/{WORKFLOW_NAME}@refs/heads/main"
-    )
-    if workflow_ref != expected_workflow_ref:
+    if env.get("GITHUB_REPOSITORY") not in REPOSITORY_NAMES:
         errors.append(
             (
                 "E_TRUST_CONTEXT",
-                f"GITHUB_WORKFLOW_REF must equal {expected_workflow_ref!r}",
+                f"GITHUB_REPOSITORY must be one of {REPOSITORY_NAMES!r}",
+            )
+        )
+    workflow_ref = env.get("GITHUB_WORKFLOW_REF") or ""
+    expected_workflow_refs = tuple(
+        f"{repository}/.github/workflows/{WORKFLOW_NAME}@refs/heads/main"
+        for repository in REPOSITORY_NAMES
+    )
+    if workflow_ref not in expected_workflow_refs:
+        errors.append(
+            (
+                "E_TRUST_CONTEXT",
+                "GITHUB_WORKFLOW_REF must equal one of "
+                f"{expected_workflow_refs!r}",
             )
         )
     if not env.get("GITHUB_WORKFLOW"):
@@ -2650,12 +2663,14 @@ def validate_document(
 
     if ci.get("headSha") != commit_sha:
         errors.append(("E_CI_SUBJECT", "CI headSha must equal subject commitSha"))
-    expected_ci_url = (
-        "https://github.com/VibecodingGermany/Project_Nova/actions/runs/"
-        f"{ci.get('runId')}"
+    expected_ci_urls = tuple(
+        f"https://github.com/{repository}/actions/runs/{ci.get('runId')}"
+        for repository in REPOSITORY_NAMES
     )
-    if ci.get("url") != expected_ci_url:
-        errors.append(("E_CI_URL", f"CI url must equal {expected_ci_url!r}"))
+    if ci.get("url") not in expected_ci_urls:
+        errors.append(
+            ("E_CI_URL", f"CI url must equal one of {expected_ci_urls!r}")
+        )
     if verify_git and isinstance(commit_sha, str):
         workflow_path = ci.get("workflowPath")
         if isinstance(workflow_path, str):
@@ -3081,7 +3096,7 @@ def _self_test_fixture() -> tuple[
             "integrityWorkflowSha256": content_digests["integrityWorkflow"],
         },
         "trustBundle": {
-            "trustedRepository": "VibecodingGermany/Project_Nova",
+            "trustedRepository": REPOSITORY,
             "trustedCommitSha": "9" * 40,
             "nodeVersion": "v24.4.1",
             "components": trust_bundle_components,
@@ -3161,14 +3176,14 @@ def _self_test_fixture() -> tuple[
         ],
         "ci": {
             "provider": "github-actions",
-            "repository": "VibecodingGermany/Project_Nova",
+            "repository": REPOSITORY,
             "workflowPath": ".github/workflows/quality-gate.yml",
             "runId": "123",
             "runAttempt": 1,
             "jobId": "456",
             "jobName": "integrity",
             "headSha": commit,
-            "url": "https://github.com/VibecodingGermany/Project_Nova/actions/runs/123",
+            "url": f"https://github.com/{REPOSITORY}/actions/runs/123",
             "conclusion": "success",
             "attestationArtifact": ci_attestation,
         },
@@ -3810,6 +3825,30 @@ def run_self_test() -> int:
             "E_COMMAND_EXECUTOR",
             lambda value: value["commands"][0].update(id="worker-g0-self-test"),
         ),
+        (
+            "repository-third-name",
+            "E_JSON_SCHEMA",
+            lambda value: value["ci"].update(
+                repository="VibecodingGermany/SomeOtherRepo"
+            ),
+        ),
+        (
+            "trusted-repository-third-name",
+            "E_JSON_SCHEMA",
+            lambda value: value["trustBundle"].update(
+                trustedRepository="VibecodingGermany/SomeOtherRepo"
+            ),
+        ),
+        (
+            "ci-url-third-name",
+            "E_CI_URL",
+            lambda value: value["ci"].update(
+                url=(
+                    "https://github.com/VibecodingGermany/SomeOtherRepo"
+                    "/actions/runs/123"
+                )
+            ),
+        ),
     ]
 
     base_errors = codes(copy.deepcopy(fixture))
@@ -3818,6 +3857,26 @@ def run_self_test() -> int:
         return 1
 
     checks = 2
+
+    # Transition positive (2026-08-09 rename): evidence carrying the
+    # pre-rename repository identity must still validate, through the schema
+    # enums (trustBundle.trustedRepository, ci.repository) and the semantic
+    # ci.url check alike.
+    legacy_fixture = copy.deepcopy(fixture)
+    legacy_fixture["trustBundle"]["trustedRepository"] = LEGACY_REPOSITORY
+    legacy_fixture["ci"]["repository"] = LEGACY_REPOSITORY
+    legacy_fixture["ci"]["url"] = (
+        f"https://github.com/{LEGACY_REPOSITORY}/actions/runs/123"
+    )
+    legacy_errors = codes(legacy_fixture)
+    checks += 1
+    if legacy_errors:
+        print(
+            "SELF-TEST FAIL: pre-rename repository identity was rejected: "
+            f"{sorted(legacy_errors)}"
+        )
+        return 1
+
     for name, expected_code, mutate in cases:
         candidate = copy.deepcopy(fixture)
         mutate(candidate)
@@ -4320,6 +4379,63 @@ def run_self_test() -> int:
                 print(
                     "SELF-TEST FAIL: protected authorize did not emit the "
                     f"receipt: {sorted(g0_authorize_codes)}"
+                )
+                return 1
+
+            # Transition positive (2026-08-09 rename): a protected runtime
+            # identifying itself under the pre-rename repository name still
+            # authorizes, while the emitted receipt carries the canonical
+            # name only.
+            legacy_environment = dict(
+                os.environ,
+                GITHUB_REPOSITORY=LEGACY_REPOSITORY,
+                GITHUB_WORKFLOW_REF=(
+                    f"{LEGACY_REPOSITORY}/.github/workflows/"
+                    f"{WORKFLOW_NAME}@refs/heads/main"
+                ),
+            )
+            legacy_codes, legacy_receipt = authorize(
+                trusted_document,
+                trusted_evidence,
+                external / "receipt-legacy-repository.json",
+                legacy_environment,
+            )
+            checks += 1
+            if (
+                legacy_codes
+                or legacy_receipt is None
+                or legacy_receipt.get("repository") != REPOSITORY
+            ):
+                print(
+                    "SELF-TEST FAIL: pre-rename runtime identity was "
+                    "rejected or the receipt lost the canonical repository "
+                    f"name: {sorted(legacy_codes)}"
+                )
+                return 1
+
+            # Negative: a third, unknown repository identity fails closed.
+            foreign_environment = dict(
+                os.environ,
+                GITHUB_REPOSITORY="VibecodingGermany/SomeOtherRepo",
+                GITHUB_WORKFLOW_REF=(
+                    "VibecodingGermany/SomeOtherRepo/.github/workflows/"
+                    f"{WORKFLOW_NAME}@refs/heads/main"
+                ),
+            )
+            foreign_codes, foreign_receipt = authorize(
+                trusted_document,
+                trusted_evidence,
+                external / "receipt-foreign-repository.json",
+                foreign_environment,
+            )
+            checks += 1
+            if (
+                foreign_receipt is not None
+                or "E_TRUST_CONTEXT" not in foreign_codes
+            ):
+                print(
+                    "SELF-TEST FAIL: unknown repository identity escaped "
+                    f"the trust-context lock: {sorted(foreign_codes)}"
                 )
                 return 1
 

@@ -310,6 +310,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Der Gate-Vertrag zeigte auf ein Repository, das es nicht mehr gibt (#14, Stufe 1).**
+  Das GitHub-Repo heißt seit dem 09.08.2026 `VibecodingGermany/HashKrieg`;
+  `GateEvidence.schema.json`, `GateAuthorization.schema.json` und
+  `validate_gate_evidence.py` pinnten weiter den alten Namen als harte
+  Konstante. Aufgefallen ist es niemandem, weil der Selbsttest des Validators
+  **dieselbe** alte Konstante in seinen Fixtures benutzte: er war mit sich
+  selbst konsistent und darum grün, während der echte Autorisierungspfad am
+  `const` durchgefallen wäre, sobald er läuft. Die Prüfung nimmt jetzt beide
+  Namen an (neuer zuerst), damit unter dem alten Namen archivierte Nachweise
+  gültig bleiben; **erzeugt** wird ausschließlich der neue. Jede der drei
+  Stellen trägt eine Abschaltklausel, damit die Übergangszeit ein Ende hat. Der
+  Selbsttest prüft die Übergangsregel jetzt wirklich: beide Namen laufen durch,
+  ein dritter scheitert an allen vier Grenzen
 - **Der Determinismus-Wächter sieht jetzt auch den KI-Strang (#74).** `NoFloatInSimulationTests`
   scannte `Scripts/Core` und `Scripts/Simulation`, nicht aber `Scripts/AI` und
   `Scripts/AI.Data` — dabei ist `SkirmishAiSystem` in der kanonischen

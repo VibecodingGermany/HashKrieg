@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/VibecodingGermany/Project_Nova/quality/schemas/GateAuthorization.schema.json",
+  "$id": "https://github.com/VibecodingGermany/HashKrieg/quality/schemas/GateAuthorization.schema.json",
   "title": "Project Nova Gate Authorization Receipt",
   "description": "Two-phase authorization receipt per D-066 (G0-A2). A successful protected gate-evidence-authorize run emits this hash-bound candidate next to the unchanged GateEvidence.json. It binds gate, subject commit/tree, evidence carrier commit, evidence path/hash, trusted tool commit, repository, workflow and run/attempt/job id. The run never checks its own pending conclusion; later gates verify the exact workflow_dispatch run via the GitHub API. Versioned append-only under quality/authorizations/G<N>/<subjectCommitSha>/<runId>-attempt<runAttempt>/GateAuthorization.json after a small follow-up PR.",
   "type": "object",
@@ -53,7 +53,11 @@
       "description": "Commit of the subject-independent trusted tools (validator, schema, workflow) that ran the protected authorize job."
     },
     "repository": {
-      "const": "VibecodingGermany/Project_Nova"
+      "enum": [
+        "VibecodingGermany/HashKrieg",
+        "VibecodingGermany/Project_Nova"
+      ],
+      "$comment": "Transition after the 2026-08-09 repository rename: the canonical name comes first; the pre-rename name stays accepted so receipts archived under it remain valid. The legacy allowance can be dropped in a dedicated PR once no one reads old evidence anymore."
     },
     "workflow": {
       "const": "quality-gate.yml",
