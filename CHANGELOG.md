@@ -189,6 +189,35 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Die Kartenmitte ist ein Gebiet mit vier schmalen Zufahrten (Paket 21.7, #94, D-109).**
+  Aus dem einen Feld bei (62,62) mit 15.000 AE werden **fünf** Felder à 8.000 —
+  zusammen 40.000 AE und damit 28 % des Kartenwerts, exakt das Gewicht, das das
+  Einzelfeld vorher hatte, nur teilbar. Die Karte trägt jetzt 15 Vorkommen mit
+  142.000 AE. Um die Zone liegt ein Felsring (Chebyshev-Radius 14–15 um die
+  Mitte, 168 gesperrte Zellen) mit vier Ecköffnungen auf den Anmarschdiagonalen;
+  die Kehle jeder Öffnung ist **vier Zellen** breit, gemessen gegen den
+  MS-1-Trupp aus sechs Einheiten — vier passen nebeneinander durch, eine
+  schmalere Öffnung wäre eine Blockade und kein Engpass.
+- **Begehbarkeit und Optik stammen jetzt aus einer einzigen Quelle (D-109-Auflage).**
+  `Gameplay/Match/GlutrinneTerrainMap` hält die kanonische Geländetabelle;
+  die Simulation bekommt sie über `CostField.SetCost` beim Aufbau der Eröffnung,
+  die `GlutrinneBlockoutView` baut exakt dieselben Zellen als Felsrücken, und
+  die alte Deko-Felsstreuung hält jetzt Abstand zum Ring. Zwei getrennte Quellen
+  hätten Einheiten ergeben, die durch Felsen laufen und an unsichtbaren Wänden
+  hängenbleiben. Weil der headless-Pfad `Gameplay/` nicht kompiliert, trägt
+  `Determinism10000Scenario` einen handgespiegelten Zweitausdruck — zellgenau
+  und über eine gemeinsame FNV-1a-Prüfsumme gepinnt, damit die beiden Spuren
+  nicht auseinanderlaufen können.
+- **Das Gelände wird auf jedem Host identisch und vor dem ersten Snapshot geschrieben.**
+  Das `CostField` ist kein Snapshot-Block; seine Wiederherstellbarkeit war bisher
+  damit begründet, dass sein Inhalt vollständig aus dem Bau-Snapshot folgt.
+  Statisches Gelände hätte diese Begründung gebrochen, wenn es nicht auf jedem
+  Host aus derselben Tabelle käme — auch auf dem Wiedergabe-Host, der
+  `SetupMatch` nie durchläuft. Schreibzahl und Schreibreihenfolge liegen fest,
+  damit der `Epoch` überall auf demselben Wert landet; ein neuer Test beweist
+  den zellgenauen und byte-identischen Snapshot-Umlauf. Ein
+  Erreichbarkeitstest sichert, dass jedes Feld und jedes HQ von beiden
+  Startpunkten aus erreichbar bleibt
 - **Die Karte trägt 11 Vorkommen statt 5 (Paket 21.6, #93).** Bisher lagen fünf
   Aetheriumfelder auf 128×128, zwei davon als Startbasis gebunden — für zwei
   Spieler blieben **drei** umkämpfte Felder, und daraus entsteht keine

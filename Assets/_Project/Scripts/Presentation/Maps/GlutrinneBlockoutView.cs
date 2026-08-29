@@ -11,14 +11,22 @@ namespace Nova.Presentation.Maps
     /// itself at Play from <see cref="MatchBootstrap"/>'s canonical layout, so
     /// what is rendered is exactly what the simulation registered: the
     /// procedural desert ground of the Glutrinne biome, scattered rock
-    /// debris, a weathered edge band instead of a hard frame, and an
-    /// aetherium crystal cluster on each of the five fields the canonical
-    /// match registers.
+    /// debris, a weathered edge band instead of a hard frame, an aetherium
+    /// crystal cluster on each registered field, and — since 21.7 — the rock
+    /// ring around the centre zone.
     /// <para>
-    /// Pure presentation: this component reads the bootstrap's layout
-    /// properties and spawns primitive-only markers; it never writes into
-    /// simulation state. The five-field manifest layout is visible since
-    /// Sprint 16.7; primary-route dressing remains later map-art scope.
+    /// Pure presentation in the write direction: this component reads the
+    /// bootstrap's layout properties and the canonical terrain table and
+    /// spawns primitive-only markers; it never writes into simulation state.
+    /// But the ring rocks are different from the debris IN KIND, not just in
+    /// look: <see cref="MatchBootstrap"/> fed the same
+    /// <see cref="GlutrinneTerrainMap"/> table into the simulation's cost
+    /// field at match build, so the ridge you see IS the wall the pathfinding
+    /// respects. That single-source rule (21.7, D-109) is what keeps units
+    /// from walking through rocks or sticking on invisible walls. The debris
+    /// keeps its old contract — pure decoration, no collider, unseen by the
+    /// sim — and additionally keeps two cells of distance to every wall cell,
+    /// so a decorative rock never reads as part of the ring.
     /// </para>
     /// <para>
     /// KARTENBILD (D-085): everything here is generated at runtime with a
@@ -54,6 +62,9 @@ namespace Nova.Presentation.Maps
 
         /// <summary>Exclusion radius around each aetherium field (cells) — harvester approach cells stay clear.</summary>
         private const float FieldExclusionRadius = 3.5f;
+
+        /// <summary>Debris distance to every wall cell of the terrain ring (cells) — a decorative rock never touches the ring's read (21.7).</summary>
+        private const int WallProximityCells = 2;
 
         /// <summary>Width of the weathered edge band in cells, as a fraction of the 128-cell map for the veil texture.</summary>
         private const float EdgeFadeCells = 3f;
@@ -108,6 +119,10 @@ namespace Nova.Presentation.Maps
         private float _reserveNextReadTime;
         private MaterialPropertyBlock _propertyBlock;
 
+        // Dilation of the ring's wall cells by WallProximityCells, computed
+        // once in Start: the debris scatter rejects any candidate inside it.
+        private bool[,] _wallProximity;
+
         private void Start()
         {
             if (_bootstrap == null) _bootstrap = FindAnyObjectByType<MatchBootstrap>();
@@ -120,6 +135,8 @@ namespace Nova.Presentation.Maps
 
             Vector2Int[] fieldCells = _bootstrap.AllFieldCells;
             TintGround();
+            BuildWallProximityGrid(_bootstrap.MapSize);
+            BuildTerrainWalls(_bootstrap.MapSize);
             BuildScatterRocks(fieldCells);
             BuildWeatheredEdge(_bootstrap.MapSize);
             for (int i = 0; i < fieldCells.Length; i++)
@@ -199,11 +216,79 @@ namespace Nova.Presentation.Maps
         }
 
         /// <summary>
+        /// The rock ring of the centre zone (21.7, D-109), built cell-exact
+        /// from <see cref="GlutrinneTerrainMap"/> — the SAME table
+        /// <see cref="MatchBootstrap"/> wrote into the simulation's cost
+        /// field at match build. One flush, axis-aligned cube per blocked
+        /// cell: rotating or shrinking the cubes would make the gap
+        /// corridors look wider or narrower than the simulation's four-cell
+        /// throats, so the only variation is height (deterministic integer
+        /// hash of the cell, no Random — editor and player show the
+        /// identical ridge). No colliders, exactly like the debris: nothing
+        /// may ever pick or physically block a wall rock.
+        /// </summary>
+        private void BuildTerrainWalls(Vector2Int mapSize)
+        {
+            var walls = new GameObject("TerrainWalls");
+            walls.transform.SetParent(transform, false);
+            Material wallMaterial = CreateRuntimeMaterial(_rockColor);
+
+            for (int y = 0; y < mapSize.y; y++)
+            {
+                for (int x = 0; x < mapSize.x; x++)
+                {
+                    if (!GlutrinneTerrainMap.IsImpassable(x, y)) continue;
+
+                    int hash = (x * 7349 + y * 15187) & 0x7FFF;
+                    float height = 0.9f + (hash % 100) * 0.006f; // 0.90 .. 1.49
+
+                    GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    rock.name = $"Wall_{x}_{y}";
+                    rock.transform.SetParent(walls.transform, false);
+                    rock.transform.position = new Vector3(x + 0.5f, height * 0.5f, y + 0.5f);
+                    // Slightly over a full cell so neighbours merge into one
+                    // ridge line instead of reading as a fence of posts.
+                    rock.transform.localScale = new Vector3(1.04f, height, 1.04f);
+                    Destroy(rock.GetComponent<Collider>());
+                    rock.GetComponent<Renderer>().sharedMaterial = wallMaterial;
+                }
+            }
+        }
+
+        /// <summary>The debris keep-out around every wall cell, dilated by <see cref="WallProximityCells"/>.</summary>
+        private void BuildWallProximityGrid(Vector2Int mapSize)
+        {
+            _wallProximity = new bool[mapSize.x, mapSize.y];
+            for (int y = 0; y < mapSize.y; y++)
+            {
+                for (int x = 0; x < mapSize.x; x++)
+                {
+                    if (!GlutrinneTerrainMap.IsImpassable(x, y)) continue;
+                    for (int dy = -WallProximityCells; dy <= WallProximityCells; dy++)
+                    {
+                        for (int dx = -WallProximityCells; dx <= WallProximityCells; dx++)
+                        {
+                            int nx = x + dx;
+                            int ny = y + dy;
+                            if (nx >= 0 && nx < mapSize.x && ny >= 0 && ny < mapSize.y)
+                            {
+                                _wallProximity[nx, ny] = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Rock debris: squashed-sphere boulders and pebbles, placed by a
         /// fixed-seed xorshift (no UnityEngine.Random), rejected inside the
-        /// exclusion zones around both start bases and all five aetherium
-        /// fields, and NEVER carrying a collider — the debris is pure
-        /// visual, the sim's grid pathing does not see it (and must not).
+        /// exclusion zones around both start bases, around every registered
+        /// aetherium field and next to every wall cell of the ring, and NEVER
+        /// carrying a collider. The debris is pure visual: the sim's grid
+        /// pathing does not see it — unlike the ring, which is the same table
+        /// the sim reads (see the class remarks for why that difference is
+        /// the whole point of 21.7).
         /// </summary>
         private void BuildScatterRocks(Vector2Int[] fieldCells)
         {
@@ -240,13 +325,18 @@ namespace Nova.Presentation.Maps
             }
         }
 
-        /// <summary>Inside a start-base or aetherium-field exclusion zone the scatter stays out (the D-085 brief).</summary>
+        /// <summary>Inside a start-base, aetherium-field or ring-wall exclusion zone the scatter stays out (the D-085 brief, extended by the 21.7 wall keep-out).</summary>
         private bool IsExcluded(float x, float z, Vector2Int[] fieldCells)
         {
             Vector2Int localHq = _bootstrap.LocalHqCenterCell;
             Vector2Int enemyHq = _bootstrap.EnemyHqCenterCell;
             if (WithinRadius(x, z, localHq.x + 0.5f, localHq.y + 0.5f, BaseExclusionRadius)
                 || WithinRadius(x, z, enemyHq.x + 0.5f, enemyHq.y + 0.5f, BaseExclusionRadius))
+            {
+                return true;
+            }
+
+            if (_wallProximity != null && _wallProximity[(int)x, (int)z])
             {
                 return true;
             }

@@ -19,8 +19,8 @@ namespace Nova.SimRunner.Tests
     /// The start zone is the build-influence area of the canonical player-0
     /// HQ anchor alone (footprint origin (4,4), D-107): every 3x3 footprint
     /// whose footprint-aware Chebyshev distance to the HQ rectangle is at most
-    /// <see cref="ConstructionSystem.BuildInfluenceRadiusCells"/>. All eleven
-    /// canonical fields (21.6/#93 layout) are registered, though only the
+    /// <see cref="ConstructionSystem.BuildInfluenceRadiusCells"/>. All fifteen
+    /// canonical fields (21.6/21.7 layout) are registered, though only the
     /// start field at (7,7) intersects the zone — the next-nearest field sits
     /// at (44,24), thirty cells past the zone boundary, so the pinned numbers
     /// below are deliberately insensitive to the outfield layout.
@@ -33,8 +33,12 @@ namespace Nova.SimRunner.Tests
     /// (map bounds, footprint occupancy, spacing, non-refinery field distance)
     /// parameterized by the minimum distance; it must reproduce the real
     /// lane's placement set cell-for-cell at the current constant before its
-    /// 1-and-0 numbers mean anything. Terrain walkability is not modelled:
-    /// the canonical map writes no terrain costs today (all cells open).
+    /// 1-and-0 numbers mean anything. Terrain walkability is not modelled and
+    /// not present IN THIS FIXTURE: the canonical terrain ring (21.7, D-109)
+    /// sits at Chebyshev distance 14..15 from the map centre, dozens of cells
+    /// outside the start zone, so the fixture's bare cost field is the
+    /// truthful local picture of the zone — and the pinned numbers are
+    /// deliberately insensitive to it.
     /// </para>
     /// <para>
     /// The greedy scan is reading order (y, then x): a deterministic,
@@ -50,8 +54,9 @@ namespace Nova.SimRunner.Tests
     {
         // Canonical player-0 start (D-107): HQ footprint origin (4,4), start
         // field point (7,7) with 9.000 AE. The remaining canonical fields
-        // (21.6/#93 layout, mirrored from MatchBootstrap.FieldLayouts like the
-        // four R-1 copies) complete the field set the spacing rule iterates.
+        // (21.6/21.7 layout, mirrored from MatchBootstrap.FieldLayouts like
+        // the four R-1 copies) complete the field set the spacing rule
+        // iterates. None of the fourteen outfield fields comes near the zone.
         private const int HqOriginX = 4;
         private const int HqOriginY = 4;
         private const ushort DefHQAlliance = 3;
@@ -64,13 +69,17 @@ namespace Nova.SimRunner.Tests
             (2,  117, 117, 9000L),
             (3,  24,  40,  9000L),
             (4,  100, 84,  9000L),
-            (5,  62,  62,  15000L),
-            (6,  44,  24,  9000L),
-            (7,  80,  100, 9000L),
-            (8,  44,  80,  12000L),
-            (9,  80,  44,  12000L),
-            (10, 24,  96,  12000L),
-            (11, 100, 28,  12000L),
+            (5,  62,  62,  8000L),
+            (6,  54,  54,  8000L),
+            (7,  70,  70,  8000L),
+            (8,  54,  70,  8000L),
+            (9,  70,  54,  8000L),
+            (10, 44,  24,  9000L),
+            (11, 80,  100, 9000L),
+            (12, 44,  80,  12000L),
+            (13, 80,  44,  12000L),
+            (14, 24,  96,  12000L),
+            (15, 100, 28,  12000L),
         };
 
         private static int F => SimDefinitions.BuildingFootprintCells;
