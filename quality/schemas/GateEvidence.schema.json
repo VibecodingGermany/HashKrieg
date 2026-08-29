@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/VibecodingGermany/Project_Nova/quality/schemas/GateEvidence.schema.json",
+  "$id": "https://github.com/VibecodingGermany/HashKrieg/quality/schemas/GateEvidence.schema.json",
   "title": "Project Nova Gate Evidence",
   "description": "Schema 1.4 contract for one append-only gate attempt. Per D-066 a pass is authorized only by a two-phase GateAuthorization receipt that binds subject, evidence carrier, trusted tools and the completed protected run independently; the evidence itself never authorizes. G1 and later must declare the ordered priorGateReceipts chain G0..G(n-1) as the authorization proof, while priorGateEvidence remains the same-subject integrity chain. Commands and performance measurements remain bound to declared environments; plans and file presence are not evidence.",
   "type": "object",
@@ -242,7 +242,11 @@
       ],
       "properties": {
         "trustedRepository": {
-          "const": "VibecodingGermany/Project_Nova"
+          "enum": [
+            "VibecodingGermany/HashKrieg",
+            "VibecodingGermany/Project_Nova"
+          ],
+          "$comment": "Transition after the 2026-08-09 repository rename: the canonical name comes first; the pre-rename name stays accepted so evidence archived under it remains valid. The legacy allowance can be dropped in a dedicated PR once no one reads old evidence anymore."
         },
         "trustedCommitSha": {
           "$ref": "#/$defs/gitSha"
@@ -621,7 +625,11 @@
           "const": "github-actions"
         },
         "repository": {
-          "const": "VibecodingGermany/Project_Nova"
+          "enum": [
+            "VibecodingGermany/HashKrieg",
+            "VibecodingGermany/Project_Nova"
+          ],
+          "$comment": "Transition after the 2026-08-09 repository rename: the canonical name comes first; the pre-rename name stays accepted so evidence archived under it remains valid. The legacy allowance can be dropped in a dedicated PR once no one reads old evidence anymore."
         },
         "workflowPath": {
           "const": ".github/workflows/quality-gate.yml"
