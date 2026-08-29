@@ -1,6 +1,6 @@
 # Sprint 22: Was der Betatest gebrauchen kann — Findbarkeit, Verträge, Aufräumen
 
-**Version:** 1.0.0 | **Status:** in Arbeit | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 22 | **Vorgänger:** [21_Sprint_Verknappungsfolgen.md](21_Sprint_Verknappungsfolgen.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **UX-Gate:** human | **Leitsatz:** ein Nachweis, den niemand einsammelt, ist kein Nachweis — und eine Einheit, die man nicht wiederfindet, ist keine Einheit
+**Version:** 1.1.0 | **Status:** done (alle vier Pakete auf `main`) | **Verantwortungsbereich:** Maintainer-Strang | **Sprint:** 22 | **Vorgänger:** [21_Sprint_Verknappungsfolgen.md](21_Sprint_Verknappungsfolgen.md) | **Parallel zu:** [13B](13B_Sprint_Einheitenverhalten.md) | **UX-Gate:** human | **Leitsatz:** ein Nachweis, den niemand einsammelt, ist kein Nachweis — und eine Einheit, die man nicht wiederfindet, ist keine Einheit
 
 ## Zweck
 
@@ -148,16 +148,62 @@ testgepinnt, nichts davon gespielt. Sprint 21 verlangt in seinem eigenen
 
 ## Fertig wenn
 
-- [ ] Ein Spieler findet seinen Pionier in einem Pulk, ohne die Kiste neu zu
+- [x] Ein Spieler findet seinen Pionier in einem Pulk, ohne die Kiste neu zu
       ziehen (22.1)
-- [ ] Der Gate-Selbsttest prüft beide zulässigen Repo-Namen, statt seine eigene
+- [x] Der Gate-Selbsttest prüft beide zulässigen Repo-Namen, statt seine eigene
       Konstante zu bestätigen (22.2)
-- [ ] Es gibt keine sechste Feldlage-Kopie mehr — oder `MapDefinitionSO` hat
+- [x] Es gibt keine sechste Feldlage-Kopie mehr — oder `MapDefinitionSO` hat
       einen Konsumenten, der sie rechtfertigt (22.3)
-- [ ] Die Gate-Schichtenkarte nennt nur Assemblies, die existieren (22.4)
-- [ ] `dotnet test tools/Nova.SimRunner.Tests` grün
+- [x] Die Gate-Schichtenkarte nennt nur Assemblies, die existieren (22.4)
+- [x] `dotnet test tools/Nova.SimRunner.Tests` grün
 - [ ] **Eine gespielte Runde auf der neuen Karte** — der Nachtrag aus Sprint 21,
       den die CI nicht leisten kann
+
+## Ergebnis
+
+Abgeschlossen am 2026-08-29, am selben Tag geschnitten und geliefert.
+
+| Paket | PR | Ergebnis |
+|---|---|---|
+| 22.1 Auswahl benutzbar | [#123](https://github.com/VibecodingGermany/HashKrieg/pull/123) | Typzeile filtert, Doppelklick wählt die Rolle im Kamerabild, `I` springt zum unbeschäftigten Pionier und zentriert |
+| 22.2 Gate-Vertrag | [#121](https://github.com/VibecodingGermany/HashKrieg/pull/121) | `enum` mit beiden Repo-Namen samt Abschaltklausel; der Selbsttest prüft die Übergangsregel jetzt wirklich |
+| 22.3 Sechste Spiegelstelle | [#125](https://github.com/VibecodingGermany/HashKrieg/pull/125) | Kopie beseitigt statt aktualisiert — der Generator liest `MatchBootstrap.CanonicalFieldCells` |
+| 22.4 Phantom-Assemblies | [#125](https://github.com/VibecodingGermany/HashKrieg/pull/125) | zwei tote Ränge raus, und ein Wächter macht die Klasse dicht |
+
+### Der Fund, der nicht geplant war
+
+Beim Bauen des Wächters für 22.4 kam heraus, dass **G0-B.3 (`check_architecture`)
+auf unberührtem `main` rot war**: `Nova.AI.Data` stand auf Rang 2 neben
+`Nova.AI`, nach dem Namen einsortiert statt nach der Abhängigkeitsrichtung, und
+die reale Kante `Nova.AI → Nova.AI.Data` ist damit eine verbotene Kante
+innerhalb derselben Schicht. Gemerkt hat es niemand, weil das Gate nicht läuft.
+
+Rang 1 ist der einzige Rang, der den bestehenden Graphen gültig macht, ohne eine
+Zeile Code zu bewegen — eine Berichtigung, keine Architekturentscheidung. G0-B.3
+ist seitdem erstmals grün, und die Negativkontrolle meldet ausdrücklich
+`baseline violations in current tree: 0`.
+
+**Das ist derselbe Befund wie [#110](https://github.com/VibecodingGermany/HashKrieg/issues/110),
+eine Ebene tiefer:** ein Kriterium, das rot meldet, wo keine Kette es fährt.
+Drei Fälle davon in zwei Sprints — der Gate-Vertrag mit dem falschen Repo-Namen,
+der PlayMode-Test, und jetzt die Schichtenkarte. Die Gemeinsamkeit ist nicht der
+Fehler, sondern dass ihn jeweils nur ein Mensch gefunden hat, der zufällig
+hinsah.
+
+### Was daraus als Issue rausgegangen ist
+
+- [#126](https://github.com/VibecodingGermany/HashKrieg/issues/126) — der
+  Erreichbarkeitstest aus 21.7 sieht ein Feld unter einer Wand als erreichbar,
+  weil `IntegrationField.Generate` die Zielzelle ungeprüft sät
+- [#127](https://github.com/VibecodingGermany/HashKrieg/issues/127) —
+  `MapDefinitionSO` hat keinen Laufzeitkonsumenten: Konsument geben oder
+  abschaffen
+
+### Was offen bleibt
+
+Unverändert die drei Punkte aus R-2 und R-3: **eine gespielte Runde** auf der
+neuen Karte, die Unity-Testspuren (Erwartung PlayMode 13/13, Batchmode ohne
+`-quit`), und die Entscheidung, ob die Unity-Tests in die CI kommen.
 
 ## Versionsrelevanz
 
@@ -169,4 +215,5 @@ erweiternder Richtung — was vorher gültig war, bleibt gültig.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.1.0 | 2026-08-29 | **Sprint abgeschlossen.** Alle vier Pakete geliefert. Der beim Bauen von 22.4 gefundene rote Zustand von G0-B.3 auf unberührtem `main` ist mit behoben und im Ergebnisabschnitt festgehalten | Orchestrator |
 | 1.0.0 | 2026-08-29 | Erstfassung während einer autonomen Sitzung. Vier Pakete aus den Nebenbefunden von Sprint 21 und dem Umbenennungs-Inventar; sechs autonom getroffene Entscheidungen ausdrücklich zur Nachprüfung ausgewiesen | Orchestrator |
