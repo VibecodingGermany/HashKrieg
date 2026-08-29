@@ -78,17 +78,21 @@ namespace Nova.SimRunner.Tests
 
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
-            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
-            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
-            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
-            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
-            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 8000L },
+            new FieldLayout { Id = 6,  X = 54,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 7,  X = 70,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 8,  X = 54,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 9,  X = 70,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 10, X = 44,  Y = 24,  ReserveAE = 9000L },
+            new FieldLayout { Id = 11, X = 80,  Y = 100, ReserveAE = 9000L },
+            new FieldLayout { Id = 12, X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 13, X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 14, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 15, X = 100, Y = 28,  ReserveAE = 12000L },
         };
         // Faction-resolved opening placement ids (SimDefinitions id rule):
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
@@ -144,6 +148,13 @@ namespace Nova.SimRunner.Tests
             kernel.BindCommands(
                 new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
 
+            // Mirror of BuildHost's terrain application (21.7, #94): the
+            // canonical Glutrinne ring is written into the cost field BEFORE
+            // Kernel.Start(), so the reference, the scenario and the Unity
+            // bootstrap carry the identical terrain into the tick-0 snapshot.
+            // The terrain content pin lives in GlutrinneTerrainTests.
+            CanonicalTerrainMirror.Apply(pathfinding.CostField);
+
             // Mirror of BuildHost's faction assignment (economy block v2):
             // slot 0 Alliance, slot 1 Legion, set BEFORE Kernel.Start() —
             // the SetSlotFaction guard forbids it once the kernel runs.
@@ -182,8 +193,8 @@ namespace Nova.SimRunner.Tests
 
         /// <summary>
         /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
-        /// eleven finite Aetherium fields (21.6, #93) in canonical id order,
-        /// then per slot a
+        /// fifteen finite Aetherium fields (21.6/21.7, #93/#94) in canonical
+        /// id order, then per slot a
         /// completed HQ and ONE Builder — nothing else. Entity spawn order is
         /// load-bearing: EntityManager hands out ids from a deterministic free
         /// list, so any reordering shifts every id and therefore every hash.
@@ -301,7 +312,7 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
-        public void ReferenceOpeningPosition_RegistersElevenFiniteFields()
+        public void ReferenceOpeningPosition_RegistersFifteenFiniteFields()
         {
             ReferenceHost host = BuildReferenceHost(CanonicalSeed);
             ApplyOpeningPosition(host);
@@ -326,13 +337,16 @@ namespace Nova.SimRunner.Tests
             Assert.That(Slot0Layout.BuilderX + Slot1Layout.BuilderX, Is.EqualTo(124),
                 "point coordinates mirror as p -> 124-p");
             Assert.That(Slot0Layout.BuilderY + Slot1Layout.BuilderY, Is.EqualTo(124));
-            // The eleven-field layout (21.6, #93): five mirrored pairs plus the
-            // self-mirroring centre. Every pair sums to 124 per axis.
+            // The fifteen-field layout (21.6/21.7, #93/#94): seven mirrored
+            // pairs plus the self-mirroring middle field of the centre zone.
+            // Every pair sums to 124 per axis.
             AssertMirrorPair(0, 1, "start fields");
             AssertMirrorPair(2, 3, "natural expansions");
-            AssertMirrorPair(5, 6, "second expansions");
-            AssertMirrorPair(7, 8, "near contested flanks");
-            AssertMirrorPair(9, 10, "far contested flanks");
+            AssertMirrorPair(5, 6, "centre-zone diagonal pair");
+            AssertMirrorPair(7, 8, "centre-zone anti-diagonal pair");
+            AssertMirrorPair(9, 10, "second expansions");
+            AssertMirrorPair(11, 12, "near contested flanks");
+            AssertMirrorPair(13, 14, "far contested flanks");
             Assert.That(FieldLayouts[4].X, Is.EqualTo(62));
             Assert.That(FieldLayouts[4].Y, Is.EqualTo(62));
             // Mirrored fields carry mirrored reserves, or the mirror is only
@@ -342,6 +356,8 @@ namespace Nova.SimRunner.Tests
             AssertMirroredReserves(5, 6);
             AssertMirroredReserves(7, 8);
             AssertMirroredReserves(9, 10);
+            AssertMirroredReserves(11, 12);
+            AssertMirroredReserves(13, 14);
         }
 
         private static void AssertMirrorPair(int first, int second, string label)
