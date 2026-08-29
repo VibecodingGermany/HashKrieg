@@ -213,5 +213,79 @@ namespace Nova.Gameplay.Tests
             selection.ClearSelection();
             Assert.AreEqual((ushort)0, selection.SelectedFieldId, "the ingress rebind relies on ClearSelection dropping the field too");
         }
+
+        // ------------------------------------------------------------------
+        // Sprint 22 (#50): type-row filter + double-click role select
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void SelectionManager_RetainRole_KeepsOnlyThatRoleInStableOrder()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId firstTank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+            EntityId harvester = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(2), role: UnitRole.Harvester);
+            EntityId secondTank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(14), SimFixed.FromInt(14)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+            selection.SelectBox(entities, playerId: 0, minX: 0f, minY: 0f, maxX: 20f, maxY: 20f);
+            Assert.AreEqual(3, selection.SelectedCount);
+
+            int kept = selection.RetainRole(entities, UnitRole.LightTank);
+
+            Assert.AreEqual(2, kept, "the row click reduces the selection to the row's type");
+            Assert.AreEqual(firstTank, selection.SelectedEntities[0], "the selection order is stable, so the first tank leads");
+            Assert.AreEqual(secondTank, selection.SelectedEntities[1]);
+        }
+
+        [Test]
+        public void SelectionManager_RetainRole_DropsStaleHandlesAndAbsentRoles()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId dying = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+            EntityId living = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+            selection.SelectBox(entities, playerId: 0, minX: 0f, minY: 0f, maxX: 20f, maxY: 20f);
+            entities.DespawnUnit(dying); // died between the card's model build and the row click
+
+            Assert.AreEqual(1, selection.RetainRole(entities, UnitRole.LightTank), "the stale handle is dropped against the live store");
+            Assert.AreEqual(living, selection.SelectedEntities[0]);
+
+            Assert.AreEqual(0, selection.RetainRole(entities, UnitRole.Harvester), "a role nothing selected has leaves an empty selection");
+            Assert.AreEqual(0, selection.SelectedCount);
+        }
+
+        [Test]
+        public void SelectionManager_ReplaceSelection_ReplacesDedupesAndClearsField()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+            EntityId u3 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(14), SimFixed.FromInt(14)), SimFixed.FromInt(5));
+            selection.SelectField(3); // a field readout owns the card before the gesture
+
+            int count = selection.ReplaceSelection(new[] { u2, u3, u2 });
+
+            Assert.AreEqual(2, count, "duplicates collapse through AddSingle");
+            Assert.AreEqual(u2, selection.SelectedEntities[0], "the new list leads, u1 never joined it");
+            Assert.AreEqual((ushort)0, selection.SelectedFieldId, "an entity selection ends the field selection");
+        }
+
+        [Test]
+        public void SelectionManager_AddRange_UnionsLikeShiftClick()
+        {
+            var entities = new EntityManager(10);
+            var selection = new SelectionManager();
+            EntityId u1 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(10), SimFixed.FromInt(10)), SimFixed.FromInt(5));
+            EntityId u2 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(12), SimFixed.FromInt(12)), SimFixed.FromInt(5));
+            EntityId u3 = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(14), SimFixed.FromInt(14)), SimFixed.FromInt(5));
+            selection.SelectSingle(u1);
+
+            int count = selection.AddRange(new[] { u2, u1, u3 });
+
+            Assert.AreEqual(3, count, "the new ids join, the already-selected one is not duplicated");
+            Assert.AreEqual(u1, selection.SelectedEntities[0], "the existing selection keeps its lead");
+            Assert.AreEqual(u2, selection.SelectedEntities[1]);
+            Assert.AreEqual(u3, selection.SelectedEntities[2]);
+        }
     }
 }
