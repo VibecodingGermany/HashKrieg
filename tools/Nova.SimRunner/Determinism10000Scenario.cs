@@ -136,8 +136,8 @@ namespace Nova.SimRunner
     /// MS-1 manifest start state of quality/content/mvp-v1.json
     /// (startStatePerPlayer) per slot — a COMPLETED HQ, ONE Builder and
     /// 3.000 AE (EconomySystem.CanonicalMatchStartingCreditsAE, wired by
-    /// <see cref="BuildHost"/>) — plus eleven finite canonical Aetherium
-    /// fields (21.6, #93). Nothing
+    /// <see cref="BuildHost"/>) — plus fifteen finite canonical Aetherium
+    /// fields (21.6/21.7, #93/#94). Nothing
     /// else is spawned: the script then drives the opening exactly like a
     /// player, for BOTH slots — walk the Builder to the future site, place
     /// the Refinery once it is affordable and the committed grid covers its
@@ -194,33 +194,88 @@ namespace Nova.SimRunner
         }
 
         /// <summary>
-        /// The eleven canonical fields (16.7/C1 layout as extended by sprint
-        /// 21.6, #93 — the T-01 report's "at least roughly twice as many"):
-        /// two start fields and TWO natural expansions per side at 9.000 AE
-        /// each, four contested flank fields at 12.000 and the contested
-        /// centre at 15.000 (a single field until 21.7 groups it). Every
-        /// slot-1 coordinate is the point mirror of slot 0 across the
-        /// D-102/D-107 Glutrinne layout axis ((x, y) -&gt; (124 - x, 124 - y)):
-        /// the pairs 1/2, 3/4, 6/7, 8/9 and 10/11 mirror exactly, the centre
-        /// (62,62) mirrors onto itself. Registration in ascending id order is
-        /// part of the canonical initial state. Mirror of
-        /// MatchBootstrap.FieldLayouts — a drift between the two is caught by
-        /// the CanonicalMatchSetupTests reference hash chain in BOTH lanes.
+        /// The fifteen canonical fields (16.7/C1 layout as extended by sprint
+        /// 21.6/#93 and 21.7/#94): two start fields and TWO natural
+        /// expansions per side at 9.000 AE each, four contested flank fields
+        /// at 12.000 and the centre as a five-field zone (D-109) at 8.000
+        /// each. Every slot-1 coordinate is the point mirror of slot 0 across
+        /// the D-102/D-107 Glutrinne layout axis ((x, y) -&gt; (124 - x, 124 - y)):
+        /// the pairs 1/2, 3/4, 6/7, 8/9, 10/11, 12/13 and 14/15 mirror
+        /// exactly, the middle field (62,62) mirrors onto itself.
+        /// Registration in ascending id order is part of the canonical
+        /// initial state. Mirror of MatchBootstrap.FieldLayouts — a drift
+        /// between the two is caught by the CanonicalMatchSetupTests
+        /// reference hash chain in BOTH lanes.
         /// </summary>
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
-            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
-            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
-            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
-            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
-            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 8000L },
+            new FieldLayout { Id = 6,  X = 54,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 7,  X = 70,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 8,  X = 54,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 9,  X = 70,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 10, X = 44,  Y = 24,  ReserveAE = 9000L },
+            new FieldLayout { Id = 11, X = 80,  Y = 100, ReserveAE = 9000L },
+            new FieldLayout { Id = 12, X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 13, X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 14, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 15, X = 100, Y = 28,  ReserveAE = 12000L },
         };
+
+        /// <summary>
+        /// Hand-mirrored copy of the canonical Glutrinne terrain
+        /// (MatchBootstrap's GlutrinneTerrainMap, 21.7/#94/D-109): the square
+        /// rock ring around the centre zone with four diagonal corner gaps.
+        /// The headless lane cannot reference the Gameplay assembly (the
+        /// csproj compiles Core/Simulation/Networking/AI only — a frozen
+        /// boundary), so the terrain rides as a mirror, exactly like the
+        /// field layout (R-1). Any edit must be applied to EVERY copy;
+        /// GlutrinneTerrainTests pins this mirror cell-exact against its own
+        /// reference and by the FNV-1a content checksum the EditMode lane
+        /// pins against the Unity host.
+        /// </summary>
+        private static class GlutrinneTerrain
+        {
+            public const int CentreX = 62;
+            public const int CentreY = 62;
+            public const int RingInnerRadius = 14;
+            public const int RingOuterRadius = 15;
+            public const int CornerGapMinRadius = 11;
+
+            /// <summary>232 ring-band cells minus the 64 corner-gap cells.</summary>
+            public const int ImpassableCellCount = 168;
+
+            public static bool IsImpassable(int x, int y)
+            {
+                int dx = Math.Abs(x - CentreX);
+                int dy = Math.Abs(y - CentreY);
+                int ring = Math.Max(dx, dy);
+                if (ring < RingInnerRadius || ring > RingOuterRadius)
+                {
+                    return false;
+                }
+                return Math.Min(dx, dy) < CornerGapMinRadius;
+            }
+
+            public static int Apply(CostField costField)
+            {
+                int written = 0;
+                for (int y = 0; y < costField.Height; y++)
+                {
+                    for (int x = 0; x < costField.Width; x++)
+                    {
+                        if (!IsImpassable(x, y)) continue;
+                        costField.SetCost((ushort)x, (ushort)y, CostField.ImpassableCost);
+                        written++;
+                    }
+                }
+                return written;
+            }
+        }
 
         /// <summary>
         /// Faction-resolved definition id of a role for the given slot
@@ -264,6 +319,7 @@ namespace Nova.SimRunner
             public EntityManager Entities;
             public EconomySystem Economy;
             public ConstructionSystem Construction;
+            public PathfindingSystem Pathfinding;
             public MatchSession Session;
             public CommandIngress Ingress;
         }
@@ -648,7 +704,7 @@ namespace Nova.SimRunner
         };
 
         /// <summary>
-        /// Applies the deterministic match setup to a fresh host: the eleven
+        /// Applies the deterministic match setup to a fresh host: the fifteen
         /// canonical fields in ascending id order, then per slot the D-077
         /// start state of quality/content/mvp-v1.json
         /// (startStatePerPlayer) — a COMPLETED HQ, ONE Builder and the 3.000
@@ -694,7 +750,10 @@ namespace Nova.SimRunner
         /// construction and production phases 4/5 BEFORE pathfinding/
         /// movement phase 6, then the 5 Hz FoW recompute, then combat, then
         /// the D-056 victory evaluation LAST), the sealed session/ingress
-        /// command pipeline, slots 0+1 active, input delay 1.
+        /// command pipeline, slots 0+1 active, input delay 1 — and the
+        /// canonical Glutrinne terrain (21.7), written before
+        /// <c>Kernel.Start()</c> so the generator AND the playback host carry
+        /// the identical cost field into the first snapshot.
         /// </summary>
         private static Host BuildHost(ulong seed, INovaLogger logger)
         {
@@ -712,6 +771,22 @@ namespace Nova.SimRunner
             var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, MapWidth, MapHeight);
             var combat = new Nova.Simulation.Combat.CombatSystem(entities, fogOfWar, economy, construction);
             var victory = new Nova.Simulation.Victory.VictorySystem(entities, construction);
+
+            // 21.7 (#94, D-109): the canonical terrain, as part of HOST
+            // CONSTRUCTION — not of SetupMatch. The playback host is built by
+            // this same method and then restores the initial snapshot without
+            // ever running SetupMatch; terrain written only in the setup pass
+            // would leave the restored host rebuilding its derived flow
+            // fields against different walls than the generator (the cost
+            // field is no snapshot block, and the serialized epoch is
+            // adopted, not replayed). Identical table and identical (y, x)
+            // write order as the Unity host's GlutrinneTerrainMap.Apply, so
+            // the epoch lands on the same value on every host before the
+            // first snapshot. The count check pins the canonical map size.
+            if (GlutrinneTerrain.Apply(pathfinding.CostField) != GlutrinneTerrain.ImpassableCellCount)
+            {
+                throw new InvalidOperationException("the canonical terrain did not apply its expected cell count");
+            }
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -743,6 +818,7 @@ namespace Nova.SimRunner
                 Entities = entities,
                 Economy = economy,
                 Construction = construction,
+                Pathfinding = pathfinding,
                 Session = session,
                 Ingress = ingress,
             };

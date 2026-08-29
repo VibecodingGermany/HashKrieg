@@ -6,6 +6,7 @@ using Nova.Gameplay.Match;
 using Nova.Simulation;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
+using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
@@ -106,17 +107,21 @@ namespace Nova.Gameplay.Tests
 
         private static readonly FieldLayout[] FieldLayouts =
         {
-            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L  },
-            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L  },
-            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 15000L },
-            new FieldLayout { Id = 6,  X = 44,  Y = 24,  ReserveAE = 9000L  },
-            new FieldLayout { Id = 7,  X = 80,  Y = 100, ReserveAE = 9000L  },
-            new FieldLayout { Id = 8,  X = 44,  Y = 80,  ReserveAE = 12000L },
-            new FieldLayout { Id = 9,  X = 80,  Y = 44,  ReserveAE = 12000L },
-            new FieldLayout { Id = 10, X = 24,  Y = 96,  ReserveAE = 12000L },
-            new FieldLayout { Id = 11, X = 100, Y = 28,  ReserveAE = 12000L },
+            new FieldLayout { Id = 1,  X = 7,   Y = 7,   ReserveAE = 9000L },
+            new FieldLayout { Id = 2,  X = 117, Y = 117, ReserveAE = 9000L },
+            new FieldLayout { Id = 3,  X = 24,  Y = 40,  ReserveAE = 9000L },
+            new FieldLayout { Id = 4,  X = 100, Y = 84,  ReserveAE = 9000L },
+            new FieldLayout { Id = 5,  X = 62,  Y = 62,  ReserveAE = 8000L },
+            new FieldLayout { Id = 6,  X = 54,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 7,  X = 70,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 8,  X = 54,  Y = 70,  ReserveAE = 8000L },
+            new FieldLayout { Id = 9,  X = 70,  Y = 54,  ReserveAE = 8000L },
+            new FieldLayout { Id = 10, X = 44,  Y = 24,  ReserveAE = 9000L },
+            new FieldLayout { Id = 11, X = 80,  Y = 100, ReserveAE = 9000L },
+            new FieldLayout { Id = 12, X = 44,  Y = 80,  ReserveAE = 12000L },
+            new FieldLayout { Id = 13, X = 80,  Y = 44,  ReserveAE = 12000L },
+            new FieldLayout { Id = 14, X = 24,  Y = 96,  ReserveAE = 12000L },
+            new FieldLayout { Id = 15, X = 100, Y = 28,  ReserveAE = 12000L },
         };
         // Faction-resolved opening placement ids (SimDefinitions id rule):
         // slot 0 Alliance (role value), slot 1 Legion (role value + 17).
@@ -172,6 +177,15 @@ namespace Nova.Gameplay.Tests
             kernel.BindCommands(
                 new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
 
+            // The canonical Glutrinne terrain (21.7, #94), written BEFORE
+            // Kernel.Start() exactly like the scenario's BuildHost. Unlike the
+            // headless lane this assembly CAN reference Nova.Gameplay, so the
+            // reference host uses the canonical source itself — no fourth copy.
+            // The terrain CONTENT pin (cell-exact plus the shared checksum the
+            // .NET lane pins against the scenario host) lives below in
+            // MatchBootstrap_AppliesTheCanonicalTerrain_PinnedToTheSharedChecksum.
+            GlutrinneTerrainMap.Apply(pathfinding.CostField);
+
             // Mirror of BuildHost's faction assignment (economy block v2):
             // slot 0 Alliance, slot 1 Legion, set BEFORE Kernel.Start() —
             // the SetSlotFaction guard forbids it once the kernel runs.
@@ -210,8 +224,8 @@ namespace Nova.Gameplay.Tests
 
         /// <summary>
         /// Byte-exact mirror of Determinism10000Scenario.SetupMatch (D-077):
-        /// eleven finite Aetherium fields (21.6, #93) in canonical id order,
-        /// then per slot a
+        /// fifteen finite Aetherium fields (21.6/21.7, #93/#94) in canonical
+        /// id order, then per slot a
         /// completed HQ and ONE Builder — nothing else. Entity spawn order is
         /// load-bearing: EntityManager hands out ids from a deterministic free
         /// list, so any reordering shifts every id and therefore every hash.
@@ -408,13 +422,17 @@ namespace Nova.Gameplay.Tests
                 new Vector2Int(24, 40),
                 new Vector2Int(100, 84),
                 new Vector2Int(62, 62),
+                new Vector2Int(54, 54),
+                new Vector2Int(70, 70),
+                new Vector2Int(54, 70),
+                new Vector2Int(70, 54),
                 new Vector2Int(44, 24),
                 new Vector2Int(80, 100),
                 new Vector2Int(44, 80),
                 new Vector2Int(80, 44),
                 new Vector2Int(24, 96),
                 new Vector2Int(100, 28),
-            }), "the eleven canonical fields (21.6, #93) in id order");
+            }), "the fifteen canonical fields (21.6/21.7, #93/#94) in id order");
             Assert.That(bootstrap.LocalHqOrigin, Is.EqualTo(new Vector2Int(4, 4)));
             Assert.That(bootstrap.EnemyHqOrigin, Is.EqualTo(new Vector2Int(118, 118)));
             Assert.That(bootstrap.MapSize, Is.EqualTo(new Vector2Int(MapWidth, MapHeight)));
@@ -436,8 +454,75 @@ namespace Nova.Gameplay.Tests
                 Is.EqualTo(3000L), "the D-077 start balance (EconomySystem.CanonicalMatchStartingCreditsAE)");
         }
 
+        // ----------------------------------------------------------------
+        // (c) THE TERRAIN PIN (21.7, #94, D-109)
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// FNV-1a over every cost byte, row-major — the SAME checksum the
+        /// .NET lane (GlutrinneTerrainTests) computes over the scenario host
+        /// and pins against the identical literal. The state hash covers only
+        /// the cost field's epoch (a mutation count), so without this literal
+        /// a one-cell drift between the Gameplay source and the headless
+        /// mirror would stay invisible to both hash chains.
+        /// </summary>
+        private const ulong PinnedOpeningCostFieldChecksum = 0x68A7C8644C9D06D5UL;
+
+        /// <summary>The two canonical HQ footprints (D-107 origins (4,4)/(118,118), 3x3) — the only non-terrain cost the opening writes.</summary>
+        private static bool IsHqFootprintCell(int x, int y)
+        {
+            int f = SimDefinitions.BuildingFootprintCells;
+            bool local = x >= 4 && x < 4 + f && y >= 4 && y < 4 + f;
+            bool enemy = x >= 118 && x < 118 + f && y >= 118 && y < 118 + f;
+            return local || enemy;
+        }
+
+        private static ulong ComputeCostFieldChecksum(CostField costs)
+        {
+            const ulong offsetBasis = 14695981039346656037UL;
+            const ulong prime = 1099511628211UL;
+            ulong hash = offsetBasis;
+            for (ushort y = 0; y < costs.Height; y++)
+            {
+                for (ushort x = 0; x < costs.Width; x++)
+                {
+                    hash ^= costs.GetCost(x, y);
+                    hash *= prime;
+                }
+            }
+            return hash;
+        }
+
         [Test]
-        public void ReferenceOpeningPosition_RegistersElevenFiniteFields()
+        public void MatchBootstrap_AppliesTheCanonicalTerrain_PinnedToTheSharedChecksum()
+        {
+            MatchBootstrap bootstrap = NewMatchObject(useDefinitionStats: false);
+            bootstrap.StartGrayboxMatch();
+            CostField costs = bootstrap.Runner.Pathfinding.CostField;
+
+            // Cell-exact against the canonical source plus the two HQ
+            // footprints: the composition is asserted explicitly so the
+            // checksum never silently pins content other than intended.
+            for (int y = 0; y < costs.Height; y++)
+            {
+                for (int x = 0; x < costs.Width; x++)
+                {
+                    bool expected = GlutrinneTerrainMap.IsImpassable(x, y) || IsHqFootprintCell(x, y);
+                    bool actual = costs.GetCost((ushort)x, (ushort)y) == CostField.ImpassableCost;
+                    Assert.That(actual, Is.EqualTo(expected),
+                        $"opening cost field drift at ({x},{y})");
+                }
+            }
+
+            Assert.That(costs.Epoch, Is.EqualTo((uint)(GlutrinneTerrainMap.ImpassableCellCount + 2 * 9)),
+                "168 terrain writes + two 3x3 HQ footprints — identical on every host before the first snapshot");
+            Assert.That(ComputeCostFieldChecksum(costs), Is.EqualTo(PinnedOpeningCostFieldChecksum),
+                "the .NET lane pins this same literal against the headless scenario host — " +
+                "a move means one terrain copy drifted from the others");
+        }
+
+        [Test]
+        public void ReferenceOpeningPosition_RegistersFifteenFiniteFields()
         {
             ReferenceHost host = BuildReferenceHost(CanonicalSeed);
             ApplyOpeningPosition(host);
@@ -462,13 +547,16 @@ namespace Nova.Gameplay.Tests
             Assert.That(Slot0Layout.BuilderX + Slot1Layout.BuilderX, Is.EqualTo(124),
                 "point coordinates mirror as p -> 124-p");
             Assert.That(Slot0Layout.BuilderY + Slot1Layout.BuilderY, Is.EqualTo(124));
-            // The eleven-field layout (21.6, #93): five mirrored pairs plus the
-            // self-mirroring centre. Every pair sums to 124 per axis.
+            // The fifteen-field layout (21.6/21.7, #93/#94): seven mirrored
+            // pairs plus the self-mirroring middle field of the centre zone.
+            // Every pair sums to 124 per axis.
             AssertMirrorPair(0, 1, "start fields");
             AssertMirrorPair(2, 3, "natural expansions");
-            AssertMirrorPair(5, 6, "second expansions");
-            AssertMirrorPair(7, 8, "near contested flanks");
-            AssertMirrorPair(9, 10, "far contested flanks");
+            AssertMirrorPair(5, 6, "centre-zone diagonal pair");
+            AssertMirrorPair(7, 8, "centre-zone anti-diagonal pair");
+            AssertMirrorPair(9, 10, "second expansions");
+            AssertMirrorPair(11, 12, "near contested flanks");
+            AssertMirrorPair(13, 14, "far contested flanks");
             Assert.That(FieldLayouts[4].X, Is.EqualTo(62));
             Assert.That(FieldLayouts[4].Y, Is.EqualTo(62));
             // Mirrored fields carry mirrored reserves, or the mirror is only
@@ -478,6 +566,8 @@ namespace Nova.Gameplay.Tests
             AssertMirroredReserves(5, 6);
             AssertMirroredReserves(7, 8);
             AssertMirroredReserves(9, 10);
+            AssertMirroredReserves(11, 12);
+            AssertMirroredReserves(13, 14);
         }
 
         private static void AssertMirrorPair(int first, int second, string label)
