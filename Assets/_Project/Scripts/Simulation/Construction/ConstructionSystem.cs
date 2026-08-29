@@ -1177,6 +1177,96 @@ namespace Nova.Simulation.Construction
             return true;
         }
 
+        /// <summary>
+        /// The build-zone overlay's two reads, hoisted from PER TEXEL to ONE
+        /// PASS (21.4 follow-up — the per-cell calls of
+        /// <see cref="IsInsideBuildInfluence"/> and
+        /// <see cref="HasMinimumBuildingSpacing"/> cost the overlay several
+        /// hundred million operations per repaint: every texel rescanned the
+        /// placement register, and each entry paid a linear site-register
+        /// probe for the finished-only rule. At the 4 Hz repaint cadence
+        /// while a placement ghost is armed, that was a main-thread hitch
+        /// four times a second in exactly the phase the player was placing).
+        /// <para>
+        /// The fill is EXACT, not an approximation: both predicates are
+        /// rectangle-Chebyshev distances between uniform f×f footprints, so
+        /// the set of candidate origins they answer for is a square around
+        /// each register entry. With RectDist(o, p) = max(0, |o−p| − (f−1))
+        /// per axis: inside-influence ⟺ |o−a| ≤ BuildInfluenceRadiusCells +
+        /// f − 1 per axis; spacing-blocked ⟺ |o−b| ≤
+        /// MinimumBuildingDistanceCells + f − 2 per axis. The per-cell reads
+        /// stay the validators' own path — this mask exists for the overlay's
+        /// repaint loop only, and the edit-mode suite pins their equivalence
+        /// over the full grid (BuildZoneOverlayQueryTests).
+        /// </para>
+        /// <para>
+        /// Filters mirror the per-cell reads precisely: influence anchors are
+        /// own, living, COMPLETED placements (a site never anchors — D-108);
+        /// spacing blockers are every active site and every placement with a
+        /// living entity, of ANY owner. Both masks are cleared first and must
+        /// cover the full grid (GridSize × GridSize).
+        /// </para>
+        /// </summary>
+        public void FillBuildZoneMasks(byte playerSlot, bool[] influenceMask, bool[] spacingBlockedMask)
+        {
+            int size = GridSize;
+            if (influenceMask == null || influenceMask.Length < size * size)
+            {
+                throw new ArgumentException("influenceMask must cover the full grid", nameof(influenceMask));
+            }
+            if (spacingBlockedMask == null || spacingBlockedMask.Length < size * size)
+            {
+                throw new ArgumentException("spacingBlockedMask must cover the full grid", nameof(spacingBlockedMask));
+            }
+            Array.Clear(influenceMask, 0, size * size);
+            Array.Clear(spacingBlockedMask, 0, size * size);
+
+            int f = SimDefinitions.BuildingFootprintCells;
+            int influenceHalf = BuildInfluenceRadiusCells + f - 1;
+            int spacingHalf = MinimumBuildingDistanceCells + f - 2;
+
+            for (int i = 0; i < MaxSites; i++)
+            {
+                ref readonly SiteState site = ref _sites[i];
+                if (site.IsActive)
+                {
+                    FillOriginBox(spacingBlockedMask, size, site.OriginX, site.OriginY, spacingHalf);
+                }
+            }
+
+            for (int i = 0; i < MaxBuildings; i++)
+            {
+                ref readonly PlacementState placement = ref _buildings[i];
+                if (!placement.IsActive) continue;
+                EntityId id = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                if (_entityManager.IsValid(id))
+                {
+                    FillOriginBox(spacingBlockedMask, size, placement.OriginX, placement.OriginY, spacingHalf);
+                }
+
+                if (IsActiveSite(id)) continue; // finished only: a site never extends the zone
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+                FillOriginBox(influenceMask, size, placement.OriginX, placement.OriginY, influenceHalf);
+            }
+        }
+
+        /// <summary>Marks the clamped square of candidate origins (cx±half, cy±half) in a row-major grid mask.</summary>
+        private static void FillOriginBox(bool[] mask, int size, int centreX, int centreY, int half)
+        {
+            int minX = Math.Max(0, centreX - half);
+            int maxX = Math.Min(size - 1, centreX + half);
+            int minY = Math.Max(0, centreY - half);
+            int maxY = Math.Min(size - 1, centreY + half);
+            for (int y = minY; y <= maxY; y++)
+            {
+                int row = y * size;
+                for (int x = minX; x <= maxX; x++)
+                {
+                    mask[row + x] = true;
+                }
+            }
+        }
+
         private bool HasValidFieldSpacing(UnitRole role, int originX, int originY)
         {
             bool refineryHasFieldInRange = false;

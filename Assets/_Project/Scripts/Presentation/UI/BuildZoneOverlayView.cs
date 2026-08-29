@@ -84,6 +84,12 @@ namespace Nova.Presentation.UI
         private Material _material;
         private GameObject _quad;
         private float _nextRepaintTime;
+        // Repaint scratch (21.4 follow-up): the two zone masks are filled by
+        // the construction system in ONE register pass per repaint — the
+        // per-texel query loop used to rescan that register per texel, which
+        // hitched the main thread four times a second while placing.
+        private bool[] _influenceMask;
+        private bool[] _spacingBlockedMask;
 
         private void Awake()
         {
@@ -121,11 +127,17 @@ namespace Nova.Presentation.UI
         /// whose 3x3 footprint would leave the map stay clear as well —
         /// painting them buildable would promise a placement the validator
         /// rejects on bounds alone (map geometry, not the zone rule).
+        /// The two masks come from the construction system pre-filled for the
+        /// whole grid (<see cref="ConstructionSystem.FillBuildZoneMasks"/>) —
+        /// texels only read them.
         /// </summary>
         private void Repaint(ConstructionSystem construction, byte viewerSlot)
         {
             int size = ConstructionSystem.GridSize;
             int lastOrigin = size - SimDefinitions.BuildingFootprintCells;
+
+            EnsureMasks(size);
+            construction.FillBuildZoneMasks(viewerSlot, _influenceMask, _spacingBlockedMask);
 
             for (int y = 0; y < size; y++)
             {
@@ -133,12 +145,11 @@ namespace Nova.Presentation.UI
                 for (int x = 0; x < size; x++)
                 {
                     Color32 color = Clear;
-                    if (x <= lastOrigin && y <= lastOrigin
-                        && construction.IsInsideBuildInfluence(viewerSlot, x, y))
+                    if (x <= lastOrigin && y <= lastOrigin && _influenceMask[row + x])
                     {
-                        color = construction.HasMinimumBuildingSpacing(x, y)
-                            ? _buildableColor
-                            : _spacingBlockedColor;
+                        color = _spacingBlockedMask[row + x]
+                            ? _spacingBlockedColor
+                            : _buildableColor;
                     }
                     _pixels[row + x] = color;
                 }
@@ -146,6 +157,15 @@ namespace Nova.Presentation.UI
 
             _texture.SetPixels32(_pixels);
             _texture.Apply();
+        }
+
+        private void EnsureMasks(int size)
+        {
+            if (_influenceMask == null || _influenceMask.Length != size * size)
+            {
+                _influenceMask = new bool[size * size];
+                _spacingBlockedMask = new bool[size * size];
+            }
         }
 
         /// <summary>

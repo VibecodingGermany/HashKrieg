@@ -288,6 +288,17 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Ruckler in der Bauphase: das Baubereich-Overlay hat den Hauptthread gebremst.**
+  Das 21.4-Overlay fragte die beiden Zonen-Reads (`IsInsideBuildInfluence`,
+  `HasMinimumBuildingSpacing`) **pro Texel** ab — jeder Texel scannte das
+  Platzierungsregister erneut, jeder Eintrag zahlte eine lineare
+  Baustellen-Probe. Das sind mehrere hundert Millionen Operationen pro
+  Repaint, viermal pro Sekunde, ausgerechnet während ein Bau-Ghost armiert
+  ist — Spielbericht: „komisch verzögert". Jetzt füllt
+  `ConstructionSystem.FillBuildZoneMasks` beide Masken in **einem** Pass
+  (exakte Rechtecks-Chebyshev-Boxen statt Texel-Scan, Äquivalenz über das
+  ganze Raster gepinnt); der Repaint liest nur noch. Selbes Bild, kein
+  Hitch. Simulationsverhalten unverändert, keine Baseline bewegt
 - **#85: Die KI erntet nicht länger endlos auf dem leeren Feld.** Aus dem
   Betatest vom 10.08.2026: die KI kam nach Erschöpfung ihres Startvorkommens
   wirtschaftlich zum Stillstand. Das war kein Strategiemangel, sondern ein
