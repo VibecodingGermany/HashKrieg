@@ -50,6 +50,20 @@ namespace Nova.Presentation.UI
     /// fields named in the title).
     /// </para>
     /// <para>
+    /// CLICKABLE BREAKDOWN ROWS (sprint 22, #50): the 21.5 per-type rows are
+    /// no longer read-only — clicking a row reduces the selection to exactly
+    /// that row's role (the card then redraws with that type's commands,
+    /// which is the cheapest path from "I see what is selected" to "I can
+    /// work with it"). The rows are buttons, so the panel hit test
+    /// (<see cref="IsPointerOverPanel"/>) already covers them: they live
+    /// inside the same BeginArea, and <see cref="EstimateHeight"/> keeps its
+    /// row-for-row contract because the row-button style carries the LABEL
+    /// style's vertical margin (see EnsureStyles — that coupling is the
+    /// "~40 px short" bug's fence). While a gesture is armed (placement
+    /// ghost or order pick) the filter is refused: the input discipline
+    /// forbids selection changes mid-gesture.
+    /// </para>
+    /// <para>
     /// REPAIR FLOW (decided, GB-006): the sim issues repair as a BUILDER-side
     /// standing order on an own damaged completed building — there is no
     /// building-side assignment. The unit card therefore arms a target pick
@@ -118,6 +132,17 @@ namespace Nova.Presentation.UI
         }
 
         /// <summary>
+        /// One clickable breakdown row (sprint 22, #50): the 21.5 label plus
+        /// the role it stands for, so a row click can reduce the selection
+        /// to exactly that type without re-deriving the grouping.
+        /// </summary>
+        private struct SelectionRow
+        {
+            public string Label;
+            public UnitRole Role;
+        }
+
+        /// <summary>
         /// One frame's panel content. Rebuilt at most once per frame and
         /// shared between the hit test and the draw, so the two cannot
         /// drift apart (the OnGUI Layout/Repaint pair also reuses it).
@@ -131,8 +156,8 @@ namespace Nova.Presentation.UI
             public string BuildingPowerText;
             /// <summary>The field card's reserve line ("6.420 / 9.000 AE"); null on every entity card.</summary>
             public string FieldReserveText;
-            /// <summary>Per-type breakdown rows of a multi-entity selection (21.5, #88), first-occurrence order; empty otherwise.</summary>
-            public readonly List<string> SelectionRows = new List<string>(8);
+            /// <summary>Per-type breakdown rows of a multi-entity selection (21.5, #88 — clickable since sprint 22, #50), first-occurrence order; empty otherwise.</summary>
+            public readonly List<SelectionRow> SelectionRows = new List<SelectionRow>(8);
             public readonly List<CardButton> Buttons = new List<CardButton>(16);
             public string QueueHeader;
             public readonly List<QueueRow> QueueRows = new List<QueueRow>(ProductionSystem.MaxQueueEntries);
@@ -191,6 +216,7 @@ namespace Nova.Presentation.UI
         private GUIStyle _buttonStyle;
         private GUIStyle _sectionStyle;
         private GUIStyle _rowStyle;
+        private GUIStyle _selectionRowStyle;
         private GUIStyle _siteStatusStyle;
         private GUIStyle _cancelStyle;
         private GUIStyle _hintStyle;
@@ -370,8 +396,16 @@ namespace Nova.Presentation.UI
                 model.Title = $"{CommandCardPresenter.UnitDisplayName(faction, firstMobileRole)} — {mobileCount} Einheiten";
                 for (int i = 0; i < groupCount; i++)
                 {
-                    model.SelectionRows.Add(CommandCardPresenter.FormatSelectionGroup(faction, in _selectionGroupScratch[i]));
+                    model.SelectionRows.Add(new SelectionRow
+                    {
+                        Label = CommandCardPresenter.FormatSelectionGroup(faction, in _selectionGroupScratch[i]),
+                        Role = _selectionGroupScratch[i].Role,
+                    });
                 }
+                // Rows are clickable (sprint 22, #50) — say so once, where
+                // the gesture lives; an armed order pick overwrites this
+                // with its own hint in BuildModel.
+                model.FooterHint = "Klick auf eine Zeile: nur diesen Typ auswählen";
             }
 
             // The intersection votes once per ROLE — repeating a role per
@@ -624,7 +658,17 @@ namespace Nova.Presentation.UI
             }
             for (int i = 0; i < model.SelectionRows.Count; i++)
             {
-                GUILayout.Label(model.SelectionRows[i], _rowStyle, GUILayout.Height(RowHeight));
+                // Buttons, not labels (sprint 22, #50): a row click filters
+                // the selection down to that row's role. The row-button
+                // style carries _rowStyle's vertical margin, so
+                // EstimateHeight's per-row cost stays exact (its comment
+                // names the bug that fence guards).
+                SelectionRow row = model.SelectionRows[i];
+                if (GUILayout.Button(row.Label, _selectionRowStyle, GUILayout.Height(RowHeight)))
+                {
+                    AudioServiceLocator.Play2D(SoundEventId.UI_Click);
+                    _input.FilterSelectionToRole(row.Role);
+                }
             }
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
             if (model.SiteStatusText != null)
@@ -731,7 +775,12 @@ namespace Nova.Presentation.UI
             for (int i = 0; i < model.SelectionRows.Count; i++)
             {
                 // Row for row with OnGUI: each breakdown row costs its
-                // content height PLUS the row style's vertical margin.
+                // content height PLUS the row style's vertical margin. The
+                // rows are buttons since sprint 22 (#50), but
+                // _selectionRowStyle copies _rowStyle's margin verbatim
+                // (EnsureStyles), so this price stays exact — changing one
+                // style's margin without the other reopens the "~40 px
+                // short: visible, but not clickable" bug above.
                 height += RowHeight + _rowStyle.margin.vertical;
             }
             if (model.ProgressBar01 >= 0f) height += ProgressHeight; // GUIStyle.none: no margin
@@ -835,6 +884,24 @@ namespace Nova.Presentation.UI
             if (_rowStyle == null)
             {
                 _rowStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = false };
+            }
+            if (_selectionRowStyle == null)
+            {
+                // The clickable breakdown row (sprint 22, #50): a button that
+                // READS like the label rows around it (left-aligned, same
+                // font size) — and carries _rowStyle's exact margin, because
+                // EstimateHeight prices every row as RowHeight plus
+                // _rowStyle.margin.vertical. Any margin drift reopens the
+                // "visible, but not clickable" height bug documented there.
+                _selectionRowStyle = new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = 11,
+                    wordWrap = false,
+                    alignment = TextAnchor.MiddleLeft,
+                    margin = new RectOffset(
+                        _rowStyle.margin.left, _rowStyle.margin.right,
+                        _rowStyle.margin.top, _rowStyle.margin.bottom),
+                };
             }
             if (_siteStatusStyle == null)
             {

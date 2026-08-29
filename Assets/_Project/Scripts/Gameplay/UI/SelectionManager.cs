@@ -113,6 +113,60 @@ namespace Nova.Gameplay
             return _selectedCount;
         }
 
+        /// <summary>
+        /// The command card's breakdown-row click (21.5 rows, made clickable
+        /// in sprint 22 for #50): reduces the selection to its entities of
+        /// <paramref name="role"/>, preserving the selection's own order (it
+        /// is stable, so the lead of the reduced selection is the first
+        /// selected entity of that role — the same first-occurrence rule the
+        /// rows are drawn in). Stale handles are dropped against the live
+        /// store, the same courtesy <see cref="RecallControlGroup"/> applies
+        /// at recall. Returns the surviving count; 0 means the selection is
+        /// empty (the row's units died between model build and click).
+        /// </summary>
+        public int RetainRole(EntityManager entityManager, UnitRole role)
+        {
+            if (entityManager == null || _selectedCount == 0) return _selectedCount;
+
+            int kept = 0;
+            for (int i = 0; i < _selectedCount; i++)
+            {
+                EntityId id = _selectedIds[i];
+                if (!entityManager.TryGetUnit(id, out UnitState unit) || unit.Role != role) continue;
+                _selectedIds[kept++] = id;
+            }
+            _selectedCount = kept;
+            return _selectedCount;
+        }
+
+        /// <summary>
+        /// Replaces the selection with <paramref name="ids"/> (deduped and
+        /// capped through <see cref="AddSingle"/>, field selection cleared).
+        /// The double-click role select's replace half (sprint 22, #50);
+        /// store-less like <see cref="SelectSingle"/> — the caller vouches
+        /// for the ids, staleness is filtered on use. Returns the new count.
+        /// </summary>
+        public int ReplaceSelection(ReadOnlySpan<EntityId> ids)
+        {
+            ClearSelection();
+            return AddRange(ids);
+        }
+
+        /// <summary>
+        /// Adds every id of <paramref name="ids"/> to the selection (deduped,
+        /// capped, field selection cleared) — the double-click role select's
+        /// Shift half, the same additive discipline Shift-click and
+        /// Shift-drag already follow (sprint 09 §7). Returns the new count.
+        /// </summary>
+        public int AddRange(ReadOnlySpan<EntityId> ids)
+        {
+            for (int i = 0; i < ids.Length; i++)
+            {
+                AddSingle(ids[i]);
+            }
+            return _selectedCount;
+        }
+
         // ------------------------------------------------------------------
         // Control groups (sprint 09 §7)
         // ------------------------------------------------------------------
