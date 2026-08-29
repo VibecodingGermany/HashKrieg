@@ -286,9 +286,18 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// Starts a freshly initialized kernel. A relay-backed kernel may be
-        /// started exactly once: restarting it would reset the simulation
-        /// tick while the remote peer keeps advancing.
+        /// Starts a freshly initialized kernel — and RESUMES a paused one at
+        /// its standing tick. The tick is handed in explicitly because
+        /// <see cref="SimulationKernel.Start()"/> defaults to 0: a bare call
+        /// on the resume path (T-03) rewound the kernel while the session
+        /// and every system kept their state, and player commands targeted
+        /// at session ticks then landed minutes late or never — units
+        /// "stopped moving" after pause while state-driven systems (sites,
+        /// production) kept running. A fresh kernel stands at tick 0, so
+        /// passing the current tick is correct for both paths. A
+        /// relay-backed kernel may be started exactly once: restarting it
+        /// would reset the simulation tick while the remote peer keeps
+        /// advancing.
         /// </summary>
         public bool StartMatch()
         {
@@ -305,7 +314,7 @@ namespace Nova.Gameplay.Match
             }
 
             _timeAccumulator = 0f;
-            Kernel.Start();
+            Kernel.Start(Kernel.CurrentTick);
             _kernelStarted = true;
             return true;
         }

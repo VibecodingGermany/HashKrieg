@@ -305,6 +305,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (exakte Rechtecks-Chebyshev-Boxen statt Texel-Scan, Äquivalenz über das
   ganze Raster gepinnt); der Repaint liest nur noch. Selbes Bild, kein
   Hitch. Simulationsverhalten unverändert, keine Baseline bewegt
+- **Nach Pause/Resume nahmen Einheiten keine Befehle mehr an (T-03).**
+  `MatchRunner.StartMatch` ist auch der Resume-Pfad des Pausemenüs und rief
+  `Kernel.Start()` mit dem Default-Tick 0 auf — der Kernel sprang zurück,
+  während Session und Systeme ihren Stand behielten: danach eingereichte
+  Spielerbefehle kamen Minuten spät oder nie an, während zustandsgetriebene
+  Systeme (Baustellen, Produktion) sichtbar weiterliefen. Jetzt resume't der
+  Kernel bei seinem stehenden Tick; ein PlayMode-Test pinnt, dass der Tick
+  über Pause/Resume nicht zurückspringt und Bewegungsbefehle danach
+  weiterhin ankommen
 - **#85: Die KI erntet nicht länger endlos auf dem leeren Feld.** Aus dem
   Betatest vom 10.08.2026: die KI kam nach Erschöpfung ihres Startvorkommens
   wirtschaftlich zum Stillstand. Das war kein Strategiemangel, sondern ein
