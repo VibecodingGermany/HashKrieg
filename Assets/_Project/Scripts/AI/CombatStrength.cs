@@ -21,12 +21,12 @@ namespace Nova.AI
     /// not 963. That is deterministic on every machine, which is the only
     /// property the netcode cares about.
     /// <para>
-    /// NOTHING ENFORCES THAT AUTOMATICALLY HERE. <c>NoFloatInSimulationTests</c>
-    /// scans <c>Scripts/Core</c> and <c>Scripts/Simulation</c> — not
-    /// <c>Scripts/AI</c> — so a float under this directory would pass CI today.
-    /// The determinism rule covers it, the guard does not; keeping the two in
-    /// step is a question for the owners of the EditMode mirror, since the test
-    /// exists twice.
+    /// THE GUARD NOW WATCHES THIS DIRECTORY TOO. <c>NoFloatInSimulationTests</c>
+    /// scans <c>Scripts/AI</c> and <c>Scripts/AI.Data</c> alongside
+    /// <c>Scripts/Core</c> and <c>Scripts/Simulation</c> — in both lanes, the
+    /// EditMode mirror and the .NET SimRunner suite the CI actually runs — so
+    /// a float under this directory fails the chain exactly like one in the
+    /// kernel would.
     /// </para>
     /// </para>
     /// <para>

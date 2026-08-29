@@ -310,6 +310,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Der Determinismus-Wächter sieht jetzt auch den KI-Strang (#74).** `NoFloatInSimulationTests`
+  scannte `Scripts/Core` und `Scripts/Simulation`, nicht aber `Scripts/AI` und
+  `Scripts/AI.Data` — dabei ist `SkirmishAiSystem` in der kanonischen
+  Tickreihenfolge registriert und seine Befehle laufen byte-gleich zum
+  Netzwerkpfad. Ein `float` dort hätte den Lockstep genauso gebrochen wie einer
+  im Kernel, nur hätte ihn kein Test gefangen. Beide Wächterkopien scannen jetzt
+  alle vier Wurzeln (97 statt 86 Dateien); der Bestand ist sauber, es gab nichts
+  zu beheben. Neue Existenz-Pins verhindern, dass der Scan eines Tages still
+  über ein leeres Verzeichnis grün läuft. Die Lücke hatte der externe
+  Beitragende selbst im Quelltext vermerkt — der Vermerk ist nachgezogen
+- **Der eine rote PlayMode-Test war eine überholte Erwartung (#110).**
+  `MainMenuTests.NetworkPanel_ValidatesMasksAndCancelsWithoutStartingGameplay`
+  schlug auf unberührtem `main` fehl und pinnte den Sprint-13-Pfad: seit
+  Sprint 14 (D-092) öffnet „Netzpartie" die **Lobby**, und das Netzwerk-Panel
+  liegt einen Schritt dahinter hinter „Direktverbindung …". Der Test geht jetzt
+  den echten Weg und behauptet dabei **mehr** als vorher — dass das
+  Netzwerk-Panel bis zur Wahl geschlossen bleibt und dass „Abbrechen" ins
+  Hauptmenü zurückführt, nicht in die Lobby. Kein Produktivcode geändert.
+  Offen bleibt der eigentliche Befund des Issues: die Unity-Tests laufen in
+  keiner CI, und das ist eine Inhaberentscheidung
 - **Ruckler in der Bauphase: das Baubereich-Overlay hat den Hauptthread gebremst.**
   Das 21.4-Overlay fragte die beiden Zonen-Reads (`IsInsideBuildInfluence`,
   `HasMinimumBuildingSpacing`) **pro Texel** ab — jeder Texel scannte das
