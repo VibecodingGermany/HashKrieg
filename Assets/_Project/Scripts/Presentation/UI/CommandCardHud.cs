@@ -24,7 +24,14 @@ namespace Nova.Presentation.UI
     /// <see cref="CommandCardPresenter"/> (the testable, Unity-free brain);
     /// this component only renders it and evaluates live state. A mobile lead
     /// unit gets Move/Stop, Attack when armed, Harvest/ReturnCargo on the
-    /// Harvester and Repair on the Builder. A completed own building gets
+    /// Harvester and Repair on the Builder — and since 21.5 (#88) a
+    /// MULTI-selection intersects those sets over all mobile roles (the
+    /// lead's slot no longer decides alone), titles "{lead type} — N
+    /// Einheiten" and lists the per-type breakdown rows with count and
+    /// summed HP; mixed-in buildings ride along as bystander rows, only an
+    /// all-building selection keeps the building card. A single damaged
+    /// unit carries its HP in the title, same convention as the building
+    /// card. A completed own building gets
     /// Sell (50% refund) and Repair (greyed with the reason when undamaged
     /// or when no Builder exists), plus — for producers — one production
     /// button per unit the building builds (from
@@ -124,6 +131,8 @@ namespace Nova.Presentation.UI
             public string BuildingPowerText;
             /// <summary>The field card's reserve line ("6.420 / 9.000 AE"); null on every entity card.</summary>
             public string FieldReserveText;
+            /// <summary>Per-type breakdown rows of a multi-entity selection (21.5, #88), first-occurrence order; empty otherwise.</summary>
+            public readonly List<string> SelectionRows = new List<string>(8);
             public readonly List<CardButton> Buttons = new List<CardButton>(16);
             public string QueueHeader;
             public readonly List<QueueRow> QueueRows = new List<QueueRow>(ProductionSystem.MaxQueueEntries);
@@ -142,6 +151,7 @@ namespace Nova.Presentation.UI
                 LeadId = EntityId.Invalid;
                 BuildingPowerText = null;
                 FieldReserveText = null;
+                SelectionRows.Clear();
                 Buttons.Clear();
                 QueueHeader = null;
                 QueueRows.Clear();
@@ -170,6 +180,10 @@ namespace Nova.Presentation.UI
         private readonly StringBuilder _builder = new StringBuilder(96);
         private readonly CardModel _model = new CardModel();
         private readonly SimUnitDefinition[] _producibleScratch = new SimUnitDefinition[SimDefinitions.UnitsPerFaction];
+        // 21.5 (#88): selection breakdown scratch — one group per distinct
+        // role, so MaxSelectedEntities always fits.
+        private readonly SelectionGroup[] _selectionGroupScratch = new SelectionGroup[SelectionManager.MaxSelectedEntities];
+        private readonly UnitRole[] _roleScratch = new UnitRole[SelectionManager.MaxSelectedEntities];
 
         private int _modelFrame = -1;
         private Rect _lastPanelRect;
@@ -247,23 +261,41 @@ namespace Nova.Presentation.UI
             FactionId faction = _runner.Economy != null
                 ? _runner.Economy.GetSlotFaction(slot)
                 : FactionId.Alliance;
+
+            // 21.5 (#88): one MOBILE unit in the selection makes this a
+            // unit selection — mixed-in buildings ride along as bystanders
+            // (the input discipline of RtsDeviceInput.TryGetLeadProducer):
+            // they get their own breakdown rows but no command vote. Only
+            // an ALL-BUILDING selection keeps the lead's site/building card.
+            bool hasMobileUnit = false;
+            for (int i = 0; i < selected.Length; i++)
+            {
+                if (entities.TryGetUnit(selected[i], out UnitState candidate)
+                    && !SimDefinitions.IsBuildingRole(candidate.Role))
+                {
+                    hasMobileUnit = true;
+                    break;
+                }
+            }
+
             uint rawLead = UnitCommandStateView.ToRawEntityId(lead.Id);
 
             model.LeadId = lead.Id;
             model.Visible = true;
 
-            if (_runner.Construction != null
+            if (!hasMobileUnit
+                && _runner.Construction != null
                 && _runner.Construction.TryGetSite(rawLead, out ushort siteDefId, out int siteProgressRaw, out uint siteBuilderRaw))
             {
                 BuildSiteModel(model, siteDefId, siteProgressRaw, siteBuilderRaw, slot, entities);
             }
-            else if (SimDefinitions.IsBuildingRole(lead.Role))
+            else if (!hasMobileUnit && SimDefinitions.IsBuildingRole(lead.Role))
             {
                 BuildBuildingModel(model, in lead, rawLead, slot, faction, entities);
             }
             else
             {
-                BuildUnitModel(model, faction, lead.Role, selected.Length);
+                BuildUnitModel(model, faction, in lead, selected, entities);
             }
 
             if (_input.OrderPickModeActive)
@@ -296,13 +328,61 @@ namespace Nova.Presentation.UI
             model.Visible = true;
         }
 
-        /// <summary>The unit card: the lead unit's role decides the buttons (armed? harvester? builder?).</summary>
-        private void BuildUnitModel(CardModel model, FactionId faction, UnitRole leadRole, int selectedCount)
+        /// <summary>
+        /// The unit card (21.5, #88). A single selection keeps the familiar
+        /// title and borrows the building card's damaged-HP title convention
+        /// ("{cur}/{max} HP", only when damaged). A multi-selection titles
+        /// "{lead type} — N Einheiten" (mobile units counted; building
+        /// bystanders are LISTED, not counted as units) and shows the
+        /// per-type breakdown rows — the honest replacement for the old
+        /// "(+N weitere)" suffix. The buttons are the INTERSECTION over all
+        /// mobile roles of the selection
+        /// (<see cref="CommandCardPresenter.GetSharedUnitCommands"/>), so
+        /// they no longer depend on the selection order.
+        /// </summary>
+        private void BuildUnitModel(CardModel model, FactionId faction, in UnitState lead, ReadOnlySpan<EntityId> selected, EntityManager entities)
         {
-            model.Title = CommandCardPresenter.UnitDisplayName(faction, leadRole);
-            if (selectedCount > 1) model.Title += $" (+{selectedCount - 1} weitere)";
+            int groupCount = _presenter.SummarizeSelection(selected, entities, _selectionGroupScratch);
 
-            CommandButtonType commands = _presenter.GetUnitCommands(faction, leadRole);
+            int liveCount = 0;
+            int mobileCount = 0;
+            UnitRole firstMobileRole = lead.Role;
+            for (int i = 0; i < groupCount; i++)
+            {
+                liveCount += _selectionGroupScratch[i].Count;
+                if (!SimDefinitions.IsBuildingRole(_selectionGroupScratch[i].Role))
+                {
+                    if (mobileCount == 0) firstMobileRole = _selectionGroupScratch[i].Role;
+                    mobileCount += _selectionGroupScratch[i].Count;
+                }
+            }
+
+            if (liveCount <= 1)
+            {
+                model.Title = CommandCardPresenter.UnitDisplayName(faction, lead.Role);
+                if (lead.CurrentHealth < lead.MaxHealth)
+                {
+                    model.Title += $"   {lead.CurrentHealth}/{lead.MaxHealth} HP";
+                }
+            }
+            else
+            {
+                model.Title = $"{CommandCardPresenter.UnitDisplayName(faction, firstMobileRole)} — {mobileCount} Einheiten";
+                for (int i = 0; i < groupCount; i++)
+                {
+                    model.SelectionRows.Add(CommandCardPresenter.FormatSelectionGroup(faction, in _selectionGroupScratch[i]));
+                }
+            }
+
+            // The intersection votes once per ROLE — repeating a role per
+            // unit would not change the AND, so the groups feed it directly.
+            int roleCount = 0;
+            for (int i = 0; i < groupCount && roleCount < _roleScratch.Length; i++)
+            {
+                _roleScratch[roleCount++] = _selectionGroupScratch[i].Role;
+            }
+
+            CommandButtonType commands = _presenter.GetSharedUnitCommands(faction, _roleScratch.AsSpan(0, roleCount));
             if (commands.HasFlag(CommandButtonType.Move)) AddButton(model, "Bewegen (RMB)", true, CardAction.MovePick);
             if (commands.HasFlag(CommandButtonType.Stop)) AddButton(model, "Stopp (S)", true, CardAction.Stop);
             if (commands.HasFlag(CommandButtonType.Attack)) AddButton(model, "Angreifen (A)", true, CardAction.AttackPick);
@@ -542,6 +622,10 @@ namespace Nova.Presentation.UI
             {
                 GUILayout.Label(model.FieldReserveText, _rowStyle, GUILayout.Height(RowHeight));
             }
+            for (int i = 0; i < model.SelectionRows.Count; i++)
+            {
+                GUILayout.Label(model.SelectionRows[i], _rowStyle, GUILayout.Height(RowHeight));
+            }
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
             if (model.SiteStatusText != null)
             {
@@ -644,6 +728,12 @@ namespace Nova.Presentation.UI
             height += TitleHeight + _titleStyle.margin.vertical;
             if (model.BuildingPowerText != null) height += RowHeight + _rowStyle.margin.vertical;
             if (model.FieldReserveText != null) height += RowHeight + _rowStyle.margin.vertical;
+            for (int i = 0; i < model.SelectionRows.Count; i++)
+            {
+                // Row for row with OnGUI: each breakdown row costs its
+                // content height PLUS the row style's vertical margin.
+                height += RowHeight + _rowStyle.margin.vertical;
+            }
             if (model.ProgressBar01 >= 0f) height += ProgressHeight; // GUIStyle.none: no margin
             if (model.SiteStatusText != null) height += SiteStatusHeight + _siteStatusStyle.margin.vertical;
             for (int i = 0; i < model.Buttons.Count; i++)

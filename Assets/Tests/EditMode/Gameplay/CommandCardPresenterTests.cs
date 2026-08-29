@@ -407,5 +407,157 @@ namespace Nova.Gameplay.Tests
             Assert.AreEqual("0 / 0 AE", CommandCardPresenter.FormatFieldReserveAE(0, 0));
             Assert.AreEqual("0 / 9.000 AE", CommandCardPresenter.FormatFieldReserveAE(-5, 9000));
         }
+
+        // ----------------------------------------------------------------
+        // Shared commands over a multi-selection (21.5, #88)
+        // ----------------------------------------------------------------
+
+        [Test]
+        public void GetSharedUnitCommands_PureHarvesters_KeepHarvestAndReturnCargo()
+        {
+            var presenter = new CommandCardPresenter();
+
+            CommandButtonType commands = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.Harvester, UnitRole.Harvester });
+
+            Assert.AreEqual(
+                CommandButtonType.Move | CommandButtonType.Stop | CommandButtonType.Harvest | CommandButtonType.ReturnCargo,
+                commands);
+        }
+
+        [Test]
+        public void GetSharedUnitCommands_HarvesterPlusBattleTank_KeepsOnlyMoveAndStop()
+        {
+            var presenter = new CommandCardPresenter();
+
+            // The Harvester is unarmed and the BattleTank cannot harvest:
+            // only the shared core survives the intersection. Previously
+            // the lead slot alone decided this, so both orders must agree.
+            CommandButtonType forward = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.Harvester, UnitRole.BattleTank });
+            CommandButtonType reversed = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.BattleTank, UnitRole.Harvester });
+
+            Assert.AreEqual(CommandButtonType.Move | CommandButtonType.Stop, forward);
+            Assert.AreEqual(forward, reversed, "the intersection must not depend on the selection order");
+        }
+
+        [Test]
+        public void GetSharedUnitCommands_BuilderPlusHarvester_KeepsOnlyMoveAndStop()
+        {
+            var presenter = new CommandCardPresenter();
+
+            CommandButtonType commands = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.Builder, UnitRole.Harvester });
+
+            Assert.AreEqual(CommandButtonType.Move | CommandButtonType.Stop, commands);
+        }
+
+        [Test]
+        public void GetSharedUnitCommands_PureBuilders_KeepRepair()
+        {
+            var presenter = new CommandCardPresenter();
+
+            CommandButtonType commands = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.Builder, UnitRole.Builder });
+
+            Assert.AreEqual(CommandButtonType.Move | CommandButtonType.Stop | CommandButtonType.Repair, commands);
+        }
+
+        [Test]
+        public void GetSharedUnitCommands_BuildingRolesAreIgnoredInsteadOfWipingTheIntersection()
+        {
+            var presenter = new CommandCardPresenter();
+
+            // GetUnitCommands returns None for building roles — skipping
+            // them before intersecting is what keeps a mixed selection's
+            // buttons alive (buildings ride along as bystanders).
+            CommandButtonType mixed = presenter.GetSharedUnitCommands(
+                FactionId.Alliance, new[] { UnitRole.HQ, UnitRole.Harvester, UnitRole.Barracks });
+
+            Assert.AreEqual(
+                presenter.GetUnitCommands(FactionId.Alliance, UnitRole.Harvester),
+                mixed,
+                "buildings contribute no commands to a mixed selection");
+            Assert.AreEqual(
+                CommandButtonType.None,
+                presenter.GetSharedUnitCommands(FactionId.Alliance, new[] { UnitRole.HQ }),
+                "an all-building input has no unit card at all");
+        }
+
+        // ----------------------------------------------------------------
+        // Selection breakdown (21.5, #88)
+        // ----------------------------------------------------------------
+
+        [Test]
+        public void SummarizeSelection_GroupsByRoleInFirstOccurrenceOrderWithHpSums()
+        {
+            var entities = new EntityManager(8);
+            EntityId leadTank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(1), SimFixed.FromInt(1)), SimFixed.FromInt(3), maxHealth: 240, role: UnitRole.LightTank);
+            EntityId harvester = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(2), SimFixed.FromInt(2)), SimFixed.FromInt(3), maxHealth: 100, role: UnitRole.Harvester);
+            EntityId secondTank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(3), SimFixed.FromInt(3)), SimFixed.FromInt(3), maxHealth: 240, role: UnitRole.LightTank);
+            entities.GetUnitRef(leadTank).CurrentHealth = 120;
+            entities.GetUnitRef(secondTank).CurrentHealth = 60;
+
+            var presenter = new CommandCardPresenter();
+            var groups = new SelectionGroup[4];
+            int count = presenter.SummarizeSelection(new[] { leadTank, harvester, secondTank }, entities, groups);
+
+            Assert.AreEqual(2, count);
+            Assert.AreEqual(UnitRole.LightTank, groups[0].Role, "the lead type stays the top row");
+            Assert.AreEqual(2, groups[0].Count);
+            Assert.AreEqual(180, groups[0].CurrentHealthSum, "summed, not averaged");
+            Assert.AreEqual(480, groups[0].MaxHealthSum);
+            Assert.AreEqual(UnitRole.Harvester, groups[1].Role);
+            Assert.AreEqual(1, groups[1].Count);
+            Assert.AreEqual(100, groups[1].CurrentHealthSum);
+        }
+
+        [Test]
+        public void SummarizeSelection_StaleHandlesAreSkippedSilently()
+        {
+            var entities = new EntityManager(4);
+            EntityId living = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(1), SimFixed.FromInt(1)), SimFixed.FromInt(3), role: UnitRole.Harvester);
+            EntityId stale = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(2), SimFixed.FromInt(2)), SimFixed.FromInt(3), role: UnitRole.Builder);
+            entities.DespawnUnit(stale); // the version bump invalidates the old handle
+
+            var presenter = new CommandCardPresenter();
+            var groups = new SelectionGroup[4];
+            int count = presenter.SummarizeSelection(new[] { living, stale }, entities, groups);
+
+            Assert.AreEqual(1, count);
+            Assert.AreEqual(UnitRole.Harvester, groups[0].Role);
+            Assert.AreEqual(1, groups[0].Count);
+            Assert.AreEqual(0, presenter.SummarizeSelection(new[] { living }, null, groups), "no store, no rows");
+        }
+
+        [Test]
+        public void SummarizeSelection_BuildingsGetTheirOwnGroups()
+        {
+            var entities = new EntityManager(4);
+            EntityId hq = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(1), SimFixed.FromInt(1)), SimFixed.FromInt(0), role: UnitRole.HQ);
+            EntityId tank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(2), SimFixed.FromInt(2)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+
+            var presenter = new CommandCardPresenter();
+            var groups = new SelectionGroup[4];
+            int count = presenter.SummarizeSelection(new[] { hq, tank }, entities, groups);
+
+            Assert.AreEqual(2, count);
+            Assert.AreEqual(UnitRole.HQ, groups[0].Role, "first occurrence — the building lead stays on top");
+            Assert.AreEqual(1, groups[0].Count);
+            Assert.AreEqual(UnitRole.LightTank, groups[1].Role);
+            Assert.AreEqual(1, groups[1].Count);
+        }
+
+        [Test]
+        public void FormatSelectionGroup_UnitsShowCountAndHpSums_BuildingsStayBystanders()
+        {
+            // The sprint's own example row.
+            var tankGroup = new SelectionGroup { Role = UnitRole.LightTank, Count = 2, CurrentHealthSum = 180, MaxHealthSum = 240 };
+            Assert.AreEqual("2× Lynx — 180/240 HP", CommandCardPresenter.FormatSelectionGroup(FactionId.Alliance, tankGroup));
+
+            var buildingGroup = new SelectionGroup { Role = UnitRole.HQ, Count = 1, CurrentHealthSum = 900, MaxHealthSum = 1000 };
+            Assert.AreEqual("1× Hauptquartier — Gebäude", CommandCardPresenter.FormatSelectionGroup(FactionId.Alliance, buildingGroup));
+        }
     }
 }

@@ -33,6 +33,22 @@ namespace Nova.Gameplay
     }
 
     /// <summary>
+    /// One row of the selection breakdown (21.5, #88): all selected entities
+    /// sharing one role, with their count and summed HP. The group order
+    /// follows the FIRST OCCURRENCE in the selection — the selection order
+    /// is stable, so the lead type stays the top row. Buildings get their
+    /// own groups; they contribute no commands
+    /// (<see cref="CommandCardPresenter.GetSharedUnitCommands"/>).
+    /// </summary>
+    public struct SelectionGroup
+    {
+        public UnitRole Role;
+        public int Count;
+        public int CurrentHealthSum;
+        public int MaxHealthSum;
+    }
+
+    /// <summary>
     /// Why a production button is blocked, in the sim's own validation order
     /// (mirror of <see cref="ProductionSystem.ValidateQueueUnit"/>): the T2
     /// gate first, then the queue capacity, then affordability. The HUD
@@ -96,7 +112,9 @@ namespace Nova.Gameplay
     /// is returned as PRESENT for the DefensePlatform so the HUD can show it
     /// deliberately disabled — the schema-v1 kind exists but the sim rejects
     /// it with RejectedPrerequisitesNotMet in this slice (defense modules are
-    /// G2/G4 content), so it must never be dispatched.
+    /// G2/G4 content), so it must never be dispatched. A MULTI-selection
+    /// intersects these per-role sets instead of taking the lead's word
+    /// (21.5, #88, <see cref="GetSharedUnitCommands"/>).
     /// </para>
     /// <para>
     /// NOT REPRESENTABLE in schema v1 (open design questions, deliberately
@@ -156,6 +174,101 @@ namespace Nova.Gameplay
                     break;
             }
             return commands;
+        }
+
+        /// <summary>
+        /// The unit card's buttons for a MULTI-selection (21.5, #88): the
+        /// intersection of <see cref="GetUnitCommands"/> over every MOBILE
+        /// role in the selection — a command is only offered when it is
+        /// meaningful for ALL selected units, so the card stops depending
+        /// on the selection's order (previously the lead unit alone
+        /// decided). Building roles are SKIPPED before intersecting:
+        /// <see cref="GetUnitCommands"/> returns
+        /// <see cref="CommandButtonType.None"/> for them, which would wipe
+        /// the intersection — in a mixed selection buildings ride along as
+        /// bystanders (the input discipline of RtsDeviceInput's lead-producer
+        /// rule) and contribute no commands.
+        /// <para>
+        /// Consequences, both deliberate (the sprint's reading: only
+        /// commands that hold for everyone): Harvest/ReturnCargo appear only
+        /// on a PURE Harvester selection — which also retires the dead
+        /// Harvest button on mixed selections, the executor rejects Harvest
+        /// for non-Harvesters anyway — and Repair only on a pure Builder
+        /// selection. An input without any mobile role yields
+        /// <see cref="CommandButtonType.None"/>.
+        /// </para>
+        /// </summary>
+        public CommandButtonType GetSharedUnitCommands(FactionId faction, ReadOnlySpan<UnitRole> roles)
+        {
+            CommandButtonType shared = CommandButtonType.None;
+            bool hasMobileRole = false;
+            for (int i = 0; i < roles.Length; i++)
+            {
+                if (SimDefinitions.IsBuildingRole(roles[i])) continue; // bystander, no command vote
+                CommandButtonType roleCommands = GetUnitCommands(faction, roles[i]);
+                shared = hasMobileRole ? shared & roleCommands : roleCommands;
+                hasMobileRole = true;
+            }
+            return hasMobileRole ? shared : CommandButtonType.None;
+        }
+
+        /// <summary>
+        /// Groups a selection by role for the unit card's breakdown rows
+        /// (21.5, #88): count and summed current/max HP per role, in
+        /// first-occurrence order (the selection order is stable, so the
+        /// lead type stays the top row). Stale handles are skipped silently
+        /// via the <see cref="EntityManager.TryGetUnit"/> miss. Returns the
+        /// number of groups written into <paramref name="destination"/>
+        /// (capped at its length).
+        /// </summary>
+        public int SummarizeSelection(ReadOnlySpan<EntityId> selection, EntityManager entities, SelectionGroup[] destination)
+        {
+            if (destination == null) throw new ArgumentNullException(nameof(destination));
+            if (entities == null) return 0;
+
+            int groupCount = 0;
+            for (int i = 0; i < selection.Length; i++)
+            {
+                if (!entities.TryGetUnit(selection[i], out UnitState unit)) continue; // stale handle
+
+                int groupIndex = -1;
+                for (int g = 0; g < groupCount; g++)
+                {
+                    if (destination[g].Role == unit.Role)
+                    {
+                        groupIndex = g;
+                        break;
+                    }
+                }
+                if (groupIndex < 0)
+                {
+                    if (groupCount >= destination.Length) continue; // count what fits, never overflow
+                    groupIndex = groupCount++;
+                    destination[groupIndex] = new SelectionGroup { Role = unit.Role };
+                }
+
+                SelectionGroup group = destination[groupIndex];
+                group.Count++;
+                group.CurrentHealthSum += unit.CurrentHealth;
+                group.MaxHealthSum += unit.MaxHealth;
+                destination[groupIndex] = group;
+            }
+            return groupCount;
+        }
+
+        /// <summary>
+        /// One breakdown row of the unit card (21.5, #88): mobile roles as
+        /// "2× Lynx — 180/240 HP" (the group's summed HP), buildings as
+        /// "1× Hauptquartier — Gebäude" — bystanders carry no HP line, the
+        /// marker is their whole statement on a unit card.
+        /// </summary>
+        public static string FormatSelectionGroup(FactionId faction, in SelectionGroup group)
+        {
+            if (SimDefinitions.IsBuildingRole(group.Role))
+            {
+                return $"{group.Count}× {BuildingDisplayName(group.Role)} — Gebäude";
+            }
+            return $"{group.Count}× {UnitDisplayName(faction, group.Role)} — {group.CurrentHealthSum}/{group.MaxHealthSum} HP";
         }
 
         /// <summary>The command buttons of a CONSTRUCTION SITE (definition role with an active site-register row): only cancelling is meaningful.</summary>

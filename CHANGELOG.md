@@ -83,6 +83,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   Harvester je Feld; mehr brauchen Wegzeit. Der Wert 9.000 bleibt — die
   Zahlen stützen den Expansionsdruck aus D-102 statt ihn zu schwächen, und
   der T-01-Fehlschätzer war ein Sichtbarkeitsproblem (21.2), kein Mengenproblem
+- **Die Befehlskarte sagt die Wahrheit über die Auswahl (Paket 21.5, #88).**
+  Bei Mehrfachauswahl bietet die Einheitenkarte nur noch Befehle an, die für
+  **alle** markierten mobilen Einheiten gelten (Schnittmenge statt
+  Anführer-Logik — „Ernten" erscheint konsequent nur bei reiner
+  Sammler-Auswahl, „Reparieren" nur bei reiner Pionier-Auswahl), listet die
+  Auswahl pro Typ auf („2× Lynx — 180/240 HP", mitmarkierte Gebäude als
+  eigene Bystander-Zeile ohne Befehlsbeitrag) und trägt bei einer
+  beschädigten Einzelauswahl deren HP im Titel; rein sim-lesend, ohne
+  Eingriff in die Simulation
 - **Restbestand der Vorkommen anklickbar und sichtbar (Paket 21.2, #86).**
   Ein Linksklick auf ein Aetherium-Vorkommen (auch ein erschöpftes) zeigt in der
   Befehlskarte Restbestand und Anfangsreserve („Aetherium-Vorkommen — 6.420 /
