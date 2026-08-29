@@ -308,7 +308,21 @@ namespace Nova.Gameplay.Match
         /// flank 0/1, contested far flank 0/1. Presentation iterates this
         /// list so marker and scatter geometry cannot silently omit a field.
         /// </summary>
-        public Vector2Int[] AllFieldCells
+        public Vector2Int[] AllFieldCells => CanonicalFieldCells;
+
+        /// <summary>
+        /// The same list as <see cref="AllFieldCells"/>, readable WITHOUT a
+        /// live component. Editor tooling that bakes the canonical map reads
+        /// the layout from here instead of restating it: the field table
+        /// already stands in five places by necessity (Unity host, headless
+        /// scenario, three test mirrors — risk R-1 of sprint 21), and a sixth
+        /// copy in BootstrapSceneGenerator drifted silently through two map
+        /// changes before anyone noticed. Its comment still claimed "the five
+        /// fields MatchBootstrap registers" when there were fifteen. A copy
+        /// nobody reads is not harmless; it is a wrong answer waiting for its
+        /// first reader.
+        /// </summary>
+        public static Vector2Int[] CanonicalFieldCells
         {
             get
             {
@@ -320,6 +334,20 @@ namespace Nova.Gameplay.Match
                 return cells;
             }
         }
+
+        /// <summary>
+        /// The two HQ footprint CENTRES in slot order (local, enemy), derived
+        /// from the same slot layouts the match spawns from — so the D-107
+        /// point mirror p -&gt; 124 - p holds by construction rather than by
+        /// a second hand-kept pair of literals. Same purpose as
+        /// <see cref="CanonicalFieldCells"/>: editor tooling reads, it does
+        /// not restate.
+        /// </summary>
+        public static Vector2Int[] CanonicalHqCentreCells => new[]
+        {
+            new Vector2Int(LocalLayout.HqOriginX + 1, LocalLayout.HqOriginY + 1),
+            new Vector2Int(EnemyLayout.HqOriginX + 1, EnemyLayout.HqOriginY + 1),
+        };
 
         /// <summary>Lower-left footprint origin of the human HQ (4, 4).</summary>
         public Vector2Int LocalHqOrigin => new Vector2Int(LocalPlayerLayout.HqOriginX, LocalPlayerLayout.HqOriginY);

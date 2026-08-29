@@ -74,17 +74,34 @@ SIMRUNNER_CSPROJ = "tools/Nova.SimRunner/Nova.SimRunner.csproj"
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 # Architecture layers (D-061): references may only point strictly downwards.
 # Nova.Editor is the host layer; test assemblies are handled separately.
+#
+# This map is the AUTHORITY on which layer an assembly sits in, so it must
+# describe the assemblies that actually exist and no others. Both directions
+# are guarded: an asmdef missing from the map trips "unknown assembly in
+# reference graph" below, and a map entry without an asmdef trips the
+# stale-entry check in analyze_asmdef_tree. Until 2026-08-29 the map carried
+# Nova.Presentation.Maps and Nova.Presentation.Shaders, which have had no
+# asmdef since the presentation layer was consolidated — dead ranks nobody
+# noticed, because nothing looked the other way round. A rank that describes
+# nothing is not harmless: it silently pre-approves a layer for whoever
+# reintroduces that name later, instead of making them decide.
 ASSEMBLY_RANKS = {
     "Nova.Core": 0,
     "Nova.Simulation": 1,
+    # Nova.AI.Data sat at rank 2 next to Nova.AI — filed by name, not by
+    # dependency direction. It is the profile data Nova.AI READS, references
+    # nothing but Nova.Core, and is otherwise consumed only from rank 4
+    # (Nova.Presentation.UI). At rank 2 the real edge Nova.AI -> Nova.AI.Data
+    # is a same-layer edge, which D-061 forbids: check_architecture (G0-B.3)
+    # has therefore been reporting a violation on an untouched tree. Rank 1 is
+    # the only rank that makes the existing graph valid without moving a line
+    # of code — every edge into and out of it stays strictly downward.
+    "Nova.AI.Data": 1,
     "Nova.AI": 2,
-    "Nova.AI.Data": 2,
     "Nova.Networking": 2,
     "Nova.Data": 2,
     "Nova.Gameplay": 3,
     "Nova.Presentation": 4,
-    "Nova.Presentation.Maps": 4,
-    "Nova.Presentation.Shaders": 4,
     "Nova.Presentation.UI": 4,
     "Nova.Editor": 5,
 }
@@ -156,6 +173,25 @@ def analyze_asmdef_tree(base: Path) -> list[str]:
             violations.append(f"{name}: duplicate assembly definition")
             continue
         assemblies[name] = document
+
+    # The map must not describe assemblies that do not exist. The opposite
+    # direction (an asmdef with no rank) is caught per reference below; this
+    # is the direction nothing looked at, and it is how two dead ranks
+    # survived the consolidation of the presentation layer unnoticed. A rank
+    # without an asmdef pre-approves a layer for whoever reintroduces that
+    # name, instead of forcing the decision into the open.
+    #
+    # It fires during a rename, and that is the point: the map is part of the
+    # rename, not a thing that catches up afterwards. What it deliberately
+    # does NOT catch is a rank that is wrong rather than dead — an assembly
+    # filed one layer too low still passes here and is only caught by the
+    # edge checks it then fails to trip.
+    for mapped in sorted(ASSEMBLY_RANKS):
+        if mapped not in assemblies:
+            violations.append(
+                f"{mapped}: ranked in ASSEMBLY_RANKS but no .asmdef defines it "
+                "— drop the entry or add the assembly"
+            )
 
     for name, document in sorted(assemblies.items()):
         references = document.get("references")
