@@ -12,9 +12,13 @@ namespace Nova.Simulation.Tests
     /// Determinism source guard (EditMode lane). Sprint hard rule 3 and
     /// docs/tech/SimulationCore.md section 9: the authoritative simulation is
     /// Q16.16 fixed point, so no IEEE-754 arithmetic may enter
-    /// Assets/_Project/Scripts/Simulation/** or Core/**. A single float
-    /// multiply that rounds differently on two CPUs desynchronises lockstep,
-    /// and no unit test catches it — the sources have to be checked directly.
+    /// Assets/_Project/Scripts/Simulation/**, Core/**, AI/** or AI.Data/**.
+    /// The AI roots share the contract: SkirmishAiSystem is registered in the
+    /// canonical tick order and its commands travel byte-identical to the
+    /// network path, so a float there desynchronises lockstep like any other.
+    /// A single float multiply that rounds differently on two CPUs
+    /// desynchronises lockstep, and no unit test catches it — the sources
+    /// have to be checked directly.
     /// <para>
     /// The scan strips comments and string literals first, so documentation
     /// that merely mentions floats never trips it.
@@ -33,13 +37,13 @@ namespace Nova.Simulation.Tests
         /// <summary>
         /// Scanned roots, relative to Assets/_Project/Scripts.
         /// </summary>
-        private static readonly string[] ScannedRoots = { "Core", "Simulation" };
+        private static readonly string[] ScannedRoots = { "AI", "AI.Data", "Core", "Simulation" };
 
         /// <summary>
         /// Repo-relative paths (forward slashes, below Assets/_Project/Scripts)
         /// allowed to contain IEEE-754 tokens, each with the reason it exists.
-        /// Nothing else in Core/** or Simulation/** may name float, double,
-        /// decimal or Mathf in code.
+        /// Nothing else in AI/**, AI.Data/**, Core/** or Simulation/** may
+        /// name float, double, decimal or Mathf in code.
         /// </summary>
         private static readonly Dictionary<string, string> FloatWhitelist = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -72,7 +76,7 @@ namespace Nova.Simulation.Tests
         /// <summary>
         /// Zero-tolerance tokens: no whitelist at all outside the declaring
         /// file. A FromFloat CALL is the exact defect hard rule 3 forbids, and
-        /// UnityEngine must not be reachable from rank 0/1 at all.
+        /// UnityEngine must not be reachable from any scanned root at all.
         /// </summary>
         private static readonly Regex ForbiddenEverywhere = new Regex(
             @"SimFixed\s*\.\s*FromFloat|(?<!\.)\bUnityEngine\b", RegexOptions.Compiled);
@@ -101,7 +105,7 @@ namespace Nova.Simulation.Tests
             Assert.That(offenders, Is.Empty,
                 "IEEE-754 arithmetic in the authoritative simulation breaks cross-platform lockstep " +
                 "(sprint hard rule 3). Use SimFixed/SimTrig instead. If a file genuinely belongs at " +
-                "the presentation boundary, move it out of Core/Simulation — do not grow the " +
+                "the presentation boundary, move it out of the scanned roots — do not grow the " +
                 "whitelist without an explicit review.\n" + string.Join("\n", offenders));
         }
 
@@ -120,7 +124,7 @@ namespace Nova.Simulation.Tests
             }
 
             Assert.That(offenders, Is.Empty,
-                "SimFixed.FromFloat must never be called inside Core/Simulation, and rank 0/1 " +
+                "SimFixed.FromFloat must never be called in any scanned root, and the scanned " +
                 "assemblies must not reference UnityEngine at all.\n" + string.Join("\n", offenders));
         }
 
@@ -161,10 +165,12 @@ namespace Nova.Simulation.Tests
             var seen = new List<string>();
             foreach (ScannedFile file in EnumerateSources()) seen.Add(file.RelativePath);
 
-            Assert.That(seen.Count, Is.GreaterThan(50), "expected the full Core+Simulation source set");
+            Assert.That(seen.Count, Is.GreaterThan(50), "expected the full AI+AI.Data+Core+Simulation source set");
             Assert.That(seen, Contains.Item("Core/SimFixed.cs"));
             Assert.That(seen, Contains.Item("Simulation/SimulationKernel.cs"));
             Assert.That(seen, Contains.Item("Simulation/Economy/EconomySystem.cs"));
+            Assert.That(seen, Contains.Item("AI/SkirmishAiSystem.cs"));
+            Assert.That(seen, Contains.Item("AI.Data/AiProfile.cs"));
         }
 
         // ----------------------------------------------------------------

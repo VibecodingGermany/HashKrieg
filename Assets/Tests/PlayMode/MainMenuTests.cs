@@ -237,6 +237,18 @@ namespace Nova.PlayMode.Tests
                 "— it must not keep playing over the match");
         }
 
+        /// <summary>
+        /// The direct connection keeps its sprint-13 contract — the code is
+        /// masked, the masks are validated, and Abbrechen never starts
+        /// gameplay — but it is REACHED through the lobby: since sprint 14
+        /// (D-092) "Netzpartie" opens the lobby entry view and the network
+        /// panel sits one step further in, behind "Direktverbindung …"
+        /// (MainMenuController.BuildMainButtons and BuildLobbyEntry). This
+        /// test still pinned the pre-lobby path and was the suite's one red
+        /// bar because of it (#110): the detour is the deliberate, documented
+        /// product behaviour, so the expectation had to follow the code, not
+        /// the other way round. Everything past the entry view is unchanged.
+        /// </summary>
         [UnityTest]
         public IEnumerator NetworkPanel_ValidatesMasksAndCancelsWithoutStartingGameplay()
         {
@@ -250,7 +262,21 @@ namespace Nova.PlayMode.Tests
             yield return null;
 
             Assert.AreEqual(DisplayStyle.None, root.Q("menu-main").style.display.value);
-            Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-network").style.display.value);
+            Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-lobby").style.display.value,
+                "'Netzpartie' opens the LOBBY panel, not the direct connection (sprint 14, D-092)");
+            Assert.AreNotEqual(DisplayStyle.None, root.Q("lobby-entry").style.display.value,
+                "the lobby opens on its entry view — create, join, or the direct connection");
+            Assert.AreEqual(DisplayStyle.None, root.Q("menu-network").style.display.value,
+                "the direct connection stays closed until the player picks it from the entry view");
+
+            Submit(FindButton(root, "Direktverbindung …"));
+            yield return null;
+
+            Assert.AreEqual(DisplayStyle.None, root.Q("menu-lobby").style.display.value,
+                "the lobby gives way to the direct connection it led to");
+            Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-network").style.display.value,
+                "'Direktverbindung …' opens the unchanged sprint-13 network panel");
+
             TextField host = FindTextField(root, "Serveradresse");
             TextField port = FindTextField(root, "Port");
             TextField code = FindTextField(root, "Match-Code");
@@ -283,6 +309,9 @@ namespace Nova.PlayMode.Tests
             yield return null;
             Assert.AreNotEqual(DisplayStyle.None, root.Q("menu-main").style.display.value);
             Assert.AreEqual(DisplayStyle.None, root.Q("menu-network").style.display.value);
+            Assert.AreEqual(DisplayStyle.None, root.Q("menu-lobby").style.display.value,
+                "Abbrechen on the direct connection returns to the MAIN panel, not one step back " +
+                "into the lobby (CancelNetworkJoin → ShowNetworkPanel(false))");
             Assert.AreEqual(NetworkJoinPhase.Idle, bootstrap.JoinStatus.Phase);
         }
 
