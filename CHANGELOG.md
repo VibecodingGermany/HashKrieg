@@ -73,6 +73,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Die Auswahl ist benutzbar geworden (#50).** Aus dem Betatest: „Weil ich den
+  Pionier in der Gruppe nicht wiederfand, konnte ich nicht bauen." Paket 21.5
+  hatte die Aufstellung geliefert, aber man konnte sie nicht anfassen. Jetzt
+  **filtert ein Klick auf eine Typzeile** die Auswahl auf genau diese Einheiten
+  (unter Erhalt der Auswahlreihenfolge, tote Handles fallen raus), ein
+  **Doppelklick** wählt alle Einheiten derselben Rolle *im Kamerabild* (Shift
+  bleibt additiv), und **`I`** springt zum nächsten unbeschäftigten Pionier und
+  zentriert die Kamera auf ihn — ohne das Zentrieren fände man ihn genauso wenig
+  wie vorher. Wiederholtes Drücken tourt in aufsteigender Entitäts-Reihenfolge
+  und läuft einmal um. Was „unbeschäftigt" heißt, ist am Code abgelesen und
+  nicht geraten: die fünf Marker sind die Räumliste des `Stop`-Befehls plus die
+  Baustellenzuweisung. Ein sechster — ein laufender Reparaturauftrag — ist aus
+  der Auswahlschicht nicht sichtbar und ist als bewusster, dokumentierter
+  blinder Fleck im Code vermerkt, statt genähert zu werden; ihn zu schließen
+  bräuchte einen Leser in `Simulation/**` und gehört nicht zu #50. Reine
+  Auswahl und Darstellung, kein Simulationseingriff
 - **Tragzeit des Startfelds ist gemessen, nicht geraten (Paket 21.3, #87).**
   `tools/Nova.SimRunner.Tests/StartFieldLongevityTests.cs` fährt den echten
   Ernte-Auto-Zyklus auf der kanonischen Eröffnungsgeometrie (Feld (7,7) mit

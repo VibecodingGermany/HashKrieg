@@ -115,6 +115,8 @@ namespace Nova.Presentation.UI
         [SerializeField] private float _pickRadiusWorld = 1.5f;
         [Tooltip("Click-select radius for Aetherium fields in world units (= cells). Wider than the unit pick radius because the marker is a seven-shard cluster; exhausted fields stay clickable for their readout (21.2, #86).")]
         [SerializeField] private float _fieldPickRadiusWorld = 2f;
+        [Tooltip("Seconds between two clicks on the same unit that read as a double-click — that selects all own units of its role visible in the current camera image (sprint 22, #50).")]
+        [SerializeField] private float _doubleClickSeconds = 0.35f;
 
         [Header("Canonical Alliance definition ids (resolved to the local slot faction at runtime)")]
         [Tooltip("B: Power — Alliance defId 5, 450 AE, prerequisite-free.")]
@@ -201,6 +203,23 @@ namespace Nova.Presentation.UI
         // repair command's actors; the executor rejects the whole command on
         // a non-Builder actor).
         private readonly EntityId[] _builderScratch = new EntityId[SelectionManager.MaxSelectedEntities];
+
+        // Double-click role select (sprint 22, #50): the last own-unit click
+        // pick and its Time.time — a second pick of the SAME entity within
+        // _doubleClickSeconds reads as the double-click gesture. The scratch
+        // gathers the visible same-role ids before they replace (or, with
+        // Shift, join) the selection, so the gesture stays allocation-free.
+        private float _lastPickTime = -1f;
+        private EntityId _lastPickedEntity = EntityId.Invalid;
+        private readonly EntityId[] _roleSelectScratch = new EntityId[SelectionManager.MaxSelectedEntities];
+
+        // Idle-Builder tour (sprint 22, #50, I key): the entity index the
+        // last press returned, so the next press continues the ascending
+        // round. The scratch collects the sites' assigned-Builder raws for
+        // IdleBuilderQuery (sized to the site format capacity, so the
+        // collection can never truncate).
+        private int _lastIdleBuilderIndex = -1;
+        private readonly uint[] _assignedBuilderScratch = new uint[ConstructionSystem.MaxSites];
 
         // Harvester escort cadence (D-085-pattern client dispatch): how often
         // the standing harvest/return orders are re-checked against the
@@ -346,6 +365,30 @@ namespace Nova.Presentation.UI
             ArmOrderPick(PendingOrder.Repair, "Repair");
         }
 
+        /// <summary>
+        /// The command card's breakdown-row click (sprint 22, #50): reduces
+        /// the selection to that row's role — the card then redraws with
+        /// exactly this type's commands, which is the cheapest path from
+        /// "I see what is selected" to "I can work with it". Refused while a
+        /// gesture is armed (placement ghost or order pick): the input
+        /// discipline forbids selection changes mid-gesture.
+        /// </summary>
+        public void FilterSelectionToRole(UnitRole role)
+        {
+            if (!EnsureDispatcher()) return;
+            if (_placementMode || _pendingOrder != PendingOrder.None)
+            {
+                _lastCommandStatus = "Type filter: resolve or cancel the armed gesture first";
+                return;
+            }
+
+            int kept = _selection.RetainRole(_runner.Entities, role);
+            _lastCommandStatus = kept > 0
+                ? $"Type filter: {kept} unit(s) of role {role} selected"
+                : $"Type filter: nothing of role {role} left — selection cleared";
+            if (kept > 0) AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+        }
+
         /// <summary>Stop for the mobile selection — the S key and the card button share this path.</summary>
         public void OrderStop()
         {
@@ -452,7 +495,8 @@ namespace Nova.Presentation.UI
                 $"Units: Q {_unitDefId} | Shift+Q {_altUnitDefId} | U {_builderDefId} | N {_antiArmorDefId} | " +
                 $"E {_scoutDefId} | Shift+E {_lightTankDefId} | D {_battleTankDefId} | Shift+D {_artilleryDefId}\n" +
                 "Command card (bottom right): LMB an order button, then LMB its target in the world (RMB/ESC cancels the pick)\n" +
-                "Groups: Ctrl+1..9 save selection, 1..9 recall | Shift+LMB/drag adds to the selection\n" +
+                "Groups: Ctrl+1..9 save selection, 1..9 recall | Shift+LMB/drag adds to the selection | " +
+                "double-click a unit: select all visible of its type | I: select next idle Builder, camera follows (press again to cycle)\n" +
                 "Camera: arrow keys / screen edge pan | wheel zoom | Z,X rotate | MMB drag rotate | Space reset rotation\n" +
                 "Linksklick auf ein Vorkommen: Restbestand anzeigen";
         }
@@ -533,6 +577,12 @@ namespace Nova.Presentation.UI
             _placementMode = false;
             _pendingOrder = PendingOrder.None;
             _dragActive = false;
+            // The selection gestures' memory belongs to the OLD match too:
+            // an idle-Builder tour would keep cycling stale indices, and a
+            // click pair started before the rebind must not complete as a
+            // double-click in the new match.
+            _lastIdleBuilderIndex = -1;
+            _lastPickedEntity = EntityId.Invalid;
             return true;
         }
 
@@ -991,6 +1041,11 @@ namespace Nova.Presentation.UI
 
             if (Input.GetKeyDown(KeyCode.R)) OrderReturnCargo();
 
+            // Sprint 22 (#50): jump to the next idle Builder — the beta
+            // report's build-flow break in its most direct form (select +
+            // camera centre, repeated presses cycle).
+            if (Input.GetKeyDown(KeyCode.I)) SelectNextIdleBuilder();
+
             // Pause/resume no longer lives here: ESC/P and the pause menu
             // belong to PauseMenuHud, which pauses the kernel clock directly
             // (no command involved). While its modal is up, the gate in
@@ -1425,7 +1480,7 @@ namespace Nova.Presentation.UI
             _lastCommandStatus = additive ? "Box select (added): 0 unit(s) selected" : "Box select: 0 unit(s)";
         }
 
-        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>, else — non-additive only — the field under the cursor within <see cref="_fieldPickRadiusWorld"/> for its reserve readout (21.2, #86); additive with Shift, else replace (a plain click on empty ground clears).</summary>
+        /// <summary>Click select: nearest own active unit within <see cref="_pickRadiusWorld"/>, else — non-additive only — the field under the cursor within <see cref="_fieldPickRadiusWorld"/> for its reserve readout (21.2, #86); additive with Shift, else replace (a plain click on empty ground clears). A second click on the SAME unit within <see cref="_doubleClickSeconds"/> is the double-click gesture (sprint 22, #50): all own units of its role visible in the camera image.</summary>
         private void SelectSingle(Vector2 screenPoint, bool additive)
         {
             if (_runner.Entities == null) return;
@@ -1433,6 +1488,20 @@ namespace Nova.Presentation.UI
             {
                 if (TryPickUnit(world, ownedByLocalSlot: true, out EntityId picked))
                 {
+                    // The double-click check runs BEFORE the record updates:
+                    // a pair is the same entity twice within the window.
+                    bool doubleClick = picked == _lastPickedEntity
+                        && Time.time - _lastPickTime <= _doubleClickSeconds;
+                    _lastPickedEntity = picked;
+                    _lastPickTime = Time.time;
+
+                    if (doubleClick
+                        && _runner.Entities.TryGetUnit(picked, out UnitState pickedUnit))
+                    {
+                        SelectVisibleSameRole(in pickedUnit, additive);
+                        return;
+                    }
+
                     if (additive)
                     {
                         bool added = _selection.AddSingle(picked);
@@ -1447,6 +1516,12 @@ namespace Nova.Presentation.UI
                     }
                     return;
                 }
+
+                // No unit under the cursor: any in-flight click pair breaks
+                // here, so the next unit pick starts a fresh pair instead of
+                // completing a stale double-click across an empty-ground
+                // click.
+                _lastPickedEntity = EntityId.Invalid;
 
                 // The field pick sits BEHIND the unit pick: a harvester
                 // standing on its field stays selectable. Additive clicks
@@ -1465,6 +1540,96 @@ namespace Nova.Presentation.UI
                 _selection.ClearSelection();
                 _lastCommandStatus = "Selection cleared";
             }
+        }
+
+        /// <summary>
+        /// The double-click gesture (sprint 22, #50): selects every own unit
+        /// of the double-clicked unit's role whose centre projects into the
+        /// CURRENT camera image — the RTS convention, bounded to the
+        /// viewport on purpose: a map-wide select would be a different
+        /// command and would surprise the player. Shift keeps the gesture
+        /// additive, the same discipline Shift-click and Shift-drag already
+        /// follow (sprint 09 §7). The clicked unit anchors the result even
+        /// if its own centre sits a hair outside the viewport (the pick
+        /// radius reaches past the screen edge), so the gesture can never
+        /// read as "clear selection".
+        /// </summary>
+        private void SelectVisibleSameRole(in UnitState clicked, bool additive)
+        {
+            EntityManager entities = _runner.Entities;
+            byte slot = _dispatcher.LocalSlot;
+            UnitState[] units = entities.RawUnits;
+            int capacity = entities.Capacity;
+
+            int gathered = 0;
+            _roleSelectScratch[gathered++] = clicked.Id; // the anchor, always
+            for (int i = 0; i < capacity && gathered < _roleSelectScratch.Length; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != slot || unit.Role != clicked.Role) continue;
+                if (unit.Id == clicked.Id) continue; // already anchored
+                if (!IsCentreOnScreen(in unit)) continue;
+                _roleSelectScratch[gathered++] = unit.Id;
+            }
+
+            int total = additive
+                ? _selection.AddRange(_roleSelectScratch.AsSpan(0, gathered))
+                : _selection.ReplaceSelection(_roleSelectScratch.AsSpan(0, gathered));
+            _lastCommandStatus = additive
+                ? $"Double-click (added): {total} unit(s) of role {clicked.Role} selected"
+                : $"Double-click: {total} visible unit(s) of role {clicked.Role}";
+            AudioServiceLocator.Play2D(SoundEventId.UI_Select);
+        }
+
+        /// <summary>True when the unit's centre projects into the current camera image — presentation-side visibility for the double-click gesture (floats are this layer's currency).</summary>
+        private bool IsCentreOnScreen(in UnitState unit)
+        {
+            if (_camera == null) _camera = Camera.main;
+            if (_camera == null) return false;
+
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(
+                unit.Transform.PositionX.ToFloat(), _groundPlaneY, unit.Transform.PositionY.ToFloat()));
+            return screen.z > 0f
+                && screen.x >= 0f && screen.x <= Screen.width
+                && screen.y >= 0f && screen.y <= Screen.height;
+        }
+
+        /// <summary>
+        /// The I key (sprint 22, #50 — the beta report's build-flow break:
+        /// the player lost the Builder in a clump and could not build):
+        /// selects the next IDLE own Builder and centres the camera on him;
+        /// repeated presses tour all idle Builders in ascending entity
+        /// order. <see cref="IdleBuilderQuery"/> owns the idle definition
+        /// (with its documented repair blind spot) and the deterministic
+        /// cycle. The camera jump travels the minimap's focus channel — this
+        /// assembly may not reference the camera rig (same rank) — and is
+        /// pure presentation: no command, no simulation read, nothing a
+        /// snapshot sees.
+        /// </summary>
+        private void SelectNextIdleBuilder()
+        {
+            if (_runner.Entities == null || _runner.Construction == null) return;
+
+            if (!IdleBuilderQuery.TryFindNextIdleBuilder(
+                    _runner.Entities, _runner.Construction, _dispatcher.LocalSlot,
+                    _lastIdleBuilderIndex, _assignedBuilderScratch, out EntityId builder))
+            {
+                // No idle Builder: restart the tour at the bottom on the next
+                // press, so a Builder finishing his job is found immediately.
+                _lastIdleBuilderIndex = -1;
+                _lastCommandStatus = "Idle Builder: none — every Builder is working (or none exists)";
+                return;
+            }
+
+            _selection.SelectSingle(builder);
+            _lastIdleBuilderIndex = builder.Index;
+            if (_runner.Entities.TryGetUnit(builder, out UnitState state))
+            {
+                MinimapCameraLink.RequestFocus(
+                    state.Transform.PositionX.ToFloat(), state.Transform.PositionY.ToFloat());
+            }
+            _lastCommandStatus = $"Idle Builder: entity {builder.Index} selected — I cycles";
+            AudioServiceLocator.Play2D(SoundEventId.UI_Select);
         }
 
         /// <summary>Nearest active unit to a ground point, filtered by ownership.</summary>
