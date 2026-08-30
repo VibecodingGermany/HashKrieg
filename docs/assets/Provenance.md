@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert das verbindliche Verfahren und Datenschema, mit dem die Herkunft und Lizenzlage **jedes einzelnen Art-Assets** (3D-Mesh, Textur, Audio, Font) von *Project Nova* nachweisbar dokumentiert wird, bevor es ins Repository aufgenommen wird. Während [Licenses.md](Licenses.md) den Lizenzrahmen je **Quelle** festhält, beschreibt dieses Dokument den Nachweis je **einzelnem Asset**: welche Pflichtfelder ein Provenienz-Datensatz enthält, wo er abgelegt wird und welchen Freigabe-Workflow er durchläuft. Es operationalisiert D-054 (0-€-Strategie, CC0-Basis plus KI-Generierung, siehe [ProcurementStrategy.md](ProcurementStrategy.md)) auf Ebene des einzelnen Imports.
+Definiert das verbindliche Verfahren und Datenschema, mit dem die Herkunft und Lizenzlage **jedes einzelnen Art-Assets** (3D-Mesh, Textur, Audio, Font) von *Hashkrieg* nachweisbar dokumentiert wird, bevor es ins Repository aufgenommen wird. Während [Licenses.md](Licenses.md) den Lizenzrahmen je **Quelle** festhält, beschreibt dieses Dokument den Nachweis je **einzelnem Asset**: welche Pflichtfelder ein Provenienz-Datensatz enthält, wo er abgelegt wird und welchen Freigabe-Workflow er durchläuft. Es operationalisiert D-054 (0-€-Strategie, CC0-Basis plus KI-Generierung, siehe [ProcurementStrategy.md](ProcurementStrategy.md)) auf Ebene des einzelnen Imports.
 
 ## Abhängigkeiten
 
@@ -213,7 +213,7 @@ Beim ersten Eintrag wird `CREDITS.md` im Repo-Root nach folgendem Muster erzeugt
 ````markdown
 # Credits und Attributionen
 
-Diese Datei listet alle Assets von *Project Nova*, deren Lizenz eine Namensnennung
+Diese Datei listet alle Assets von *Hashkrieg*, deren Lizenz eine Namensnennung
 vorschreibt. Ein Asset wird eingetragen, sobald sein Provenienznachweis
 `attributionRequired: true` ausweist. Assets ohne Attributionspflicht (CC0-Importe,
 KI-Material ohne Namensnennungspflicht) stehen hier nicht, sind aber im

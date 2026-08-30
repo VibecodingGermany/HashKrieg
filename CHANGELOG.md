@@ -205,6 +205,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
+  84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
+  Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die
+  Code-Identität bleibt `Nova.*` — Namensräume, die siebzehn `.asmdef`,
+  `tools/Nova.SimRunner`, `NOVA_FIXED_POINT` und die übrigen
+  Vertragskonstanten sind unangetastet; aus „die `Nova.Simulation`-Assembly des
+  Project-Nova-Projekts" wird „die `Nova.Simulation`-Assembly des
+  Hashkrieg-Projekts", nicht mehr. Zweitens: **die Vergangenheit wird nicht
+  umgeschrieben.** Entscheidungsprotokoll, Sprintberichte, Testberichte,
+  Statusaufnahmen und Forschungsnotizen behalten den alten Namen, weil er dort
+  der historisch richtige ist — eine Umbenennung, die die Vergangenheit
+  angleicht, macht die Dokumentation als Beleg wertlos. Bewusst stehen bleiben
+  außerdem elf Zitate von Unity-Menüpfaden und Build-Artefaktnamen, die der Code
+  noch so erzeugt: die Doku darf dem Code nicht vorauslaufen, sie ziehen mit
+  Stufe 2 nach. `README.md` behauptete bis hierher, „Repo, Code und Wiki laufen
+  weiter unter *Project Nova*" — das stimmte seit dem 09.08.2026 nicht mehr
 - **Die Kartenmitte ist ein Gebiet mit vier schmalen Zufahrten (Paket 21.7, #94, D-109).**
   Aus dem einen Feld bei (62,62) mit 15.000 AE werden **fünf** Felder à 8.000 —
   zusammen 40.000 AE und damit 28 % des Kartenwerts, exakt das Gewicht, das das

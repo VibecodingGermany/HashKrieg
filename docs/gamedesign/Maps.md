@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert das Layout-Regelwerk für alle Project-Nova-Karten: Größenklassen, Startpositionen, Expansions-Logik, Engstellen-Topologie, Aetherium-Feld-Platzierung (Mengengerüst), neutrale Elemente (gemäß D-016), die Karten-Roadmap (MVP 1 / Alpha 4 / Beta 8 / Release 12, gemäß D-017) und den Karten-Produktionsprozess. Verbindlich für Level Design; Input für Economy-Balancing ([./Economy.md](./Economy.md)), KI (Expansions-/Angriffsrouten) und Asset-Pipeline.
+Definiert das Layout-Regelwerk für alle Hashkrieg-Karten: Größenklassen, Startpositionen, Expansions-Logik, Engstellen-Topologie, Aetherium-Feld-Platzierung (Mengengerüst), neutrale Elemente (gemäß D-016), die Karten-Roadmap (MVP 1 / Alpha 4 / Beta 8 / Release 12, gemäß D-017) und den Karten-Produktionsprozess. Verbindlich für Level Design; Input für Economy-Balancing ([./Economy.md](./Economy.md)), KI (Expansions-/Angriffsrouten) und Asset-Pipeline.
 
 ## Abhängigkeiten
 

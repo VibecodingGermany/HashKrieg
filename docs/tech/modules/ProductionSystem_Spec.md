@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Production Queue & Tech-Tree System** von *Project Nova*. Das Modul führt Einheiten-Produktions-Queues in Kasernen und Fabriken aus, berechnet Produktionszeit-Timer unter Berücksichtigung von Low-Power-Mali und spawnt fertiggestellte Einheiten in den `EntityManager`. Zudem verwaltet das Modul die Tech-Tier-Stufen der Spieler.
+Dieses Dokument beschreibt das deterministische **Production Queue & Tech-Tree System** von *Hashkrieg*. Das Modul führt Einheiten-Produktions-Queues in Kasernen und Fabriken aus, berechnet Produktionszeit-Timer unter Berücksichtigung von Low-Power-Mali und spawnt fertiggestellte Einheiten in den `EntityManager`. Zudem verwaltet das Modul die Tech-Tier-Stufen der Spieler.
 
 
 ## Abhängigkeiten

@@ -4,8 +4,8 @@
 
 ## Zweck
 
-Dieses Dokument legt den verbindlichen Standard für Art-Assets von *Project
-Nova* fest: Ordnerstruktur unter `Assets/_Project/Art/`, Dateinamenskonvention
+Dieses Dokument legt den verbindlichen Standard für Art-Assets von *Hashkrieg*
+fest: Ordnerstruktur unter `Assets/_Project/Art/`, Dateinamenskonvention
 für Meshes/Texturen/Materialien/Prefabs, LOD-Konvention, Unity-Import-Settings
 und den Material-Standard inklusive der Team-Farben-Masken-Spezifikation. Es
 schließt die bislang undokumentierte Lücke zwischen Blender-Quelldateien und

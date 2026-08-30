@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Zentrales **Lizenz-Register** für alle externen und KI-generierten Asset-Quellen von *Project Nova*: Lizenzmodell, Seat-Regeln, Attributionspflichten, Weitergabe-/Repo-Beschränkungen und offene Lizenz-Detailfragen je Quelle (gemäß D-054: 0 € Open-Source & KI-Pipeline). Dieses Dokument ist ein verbindliches Sprint-5-Exit-Kriterium und wird **bei jedem Asset-Import fortgeschrieben**. Es ist die Freigabe-Grundlage dafür, welche Assets im öffentlichen Git-Repo liegen dürfen.
+Zentrales **Lizenz-Register** für alle externen und KI-generierten Asset-Quellen von *Hashkrieg*: Lizenzmodell, Seat-Regeln, Attributionspflichten, Weitergabe-/Repo-Beschränkungen und offene Lizenz-Detailfragen je Quelle (gemäß D-054: 0 € Open-Source & KI-Pipeline). Dieses Dokument ist ein verbindliches Sprint-5-Exit-Kriterium und wird **bei jedem Asset-Import fortgeschrieben**. Es ist die Freigabe-Grundlage dafür, welche Assets im öffentlichen Git-Repo liegen dürfen.
 
 ## Abhängigkeiten
 
@@ -39,7 +39,7 @@ Zentrales **Lizenz-Register** für alle externen und KI-generierten Asset-Quelle
 
 ## 2. Verbindliche Lizenz-Regeln (D-054)
 
-1. **Öffentliche Repository-Tauglichkeit.** Alle CC0- und KI-generierten Assets dürfen direkt im öffentlichen GitHub-Repository (`VibecodingGermany/Project_Nova`) geteilt werden.
+1. **Öffentliche Repository-Tauglichkeit.** Alle CC0- und KI-generierten Assets dürfen direkt im öffentlichen GitHub-Repository (`VibecodingGermany/HashKrieg`) geteilt werden.
 2. **CC-BY = Attribution-Pflicht.** Jedes CC-BY-Modell (v. a. Sketchfab) wird beim Erwerb/Import in `CREDITS.md` (ab erstem CC-BY-Import) mit Autor, Titel, Quelle und Lizenz-URL erfasst.
 3. **Keine Per-Seat-Kaufkosten (0 € Budget).** Es werden keine kostenpflichtigen Per-Seat-Store-Packs erworben.
 4. **Mixamo-Nutzung.** Mixamo-Clips dürfen im Unity-Projekt eingebunden und gerendert werden; eine Weitergabe loser Raw-Clips an Dritte außerhalb des Projekts ist zu vermeiden.

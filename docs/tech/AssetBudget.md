@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument definiert die verbindlichen Asset-Budgets pro Asset-Klasse (Polycount, Texturen, LOD, VFX-Partikel, Audio-Kompression) für Project Nova. Es operationalisiert die Kauf-Prüfung aus TPD §7.3 in messbare Richtwerte, definiert das Gesamtbudget-Tracking für den schlimmsten sichtbaren Fall (500 Einheiten, L-Karte) und stellt sicher, dass Asset-Produktion und Asset-Store-Käufe innerhalb der Frame- und Speicherbudgets ([PerformanceBudget.md](PerformanceBudget.md), [MemoryBudget.md](MemoryBudget.md)) bleiben. Verbindlich für Lead Performance Engineer, Technical Art und Lead Technical Director; Eingabe für alle Asset-Reviews ab Phase 0.
+Dieses Dokument definiert die verbindlichen Asset-Budgets pro Asset-Klasse (Polycount, Texturen, LOD, VFX-Partikel, Audio-Kompression) für Hashkrieg. Es operationalisiert die Kauf-Prüfung aus TPD §7.3 in messbare Richtwerte, definiert das Gesamtbudget-Tracking für den schlimmsten sichtbaren Fall (500 Einheiten, L-Karte) und stellt sicher, dass Asset-Produktion und Asset-Store-Käufe innerhalb der Frame- und Speicherbudgets ([PerformanceBudget.md](PerformanceBudget.md), [MemoryBudget.md](MemoryBudget.md)) bleiben. Verbindlich für Lead Performance Engineer, Technical Art und Lead Technical Director; Eingabe für alle Asset-Reviews ab Phase 0.
 
 ## Abhängigkeiten
 
@@ -105,7 +105,7 @@ Jedes Asset-Store-Paket wird gegen diese Richtwerte geprüft; **drei oder mehr �
 | Animationen | Humanoid-kompatibel (Infanterie) bzw. nicht erforderlich (Fahrzeuge, Code-Animation) |
 | Rigging | Humanoid-Standard-Skelett; exotische Rigs nur bei Einzel-Showcase-Assets |
 | Materialaufbau | ≤ 2 Materialien pro Mesh-Renderer, SRP-Batcher-kompatibel |
-| Mobile/WebGL-Eignung | für Nova **nicht relevant** (Desktop primär, D-006) – kein K.O.-Kriterium |
+| Mobile/WebGL-Eignung | für Hashkrieg **nicht relevant** (Desktop primär, D-006) – kein K.O.-Kriterium |
 | Visuelle Kompatibilität | Stil-Check gegen Signature-Assets (TPD §7.2) durch Art Direction |
 | Anpassbarkeit | FBX/Quelle enthalten, Materialien editierbar |
 | Dateiformate | FBX + PNG/TGA/PSD; proprietäre Formate nur mit Export-Pfad |

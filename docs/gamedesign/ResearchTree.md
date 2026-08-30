@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert den Forschungsbaum aller drei Fraktionen (Allianz, Legion, Evolvierte) für Project Nova: Tier-Struktur 1–3, die vier Kategorien Wirtschaft / Militär / Spezialfähigkeiten / Superwaffe, konkrete Technologien mit Kosten, Zeiten, Voraussetzungen und Effekten sowie Freischaltpfade für Elite-Einheiten (D-015) und Superwaffen. Verbindlich für Balancing, UI (Forschungsmenü), KI (Forschungsverhalten) und die technische Umsetzung als datengetriebene Datensätze (ScriptableObjects, flache Struktur). Alle Zahlen sind Startwerte v0.1 zum Tunen, keine finalen Balancing-Werte.
+Definiert den Forschungsbaum aller drei Fraktionen (Allianz, Legion, Evolvierte) für Hashkrieg: Tier-Struktur 1–3, die vier Kategorien Wirtschaft / Militär / Spezialfähigkeiten / Superwaffe, konkrete Technologien mit Kosten, Zeiten, Voraussetzungen und Effekten sowie Freischaltpfade für Elite-Einheiten (D-015) und Superwaffen. Verbindlich für Balancing, UI (Forschungsmenü), KI (Forschungsverhalten) und die technische Umsetzung als datengetriebene Datensätze (ScriptableObjects, flache Struktur). Alle Zahlen sind Startwerte v0.1 zum Tunen, keine finalen Balancing-Werte.
 
 ## Abhängigkeiten
 

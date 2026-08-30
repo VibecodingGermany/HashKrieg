@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Technisches Design des Beleuchtungs- und Post-Processing-Konzepts von *Project Nova* für Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Festgelegt werden: Lichtkonzept pro Biom-Typ, die Realtime-vs.-Baked-Strategie, Schatten-Budget, Aetherium-Glow (Emissive + Bloom), VFX-Beleuchtung (Explosionen) und der URP-Post-Processing-Stack. API-Skizzen sind Entwürfe; keine Implementierungslogik. Pipeline-Setup, FoW und Overlays siehe [./Rendering.md](./Rendering.md).
+Technisches Design des Beleuchtungs- und Post-Processing-Konzepts von *Hashkrieg* für Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Festgelegt werden: Lichtkonzept pro Biom-Typ, die Realtime-vs.-Baked-Strategie, Schatten-Budget, Aetherium-Glow (Emissive + Bloom), VFX-Beleuchtung (Explosionen) und der URP-Post-Processing-Stack. API-Skizzen sind Entwürfe; keine Implementierungslogik. Pipeline-Setup, FoW und Overlays siehe [./Rendering.md](./Rendering.md).
 
 ## Abhängigkeiten
 

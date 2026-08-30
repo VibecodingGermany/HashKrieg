@@ -1,4 +1,4 @@
-# Naming Convention – Benennungsregeln für Project Nova
+# Naming Convention – Benennungsregeln für Hashkrieg
 
 **Version:** 0.5.0 | **Status:** Entwurf – MS-1 rebaselined | **Verantwortungsbereich:** Lead Technical Director | **Sprint:** 4
 
@@ -172,7 +172,7 @@ Jede handgeschriebene `.cs`-Datei beginnt mit:
 
 ```csharp
 // -----------------------------------------------------------------------------
-// Project Nova – <eine Zeile Zweck>
+// Hashkrieg – <eine Zeile Zweck>
 // Assembly: Nova.Simulation | Layer: Simulation (keine UnityEngine-Referenzen, D-057)
 // Entscheidungen: D-057, D-061
 // -----------------------------------------------------------------------------

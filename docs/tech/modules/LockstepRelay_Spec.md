@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das **Multiplayer Command-Relay System** von *Project Nova*. Das Modul serialisiert deterministische Befehlspakete (`CommandEnvelopeNetPacket`) in kompakte 37-Byte-Binärpuffer, puffert eingehende Befehle pro Turn-Tick in einem `LockstepRelayBuffer` und prüft `StateHash`-Übereinstimmungen zur Multiplayer-Desync-Erkennung.
+Dieses Dokument beschreibt das **Multiplayer Command-Relay System** von *Hashkrieg*. Das Modul serialisiert deterministische Befehlspakete (`CommandEnvelopeNetPacket`) in kompakte 37-Byte-Binärpuffer, puffert eingehende Befehle pro Turn-Tick in einem `LockstepRelayBuffer` und prüft `StateHash`-Übereinstimmungen zur Multiplayer-Desync-Erkennung.
 
 
 ## Abhängigkeiten

@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweiterung** von *Project Nova*. Das Modul verwaltet Karten-Layouts (`MapDefinitionSO`) für 1v1- und 2v2-Gefechte, 2 bis 4 Spieler-Spawn-Punkte, Aetherium-Kristallknoten-Positionen sowie drei Biom-Umgebungen (`Desert`, `Snow`, `JungleIndustrial`).
+Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweiterung** von *Hashkrieg*. Das Modul verwaltet Karten-Layouts (`MapDefinitionSO`) für 1v1- und 2v2-Gefechte, 2 bis 4 Spieler-Spawn-Punkte, Aetherium-Kristallknoten-Positionen sowie drei Biom-Umgebungen (`Desert`, `Snow`, `JungleIndustrial`).
 
 
 ## Abhängigkeiten

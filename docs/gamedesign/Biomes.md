@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert die 10 Biome von Project Nova als Themen-Bibliothek (gemäß D-017): visuelle Identität, Terrain-Features, zerstörbare Elemente (gemäß D-012), Wetter bzw. Hazards sowie die sparsamen, lesbaren Gameplay-Effekte je Biom. Verbindlich für Level Design, Environment Art (Input für Sprint 5, APL Paket 01/02) und VFX-Planung (Wetter/Hazards). Biome sind Themen, keine fertigen Karten – konkrete Layouts entstehen nach [./Maps.md](./Maps.md). Die Karten-Roadmap (12 Karten, D-017) nutzt Wüste und Schnee je zweimal (Doppelbelegung bestätigt, D-028).
+Definiert die 10 Biome von Hashkrieg als Themen-Bibliothek (gemäß D-017): visuelle Identität, Terrain-Features, zerstörbare Elemente (gemäß D-012), Wetter bzw. Hazards sowie die sparsamen, lesbaren Gameplay-Effekte je Biom. Verbindlich für Level Design, Environment Art (Input für Sprint 5, APL Paket 01/02) und VFX-Planung (Wetter/Hazards). Biome sind Themen, keine fertigen Karten – konkrete Layouts entstehen nach [./Maps.md](./Maps.md). Die Karten-Roadmap (12 Karten, D-017) nutzt Wüste und Schnee je zweimal (Doppelbelegung bestätigt, D-028).
 
 ## Abhängigkeiten
 

@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Legt die verbindliche Beschaffungsstrategie für alle Assets von *Project Nova* fest und definiert die **Audit-Methodik**, nach der jedes benötigte Asset im [AssetRegister.md](AssetRegister.md) klassifiziert wird (**BUY / MODIFY / BUILD**). Dieses Dokument ratifiziert die in Sprint 1 vorbereitete Entscheidungsvorlage aus [../research/AssetStore_Landschaft.md](../research/AssetStore_Landschaft.md) als **D-053** und die verbindliche Inhaberentscheidung **D-054 (0 € Open-Source & KI-Asset-Pipeline)**. Es operationalisiert die Bewertungsdimensionen zu einer Prüf-Checkliste. Verbindlich für: Producer (Budget/Beschaffung), Lead Environment Artist, Technical Art Director, alle Mitwirkenden mit Asset-Erstellungsberechtigung.
+Legt die verbindliche Beschaffungsstrategie für alle Assets von *Hashkrieg* fest und definiert die **Audit-Methodik**, nach der jedes benötigte Asset im [AssetRegister.md](AssetRegister.md) klassifiziert wird (**BUY / MODIFY / BUILD**). Dieses Dokument ratifiziert die in Sprint 1 vorbereitete Entscheidungsvorlage aus [../research/AssetStore_Landschaft.md](../research/AssetStore_Landschaft.md) als **D-053** und die verbindliche Inhaberentscheidung **D-054 (0 € Open-Source & KI-Asset-Pipeline)**. Es operationalisiert die Bewertungsdimensionen zu einer Prüf-Checkliste. Verbindlich für: Producer (Budget/Beschaffung), Lead Environment Artist, Technical Art Director, alle Mitwirkenden mit Asset-Erstellungsberechtigung.
 
 ## Abhängigkeiten
 
@@ -16,7 +16,7 @@ Legt die verbindliche Beschaffungsstrategie für alle Assets von *Project Nova* 
 
 ## 1. Ratifizierte Strategie (D-053 & D-054)
 
-**Strategie B-Zero – 0 € Open-Source & KI-Asset-Pipeline (D-054).** Als rein organisches Open-Source-Projekt verfügt Project Nova über **0 € Budget** (Beschluss des Project Owners). Statt kommerzieller Asset-Store-Bundles stützt sich die Beschaffung auf:
+**Strategie B-Zero – 0 € Open-Source & KI-Asset-Pipeline (D-054).** Als rein organisches Open-Source-Projekt verfügt Hashkrieg über **0 € Budget** (Beschluss des Project Owners). Statt kommerzieller Asset-Store-Bundles stützt sich die Beschaffung auf:
 
 - **Freie CC0 Public Domain Bibliotheken** ([Quaternius](https://quaternius.com/) mit Modular Sci-Fi Megakit & Riggings, [Kenney.nl](https://kenney.nl/), Poly Pizza, OpenGameArt) als Basis für Gebäude, Fahrzeuge und Terrain-Props.
 - **KI-gestützte 3D-Mesh-Generierung (Open Source / Free Tools)** wie **Hunyuan3D** (Tencent / Open Source), **Meshy** und **Tripo3D** für schnelles Prototyping, Blockouts und organische Strukturen.
@@ -55,7 +55,7 @@ Legt die verbindliche Beschaffungsstrategie für alle Assets von *Project Nova* 
 
 ## 4. Repo-Hygiene & Open-Source-Verteilung
 
-- **Öffentliches Repo (`VibecodingGermany/Project_Nova`):** Enthält alle spielbaren CC0-Assets, KI-generierten Meshes/Texturen und Open-Source-Audio-Dateien.
+- **Öffentliches Repo (`VibecodingGermany/HashKrieg`):** Enthält alle spielbaren CC0-Assets, KI-generierten Meshes/Texturen und Open-Source-Audio-Dateien.
 - **CC-BY-Quellen:** Werden in `CREDITS.md` sauber atribuiert (gemäß [Licenses.md](Licenses.md)).
 
 ## Offene Punkte

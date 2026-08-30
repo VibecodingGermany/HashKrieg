@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Skirmish-KI-System** von *Project Nova*. Das Modul führt eine nutzenbasierte Entscheidungsschleife für Allianz- und Legion-Fraktionen aus, bewertet den Wirtschafts- und Energieaufbau, erteilt automatische Baubefehle für Gebäude und Einheiten und formiert Angriffs-Squads.
+Dieses Dokument beschreibt das deterministische **Skirmish-KI-System** von *Hashkrieg*. Das Modul führt eine nutzenbasierte Entscheidungsschleife für Allianz- und Legion-Fraktionen aus, bewertet den Wirtschafts- und Energieaufbau, erteilt automatische Baubefehle für Gebäude und Einheiten und formiert Angriffs-Squads.
 
 
 ## Abhängigkeiten

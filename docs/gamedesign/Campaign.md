@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Konzept-Rahmen für die Singleplayer-Kampagne von Project Nova. Die Kampagne ist **verbindlich Phase 3 / Post-MVP** (D-020; MVP ist Solo-Skirmish 1v1 vs. KI, gemäß D-018) und wird in diesem Sprint nur dokumentarisch festgelegt, damit Commander (D-009), Fraktionen, Mechaniken und Welt konsistent auf sie hin angelegt werden. Kein Implementierungsauftrag.
+Konzept-Rahmen für die Singleplayer-Kampagne von Hashkrieg. Die Kampagne ist **verbindlich Phase 3 / Post-MVP** (D-020; MVP ist Solo-Skirmish 1v1 vs. KI, gemäß D-018) und wird in diesem Sprint nur dokumentarisch festgelegt, damit Commander (D-009), Fraktionen, Mechaniken und Welt konsistent auf sie hin angelegt werden. Kein Implementierungsauftrag.
 
 ## Abhängigkeiten
 

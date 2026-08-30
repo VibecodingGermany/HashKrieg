@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Technisches Design des Animations-Systems von Project Nova: Hybrid-Modell aus Mecanim-Skeletal-Animation (nur Infanterie) und rig-loser Code-/Transform-Animation (Fahrzeuge, Gebäude), 3-stufiges Animations-LOD, Kopplung an Simulations-Events (Mündungsfeuer, Zerstörung, Evolvierte-Wachstum) und datengetriebene AnimationClip-Referenzen über ScriptableObjects. Umsetzungsreif für Sprint 7, ohne Implementierungslogik.
+Technisches Design des Animations-Systems von Hashkrieg: Hybrid-Modell aus Mecanim-Skeletal-Animation (nur Infanterie) und rig-loser Code-/Transform-Animation (Fahrzeuge, Gebäude), 3-stufiges Animations-LOD, Kopplung an Simulations-Events (Mündungsfeuer, Zerstörung, Evolvierte-Wachstum) und datengetriebene AnimationClip-Referenzen über ScriptableObjects. Umsetzungsreif für Sprint 7, ohne Implementierungslogik.
 
 ## Abhängigkeiten
 

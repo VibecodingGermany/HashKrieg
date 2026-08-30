@@ -1,4 +1,4 @@
-# Project Nova
+# Hashkrieg
 
 **Dokumentversion:** 0.23.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
 
@@ -96,7 +96,7 @@ Mechanik ist mechanisch fast identisch und validiert sich dabei selbst —, den
 Hashkrieg-Umbau **danach** als Prototyp erproben.
 
 Gegenmeinungen sind ausdrücklich erwünscht. Wenn du dazu etwas zu sagen hast:
-[ein Issue aufmachen](https://github.com/VibecodingGermany/Project_Nova/issues/new)
+[ein Issue aufmachen](https://github.com/VibecodingGermany/HashKrieg/issues/new)
 und in zwei Sätzen begründen, welche Option du für richtig hältst.
 
 ## 3. Projektstatus
@@ -346,7 +346,7 @@ mindestens drei geprüften Alternativen im
 [DecisionLog](docs/production/DecisionLog.md); nichts wird still geändert.
 
 Ablauf steht in [CONTRIBUTING.md](CONTRIBUTING.md). Fragen gern als
-[Issue](https://github.com/VibecodingGermany/Project_Nova/issues).
+[Issue](https://github.com/VibecodingGermany/HashKrieg/issues).
 
 ## 7. Closed-Core MS-1
 
@@ -437,8 +437,10 @@ nicht rückwirkend übertragen.
 - **Die manuelle Strang-C-Abnahme** muss Blocker-, Energie- und Stop-Feedback
   im laufenden Spiel prüfen; die technische Umsetzung von Paket 16.10 ist
   abgeschlossen.
-- Der Umbenennungsbeschluss auf *Hashkrieg* ist im Bestand dieses Repositories
-  noch nicht vollzogen — Repo, Code und Wiki laufen weiter unter *Project Nova*.
+- Der Umbenennungsbeschluss auf *Hashkrieg* ist teilweise vollzogen: das
+  GitHub-Repository heißt seit dem 09.08.2026 `VibecodingGermany/HashKrieg`,
+  und die lebende Dokumentation ist nachgezogen. Die Code-Identität bleibt
+  nach E-3 bewusst `Nova.*`; Marke und Build-Ausgabe stehen noch aus.
 - Q-018 (Preis) und Q-019 (Telemetrie) bleiben offen und blockieren MS-1 nicht.
 
 ## Nächste Schritte

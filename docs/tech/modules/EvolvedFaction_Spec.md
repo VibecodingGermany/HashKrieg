@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die organischen Fraktions-Mechaniken der **3. Fraktion "Die Evolvierten"** von *Project Nova*. Das Modul verwaltet die Biomasse-Verbreitung (`BiomassGrid`) und gewährt Einheiten auf Biomasse-Zellen eine passive Lebenspunkte-Regeneration (+2 HP alle 0,5 Sekunden).
+Dieses Dokument beschreibt die organischen Fraktions-Mechaniken der **3. Fraktion "Die Evolvierten"** von *Hashkrieg*. Das Modul verwaltet die Biomasse-Verbreitung (`BiomassGrid`) und gewährt Einheiten auf Biomasse-Zellen eine passive Lebenspunkte-Regeneration (+2 HP alle 0,5 Sekunden).
 
 
 ## Abhängigkeiten

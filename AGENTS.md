@@ -3,7 +3,7 @@
 **Dokumentversion:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Verbindliche Betriebsanleitung für jeden KI-Coding-Agenten (Claude, Kimi, Codex,
-Cursor u. a.) und jede Person, die an *Project Nova* arbeitet. **Lies diese Datei
+Cursor u. a.) und jede Person, die an *Hashkrieg* arbeitet. **Lies diese Datei
 zuerst.** Sie wird von den gängigen Agenten-Tools automatisch als Kontext geladen.
 
 Welche Regeln in welcher Projektphase gelten, steht in [GOVERNANCE.md](GOVERNANCE.md).
@@ -12,7 +12,7 @@ Aktiv ist **Tier 2: externe Beitragende, ein Projektinhaber.** Dennis Westermann
 
 ## 1. Projekt in einem Absatz
 
-*Project Nova* ist ein Echtzeitstrategiespiel auf **Unity `6000.5.4f1`**
+*Hashkrieg* ist ein Echtzeitstrategiespiel auf **Unity `6000.5.4f1`**
 (Revision `d550df8bd089`), C# und URP. Die Simulation ist deterministisch und
 liegt unter `Assets/_Project/Scripts/{Core,Simulation}`; dieselben Quellen
 kompilieren headless in `tools/Nova.SimRunner`. Spielbar ist ein lokales 1v1 auf

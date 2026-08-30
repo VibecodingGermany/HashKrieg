@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Commander- & Doktrinen-System** von *Project Nova*. Das Modul verwaltet den passiven Aufbau von Commander-Energie, führt Cooldown-Timer für aktive Fähigkeiten (`CommanderAbilityDefinition`) aus und wendet Bereichs-Effekte (z. B. Orbital-Schläge oder Schild-Boosts) auf Einheiten an.
+Dieses Dokument beschreibt das deterministische **Commander- & Doktrinen-System** von *Hashkrieg*. Das Modul verwaltet den passiven Aufbau von Commander-Energie, führt Cooldown-Timer für aktive Fähigkeiten (`CommanderAbilityDefinition`) aus und wendet Bereichs-Effekte (z. B. Orbital-Schläge oder Schild-Boosts) auf Einheiten an.
 
 
 ## Abhängigkeiten

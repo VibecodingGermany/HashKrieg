@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Runbook führt durch die **erste Demo-Runde** von *Project Nova* auf dem
+Dieses Runbook führt durch die **erste Demo-Runde** von *Hashkrieg* auf dem
 Graybox-Stand: Projekt öffnen, Match starten, zeigen, was funktioniert, und
 ehrlich benennen, was (noch) nicht funktioniert. Es richtet sich an den
 Inhaber und an jeden, der die Demo vorführt oder danach Assets ablegt.

@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Spezifiziert den Wirtschafts-Kreislauf von Project Nova: Sammler-Loop, Lagerkapazität, Energie mit Low-Power-Regel, Einkommensraten-Ziele, Kostenrahmen für Gebäude und Einheiten, Reparatur-/Verkaufsregeln, Zielkurven für 20–35-min-Matches (D-010) und Anti-Stall-Logik. Alle Werte sind Richtwerte v0.1 zum Tunen und als flache, ScriptableObject-taugliche Datensätze angelegt.
+Spezifiziert den Wirtschafts-Kreislauf von Hashkrieg: Sammler-Loop, Lagerkapazität, Energie mit Low-Power-Regel, Einkommensraten-Ziele, Kostenrahmen für Gebäude und Einheiten, Reparatur-/Verkaufsregeln, Zielkurven für 20–35-min-Matches (D-010) und Anti-Stall-Logik. Alle Werte sind Richtwerte v0.1 zum Tunen und als flache, ScriptableObject-taugliche Datensätze angelegt.
 
 ## Abhängigkeiten
 

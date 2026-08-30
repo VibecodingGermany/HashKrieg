@@ -1,10 +1,10 @@
-# Zielgruppen & Personas – Project Nova
+# Zielgruppen & Personas – Hashkrieg
 
 **Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Game Director | **Sprint:** 2
 
 ## Zweck
 
-Definiert die Personas H1–H4 von Project Nova mit Bedürfnissen, Erwartungen und verbindlichen Design-Ableitungen. Dieses Dokument ist die Priorisierungsreferenz für alle Feature- und Content-Entscheidungen: Bei Zielkonflikten gilt die Staffelung **H1 > H2 > H3 > H4**, und H4 ist vor Phase 3 explizit nicht zu bedienen (D-007, D-018). Die Personas operationalisieren die Zielgruppen-Hypothesen aus dem Markt-Research für die GDD-Arbeit.
+Definiert die Personas H1–H4 von Hashkrieg mit Bedürfnissen, Erwartungen und verbindlichen Design-Ableitungen. Dieses Dokument ist die Priorisierungsreferenz für alle Feature- und Content-Entscheidungen: Bei Zielkonflikten gilt die Staffelung **H1 > H2 > H3 > H4**, und H4 ist vor Phase 3 explizit nicht zu bedienen (D-007, D-018). Die Personas operationalisieren die Zielgruppen-Hypothesen aus dem Markt-Research für die GDD-Arbeit.
 
 ## Abhängigkeiten
 
@@ -56,14 +56,14 @@ Definiert die Personas H1–H4 von Project Nova mit Bedürfnissen, Erwartungen u
 
 ## H2 – Der RTS-Einsteiger
 
-**Profil:** 20–35 Jahre, spielt Strategie eher rundenbasiert oder Survival-/Aufbau-Hybride (Anno, Frostpunk, Against the Storm), hat kein RTS-Muscle-Memory. Findet Nova über Store-Screenshots (Aetherium-Look) oder Streamer. Kauft Premium, wenn der Einstieg nicht demütigt. Bricht ab, wenn er in Minute 3 von der KI überrannt wird oder nicht versteht, warum seine Produktion halbiert ist (Low-Power).
+**Profil:** 20–35 Jahre, spielt Strategie eher rundenbasiert oder Survival-/Aufbau-Hybride (Anno, Frostpunk, Against the Storm), hat kein RTS-Muscle-Memory. Findet Hashkrieg über Store-Screenshots (Aetherium-Look) oder Streamer. Kauft Premium, wenn der Einstieg nicht demütigt. Bricht ab, wenn er in Minute 3 von der KI überrannt wird oder nicht versteht, warum seine Produktion halbiert ist (Low-Power).
 
 ### Bedürfnisse
 
 - Geführter Einstieg ohne Scham: die ersten 15 Minuten müssen Kernmechaniken spielerisch vermitteln.
 - Verständliches Feedback statt Systemwissen vorauszusetzen: Warum ist mein Radar aus? (Low-Power-Regel muss die UI *erklären*, nicht nur anzeigen.)
 - Fehlerverzeihende Frühphase: Zeit, die Basis aufzubauen, bevor Druck entsteht.
-- Keine APM-Hürde: Nova darf keine Mikro-Intensität verlangen, die Einsteiger strukturell ausschließt.
+- Keine APM-Hürde: Hashkrieg darf keine Mikro-Intensität verlangen, die Einsteiger strukturell ausschließt.
 
 ### Erwartungen
 
@@ -124,9 +124,9 @@ Definiert die Personas H1–H4 von Project Nova mit Bedürfnissen, Erwartungen u
 
 ## Nicht-Zielgruppe: Sandbox-/Skalierungs-Enthusiasten (BAR/Zero-K)
 
-Die im Markt-Research (§7) als Hypothese geführte Sandbox-/Skalierungs-Nische (Beyond All Reason, Zero-K: langlebig, modding-affin, Megamatches mit tausenden Einheiten) ist **explizit keine Zielgruppe** von Project Nova; es wird keine Persona H5 angelegt.
+Die im Markt-Research (§7) als Hypothese geführte Sandbox-/Skalierungs-Nische (Beyond All Reason, Zero-K: langlebig, modding-affin, Megamatches mit tausenden Einheiten) ist **explizit keine Zielgruppe** von Hashkrieg; es wird keine Persona H5 angelegt.
 
-**Begründung:** D-007 (Premium, Singleplayer/Skirmish-first) positioniert Nova bewusst gegen das Skalierungs-Versprechen. BAR gewinnt jede Skalierungs- und Preis-Debatte (kostenlos, Open Source, 100 Spieler, 10k Einheiten) – ein Wettbewerb um diese Nische ist mit der Studio-Kapazität und der 20–35-Minuten-Matchdauer (D-010) nicht zu gewinnen und würde den polierten Solo-Kern verwässern. Modding/Workshop und Einheiten-Skalierung sind keine Planungsannahme; eine spätere Öffnung wäre eine eigenständige neue Entscheidung.
+**Begründung:** D-007 (Premium, Singleplayer/Skirmish-first) positioniert Hashkrieg bewusst gegen das Skalierungs-Versprechen. BAR gewinnt jede Skalierungs- und Preis-Debatte (kostenlos, Open Source, 100 Spieler, 10k Einheiten) – ein Wettbewerb um diese Nische ist mit der Studio-Kapazität und der 20–35-Minuten-Matchdauer (D-010) nicht zu gewinnen und würde den polierten Solo-Kern verwässern. Modding/Workshop und Einheiten-Skalierung sind keine Planungsannahme; eine spätere Öffnung wäre eine eigenständige neue Entscheidung.
 
 ## Priorisierung bei Zielkonflikten
 
@@ -138,7 +138,7 @@ Die im Markt-Research (§7) als Hypothese geführte Sandbox-/Skalierungs-Nische 
 
 ## Offene Punkte
 
-- **H2-Evidenz schwach:** Die Einsteiger-Hypothese stützt sich auf Franchise-Kumuliertzahlen (AoE), nicht auf Nova-nahe Daten. Bei Marketing-Budget für User Research ggf. validieren; kein Sprint-2-Blocker. Status: offen.
+- **H2-Evidenz schwach:** Die Einsteiger-Hypothese stützt sich auf Franchise-Kumuliertzahlen (AoE), nicht auf Hashkrieg-nahe Daten. Bei Marketing-Budget für User Research ggf. validieren; kein Sprint-2-Blocker. Status: offen.
 
 Entschieden seit 0.1.0: **Persona-Abweichung/Sandbox-Frage** (Sandbox-/Skalierungs-Nische als Nicht-Zielgruppe deklariert, begründet über D-007 – siehe Abschnitt "Nicht-Zielgruppe"); **Kampagnen-Persona-Lücke** (D-020 – Solo-Kampagne ja, Phase 3; als Kaufgrund Nr. 1 in H1 aufgenommen); **Alterskorridor H1** (30–45 Jahre verbindlich, D-007).
 

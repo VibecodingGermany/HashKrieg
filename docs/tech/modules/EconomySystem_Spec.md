@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Economy & Energy Grid System** von *Project Nova*. Das Modul verwaltet Aetherium-Guthaben, verarbeitet Entladungen von Sammlereinheiten und berechnet das Energie-Netzwerk. Bei Energieunterdeckung wird automatisch ein **Low-Power-Malus (-50 % Produktions- und Forschungsgeschwindigkeit)** ausgelöst.
+Dieses Dokument beschreibt das deterministische **Economy & Energy Grid System** von *Hashkrieg*. Das Modul verwaltet Aetherium-Guthaben, verarbeitet Entladungen von Sammlereinheiten und berechnet das Energie-Netzwerk. Bei Energieunterdeckung wird automatisch ein **Low-Power-Malus (-50 % Produktions- und Forschungsgeschwindigkeit)** ausgelöst.
 
 
 ## Abhängigkeiten

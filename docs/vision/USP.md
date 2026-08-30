@@ -1,10 +1,10 @@
-# USP – Alleinstellungsmerkmale von Project Nova
+# USP – Alleinstellungsmerkmale von Hashkrieg
 
 **Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Game Director | **Sprint:** 2
 
 ## Zweck
 
-Definiert und belegt die Alleinstellungsmerkmale von Project Nova: den Kern-USP (Aetherium), die Sekundär-USPs und die konkrete Abgrenzung zu den relevanten Wettbewerbern. Dieses Dokument ist die verbindliche Basis für Store-Texte, Key-Art-Briefings und alle Design-Trade-offs ("stärkt das Feature einen USP oder verwässert es ihn?"). Ein Feature, das keinen USP stützt und nicht Säule 1 (Kernloop) dient, ist Scope-Risiko.
+Definiert und belegt die Alleinstellungsmerkmale von Hashkrieg: den Kern-USP (Aetherium), die Sekundär-USPs und die konkrete Abgrenzung zu den relevanten Wettbewerbern. Dieses Dokument ist die verbindliche Basis für Store-Texte, Key-Art-Briefings und alle Design-Trade-offs ("stärkt das Feature einen USP oder verwässert es ihn?"). Ein Feature, das keinen USP stützt und nicht Säule 1 (Kernloop) dient, ist Scope-Risiko.
 
 ## Abhängigkeiten
 
@@ -33,7 +33,7 @@ Der USP ist kein Marketing-Versprechen, sondern vier konkrete, datengetriebene R
 ### Warum das trägt (Marktbeleg)
 
 - Tempest Rising nutzt exakt diesen Haken (nachwachsende Felder, die die Karte verändern) und wurde dafür als "frische Variante der Tiberium-Formel" mit ~87 % positiven Reviews belohnt (Markt-Research §6.1). Der Mechanismus ist **bewiesen attraktiv und dennoch nicht ausgereizt**.
-- Nova geht zwei Schritte weiter als Tempest Rising: **Ausbreitung mit Terrainveränderung** und **Überernte als dauerhafte Spielerentscheidung** – die Ressource hat Gedächtnis. Das ist die eigentliche Differenzierung innerhalb des belegten Haken-Musters.
+- Hashkrieg geht zwei Schritte weiter als Tempest Rising: **Ausbreitung mit Terrainveränderung** und **Überernte als dauerhafte Spielerentscheidung** – die Ressource hat Gedächtnis. Das ist die eigentliche Differenzierung innerhalb des belegten Haken-Musters.
 - Technisch tragfähig: datengetrieben (flache ScriptableObject-Datensätze für Wachstumsraten, Feldzustände, Überernte-Schwellen), auf demselben Grid wie Pathfinding/Fog of War (Konsequenz D-010).
 
 ### USP-Regel für alle weiteren Dokumente
@@ -52,7 +52,7 @@ Drei Fraktionen sind Hygienefaktor (Markt-Research §6.3) – **die Bauweise der
 
 ### S3 – Gezielte Zerstörbarkeit mit taktischem Nutzen (D-012)
 
-Wald abfackeln, um Sicht- und Deckungslinien zu ändern; Brücken sprengen, um Engpässe zu schließen; Aetherium-Felder unter Beschuss vernichten, um dem Gegner die Zukunft zu nehmen. Bewusst **gezielt statt vollständig** – Nova verspricht Zerstörung als Taktik, nicht als Physik-Spielzeug. Abgrenzung zu CoH (Deckungssystem-Zerstörung) und BAR/Zero-K (Terraforming): Bei Nova ist Zerstörung kuratiert, lesbar und immer mit klarer Kosten-Nutzen-Frage verbunden.
+Wald abfackeln, um Sicht- und Deckungslinien zu ändern; Brücken sprengen, um Engpässe zu schließen; Aetherium-Felder unter Beschuss vernichten, um dem Gegner die Zukunft zu nehmen. Bewusst **gezielt statt vollständig** – Hashkrieg verspricht Zerstörung als Taktik, nicht als Physik-Spielzeug. Abgrenzung zu CoH (Deckungssystem-Zerstörung) und BAR/Zero-K (Terraforming): Bei Hashkrieg ist Zerstörung kuratiert, lesbar und immer mit klarer Kosten-Nutzen-Frage verbunden.
 
 ### S4 – Biome mit spielbaren Hazards (D-017)
 
@@ -66,7 +66,7 @@ Wald abfackeln, um Sicht- und Deckungslinien zu ändern; Brücken sprengen, um E
 
 ## Abgrenzung zum Wettbewerb
 
-| | **Project Nova** | **Tempest Rising** | **Age of Empires IV** | **Beyond All Reason** |
+| | **Hashkrieg** | **Tempest Rising** | **Age of Empires IV** | **Beyond All Reason** |
 |---|---|---|---|---|
 | Modell | Premium ~30–40 €, SP/Skirmish-first (D-007) | Premium $39,99, SP-getrieben | Premium + Game Pass, AAA-Live-Pflege | Kostenlos, Open Source, Community |
 | Ressource | **Lebendig: nachwachsend + ausbreitend + Überernte-Gedächtnis** (D-010) | Nachwachsende Tempest-Felder, kartenverändernd | Klassisch endlich (Nahrung/Holz/Gold/Stein) | Unendlich (Metall-Extraktoren, Energy) |
@@ -77,9 +77,9 @@ Wald abfackeln, um Sicht- und Deckungslinien zu ändern; Brücken sprengen, um E
 
 **Abgrenzungs-Kernaussagen:**
 
-1. **vs. Tempest Rising:** Nova ist *nicht* "noch ein C&C-Erbe". Tempest Rising belegt den Markt, Nova überbietet den Haken: Aetherium hat Gedächtnis (Überernte) und Zukunft (Ausbreitung), dazu die Evolvierte Wachstumsbauweise als zweite mechanische Säule. Wo Tempest Rising Nostalgie poliert, evolviert Nova die Formel.
-2. **vs. Age of Empires IV:** Kein Wettbewerb um dasselbe Publikum. AoE IV ist historisch-breit und AAA-gepflegt; Nova ist Sci-Fi, fokussiert, Kleinstudio-Premium. Wir konkurrieren um "RTS-Abend"-Zeit, nicht um Features – und verlieren jeden Feature-Vergleich, also führen wir ihn nicht.
-3. **vs. Beyond All Reason:** BAR gewinnt jede Skalierungs- und Preis-Debatte (kostenlos, 10k Einheiten, 100 Spieler). Nova konkurriert dort bewusst nicht: Unser Versprechen ist ein **kuratiertes, poliertes Solo-Erlebnis mit 20–35-minütigen Matches** – das Gegenteil der BAR-Sandbox. BAR-Spieler sind nicht unsere Käufer; unsere Käufer wollen kein 3-Stunden-Megamatch.
+1. **vs. Tempest Rising:** Hashkrieg ist *nicht* "noch ein C&C-Erbe". Tempest Rising belegt den Markt, Hashkrieg überbietet den Haken: Aetherium hat Gedächtnis (Überernte) und Zukunft (Ausbreitung), dazu die Evolvierte Wachstumsbauweise als zweite mechanische Säule. Wo Tempest Rising Nostalgie poliert, evolviert Hashkrieg die Formel.
+2. **vs. Age of Empires IV:** Kein Wettbewerb um dasselbe Publikum. AoE IV ist historisch-breit und AAA-gepflegt; Hashkrieg ist Sci-Fi, fokussiert, Kleinstudio-Premium. Wir konkurrieren um "RTS-Abend"-Zeit, nicht um Features – und verlieren jeden Feature-Vergleich, also führen wir ihn nicht.
+3. **vs. Beyond All Reason:** BAR gewinnt jede Skalierungs- und Preis-Debatte (kostenlos, 10k Einheiten, 100 Spieler). Hashkrieg konkurriert dort bewusst nicht: Unser Versprechen ist ein **kuratiertes, poliertes Solo-Erlebnis mit 20–35-minütigen Matches** – das Gegenteil der BAR-Sandbox. BAR-Spieler sind nicht unsere Käufer; unsere Käufer wollen kein 3-Stunden-Megamatch.
 
 ## Offene Punkte
 

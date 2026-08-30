@@ -1,4 +1,4 @@
-# Beitragen zu Project Nova
+# Beitragen zu Hashkrieg
 
 **Version:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 

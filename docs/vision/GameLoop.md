@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Beschreibt den spielerischen Kernloop von *Project Nova*, den zeitlichen Ablauf eines Matches bei der Ziel-Matchdauer von 20–35 Minuten (D-010), die beabsichtigten Spannungsbögen und die Anti-Stall-Mechanismen, die aus der Aetherium-Hybridwirtschaft (D-010) erwachsen. Verbindlich für Balancing, KI-Design, Map-Design und alle Wirtschaftsdokumente.
+Beschreibt den spielerischen Kernloop von *Hashkrieg*, den zeitlichen Ablauf eines Matches bei der Ziel-Matchdauer von 20–35 Minuten (D-010), die beabsichtigten Spannungsbögen und die Anti-Stall-Mechanismen, die aus der Aetherium-Hybridwirtschaft (D-010) erwachsen. Verbindlich für Balancing, KI-Design, Map-Design und alle Wirtschaftsdokumente.
 
 ## Abhängigkeiten
 

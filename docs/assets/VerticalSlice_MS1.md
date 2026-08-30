@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument spezifiziert produktionsreif die **vier Vertical-Slice-Assets** der ersten Kunst-Iteration von Project Nova – je ein HQ-Gebäude und ein Leichter Panzer für Allianz und Legion. Es liefert Maße, Silhouetten-Regeln, LOD-Detailverteilung, Team-Farb-Flächen, PBR-Wertekorridore, Tri-/Texturbudgets sowie fertig kopierbare Bild-Prompts für die Image-to-3D-Referenzgenerierung. Es ist die verbindliche Arbeitsgrundlage für den Art-Strang von Sprint 7, ersetzt aber keine Fachdokumente (Gamedesign-Werte, Tri-Budgets) – diese werden zeichengenau referenziert, nicht neu erfunden.
+Dieses Dokument spezifiziert produktionsreif die **vier Vertical-Slice-Assets** der ersten Kunst-Iteration von Hashkrieg – je ein HQ-Gebäude und ein Leichter Panzer für Allianz und Legion. Es liefert Maße, Silhouetten-Regeln, LOD-Detailverteilung, Team-Farb-Flächen, PBR-Wertekorridore, Tri-/Texturbudgets sowie fertig kopierbare Bild-Prompts für die Image-to-3D-Referenzgenerierung. Es ist die verbindliche Arbeitsgrundlage für den Art-Strang von Sprint 7, ersetzt aber keine Fachdokumente (Gamedesign-Werte, Tri-Budgets) – diese werden zeichengenau referenziert, nicht neu erfunden.
 
 Die vier Assets:
 

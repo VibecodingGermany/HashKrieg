@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert die Balancing-Ziele, Vergleichsmetriken und den Balancing-Prozess von Project Nova. Dieses Dokument ist die Methodik- und Governance-Grundlage: Es enthält **keine** Einheiten- oder Gebäudelisten (diese stehen in den jeweiligen Fachdokumenten), sondern legt fest, **wie** Werte geprüft, verglichen, geändert und protokolliert werden. Verbindlich für alle, die Zahlen an Einheiten, Gebäuden, Wirtschaft oder Waffen festlegen.
+Definiert die Balancing-Ziele, Vergleichsmetriken und den Balancing-Prozess von Hashkrieg. Dieses Dokument ist die Methodik- und Governance-Grundlage: Es enthält **keine** Einheiten- oder Gebäudelisten (diese stehen in den jeweiligen Fachdokumenten), sondern legt fest, **wie** Werte geprüft, verglichen, geändert und protokolliert werden. Verbindlich für alle, die Zahlen an Einheiten, Gebäuden, Wirtschaft oder Waffen festlegen.
 
 ## Abhängigkeiten
 

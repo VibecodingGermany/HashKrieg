@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert, **wann** Project Nova wieder geschätzt werden darf. Die frühere
+Definiert, **wann** Hashkrieg wieder geschätzt werden darf. Die frühere
 445-PT- und Kalenderplanung ist eine ungetaggte Sprint-6-Momentaufnahme und
 keine aktive Baseline. Dieses Dokument enthält bewusst weder Fertigstellungsdatum
 noch aktive Gesamt-PT-Summe.

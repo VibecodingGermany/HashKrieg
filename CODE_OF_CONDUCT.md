@@ -28,6 +28,6 @@ und in jedem anderen Raum, in dem jemand für dieses Projekt spricht.
 
 Verstöße bitte an den Projektinhaber melden — über ein Issue, wenn es öffentlich
 verhandelbar ist, sonst über
-[Private Vulnerability Reporting](https://github.com/VibecodingGermany/Project_Nova/security/advisories/new).
+[Private Vulnerability Reporting](https://github.com/VibecodingGermany/HashKrieg/security/advisories/new).
 Meldungen werden vertraulich behandelt. Der Projektinhaber entscheidet über
 Konsequenzen, von einer Klarstellung bis zum dauerhaften Ausschluss.

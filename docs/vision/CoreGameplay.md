@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert das Moment-zu-Moment-Spielerlebnis von *Project Nova*: wie sich das Spiel in jeder Sekunde anfühlt, wie die Kamera arbeitet (D-019), wie alle Befehle erteilt werden und nach welchen Prinzipien die UI aufgebaut ist. Verbindlich für UI-, Kamera-, Input- und Gameplay-Implementierung ab Sprint 3/7.
+Definiert das Moment-zu-Moment-Spielerlebnis von *Hashkrieg*: wie sich das Spiel in jeder Sekunde anfühlt, wie die Kamera arbeitet (D-019), wie alle Befehle erteilt werden und nach welchen Prinzipien die UI aufgebaut ist. Verbindlich für UI-, Kamera-, Input- und Gameplay-Implementierung ab Sprint 3/7.
 
 ## Abhängigkeiten
 
@@ -18,7 +18,7 @@ Definiert das Moment-zu-Moment-Spielerlebnis von *Project Nova*: wie sich das Sp
 
 ## Moment-zu-Moment-Spielgefühl
 
-Project Nova richtet sich an H1 "C&C-Nostalgiker" (D-007): Das Spielgefühl ist **klassisch-lesbar, direkt und großzügig** – kein APM-Zwang, keine versteckten Systeme, keine verschachtelten Menüs im Gefecht.
+Hashkrieg richtet sich an H1 "C&C-Nostalgiker" (D-007): Das Spielgefühl ist **klassisch-lesbar, direkt und großzügig** – kein APM-Zwang, keine versteckten Systeme, keine verschachtelten Menüs im Gefecht.
 
 Designprinzipien (verbindlich, priorisiert):
 

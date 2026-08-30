@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die Präsentations-Schicht der **RTS-UI & Command-Card** von *Project Nova*. Das Modul verwaltet Einheiten-Auswahlen (Einzelklick & Rechtecks-Drag-Box), verbindet ausgewählte Einheiten mit dynamischen Command-Card-HUD-Buttons (`Move`, `Stop`, `Attack`) und berechnet Koordinaten-Transformationen für das Minimap-Rendering.
+Dieses Dokument beschreibt die Präsentations-Schicht der **RTS-UI & Command-Card** von *Hashkrieg*. Das Modul verwaltet Einheiten-Auswahlen (Einzelklick & Rechtecks-Drag-Box), verbindet ausgewählte Einheiten mit dynamischen Command-Card-HUD-Buttons (`Move`, `Stop`, `Attack`) und berechnet Koordinaten-Transformationen für das Minimap-Rendering.
 
 
 ## Abhängigkeiten
