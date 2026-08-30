@@ -371,6 +371,32 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Eine einseitige Änderung der Geländetabelle blieb in der CI unsichtbar.**
+  Die kanonische Tabelle steht notgedrungen zweimal im Repo — `GlutrinneTerrainMap`
+  auf der Unity-Seite und ein handgespiegelter Ausdruck in
+  `Determinism10000Scenario`, weil `tools/Nova.SimRunner*` `Gameplay/` nicht
+  kompiliert. Gepinnt war bisher nur der Spiegel; die Spur, die den
+  Gameplay-Ausdruck pinnt, liegt in `Assets/Tests/EditMode/` und **läuft in
+  keiner CI**. Nachgewiesen, nicht vermutet: eine geänderte Konstante in
+  `GlutrinneTerrainMap.cs` ließ die Kette 736/736 grün — Host und Gast hätten
+  danach verschiedene Karten gerechnet. Neu ist
+  `GlutrinneTerrainSourceGuardTests` in der Spur, die tatsächlich läuft: es
+  liest beide Quellen als **Text** (dasselbe Muster, mit dem
+  `NoFloatInSimulationTests` seit jeher Gameplay-fremde Dateien prüft),
+  vergleicht die Konstanten gegen die kompilierten Werte und das
+  `IsImpassable`-Prädikat Token für Token. Kommentare und Leerraum werden
+  vorher entfernt, damit eine Umformatierung keinen Fehlalarm auslöst, und ein
+  dritter Test beweist, dass der Wächter beide Dateien wirklich liest statt
+  leer grün zu laufen
+- **Der Erreichbarkeitstest sah ein Feld unter einer Wand als erreichbar (#126).**
+  `IntegrationField.Generate` sät die Zielzelle ohne Begehbarkeitsprüfung —
+  nachgeprüft und verschärft: auch `RequestFlowField` und `TryAddField` tun es
+  nicht. Ein Ziel auf einer unbegehbaren Zelle bekam damit Kosten 0 und galt als
+  erreicht, also übersah der Test aus Paket 21.7 genau den Fall, gegen den er
+  existiert. Er prüft die Begehbarkeit seiner Ziele jetzt selbst, bevor er die
+  Erreichbarkeit prüft — und trennt damit zwei Fehlerbilder, die vorher zu einem
+  grünen Haken verschmolzen: „das Feld liegt auf einer Wand" ist etwas anderes
+  als „das Feld ist umbaut". `Simulation/Pathfinding/` bleibt unangetastet
 - **Das Architektur-Gate war auf unberührtem `main` rot, und niemand sah es (Paket 22.4).**
   `run_gate_check.py` führte `Nova.AI.Data` auf Rang 2 neben `Nova.AI` — nach
   dem Namen einsortiert, nicht nach der Abhängigkeitsrichtung. Die reale Kante

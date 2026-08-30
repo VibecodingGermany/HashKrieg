@@ -332,6 +332,20 @@ namespace Nova.SimRunner.Tests
             {
                 if (economy.TryGetField(id, out AetheriumField field))
                 {
+                    // #126: a field registered ON impassable terrain must fail
+                    // HERE, not pass as "reachable" below — IntegrationField
+                    // .Generate seeds the target cell with distance 0 without
+                    // a walkability check, so the wave spreads from inside
+                    // the wall and every start reads as connected. A field on
+                    // a wall is a different defect than a field sealed behind
+                    // walls (the Unreachable assertion below), and the test
+                    // owes the reader that distinction. (The HQ door cells
+                    // need no such check: HqDoorCell only returns cells the
+                    // cost field already reports as walkable.)
+                    Assert.That(pathfinding.CostField.IsWalkable((ushort)field.GridPos.X, (ushort)field.GridPos.Y), Is.True,
+                        $"field {id} at ({field.GridPos.X},{field.GridPos.Y}) lies on impassable terrain — " +
+                        "a unit can never stand on its own destination. Fix the field layout " +
+                        "(or the terrain), not this assertion.");
                     destinations.Add(field.GridPos);
                 }
             }
