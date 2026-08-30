@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das **Asset-Integrations-System** von *Project Nova*. Das Modul verknüpft deterministische Simulations-Definitionen (`DefinitionId`) mit visuellen 3D-Modell-Assets (CC0-Asset-Bibliotheken Kenney/Quaternius aus Sprint 5 Asset Audit) für 27 Einheiten- und 24 Gebäudetypen.
+Dieses Dokument beschreibt das **Asset-Integrations-System** von *Hashkrieg*. Das Modul verknüpft deterministische Simulations-Definitionen (`DefinitionId`) mit visuellen 3D-Modell-Assets (CC0-Asset-Bibliotheken Kenney/Quaternius aus Sprint 5 Asset Audit) für 27 Einheiten- und 24 Gebäudetypen.
 
 
 ## Abhängigkeiten

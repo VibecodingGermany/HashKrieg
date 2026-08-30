@@ -8,7 +8,7 @@ beziehen sich auf den aktuellen Stand von `main`.
 ## Eine Schwachstelle melden
 
 Bitte **kein öffentliches Issue** für Sicherheitslücken. Nutze stattdessen
-[Private Vulnerability Reporting](https://github.com/VibecodingGermany/Project_Nova/security/advisories/new)
+[Private Vulnerability Reporting](https://github.com/VibecodingGermany/HashKrieg/security/advisories/new)
 auf GitHub. Wir melden uns so schnell wie möglich zurück.
 
 Hilfreich in der Meldung: betroffener Bereich, Schritte zum Nachvollziehen,

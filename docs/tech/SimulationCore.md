@@ -5,7 +5,7 @@
 ## Zweck
 
 Dieses Dokument definiert den einzigen autoritativen Rechen-, Zustands-, Hash-,
-Snapshot- und Replay-Vertrag für Project Nova. Es ist die Implementierungsgrenze
+Snapshot- und Replay-Vertrag für Hashkrieg. Es ist die Implementierungsgrenze
 für `Nova.Core`, `Nova.Simulation`, `Nova.AI`, den Unity-Host und
 `Nova.SimRunner`. Der Vertrag ist noch nicht nachgewiesen; G1 bleibt offen.
 

@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das **Lockstep State Hashing**, die **Replay-Aufzeichnung** und die **Scene View Debug-Visualisierung** von *Project Nova*. Es garantiert die Erkennung von Desynchronisationen im Multiplayer und ermöglicht die exakte Wiedergabe von aufgezeichneten Matches.
+Dieses Dokument beschreibt das **Lockstep State Hashing**, die **Replay-Aufzeichnung** und die **Scene View Debug-Visualisierung** von *Hashkrieg*. Es garantiert die Erkennung von Desynchronisationen im Multiplayer und ermöglicht die exakte Wiedergabe von aufgezeichneten Matches.
 
 
 ## Abhängigkeiten

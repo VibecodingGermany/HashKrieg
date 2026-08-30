@@ -1,10 +1,10 @@
-# Project Nova – Entwicklungs-Wiki
+# Hashkrieg – Entwicklungs-Wiki
 
 **Version:** 0.21.0 | **Status:** unveröffentlichter Arbeitsstand – Sprint 16 technisch umgesetzt; manuelle Strang-C-, Netzwerk-, Gefechts- und Lobby-Abnahmen offen | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
-Zentraler Einstieg in das versionierte Project-Nova-Wiki. Der aktuelle Stand
+Zentraler Einstieg in das versionierte Hashkrieg-Wiki. Der aktuelle Stand
 bündelt die technische Umsetzung der Sprint-12-Stränge A und B; er ist kein
 Game-Release und ohne die benannten gespielten Abnahmen kein bestandenes Gate.
 

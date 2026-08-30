@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Technisches Design der Render-Pipeline von *Project Nova* auf Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Das Dokument legt URP-Konfiguration, Draw-Call-Strategie, FoW-Rendering, Minimap, LOD- und Qualitätsstufen fest. API-Skizzen sind Entwürfe; keine Implementierungslogik. Beleuchtung und Post-Processing sind ausgelagert nach [./Lighting.md](./Lighting.md).
+Technisches Design der Render-Pipeline von *Hashkrieg* auf Unity `6000.5.4f1`, Revision `d550df8bd089`, URP (D-060). Das Dokument legt URP-Konfiguration, Draw-Call-Strategie, FoW-Rendering, Minimap, LOD- und Qualitätsstufen fest. API-Skizzen sind Entwürfe; keine Implementierungslogik. Beleuchtung und Post-Processing sind ausgelagert nach [./Lighting.md](./Lighting.md).
 
 ## Abhängigkeiten
 

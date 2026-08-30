@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Gameplay-Regelwerk für Sicht, Aufklärung, Radar und Tarnung in *Project Nova*. Dieses Dokument definiert die **Design-Seite** (was der Spieler sieht und warum); die technische Umsetzung (grid-/bitmask-basiertes CPU-Sichtmodell, URP-Darstellung) ist in [../research/FogOfWar.md](../research/FogOfWar.md) recherchiert und hier verbindlich referenziert. Alle Sichtparameter sind datengetrieben (ScriptableObject-`VisionProfile`, flache Datensätze) und als Startwerte v0.1 zum Tunen zu verstehen.
+Gameplay-Regelwerk für Sicht, Aufklärung, Radar und Tarnung in *Hashkrieg*. Dieses Dokument definiert die **Design-Seite** (was der Spieler sieht und warum); die technische Umsetzung (grid-/bitmask-basiertes CPU-Sichtmodell, URP-Darstellung) ist in [../research/FogOfWar.md](../research/FogOfWar.md) recherchiert und hier verbindlich referenziert. Alle Sichtparameter sind datengetrieben (ScriptableObject-`VisionProfile`, flache Datensätze) und als Startwerte v0.1 zum Tunen zu verstehen.
 
 ## Abhängigkeiten
 

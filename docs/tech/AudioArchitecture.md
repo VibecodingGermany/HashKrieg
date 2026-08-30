@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Technisches Design der Audio-Architektur von Project Nova: `AudioService`-Abstraktion mit Unity-Audio-Backend, Bus-/Kategoriestruktur, Voice-Management, adaptive Musik aus Sim-Daten, 3D-Sound-Setup für die isometrische Kamera, datengetriebene Sound-Zuweisung via ScriptableObjects sowie Lokalisierung und Performance-Budgets. Die FMOD-Zielarchitektur ist Post-MVP und keine MS-1-Verpflichtung.
+Technisches Design der Audio-Architektur von Hashkrieg: `AudioService`-Abstraktion mit Unity-Audio-Backend, Bus-/Kategoriestruktur, Voice-Management, adaptive Musik aus Sim-Daten, 3D-Sound-Setup für die isometrische Kamera, datengetriebene Sound-Zuweisung via ScriptableObjects sowie Lokalisierung und Performance-Budgets. Die FMOD-Zielarchitektur ist Post-MVP und keine MS-1-Verpflichtung.
 
 ## Abhängigkeiten
 

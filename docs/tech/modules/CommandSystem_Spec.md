@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das **Command Bus & Order System** von *Project Nova*. Befehle von Spielern oder KI-Agenten werden in unboxed `CommandEnvelope`-Structs verpackt und im Lockstep-Tick-Loop deterministisch verarbeitet.
+Dieses Dokument beschreibt das **Command Bus & Order System** von *Hashkrieg*. Befehle von Spielern oder KI-Agenten werden in unboxed `CommandEnvelope`-Structs verpackt und im Lockstep-Tick-Loop deterministisch verarbeitet.
 
 
 ## Abhängigkeiten

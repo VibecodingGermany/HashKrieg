@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Construction & Building System** von *Project Nova*. Das Modul validiert Bauplatz-Belegungen auf einem diskreten 2D-Raster (`ConstructionGrid`), führt Bauzeit-Timer aus und registriert fertige Gebäude im Energienetzwerk (`EnergyGridSystem`).
+Dieses Dokument beschreibt das deterministische **Construction & Building System** von *Hashkrieg*. Das Modul validiert Bauplatz-Belegungen auf einem diskreten 2D-Raster (`ConstructionGrid`), führt Bauzeit-Timer aus und registriert fertige Gebäude im Energienetzwerk (`EnergyGridSystem`).
 
 
 ## Abhängigkeiten

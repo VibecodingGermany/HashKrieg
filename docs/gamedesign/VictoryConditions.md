@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert, wann ein Match von *Project Nova* endet und wer gewinnt: den Standard-Sieg (Vernichtung), optionale Siegbedingungen je Modus, Remis- und Timeout-Regeln sowie die Aufgabe-Regel. Verbindlich für Match-Flow, UI (Sieg-/Niederlagen-Screens), KI (Aufgabe-/Sieg-Logik) und Balancing der Matchdauer (20–35 min, D-010).
+Definiert, wann ein Match von *Hashkrieg* endet und wer gewinnt: den Standard-Sieg (Vernichtung), optionale Siegbedingungen je Modus, Remis- und Timeout-Regeln sowie die Aufgabe-Regel. Verbindlich für Match-Flow, UI (Sieg-/Niederlagen-Screens), KI (Aufgabe-/Sieg-Logik) und Balancing der Matchdauer (20–35 min, D-010).
 
 ## Abhängigkeiten
 

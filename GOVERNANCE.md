@@ -1,4 +1,4 @@
-# Governance – Project Nova
+# Governance – Hashkrieg
 
 **Version:** 3.0.0 | **Status:** verbindlich; Tier 2 aktiv | **Verantwortungsbereich:** Project Owner | **Sprint:** 16
 

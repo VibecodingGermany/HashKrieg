@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt das deterministische **Fog of War & Sichtweiten-System** von *Project Nova*. Das Modul verwaltet pro Spieler ein 2D-Sichtraster (`VisionGrid`) mit drei diskreten Zuständen (`Unexplored`, `Explored`, `Visible`) und aktualisiert Sichtweiten-Radien um Einheiten und Gebäude.
+Dieses Dokument beschreibt das deterministische **Fog of War & Sichtweiten-System** von *Hashkrieg*. Das Modul verwaltet pro Spieler ein 2D-Sichtraster (`VisionGrid`) mit drei diskreten Zuständen (`Unexplored`, `Explored`, `Visible`) und aktualisiert Sichtweiten-Radien um Einheiten und Gebäude.
 
 
 ## Abhängigkeiten

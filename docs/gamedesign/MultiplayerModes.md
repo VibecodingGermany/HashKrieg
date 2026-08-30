@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert die Regeln aller Spielmodi von Project Nova gemäß der Phasenstaffelung **D-018**: Solo-Skirmish (MVP), Koop vs. KI und FFA (Alpha), PvP 1v1/2v2 und Survival (Beta), King of the Hill (Release), Ranked nur nach Re-Evaluierung. Enthält Lobby-/Teamregeln, Map-Pools, datengetriebene Match-Einstellungen sowie Beobachter-/Replay-Anforderungen. Verbindlich für UI/UX, Gameplay-Design und die Multiplayer-/Simulationsplanung (Sprint 3+).
+Definiert die Regeln aller Spielmodi von Hashkrieg gemäß der Phasenstaffelung **D-018**: Solo-Skirmish (MVP), Koop vs. KI und FFA (Alpha), PvP 1v1/2v2 und Survival (Beta), King of the Hill (Release), Ranked nur nach Re-Evaluierung. Enthält Lobby-/Teamregeln, Map-Pools, datengetriebene Match-Einstellungen sowie Beobachter-/Replay-Anforderungen. Verbindlich für UI/UX, Gameplay-Design und die Multiplayer-/Simulationsplanung (Sprint 3+).
 
 ## Abhängigkeiten
 

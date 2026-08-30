@@ -1,10 +1,10 @@
-# Vision – Project Nova
+# Vision – Hashkrieg
 
 **Version:** 0.4.1 | **Status:** Entwurf – MS-1-Recovery abgegrenzt | **Verantwortungsbereich:** Game Director | **Sprint:** 2
 
 ## Zweck
 
-Das Leitbild von Project Nova: Was das Spiel sein soll, für wen, und nach welchen Design-Säulen jede spätere Entscheidung (Units, Maps, UI, KI, Content) bewertet wird. Dieses Dokument ist die oberste Design-Referenz des Projekts; alle GDD-Dokumente in `docs/gamedesign/` müssen sich auf mindestens eine Säule begründen können. Es ersetzt die verstreuten Vision-Formulierungen aus dem GDD-Outline und präzisiert sie gemäß den Sprint-2-Entscheidungen D-007 bis D-030.
+Das Leitbild von Hashkrieg: Was das Spiel sein soll, für wen, und nach welchen Design-Säulen jede spätere Entscheidung (Units, Maps, UI, KI, Content) bewertet wird. Dieses Dokument ist die oberste Design-Referenz des Projekts; alle GDD-Dokumente in `docs/gamedesign/` müssen sich auf mindestens eine Säule begründen können. Es ersetzt die verstreuten Vision-Formulierungen aus dem GDD-Outline und präzisiert sie gemäß den Sprint-2-Entscheidungen D-007 bis D-030.
 
 ## Abhängigkeiten
 
@@ -28,7 +28,7 @@ Coding-Starts.
 
 ## Leitbild
 
-> **Project Nova ist der klassische Base-Builder für eine Generation, die mit Command & Conquer groß geworden ist – mit einer Ressource, die lebt, und einer Produktionsqualität, die 2026 State of the Art ist.**
+> **Hashkrieg ist der klassische Base-Builder für eine Generation, die mit Command & Conquer groß geworden ist – mit einer Ressource, die lebt, und einer Produktionsqualität, die 2026 State of the Art ist.**
 
 Drei Sätze, an denen sich jede Entscheidung messen lassen muss:
 
@@ -92,10 +92,10 @@ Premium-Qualität heißt: Das Spiel muss ohne jede Online-Komponente vollständi
 
 - **Lesbarkeit als Art-Direction-Regel:** Silhouette > Detail. Jede Einheit muss in 2-facher Zoom-Entfernung per Umriss und Fraktionsfarbe identifizierbar sein. Details leben in der Nahansicht (Zoom belohnt Inspektion).
 - **Fraktions-Codes:** Allianz = kantig, metallisch, Azurblau/Stahlgrau, saubere Energieeffekte; Legion = massiv, verrostet, Rostrot/Ocker, dreckige Verbrennung; Evolvierte = organisch-kristallin, Violett/Bio-Grün, leuchtende Adern und Wachstumsanimationen (D-011 macht Bauen zum sichtbaren Schauspiel).
-- **Aetherium als visueller Anker:** Die Kristalle sind das Wiedererkennungszeichen des Spiels – Screenshots müssen ohne Logo als "Nova" erkennbar sein. Leuchten, Pulsieren, Ausbreitung und Verfall (Überernte) sind Key-VFX.
+- **Aetherium als visueller Anker:** Die Kristalle sind das Wiedererkennungszeichen des Spiels – Screenshots müssen ohne Logo als "Hashkrieg" erkennbar sein. Leuchten, Pulsieren, Ausbreitung und Verfall (Überernte) sind Key-VFX.
 - **Referenzrahmen:** Näher an Tempest Rising / C&C3-Ästhetik als an AoE IV oder BAR. Stilisierung ist auch Budget-Realismus (Asset-Pipeline, Unity `6000.5.4f1`, Revision `d550df8bd089`, URP).
 
-## Was Project Nova bewusst NICHT ist
+## Was Hashkrieg bewusst NICHT ist
 
 Anti-Ziele sind verbindlich: Wer ein Feature vorschlägt, das hier steht, muss zuerst den entsprechenden Decision-Log-Eintrag revidieren lassen.
 

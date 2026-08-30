@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Definiert, wie in Project Nova Schaden entsteht, zugestellt und verrechnet wird: Schadensarten, Treffer-Modelle, Flächenschaden-Falloff, Status-Effekte sowie die Regeln für Friendly Fire und Deckung. Das Dokument ist die Regel-Referenz für alle Kampfsysteme; konkrete Waffenwerte stehen in [Weapons.md](Weapons.md), die Panzerungs-Verrechnung in [ArmorSystem.md](ArmorSystem.md). Alle Werte sind Startwerte **v0.1** zum Tunen (Richtwerte mit Begründung, keine Pseudo-Präzision) und müssen als flache Datensätze (ScriptableObject-tauglich) abbildbar sein.
+Definiert, wie in Hashkrieg Schaden entsteht, zugestellt und verrechnet wird: Schadensarten, Treffer-Modelle, Flächenschaden-Falloff, Status-Effekte sowie die Regeln für Friendly Fire und Deckung. Das Dokument ist die Regel-Referenz für alle Kampfsysteme; konkrete Waffenwerte stehen in [Weapons.md](Weapons.md), die Panzerungs-Verrechnung in [ArmorSystem.md](ArmorSystem.md). Alle Werte sind Startwerte **v0.1** zum Tunen (Richtwerte mit Begründung, keine Pseudo-Präzision) und müssen als flache Datensätze (ScriptableObject-tauglich) abbildbar sein.
 
 ## Abhängigkeiten
 

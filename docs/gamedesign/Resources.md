@@ -60,7 +60,7 @@ Erschöpfte Mutterkristalle bleiben als Terrain-Objekt bestehen (kein Terrain-Um
 | Globales Nachwuchs-Limit | Summe Nachwuchs ≤ Reserve-Rest | Nachwachsen verbraucht die Reserve: jede nachgewachsene AE wird von der Mutterkristall-Reserve abgezogen (1:1) |
 | Reifedrossel bei Überernte-Schaden | −25 % Nachwachsrate je Schadensstufe | Koppelt Überernte sichtbar an geringere Feldleistung |
 
-Wichtig: Nachwachsen ist **kein** unendlicher Brunnen – es transferiert Reserve in erntbare Ausläufer. Das unterscheidet Nova von SupCom (unendlich) und bewahrt C&C-Nähe (endlich), ohne Ressourcen-Timeout.
+Wichtig: Nachwachsen ist **kein** unendlicher Brunnen – es transferiert Reserve in erntbare Ausläufer. Das unterscheidet Hashkrieg von SupCom (unendlich) und bewahrt C&C-Nähe (endlich), ohne Ressourcen-Timeout.
 
 ## Ausbreitungsregeln
 

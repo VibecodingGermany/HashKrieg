@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Dieses Dokument beschreibt die deterministische **Combat & Damage Pipeline** von *Project Nova*. Das Modul führt Entfernungs- und Cooldown-Prüfungen aus, wendet Schaden an und entfernt zerstörte Einheiten allokationsfrei aus dem `EntityManager`.
+Dieses Dokument beschreibt die deterministische **Combat & Damage Pipeline** von *Hashkrieg*. Das Modul führt Entfernungs- und Cooldown-Prüfungen aus, wendet Schaden an und entfernt zerstörte Einheiten allokationsfrei aus dem `EntityManager`.
 
 
 ## Abhängigkeiten

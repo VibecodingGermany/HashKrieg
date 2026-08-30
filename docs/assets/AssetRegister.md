@@ -4,7 +4,7 @@
 
 ## Zweck
 
-Das **verbindliche Asset-Register** von *Project Nova*: pro benötigter Asset-Kategorie die kanonische Bedarfsmenge (mit führendem GDD-Dokument), eine Kandidatenquelle, Lizenz, Kostenschätzung (0 € Budget per D-054), URP-/Qualitätsbewertung, geschätzter Anpassungsaufwand und die **BUY / MODIFY / BUILD**-Klassifikation nach der Rubrik aus [ProcurementStrategy.md](ProcurementStrategy.md) §3. Dieses Dokument ist das zentrale Sprint-5-Ergebnis (Asset Audit) und die Eingabe für die Produktionsplanung (Sprint 6).
+Das **verbindliche Asset-Register** von *Hashkrieg*: pro benötigter Asset-Kategorie die kanonische Bedarfsmenge (mit führendem GDD-Dokument), eine Kandidatenquelle, Lizenz, Kostenschätzung (0 € Budget per D-054), URP-/Qualitätsbewertung, geschätzter Anpassungsaufwand und die **BUY / MODIFY / BUILD**-Klassifikation nach der Rubrik aus [ProcurementStrategy.md](ProcurementStrategy.md) §3. Dieses Dokument ist das zentrale Sprint-5-Ergebnis (Asset Audit) und die Eingabe für die Produktionsplanung (Sprint 6).
 
 Die Bedarfsmengen folgen der **Single-Source-of-Truth-Regel** (D-047): jede Zahl verweist auf das führende GDD-Dokument, statt sie hier neu festzulegen. Die historische [../../RTS_Asset_Pipeline.md](../../RTS_Asset_Pipeline.md) (APL) ist eine Wunschliste und wird von diesem Register **abgelöst** (Reconciliation §2).
 
