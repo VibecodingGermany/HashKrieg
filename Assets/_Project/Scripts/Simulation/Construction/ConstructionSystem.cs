@@ -38,7 +38,11 @@ namespace Nova.Simulation.Construction
     /// 128x128 grid or occupied cells; then D-104 terrain, influence,
     /// building-clearance and Aetherium-field geometry (all
     /// RejectedInvalidTarget); then missing prerequisite roles, the power rule
-    /// and site capacity (RejectedPrerequisitesNotMet).
+    /// and site capacity (RejectedPrerequisitesNotMet). The fine-grained
+    /// FIRST failure of the same walk is readable through
+    /// <see cref="GetPlacementDenial"/> (issue #135): the frozen schema-v1
+    /// result codes stay shared between several causes, so the reason the
+    /// HUD words travels outside the command stream.
     /// The power rule: a building with PowerRequired &gt; 0 may only be
     /// placed while the owner's last committed balance
     /// (previous tick's phase-2 recompute) covers the additional draw:
@@ -488,6 +492,67 @@ namespace Nova.Simulation.Construction
         // ------------------------------------------------------------------
 
         /// <summary>
+        /// The specific state-dependent reason a placement is denied, in the
+        /// fixed validation order of <see cref="ValidatePlacement"/> (first
+        /// failure wins, exactly like the validator's short-circuit). Schema
+        /// v1 deliberately keeps ONE <see cref="CommandResultCode"/> for
+        /// several of these cases — the code is part of the replay and
+        /// frozen — so the fine-grained reason travels OUTSIDE the command
+        /// stream through this read-only enum (issue #135: "geht nicht" was
+        /// indistinguishable from "the unit is broken"). The presentation
+        /// layer asks <see cref="GetPlacementDenial"/> and words the reason;
+        /// nothing here mutates state or the replay.
+        /// </summary>
+        public enum PlacementDenial
+        {
+            /// <summary>Every check passed; <see cref="ValidatePlacement"/> returns Applied.</summary>
+            None = 0,
+
+            /// <summary>The definition id names no building row (RejectedInvalidTarget).</summary>
+            UnknownDefinition = 1,
+
+            /// <summary>The definition id names another faction's row (RejectedInvalidTarget).</summary>
+            ForeignDefinition = 2,
+
+            /// <summary>The 3x3 footprint would leave the 128x128 grid (RejectedInvalidTarget).</summary>
+            FootprintOutsideMap = 3,
+
+            /// <summary>A footprint cell is already occupied by a placement or site (RejectedInvalidTarget).</summary>
+            FootprintOccupied = 4,
+
+            /// <summary>A footprint cell sits on impassable terrain (D-104; RejectedInvalidTarget).</summary>
+            FootprintOnImpassableTerrain = 5,
+
+            /// <summary>
+            /// No own, living, COMPLETED building within
+            /// <see cref="BuildInfluenceRadiusCells"/> (D-108; RejectedInvalidTarget).
+            /// The build zone is anchored to finished buildings only — never
+            /// to the Builder unit and never to a construction site.
+            /// </summary>
+            OutsideBuildInfluence = 6,
+
+            /// <summary>Less than <see cref="MinimumBuildingDistanceCells"/> to another footprint or site, any owner (RejectedInvalidTarget).</summary>
+            TooCloseToBuilding = 7,
+
+            /// <summary>
+            /// The Aetherium-field geometry fails (D-104; RejectedInvalidTarget):
+            /// a Refinery needs a field at distance
+            /// <see cref="RefineryMinimumFieldDistanceCells"/>..<see cref="RefineryMaximumFieldDistanceCells"/>,
+            /// every other role must keep <see cref="MinimumNonRefineryFieldDistanceCells"/>.
+            /// </summary>
+            FieldSpacingViolated = 8,
+
+            /// <summary>A completed own building role of the all-of prerequisite mask is missing (D-103; RejectedPrerequisitesNotMet).</summary>
+            MissingPrerequisite = 9,
+
+            /// <summary>The last committed power balance does not cover the new draw (RejectedPrerequisitesNotMet).</summary>
+            InsufficientPower = 10,
+
+            /// <summary>The site register is full (<see cref="MaxSites"/>; RejectedPrerequisitesNotMet).</summary>
+            SiteCapacityReached = 11,
+        }
+
+        /// <summary>
         /// Full state-dependent placement validation in fixed order: unknown
         /// definition, foreign-faction definition, out-of-map footprint and
         /// occupied cells; then terrain, build influence, one-cell building
@@ -495,12 +560,52 @@ namespace Nova.Simulation.Construction
         /// roles, power rule and site capacity (RejectedPrerequisitesNotMet).
         /// Cost is the executor's separate check
         /// (RejectedInsufficientResources) and runs BEFORE this.
+        /// <para>
+        /// The result is the coarse schema-v1 mapping of
+        /// <see cref="GetPlacementDenial"/> — this method IS that walk mapped
+        /// onto <see cref="CommandResultCode"/>, so the coarse code and the
+        /// fine-grained reason can never drift apart. Behavior is unchanged:
+        /// the same first failure short-circuits, in the same order.
+        /// </para>
         /// </summary>
         public CommandResultCode ValidatePlacement(byte playerSlot, ushort buildingDefId, int originX, int originY)
         {
+            switch (GetPlacementDenial(playerSlot, buildingDefId, originX, originY))
+            {
+                case PlacementDenial.None:
+                    return CommandResultCode.Applied;
+                case PlacementDenial.MissingPrerequisite:
+                case PlacementDenial.InsufficientPower:
+                case PlacementDenial.SiteCapacityReached:
+                    return CommandResultCode.RejectedPrerequisitesNotMet;
+                default:
+                    return CommandResultCode.RejectedInvalidTarget;
+            }
+        }
+
+        /// <summary>
+        /// The fine-grained read of <see cref="ValidatePlacement"/>: the
+        /// FIRST state-dependent denial in the validator's own fixed order,
+        /// or <see cref="PlacementDenial.None"/> when the placement is legal.
+        /// Pure read, no mutation, no cost check (credits are the executor's
+        /// separate gate, evaluated before this walk).
+        /// <para>
+        /// THIS METHOD IS THE REASON SURFACE, public so the presentation
+        /// layer can ASK why a cell is denied instead of re-deriving the
+        /// checks — the same contract that made
+        /// <see cref="IsInsideBuildInfluence"/> and
+        /// <see cref="HasMinimumBuildingSpacing"/> public for the build-zone
+        /// overlay. It answers for a single footprint origin, so it stays
+        /// cheap enough to ask per frame while the placement ghost is armed
+        /// (issue #135: the HUD names the rule, the sim stays the only
+        /// owner of the rule).
+        /// </para>
+        /// </summary>
+        public PlacementDenial GetPlacementDenial(byte playerSlot, ushort buildingDefId, int originX, int originY)
+        {
             if (!SimDefinitions.TryGetBuilding(buildingDefId, out SimBuildingDefinition def))
             {
-                return CommandResultCode.RejectedInvalidTarget;
+                return PlacementDenial.UnknownDefinition;
             }
             if (def.Faction != _economy.GetSlotFaction(playerSlot))
             {
@@ -508,33 +613,46 @@ namespace Nova.Simulation.Construction
                 // its own faction's rows. A foreign id is a known id naming
                 // content the slot cannot build — an invalid target, exactly
                 // like an unknown one.
-                return CommandResultCode.RejectedInvalidTarget;
+                return PlacementDenial.ForeignDefinition;
             }
-            if (!FootprintInsideMap(originX, originY) || !FootprintFree(originX, originY))
+            if (!FootprintInsideMap(originX, originY))
             {
-                return CommandResultCode.RejectedInvalidTarget;
+                return PlacementDenial.FootprintOutsideMap;
             }
-            if (!FootprintIsWalkable(originX, originY)
-                || !IsInsideBuildInfluence(playerSlot, originX, originY)
-                || !HasMinimumBuildingSpacing(originX, originY)
-                || !HasValidFieldSpacing(def.Role, originX, originY))
+            if (!FootprintFree(originX, originY))
             {
-                return CommandResultCode.RejectedInvalidTarget;
+                return PlacementDenial.FootprintOccupied;
+            }
+            if (!FootprintIsWalkable(originX, originY))
+            {
+                return PlacementDenial.FootprintOnImpassableTerrain;
+            }
+            if (!IsInsideBuildInfluence(playerSlot, originX, originY))
+            {
+                return PlacementDenial.OutsideBuildInfluence;
+            }
+            if (!HasMinimumBuildingSpacing(originX, originY))
+            {
+                return PlacementDenial.TooCloseToBuilding;
+            }
+            if (!HasValidFieldSpacing(def.Role, originX, originY))
+            {
+                return PlacementDenial.FieldSpacingViolated;
             }
             if (!HasFinishedBuildings(playerSlot, def.PrerequisiteRoles))
             {
-                return CommandResultCode.RejectedPrerequisitesNotMet;
+                return PlacementDenial.MissingPrerequisite;
             }
             ref readonly PlayerEconomyState eco = ref _economy.GetPlayerEconomy(playerSlot);
             if (def.PowerRequired > 0 && eco.PowerProvided - eco.PowerRequired < def.PowerRequired)
             {
-                return CommandResultCode.RejectedPrerequisitesNotMet;
+                return PlacementDenial.InsufficientPower;
             }
             if (FreeSiteIndex() < 0)
             {
-                return CommandResultCode.RejectedPrerequisitesNotMet;
+                return PlacementDenial.SiteCapacityReached;
             }
-            return CommandResultCode.Applied;
+            return PlacementDenial.None;
         }
 
         /// <summary>CancelConstruction legality: the entity must be an active site owned by the slot.</summary>

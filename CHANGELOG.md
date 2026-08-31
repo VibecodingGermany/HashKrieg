@@ -403,6 +403,23 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
+  31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
+  zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein
+  Hauptquartier bauen, obwohl ich genug Strom und Geld hatte." Die Simulation
+  hatte in beiden Fällen recht — `IsInsideBuildInfluence` misst die Bauzone von
+  den eigenen **Gebäuden** aus, nicht vom Pionier, und die Mitte liegt 56 Zellen
+  vom HQ entfernt bei einem Radius von 8. Der Defekt lag darin, dass
+  `ValidatePlacement` vier verschiedene Regeln in **einen** Rückgabewert warf:
+  der Spieler bekam „geht nicht" und musste raten, und bei genug Geld und Strom
+  ist „die Einheit ist kaputt" der vernünftigste Schluss. Die Gründe sind jetzt
+  unterscheidbar, und die Meldungen nennen die **Regel** statt des Ergebnisses —
+  „Außerhalb der Bauzone — sie reicht 8 Felder um jedes fertige Gebäude" statt
+  „ungültiges Ziel". Die Texte lesen die tatsächlichen Konstanten, können also
+  nicht veralten. Das eingefrorene `CommandsV1`-Schema bleibt unangetastet: der
+  feine Grund reist über ein schreibgeschütztes Enum außerhalb des
+  Befehlsstroms, ermittelt vom **selben** Durchlauf wie die Prüfung, damit
+  Ergebnis und Begründung nicht auseinanderlaufen können. Verhalten unverändert
 - **Sammler ernten nicht mehr weiter, wenn das Lager voll ist (#136).** Aus der
   Proberunde vom 31.08.2026: „Die ernten ab, bringen das zur Raffinerie, aber
   das erhöht den Kontostand nicht. Das vernichtet Material." Genau so war es —

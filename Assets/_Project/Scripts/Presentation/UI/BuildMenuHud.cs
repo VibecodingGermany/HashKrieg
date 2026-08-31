@@ -27,11 +27,14 @@ namespace Nova.Presentation.UI
     /// </para>
     /// <para>
     /// THE STATUS LINE above the bar always carries the live power balance on
-    /// the left. Its right side serves three masters in priority order: the
-    /// hovered entry's blocker or power value, then the D-085 builder warning
-    /// ("Kein Builder — Bau pausiert…") shown as long as any own construction
-    /// site has no living Builder — the visible warning instead of the silent
-    /// dead end —, then the onboarding hint below.
+    /// the left. Its right side serves four masters in priority order: the
+    /// hovered entry's blocker or power value, then the live placement
+    /// denial while the ghost is armed (#135 — the red ghost names its rule
+    /// here, so "geht nicht" no longer reads as "the unit is broken"), then
+    /// the D-085 builder warning ("Kein Builder — Bau pausiert…") shown as
+    /// long as any own construction site has no living Builder — the visible
+    /// warning instead of the silent dead end —, then the onboarding hint
+    /// below.
     /// </para>
     /// <para>
     /// DATA SOURCE: <see cref="SimDefinitions"/> — the authoritative static
@@ -123,6 +126,7 @@ namespace Nova.Presentation.UI
         private bool _siteLacksBuilder;
         private int _siteLacksBuilderFrame = -1;
         private string _hoveredStatusText;
+        private string _placementStatusText;
         private string _transientNotice;
         private float _transientNoticeUntil;
 
@@ -329,6 +333,12 @@ namespace Nova.Presentation.UI
                 }
             }
 
+            // While the placement ghost is armed, the status line's second
+            // master is the live verdict of the cell under the cursor (#135).
+            _placementStatusText = ComputePlacementStatusText(
+                slot, construction, credits,
+                playerEconomy.PowerProvided, playerEconomy.PowerRequired, activeSiteCount);
+
             // Chrome and status line paint BEFORE the buttons — IMGUI paints
             // in call order and later calls sit on top.
             DrawChromeAndStatusLine(
@@ -406,14 +416,18 @@ namespace Nova.Presentation.UI
         /// <summary>
         /// What the status line says, in priority order: the hovered entry's
         /// blocker reason (the player is interrogating that button right
-        /// now), then the D-085 builder warning while any own site lacks a
-        /// Builder, then the onboarding hint until it dismisses itself.
+        /// now), then the live placement denial while the ghost is armed
+        /// (#135 — the cell under the cursor is what the player is
+        /// interrogating then), then a transient command notice, then the
+        /// D-085 builder warning while any own site lacks a Builder, then
+        /// the onboarding hint until it dismisses itself.
         /// Null leaves the contextual right side empty; the power balance on
         /// the left remains visible.
         /// </summary>
         private string ResolveStatusLineText()
         {
             if (_hoveredStatusText != null) return _hoveredStatusText;
+            if (_placementStatusText != null) return _placementStatusText;
             if (_transientNotice != null && Time.unscaledTime < _transientNoticeUntil) return _transientNotice;
             if (_siteLacksBuilder) return ConstructionSiteStatus.NoBuilderWarning;
             if (!_hintDismissed && _runner.IsRunning) return HintText;
@@ -504,6 +518,82 @@ namespace Nova.Presentation.UI
                         + $" · {buildingPower}";
                 default:
                     return null;
+            }
+        }
+
+        /// <summary>
+        /// The live placement verdict while the ghost is armed: WHY the
+        /// hovered cell denies, worded as the rule plus the counter-play
+        /// (issue #135 — a red ghost without a reason read as "the unit is
+        /// broken": the player tried to place an HQ at the centre fields 56
+        /// cells from his base and concluded his second Builder was
+        /// defective). The credits gate mirrors the executor's order (it
+        /// charges before validating), then the sim's own fine-grained
+        /// denial (<see cref="ConstructionSystem.GetPlacementDenial"/>) is
+        /// asked per frame — the same reads the executor runs, never
+        /// re-derived, so the text cannot drift from the rule. A legal cell
+        /// returns null: under a green ghost the line keeps its normal
+        /// priorities (the onboarding hint must survive the D-077 opening's
+        /// first placement).
+        /// </summary>
+        private string ComputePlacementStatusText(
+            byte slot, ConstructionSystem construction, long credits,
+            int powerProvided, int powerRequired, int activeSiteCount)
+        {
+            if (_input == null || !_input.PlacementModeActive) return null;
+            if (!_input.TryGetPlacementCell(out int originX, out int originY)) return null;
+            if (!SimDefinitions.TryGetBuilding(_input.PlacementDefId, out SimBuildingDefinition def)) return null;
+
+            // The ghost verdict combines affordability with the sim walk —
+            // credits first, exactly like the executor.
+            if (credits < def.CostAE)
+            {
+                return BlockerReason(
+                    def.Role, in def, BuildingPlacementBlocker.InsufficientCredits,
+                    UnitRoleMask.None, credits, powerProvided, powerRequired, activeSiteCount);
+            }
+
+            switch (construction.GetPlacementDenial(slot, _input.PlacementDefId, originX, originY))
+            {
+                case ConstructionSystem.PlacementDenial.None:
+                    return null;
+                case ConstructionSystem.PlacementDenial.OutsideBuildInfluence:
+                    // The #135 case: the zone is anchored to finished
+                    // buildings, never to the Builder — the sentence says
+                    // both the rule and the counter-play (chain buildings
+                    // toward the target).
+                    return $"Außerhalb der Bauzone — sie reicht {ConstructionSystem.BuildInfluenceRadiusCells} Felder "
+                        + "um jedes fertige Gebäude. Bau dich mit Gebäuden Richtung Ziel vor.";
+                case ConstructionSystem.PlacementDenial.TooCloseToBuilding:
+                    return "Zu dicht an einem Gebäude oder einer Baustelle — mindestens ein freies Feld dazwischen.";
+                case ConstructionSystem.PlacementDenial.FieldSpacingViolated:
+                    return def.Role == UnitRole.Refinery
+                        ? $"Raffinerie braucht ein Vorkommen in {ConstructionSystem.RefineryMinimumFieldDistanceCells} bis {ConstructionSystem.RefineryMaximumFieldDistanceCells} Feldern Entfernung — näher am Aetherium platzieren."
+                        : $"Zu dicht an einem Aetherium-Vorkommen — {ConstructionSystem.MinimumNonRefineryFieldDistanceCells} Felder Abstand nötig (nur die Raffinerie darf näher).";
+                case ConstructionSystem.PlacementDenial.FootprintOccupied:
+                    return "Hier steht schon ein Gebäude oder eine Baustelle — freie Zelle wählen.";
+                case ConstructionSystem.PlacementDenial.FootprintOutsideMap:
+                    return "Das Gebäude würde über den Kartenrand ragen — weiter innen platzieren.";
+                case ConstructionSystem.PlacementDenial.FootprintOnImpassableTerrain:
+                    return "Unwegsames Gelände — Gebäude brauchen freien Boden.";
+                case ConstructionSystem.PlacementDenial.MissingPrerequisite:
+                    return BlockerReason(
+                        def.Role, in def, BuildingPlacementBlocker.MissingPrerequisite,
+                        construction.GetMissingPrerequisiteRoles(slot, def.PrerequisiteRoles),
+                        credits, powerProvided, powerRequired, activeSiteCount);
+                case ConstructionSystem.PlacementDenial.InsufficientPower:
+                    return BlockerReason(
+                        def.Role, in def, BuildingPlacementBlocker.InsufficientPower,
+                        UnitRoleMask.None, credits, powerProvided, powerRequired, activeSiteCount);
+                case ConstructionSystem.PlacementDenial.SiteCapacityReached:
+                    return BlockerReason(
+                        def.Role, in def, BuildingPlacementBlocker.SiteCapacityReached,
+                        UnitRoleMask.None, credits, powerProvided, powerRequired, activeSiteCount);
+                default:
+                    // UnknownDefinition / ForeignDefinition: the bar and the
+                    // hotkeys only offer the local faction's own rows, so
+                    // reaching this is defensive only.
+                    return "Dieses Gebäude kannst du nicht bauen.";
             }
         }
 
