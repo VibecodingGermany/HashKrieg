@@ -1032,14 +1032,14 @@ namespace Nova.Simulation.Tests
                 Is.EqualTo(EconomySystem.HqBaseCapacityAE + EconomySystem.StorageCapacityBonusAE));
 
             Assert.That(f.Construction.SellBuilding(UnitCommandStateView.ToRawEntityId(storage)), Is.True);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(4000L),
-                "only 100 of the 150 AE sale refund fit before the Storage leaves the stock");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(4050L),
+                "the whole 150 AE sale refund now fits before the Storage leaves the stock; it only partially fit while the HQ ceiling was 2.000 (#131 raised it to 3.000)");
             Assert.That(f.Economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE),
                 "selling the Storage immediately lowers the derived ceiling");
 
             f.Step(EconomySystem.ExcessDecayIntervalTicks);
-            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3500L),
-                "tick 10 removes 25% of the 2,000 AE excess");
+            Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3788L),
+                "tick 10 removes 25% of the 1.050 AE excess (4.050 over the 3.000 HQ ceiling that #131 raised from 2.000; the excess used to be 2.000)");
         }
 
         [Test]

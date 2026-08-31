@@ -403,6 +403,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Sammler ernten nicht mehr weiter, wenn das Lager voll ist (#136).** Aus der
+  Proberunde vom 31.08.2026: „Die ernten ab, bringen das zur Raffinerie, aber
+  das erhöht den Kontostand nicht. Das vernichtet Material." Genau so war es —
+  und seit die Vorkommen endlich sind (#80), ging dabei nicht nur die Fahrt
+  verloren, sondern der Rohstoff selbst. Gebremst wird jetzt beim **Aufnehmen**,
+  nicht beim Abliefern: was nie abgebaut wurde, ist nicht verloren. Der Sammler
+  hält mit Auftrag und Ladung inne und nimmt die Arbeit von selbst wieder auf,
+  sobald Platz ist — durch ein neues Lager oder durch Ausgeben. Drei Tests
+  pinnen Halt, beide Wege der Wiederaufnahme und die Grenze „1 AE Platz heißt
+  arbeiten". **Dass der Überschuss verfällt, bleibt unangetastet** — das ist
+  D-024; geändert hat sich nur, ob überhaupt noch abgebaut wird
+- **Das Startguthaben passt wieder unter die Decke (#131).**
+  `EconomySystem.HqBaseCapacityAE` steigt von 2.000 auf 3.000 AE. Die 3.000 AE
+  Startguthaben kamen mit **D-077** als bewusst gesetzter Eröffnungspuffer, die
+  2.000er-Decke erst später mit **D-024 / Sprint 16.4** — die zweite
+  Entscheidung hob die erste auf, ohne dass es jemandem auffiel, und ein Drittel
+  des Startguthabens verdampfte in den ersten fünfzehn Sekunden. Bewusst in Kauf
+  genommen: das Lagergebäude wird früh weniger wertvoll. Der eigentliche Ertrag
+  ist der Test, den es bis heute nicht gab — **keiner sah Startguthaben und
+  Decke zusammen**, und genau deshalb blieb der Widerspruch drei Wochen stehen
 - **Eine einseitige Änderung der Geländetabelle blieb in der CI unsichtbar.**
   Die kanonische Tabelle steht notgedrungen zweimal im Repo — `GlutrinneTerrainMap`
   auf der Unity-Seite und ein handgespiegelter Ausdruck in

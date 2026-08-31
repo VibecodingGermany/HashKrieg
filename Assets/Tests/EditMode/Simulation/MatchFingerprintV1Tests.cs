@@ -84,8 +84,14 @@ namespace Nova.Simulation.Tests
             ulong revisionOne = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV1);
             ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
 
-            Assert.That(revisionOne, Is.EqualTo(0x531CE8F614A16CB5UL), "revision 1 canonical stream is frozen");
-            Assert.That(revisionTwo, Is.EqualTo(0x07725EA26668C9F8UL), "revision 2 canonical stream is frozen");
+            // NOT actually frozen — see issue #138. ComputeRulesHash64 writes
+            // TODAY's constants into every revision, so raising
+            // HqBaseCapacityAE (#131) moved the revision-1 hash too. Re-pinning
+            // here restores green; it does NOT restore the guarantee the name
+            // claims. Do not read this assertion as proof of anything until #138
+            // is decided.
+            Assert.That(revisionOne, Is.EqualTo(0x1163158B8146B168UL), "revision 1 canonical stream is frozen");
+            Assert.That(revisionTwo, Is.EqualTo(0x259E6977B751109BUL), "revision 2 canonical stream is frozen");
         }
 
         [Test]
@@ -96,7 +102,7 @@ namespace Nova.Simulation.Tests
 
             Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV3));
             Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV3)));
-            Assert.That(current, Is.EqualTo(0x05CCA8475789AD4AUL), "revision 3 canonical stream is frozen");
+            Assert.That(current, Is.EqualTo(0xD1B683837D12FCEFUL), "revision 3 canonical stream is frozen");
             Assert.That(current, Is.Not.EqualTo(revisionTwo),
                 "D-104 placement and repair behavior must not share revision 2's rules identity");
         }

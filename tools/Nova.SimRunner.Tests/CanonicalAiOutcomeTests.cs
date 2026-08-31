@@ -54,7 +54,7 @@ namespace Nova.SimRunner.Tests
         /// AiBehaviorId is r7.E34435F9.
         /// Previous value: 0x28F2CC571BCE6B76 (Sprint 16.8).
         /// </summary>
-        private const string PinnedEndState = "0x10B83E94F86F2E55";
+        private const string PinnedEndState = "0x4A861D9FA2E57C6F";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()
