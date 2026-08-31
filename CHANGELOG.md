@@ -73,6 +73,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Eine Ressourcenleiste zeigt endlich, was die Wirtschaft tut (#137).** Aus der
+  Proberunde vom 31.08.2026: „Mir fehlt ein globales Overlay, in dem man sieht,
+  wie viel Strom man hat, vor allem auch wie viel Lagerplatz man noch hat."
+  Bisher stand der Kontostand nur in der Baukarte, wo er Knöpfe sperrt, und
+  Strom samt Lagerdecke ausschließlich in der DebugHud — teils erst hinter `F3`,
+  also in einem Entwicklerwerkzeug. **Die Lagerdecke stand nirgends im
+  Spiel-UI.** Damit waren drei Regeln unsichtbar, die aktiv in die Partie
+  eingreifen: der Verfall über der Decke (D-024), der Strommangel mit halbierter
+  Reparaturrate und abgeschaltetem Radar (16.6/C4), und das Startguthaben über
+  der Decke (#131). Die neue Leiste zeigt Aetherium als Bestand **und** Decke
+  (`2.318 / 3.000` liest sich sofort, `2.318` allein sagt nichts), die Stromlage
+  und einen Warnzustand, wenn die Decke erreicht ist — der Moment, in dem der
+  Spieler ein Lager bauen muss. Die Formatier- und Zustandslogik liegt als reine
+  Funktionen in `ResourceBarPresenter` und ist mit 19 EditMode-Tests belegt;
+  reine Präsentation, kein Simulationseingriff, die Leiste schluckt bewusst
+  keine Klicks
 - **Die Auswahl ist benutzbar geworden (#50).** Aus dem Betatest: „Weil ich den
   Pionier in der Gruppe nicht wiederfand, konnte ich nicht bauen." Paket 21.5
   hatte die Aufstellung geliefert, aber man konnte sie nicht anfassen. Jetzt
