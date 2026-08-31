@@ -73,6 +73,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Fahrzeugfabrik und Kaserne reparieren jetzt passiv, was sie bauen können (#55).**
+  Der Wunsch stammt aus dem Betatest vom 09.08.2026 und wurde am 31.08.2026
+  erneut vermisst: beschädigte Panzerung war bis hierher faktisch dauerhaft —
+  man schickte jede Einheit einzeln mit einem Pionier los oder verlor sie im
+  nächsten Gefecht. Nach Inhaberentscheidung heilt jedes der beiden Gebäude
+  **nur, was es auch produzieren kann** (die Zuordnung wird aus
+  `SimDefinitions` abgeleitet, es gibt keine zweite Liste): eine Kaserne
+  repariert keine Panzer. Die vier offenen Zahlen sind gegen den Bestand
+  hergeleitet und im Docstring begründet, damit die nächste Balance-Runde sie
+  am Code findet — **Radius 3** Zellen (gegen die 8er-Bauzone: eine Zone, in
+  der eine ganze Armee Platz hat, ist keine Zone), **1 HP/Tick** (ein Zehntel
+  der aktiven Reparatur und unter jeder Waffenrate: es heilt zwischen
+  Gefechten, nicht während eines), **0 AE** (ein leeres Konto heilt gleich
+  schnell), **kein Stapeln** (stehen zwei Zonen übereinander, gewinnt die
+  erste). Deterministisch: feste Phasenposition, aufsteigende
+  Entitäts-Indizes, Ganzzahlarithmetik
 - **Eine Ressourcenleiste zeigt endlich, was die Wirtschaft tut (#137).** Aus der
   Proberunde vom 31.08.2026: „Mir fehlt ein globales Overlay, in dem man sieht,
   wie viel Strom man hat, vor allem auch wie viel Lagerplatz man noch hat."
