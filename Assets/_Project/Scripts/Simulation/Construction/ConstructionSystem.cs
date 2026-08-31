@@ -14,8 +14,8 @@ namespace Nova.Simulation.Construction
     /// slice (docs/tech/SimulationCore.md section 2, phases 4 and 5):
     /// building placement with state-dependent validation, construction
     /// sites progressed by an assigned Builder, completion into building-role
-    /// entities, cancel/sell refunds, repair orders and the per-slot T2
-    /// unlock. Deterministic, pure integer/fixed-point, zero engine
+    /// entities, cancel/sell refunds, repair orders, the passive producer
+    /// repair zones (Issue #55) and the per-slot T2 unlock. Deterministic, pure integer/fixed-point, zero engine
     /// dependencies. Replaces the unregistered prototype scaffolding
     /// (pre-G1 reset; the retired ConstructionGrid is folded into this
     /// system as a derived occupancy cache).
@@ -116,7 +116,12 @@ namespace Nova.Simulation.Construction
     /// <see cref="LowPowerRepairRateHpPerTick"/> under low power, and pays an
     /// exact cumulative integer share of 30% of its new price. At most one
     /// reachable Builder may repair a target per tick; out-of-reach orders are
-    /// HELD, never dropped, and Stop clears them.
+    /// HELD, never dropped, and Stop clears them. Complementing the active
+    /// order, completed Barracks and VehicleFactory buildings passively heal
+    /// matching own units inside a small zone around their footprint
+    /// (Issue #55, owner decision E-3; the four rule decisions — rate,
+    /// radius, cost, stacking — are documented on
+    /// <see cref="ProcessPassiveRepairZones"/>).
     /// </para>
     /// <para>
     /// State (snapshot block <see cref="SnapshotBlockIds.Construction"/>,
@@ -198,6 +203,26 @@ namespace Nova.Simulation.Construction
         /// <summary>Repair rate in HP per tick while the owner's grid is in LOW POWER (C4, Sprint 16.6).</summary>
         public const int LowPowerRepairRateHpPerTick = 5;
 
+        /// <summary>
+        /// Passive producer-zone repair rate in HP per tick (Issue #55, owner
+        /// decision E-3 of 2026-08-31). Deliberately far below the active
+        /// repair (<see cref="RepairRateHpPerTick"/> = 10, low power
+        /// <see cref="LowPowerRepairRateHpPerTick"/> = 5): the zone heals
+        /// BETWEEN engagements, not during one — the full rationale lives on
+        /// <see cref="ProcessPassiveRepairZones"/>.
+        /// </summary>
+        public const int PassiveRepairRateHpPerTick = 1;
+
+        /// <summary>
+        /// Footprint-aware Chebyshev radius of the passive producer repair
+        /// zone in cells (Issue #55): a unit's grid cell heals while within
+        /// this distance of a matching zone building's 3x3 footprint (the
+        /// D-104 rectangle-distance convention). Deliberately far under
+        /// <see cref="BuildInfluenceRadiusCells"/> (8) — the zone is the
+        /// building's own yard, not its territory.
+        /// </summary>
+        public const int PassiveRepairRadiusCells = 3;
+
         private struct SiteState
         {
             public bool IsActive;
@@ -232,6 +257,26 @@ namespace Nova.Simulation.Construction
         private readonly RepairOrderState[] _repairs;
         private readonly bool[] _t2Unlocked;
         private INovaLogger _logger = NullNovaLogger.Instance;
+
+        /// <summary>
+        /// E-3 derivation table of the passive repair zone (Issue #55): per
+        /// building role the mask of unit roles its zone repairs — exactly
+        /// the unit roles the definition table assigns to that building's
+        /// production (<see cref="SimUnitDefinition.ProducerRole"/>), filled
+        /// only for the two zone-building roles of the issue scope
+        /// (Barracks, VehicleFactory). Derived from
+        /// <see cref="SimDefinitions.AllUnits"/>, the same source the
+        /// production executor's producer check reads — a producer
+        /// reassignment (D-077 precedent) moves the zone with the table
+        /// instead of stranding a second list. Full-domain (byte enum) so
+        /// lookups need no bounds check.
+        /// </summary>
+        private static readonly UnitRoleMask[] PassiveRepairableByBuildingRole = BuildPassiveRepairableTable();
+
+        /// <summary>Union of every zone-repairable unit role; prunes the per-tick unit scan before any placement is read.</summary>
+        private static readonly UnitRoleMask PassiveRepairableUnion =
+            PassiveRepairableByBuildingRole[(int)UnitRole.Barracks]
+            | PassiveRepairableByBuildingRole[(int)UnitRole.VehicleFactory];
 
         // Derived occupancy cache (rebuilt from the placements on restore).
         private readonly byte[] _occupied;
@@ -380,6 +425,53 @@ namespace Nova.Simulation.Construction
         {
             UnitRoleMask roleMask = RoleMask(role);
             return roleMask != UnitRoleMask.None && HasFinishedBuildings(playerSlot, roleMask);
+        }
+
+        /// <summary>
+        /// The E-3 mapping of the passive repair zone (Issue #55): the unit
+        /// roles a completed building of <paramref name="buildingRole"/>
+        /// heals inside its zone — exactly the unit roles the definition
+        /// table assigns to that building's production
+        /// (<see cref="SimUnitDefinition.ProducerRole"/>), restricted to the
+        /// two zone-building roles of the issue scope (Barracks,
+        /// VehicleFactory). <see cref="UnitRoleMask.None"/> for every other
+        /// role: no zone, nothing repairable. Pure read of the derived
+        /// table, no mutation.
+        /// </summary>
+        public static UnitRoleMask GetPassiveRepairableRoles(UnitRole buildingRole)
+        {
+            return PassiveRepairableByBuildingRole[(int)buildingRole];
+        }
+
+        /// <summary>
+        /// True when the grid cell is covered by the passive repair zone of
+        /// an own, living, COMPLETED zone building (footprint-aware
+        /// Chebyshev &lt;= <see cref="PassiveRepairRadiusCells"/>).
+        /// Role-agnostic on purpose: which units a zone actually heals is
+        /// <see cref="GetPassiveRepairableRoles"/> plus the own/damaged
+        /// rules of the tick. THIS METHOD IS THE RULE, and it is public so
+        /// that a future repair-zone overlay can ASK it per cell instead of
+        /// re-deriving the radius or the anchor set on its own (the
+        /// <see cref="IsInsideBuildInfluence"/> precedent). Pure read, no
+        /// mutation.
+        /// </summary>
+        public bool IsCellInsidePassiveRepairZone(byte playerSlot, int cellX, int cellY)
+        {
+            for (int i = 0; i < MaxBuildings; i++)
+            {
+                ref readonly PlacementState placement = ref _buildings[i];
+                if (!placement.IsActive) continue;
+                if (!SimDefinitions.TryGetBuilding(placement.BuildingDefId, out SimBuildingDefinition def)) continue;
+                if (PassiveRepairableByBuildingRole[(int)def.Role] == UnitRoleMask.None) continue;
+
+                EntityId id = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                if (!_entityManager.TryGetUnit(id, out UnitState unit) || unit.PlayerId != playerSlot) continue;
+                if (PointToFootprintDistance(cellX, cellY, placement.OriginX, placement.OriginY) <= PassiveRepairRadiusCells)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static UnitRoleMask RoleMask(UnitRole role)
@@ -654,14 +746,16 @@ namespace Nova.Simulation.Construction
         /// Phase 4: sweeps placements whose entity died (sites abort without
         /// refund, completed placements free their footprint), then progresses
         /// every site with an in-reach Builder by the owner's exact Q16.16
-        /// speed multiplier, then processes standing repair orders — all in
-        /// strict ascending table order.
+        /// speed multiplier, then processes standing repair orders, then
+        /// heals own damaged units inside the passive producer repair zones
+        /// — all in strict ascending table order.
         /// </summary>
         public void ExecuteTick(Tick tick)
         {
             SweepDeadPlacements();
             ProgressSites();
             ProcessRepairOrders();
+            ProcessPassiveRepairZones(tick);
         }
 
         private void SweepDeadPlacements()
@@ -996,6 +1090,169 @@ namespace Nova.Simulation.Construction
             if (fullRepairCost <= 0 || health <= 0 || maxHealth <= 0) return 0;
             if (health >= maxHealth) return fullRepairCost;
             return fullRepairCost * health / maxHealth;
+        }
+
+        /// <summary>
+        /// Passive repair zones of the producer buildings (Issue #55, owner
+        /// decision E-3 of 2026-08-31): a completed Barracks or
+        /// VehicleFactory projects a zone around its footprint in which its
+        /// OWNER's damaged units of the roles it can PRODUCE regain
+        /// <see cref="PassiveRepairRateHpPerTick"/> HP per tick. Runs in
+        /// phase 4 as the last step of this system's tick, directly after
+        /// <see cref="ProcessRepairOrders"/>: the active Builder repair and
+        /// the passive zone are the two repair behaviors of the
+        /// construction domain, both read tick-start positions (movement is
+        /// phase 6, so a unit walking into the zone during tick T is first
+        /// healed in tick T+1), and both heal before combat (phase 8) can
+        /// re-damage in the same tick — the same documented ordering the
+        /// building repair already lives with. The target sets are disjoint
+        /// (building roles vs. unit roles), so the relative order of the
+        /// two repair passes cannot interact.
+        /// <para>
+        /// THE FOUR RULE DECISIONS (Q-040 candidates, stated here so the
+        /// next balance pass finds them at the code):
+        /// RATE — 1 HP/tick at full power, deliberately far below the
+        /// active repair (<see cref="RepairRateHpPerTick"/> = 10,
+        /// <see cref="LowPowerRepairRateHpPerTick"/> = 5): the zone heals
+        /// BETWEEN engagements, not during one. 1 HP/tick loses against
+        /// every weapon in the table (the weakest attacker, BasicInfantry,
+        /// deals 10 damage per 9 ticks), so a unit under fire inside the
+        /// zone still loses its fight, while a half-dead Light Tank is full
+        /// again in roughly half a minute at the 10 Hz tick rate — and the
+        /// active, priced Builder repair keeps its role as the fast option.
+        /// Under LOW POWER the zone follows the Sprint-16.6 C4 halving
+        /// precedent exactly: it heals on even ticks only — 0.5 HP per tick
+        /// on average with no rounding, the same "one tick of progress per
+        /// two ticks" idiom the exact Q16.16 0.5 multiplier encodes for
+        /// sites and queues.
+        /// RADIUS — <see cref="PassiveRepairRadiusCells"/> = 3 cells,
+        /// footprint-aware (the D-104 rectangle-Chebyshev convention, unit
+        /// cell to footprint rectangle). Deliberately far under
+        /// <see cref="BuildInfluenceRadiusCells"/> (8): the zone is the
+        /// building's own yard, not its territory — one footprint-width of
+        /// breathing room around a 3x3 building (72 free cells), enough for
+        /// a battered control group, too small to park a whole army; a zone
+        /// an entire army fits in is not a zone anymore.
+        /// COST — free. No AE is debited, ever, and an empty account heals
+        /// exactly like a full one. The zone exists to remove the per-unit
+        /// repair micromanagement the beta report complained about; a
+        /// credit drip would re-introduce exactly that friction (shuttling
+        /// units out of the zone while saving). The zone's price is already
+        /// paid in the building's cost and power draw and in the
+        /// opportunity cost of units standing still in a small yard instead
+        /// of fighting or harvesting; the active repair keeps its 30% price
+        /// because it buys speed (10x) and map-wide reach. The economy
+        /// coupling the zone DOES carry is the power grid (the low-power
+        /// halving above) — the same coupling every other passive building
+        /// behavior has.
+        /// STACKING — a unit heals at most once per tick no matter how many
+        /// zones cover it: the first matching zone in ascending placement
+        /// order wins and the scan stops. Overlapping auras must not reward
+        /// duplicate producers (the building CHOICE keeps its meaning, not
+        /// the building COUNT), and the cap keeps the maximum inbound heal
+        /// per unit readable in combat math. The active repair answers the
+        /// same question the same way (at most one reachable Builder per
+        /// target per tick).
+        /// </para>
+        /// <para>
+        /// MAPPING (E-3): a building heals exactly the unit roles the
+        /// definition table's producer assignment names for it — derived
+        /// from <see cref="SimDefinitions.AllUnits"/>
+        /// (<see cref="SimUnitDefinition.ProducerRole"/>), the same source
+        /// the production executor and the input layer's
+        /// ProducerBuildingRoles read, so a producer reassignment (D-077
+        /// precedent) moves the zone with the table instead of stranding a
+        /// second list. Issue #55 scopes the zone to the two combat-unit
+        /// producers (Barracks, VehicleFactory); the HQ and Refinery rows
+        /// of the same derivation would yield Builder/Harvester if a future
+        /// decision extends the zone set — the derivation is ready for it,
+        /// the zone set is the decision.
+        /// </para>
+        /// <para>
+        /// Determinism: units are scanned in ascending entity-store index,
+        /// placements in ascending table order; the low-power gate reads
+        /// the tick parity; no PRNG, no allocation, pure integer math. The
+        /// zone keeps NO state of its own — it is re-derived from the
+        /// placements and the entities every tick (founding-Harvester
+        /// precedent), so the snapshot block layout is untouched. Guards:
+        /// dead units (inactive slots, or a not-yet-swept zero-HP entity)
+        /// are never healed; sites and completed buildings are never healed
+        /// (their roles appear in no repairable mask — building repair
+        /// stays the Builder's job); healing never exceeds MaxHealth; only
+        /// OWN units heal.
+        /// </para>
+        /// </summary>
+        private void ProcessPassiveRepairZones(Tick tick)
+        {
+            UnitState[] units = _entityManager.RawUnits;
+            int capacity = _entityManager.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.CurrentHealth <= 0) continue; // dead or not yet swept
+                if (unit.CurrentHealth >= unit.MaxHealth) continue; // nothing to heal — also the overheal guard
+                if ((PassiveRepairableUnion & RoleMask(unit.Role)) == UnitRoleMask.None) continue; // no zone repairs this role
+
+                int ux = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionX));
+                int uy = Math.Max(0, SimFixed.WorldToGrid(unit.Transform.PositionY));
+                for (int b = 0; b < MaxBuildings; b++)
+                {
+                    ref readonly PlacementState placement = ref _buildings[b];
+                    if (!placement.IsActive) continue;
+                    if (!SimDefinitions.TryGetBuilding(placement.BuildingDefId, out SimBuildingDefinition def)) continue;
+                    if ((PassiveRepairableByBuildingRole[(int)def.Role] & RoleMask(unit.Role)) == UnitRoleMask.None)
+                    {
+                        continue; // E-3: the building heals only what it can produce
+                    }
+
+                    EntityId buildingId = UnitCommandStateView.ToEntityId(placement.RawEntityId);
+                    if (!_entityManager.TryGetUnit(buildingId, out UnitState building) || building.PlayerId != unit.PlayerId)
+                    {
+                        continue; // own, living, completed placements only (sites are never in _buildings)
+                    }
+                    if (PointToFootprintDistance(ux, uy, placement.OriginX, placement.OriginY) > PassiveRepairRadiusCells)
+                    {
+                        continue;
+                    }
+
+                    // The first matching zone wins and the scan stops: no
+                    // stacking. The low-power gate reads the OWNER's grid —
+                    // every matching zone has the same owner, so the verdict
+                    // never depends on which placement matched first. Exact
+                    // halving by tick parity (Sprint-16.6 C4 precedent):
+                    // under low power the zone heals on even ticks only.
+                    ref readonly PlayerEconomyState eco = ref _economy.GetPlayerEconomy(building.PlayerId);
+                    if (!eco.IsLowPower || (tick.Value & 1u) == 0u)
+                    {
+                        unit.CurrentHealth = Math.Min(unit.MaxHealth, unit.CurrentHealth + PassiveRepairRateHpPerTick);
+                    }
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds the E-3 derivation table from the definition table: for
+        /// the two zone-building roles of the Issue-#55 scope (Barracks,
+        /// VehicleFactory) the mask of the unit roles their production
+        /// covers; every other entry stays <see cref="UnitRoleMask.None"/>.
+        /// Both faction rows iterate the same D-077 assignment, so the OR
+        /// is idempotent.
+        /// </summary>
+        private static UnitRoleMask[] BuildPassiveRepairableTable()
+        {
+            var table = new UnitRoleMask[256];
+            ReadOnlySpan<SimUnitDefinition> units = SimDefinitions.AllUnits;
+            for (int i = 0; i < units.Length; i++)
+            {
+                UnitRole producer = units[i].ProducerRole;
+                if (producer != UnitRole.Barracks && producer != UnitRole.VehicleFactory)
+                {
+                    continue; // Issue #55 zone scope: the two combat-unit producers
+                }
+                table[(int)producer] |= RoleMask(units[i].Role);
+            }
+            return table;
         }
 
         // ------------------------------------------------------------------
