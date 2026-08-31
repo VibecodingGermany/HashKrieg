@@ -73,6 +73,38 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Fahrzeugfabrik und Kaserne reparieren jetzt passiv, was sie bauen können (#55).**
+  Der Wunsch stammt aus dem Betatest vom 09.08.2026 und wurde am 31.08.2026
+  erneut vermisst: beschädigte Panzerung war bis hierher faktisch dauerhaft —
+  man schickte jede Einheit einzeln mit einem Pionier los oder verlor sie im
+  nächsten Gefecht. Nach Inhaberentscheidung heilt jedes der beiden Gebäude
+  **nur, was es auch produzieren kann** (die Zuordnung wird aus
+  `SimDefinitions` abgeleitet, es gibt keine zweite Liste): eine Kaserne
+  repariert keine Panzer. Die vier offenen Zahlen sind gegen den Bestand
+  hergeleitet und im Docstring begründet, damit die nächste Balance-Runde sie
+  am Code findet — **Radius 3** Zellen (gegen die 8er-Bauzone: eine Zone, in
+  der eine ganze Armee Platz hat, ist keine Zone), **1 HP/Tick** (ein Zehntel
+  der aktiven Reparatur und unter jeder Waffenrate: es heilt zwischen
+  Gefechten, nicht während eines), **0 AE** (ein leeres Konto heilt gleich
+  schnell), **kein Stapeln** (stehen zwei Zonen übereinander, gewinnt die
+  erste). Deterministisch: feste Phasenposition, aufsteigende
+  Entitäts-Indizes, Ganzzahlarithmetik
+- **Eine Ressourcenleiste zeigt endlich, was die Wirtschaft tut (#137).** Aus der
+  Proberunde vom 31.08.2026: „Mir fehlt ein globales Overlay, in dem man sieht,
+  wie viel Strom man hat, vor allem auch wie viel Lagerplatz man noch hat."
+  Bisher stand der Kontostand nur in der Baukarte, wo er Knöpfe sperrt, und
+  Strom samt Lagerdecke ausschließlich in der DebugHud — teils erst hinter `F3`,
+  also in einem Entwicklerwerkzeug. **Die Lagerdecke stand nirgends im
+  Spiel-UI.** Damit waren drei Regeln unsichtbar, die aktiv in die Partie
+  eingreifen: der Verfall über der Decke (D-024), der Strommangel mit halbierter
+  Reparaturrate und abgeschaltetem Radar (16.6/C4), und das Startguthaben über
+  der Decke (#131). Die neue Leiste zeigt Aetherium als Bestand **und** Decke
+  (`2.318 / 3.000` liest sich sofort, `2.318` allein sagt nichts), die Stromlage
+  und einen Warnzustand, wenn die Decke erreicht ist — der Moment, in dem der
+  Spieler ein Lager bauen muss. Die Formatier- und Zustandslogik liegt als reine
+  Funktionen in `ResourceBarPresenter` und ist mit 19 EditMode-Tests belegt;
+  reine Präsentation, kein Simulationseingriff, die Leiste schluckt bewusst
+  keine Klicks
 - **Die Auswahl ist benutzbar geworden (#50).** Aus dem Betatest: „Weil ich den
   Pionier in der Gruppe nicht wiederfand, konnte ich nicht bauen." Paket 21.5
   hatte die Aufstellung geliefert, aber man konnte sie nicht anfassen. Jetzt
@@ -388,6 +420,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   feine Grund reist über ein schreibgeschütztes Enum außerhalb des
   Befehlsstroms, ermittelt vom **selben** Durchlauf wie die Prüfung, damit
   Ergebnis und Begründung nicht auseinanderlaufen können. Verhalten unverändert
+- **Sammler ernten nicht mehr weiter, wenn das Lager voll ist (#136).** Aus der
+  Proberunde vom 31.08.2026: „Die ernten ab, bringen das zur Raffinerie, aber
+  das erhöht den Kontostand nicht. Das vernichtet Material." Genau so war es —
+  und seit die Vorkommen endlich sind (#80), ging dabei nicht nur die Fahrt
+  verloren, sondern der Rohstoff selbst. Gebremst wird jetzt beim **Aufnehmen**,
+  nicht beim Abliefern: was nie abgebaut wurde, ist nicht verloren. Der Sammler
+  hält mit Auftrag und Ladung inne und nimmt die Arbeit von selbst wieder auf,
+  sobald Platz ist — durch ein neues Lager oder durch Ausgeben. Drei Tests
+  pinnen Halt, beide Wege der Wiederaufnahme und die Grenze „1 AE Platz heißt
+  arbeiten". **Dass der Überschuss verfällt, bleibt unangetastet** — das ist
+  D-024; geändert hat sich nur, ob überhaupt noch abgebaut wird
+- **Das Startguthaben passt wieder unter die Decke (#131).**
+  `EconomySystem.HqBaseCapacityAE` steigt von 2.000 auf 3.000 AE. Die 3.000 AE
+  Startguthaben kamen mit **D-077** als bewusst gesetzter Eröffnungspuffer, die
+  2.000er-Decke erst später mit **D-024 / Sprint 16.4** — die zweite
+  Entscheidung hob die erste auf, ohne dass es jemandem auffiel, und ein Drittel
+  des Startguthabens verdampfte in den ersten fünfzehn Sekunden. Bewusst in Kauf
+  genommen: das Lagergebäude wird früh weniger wertvoll. Der eigentliche Ertrag
+  ist der Test, den es bis heute nicht gab — **keiner sah Startguthaben und
+  Decke zusammen**, und genau deshalb blieb der Widerspruch drei Wochen stehen
 - **Eine einseitige Änderung der Geländetabelle blieb in der CI unsichtbar.**
   Die kanonische Tabelle steht notgedrungen zweimal im Repo — `GlutrinneTerrainMap`
   auf der Unity-Seite und ein handgespiegelter Ausdruck in

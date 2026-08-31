@@ -37,7 +37,18 @@ namespace Nova.Simulation.Economy
     /// <see cref="UnitState.HarvestFieldId"/> order whose grid cell is the
     /// field's cell or adjacent (Chebyshev distance &lt;= 1, documented
     /// reach rule) gathers <see cref="HarvestRateAE"/> per tick, bounded by
-    /// the field's remaining reserve and the free cargo space. A FULL cargo
+    /// the field's remaining reserve and the free cargo space — but ONLY
+    /// while the owner account has room under the derived storage ceiling.
+    /// An account at or above its ceiling holds the harvester in place with
+    /// its order kept (#136, owner decision E-1 of 2026-08-31): every AE
+    /// gathered into a full account would be forfeited at the deposit while
+    /// the FINITE field (G2 reservation, D-010) still drains — the reserve
+    /// burns in front of a player who reads it as progress. The brake sits
+    /// at the pickup, not the deposit: what was never mined is never lost,
+    /// and the D-024 forfeit itself stays exactly as decided. The check
+    /// re-reads the live balance and the derived ceiling on every tick and
+    /// stores nothing, so the harvester resumes BY ITSELF the moment room
+    /// exists — credits spent or a storage completed. A FULL cargo
     /// no longer resolves the order: the harvester flips to
     /// <see cref="UnitState.IsReturningCargo"/> and KEEPS its
     /// <see cref="UnitState.HarvestFieldId"/>, so after the deposit it
@@ -53,7 +64,8 @@ namespace Nova.Simulation.Economy
     /// <para>
     /// Storage ceiling (16.4, #53, D-024/D-096/D-106): the AE account has a
     /// derived upper bound — one or more completed HQs provide the single
-    /// 2.000 AE account base,
+    /// 3.000 AE account base (E-2 of 2026-08-31, #131: raised from 2.000 so
+    /// the base carries the D-077 opening buffer),
     /// every completed Storage adds 2.000, scanned from the living building
     /// stock on every read and NEVER stored (a stored cap would be a state
     /// field and a format break). All income and refunds route through
@@ -150,12 +162,16 @@ namespace Nova.Simulation.Economy
         /// <summary>
         /// 16.4 (#53, D-024/D-096/D-106): one-time AE account base while the
         /// slot owns at least one completed HQ. Additional HQs do not stack.
-        /// Deliberately below the canonical start balance (3.000 AE, D-077):
-        /// the start stock stays (existing balances only decay), but fresh
-        /// income forfeits until the player builds storage — the D-024 silo
-        /// pressure from the first minute.
+        /// E-2 of 2026-08-31 (#131): raised from 2.000 to 3.000, so the base
+        /// carries the canonical start balance (D-077,
+        /// <see cref="CanonicalMatchStartingCreditsAE"/>) instead of silently
+        /// overriding it — the 3.000 AE opening buffer predates the ceiling,
+        /// and with a 2.000 base the first minutes decayed a third of it
+        /// away before the first harvester could deliver. Consequence,
+        /// deliberate: a completed Storage is worth slightly less in the
+        /// opening than it was under the 2.000 base.
         /// </summary>
-        public const long HqBaseCapacityAE = 2000L;
+        public const long HqBaseCapacityAE = 3000L;
 
         /// <summary>16.4 (#53, D-024): AE capacity bonus per completed Storage.</summary>
         public const long StorageCapacityBonusAE = 2000L;
@@ -242,8 +258,8 @@ namespace Nova.Simulation.Economy
         /// 16.4 (#53, D-024/D-096/D-106): the slot's AE ceiling, DERIVED from the
         /// living building stock on every read — never stored (a stored cap
         /// would be a state-field and format break). One or more completed HQs
-        /// provide the single 2.000 AE account base; every completed Storage
-        /// adds 2.000.
+        /// provide the single 3.000 AE account base (E-2 of 2026-08-31, #131);
+        /// every completed Storage adds 2.000.
         /// Sites are excluded via the bound lookup: a half-built silo holds
         /// nothing. Without the lookup (construction-free rigs) every
         /// building-role entity counts. Integer scan in ascending entity
@@ -569,7 +585,20 @@ namespace Nova.Simulation.Economy
         /// <summary>
         /// One harvest order: in reach, bounded by reserve and free cargo;
         /// starts the return leg on a full cargo (field id retained), resolves
-        /// to idle on an exhausted field, holds out of reach.
+        /// to idle on an exhausted field, holds out of reach — and HOLDS
+        /// WITHOUT GATHERING while the owner account has no room under the
+        /// derived storage ceiling (#136, owner decision E-1 of 2026-08-31).
+        /// The brake sits at the pickup, deliberately not at the deposit:
+        /// what was never mined is never lost, whereas a deposit-side brake
+        /// would let a finite field drain into loads the capped deposit then
+        /// forfeits in full. "Full" means NO room at all — a single free AE
+        /// keeps the harvester working; how much of a delivered cargo then
+        /// fits remains the deposit's D-024 concern, unchanged. The check
+        /// re-reads the live balance and the derived ceiling on every tick
+        /// and stores nothing, so the harvester resumes by itself the moment
+        /// room exists (credits spent, storage completed) — and a harvester
+        /// whose cargo is already full holds its load instead of starting a
+        /// return leg that would bank zero and wipe the cargo anyway.
         /// </summary>
         private void ExecuteHarvestOrder(ref UnitState unit)
         {
@@ -591,6 +620,16 @@ namespace Nova.Simulation.Economy
             }
 
             if (!IsInReach(in unit, field.GridPos)) return; // held, not dropped
+
+            // #136 (E-1): the account-full hold. Gathering now would drain a
+            // FINITE reserve into a deposit that banks nothing (D-024 caps
+            // the deposit, and the deposit clears the cargo regardless), so
+            // the harvester stands still with order and cargo kept. The room
+            // read is live and stateless: the moment the balance drops below
+            // the derived ceiling or the ceiling rises, this same order
+            // gathers again without any command.
+            long accountRoom = CapacityFor(unit.PlayerId) - _players[unit.PlayerId].AetheriumCredits;
+            if (accountRoom <= 0) return; // held, not dropped — nothing is mined into the void
 
             // The cargo ceiling is the OWNER FACTION's, not a flat constant:
             // an Alliance harvester loads 330, a Legion one 300.
