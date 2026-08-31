@@ -54,6 +54,17 @@ namespace Nova.SimRunner.Tests
                 0, new Transform2D(SimFixed.FromInt(9), SimFixed.FromInt(5)),
                 SimFixed.Zero, role: UnitRole.Refinery);
 
+            // An HQ, because since #136 the harvester stops extracting once the
+            // account sits at its ceiling — and CapacityFor returns ZERO for a
+            // slot without a completed HQ. Without one this fixture would read
+            // as permanently full and no harvester would ever move: the
+            // measurement would have no answer rather than a different one.
+            // The canonical opening has an HQ, so this restores the fixture to
+            // the situation it always claimed to measure.
+            entities.SpawnUnit(
+                0, new Transform2D(SimFixed.FromInt(5), SimFixed.FromInt(5)),
+                SimFixed.Zero, role: UnitRole.HQ);
+
             Assert.That(
                 SimDefinitions.TryGetUnit(FactionId.Alliance, UnitRole.Harvester, out SimUnitDefinition harvesterDef),
                 Is.True, "Alliance harvester definition");
@@ -80,6 +91,18 @@ namespace Nova.SimRunner.Tests
             kernel.Start();
             while (kernel.CurrentTick.Value < TickCap)
             {
+                // The fixture models a player who SPENDS everything, and it has
+                // to since #136: a harvester now stops extracting once the
+                // account sits at its ceiling. Without a consumer this loop
+                // stalls at the cap and the field is never exhausted — the
+                // measurement would have no answer rather than a different one.
+                // Draining to zero every tick isolates what 21.3 actually asks:
+                // how long the FIELD lasts at the pure extraction rate, with the
+                // storage ceiling deliberately taken out of the question. The
+                // tick counts below are therefore unchanged from the original
+                // measurement — the harvest dynamics never changed, only the
+                // condition under which they pause.
+                economy.GetPlayerEconomy(0).AetheriumCredits = 0L;
                 kernel.StepTick();
                 if (economy.TryGetField(FieldId, out AetheriumField field) && field.IsExhausted)
                 {

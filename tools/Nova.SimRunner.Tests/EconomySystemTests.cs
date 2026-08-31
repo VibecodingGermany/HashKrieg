@@ -64,6 +64,31 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void CanonicalStartBalance_FitsUnderTheFreshHqCeiling()
+        {
+            // #131 / E-2 (2026-08-31): the D-077 opening balance must never
+            // exceed the ceiling one fresh completed HQ provides. No test
+            // used to look at the two constants together — exactly why the
+            // 3.000 start over the 2.000 base survived three weeks and
+            // silently decayed a third of the opening buffer before the
+            // first harvester delivered. The named values are pinned too,
+            // so the next silent divergence between them trips here.
+            Assert.That(EconomySystem.CanonicalMatchStartingCreditsAE, Is.EqualTo(3000L), "D-077");
+            Assert.That(EconomySystem.HqBaseCapacityAE, Is.EqualTo(3000L),
+                "E-2: the HQ account base carries the D-077 opening buffer");
+
+            EntityManager entities = CreateEntities();
+            var economy = new EconomySystem(entities, EconomySystem.CanonicalMatchStartingCreditsAE);
+            var construction = new ConstructionSystem(entities, economy);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+
+            Assert.That(economy.CapacityFor(0),
+                Is.GreaterThanOrEqualTo(EconomySystem.CanonicalMatchStartingCreditsAE),
+                "the canonical start balance must fit under the fresh-HQ ceiling — no opening decay");
+        }
+
+        [Test]
         public void Credits_NeverGoNegative_SpendingIsAtomic()
         {
             var economy = new EconomySystem(CreateEntities());
@@ -164,7 +189,7 @@ namespace Nova.SimRunner.Tests
             Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
 
             // 16.4: deposits obey the derived storage ceiling — a completed
-            // HQ provides the 2.000 AE base. Far away, so no reach rule here
+            // HQ provides the 3.000 AE base. Far away, so no reach rule here
             // is touched.
             entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)), SimFixed.Zero, role: UnitRole.HQ);
 
@@ -196,7 +221,7 @@ namespace Nova.SimRunner.Tests
         {
             EntityManager entities = CreateEntities();
             var kernel = new SimulationKernel(new SimRandom(42UL));
-            var economy = new EconomySystem(entities, startingCredits: 1995);
+            var economy = new EconomySystem(entities, startingCredits: 2995);
             kernel.RegisterSystem(economy);
             kernel.Start();
 
@@ -310,6 +335,11 @@ namespace Nova.SimRunner.Tests
             kernel.Start();
             Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
 
+            // 16.4 / #136: the account must have room under its ceiling or
+            // the E-1 hold engages instead — a completed HQ far away
+            // provides the 3.000 AE base over the 1.000 start.
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)), SimFixed.Zero, role: UnitRole.HQ);
+
             EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
             ref UnitState unit = ref entities.GetUnitRef(harvester);
             unit.HarvestFieldId = 1;
@@ -348,6 +378,10 @@ namespace Nova.SimRunner.Tests
             kernel.Start();
             Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
 
+            // 16.4 / #136: account room under the ceiling, or the E-1 hold
+            // engages — a completed HQ far away provides it.
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)), SimFixed.Zero, role: UnitRole.HQ);
+
             EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
             ref UnitState unit = ref entities.GetUnitRef(harvester);
             unit.HarvestFieldId = 1;
@@ -374,6 +408,10 @@ namespace Nova.SimRunner.Tests
             kernel.Start();
             Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 3), Is.True);
 
+            // 16.4 / #136: account room under the ceiling, or the E-1 hold
+            // engages — a completed HQ far away provides it.
+            entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(60), SimFixed.FromInt(60)), SimFixed.Zero, role: UnitRole.HQ);
+
             EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
             entities.GetUnitRef(harvester).HarvestFieldId = 1;
 
@@ -391,6 +429,138 @@ namespace Nova.SimRunner.Tests
             Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(3));
             Assert.That(economy.TryGetField(1, out field), Is.True);
             Assert.That(field.RemainingAE, Is.EqualTo(0L));
+        }
+
+        // ------------------------------------------------------------------
+        // #136 (owner decision E-1 of 2026-08-31): the account-full hold —
+        // a harvester brakes at the PICKUP while its owner account has no
+        // room under the derived ceiling, and resumes by itself the moment
+        // room exists. The D-024 deposit forfeit is deliberately untouched.
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void Harvest_AccountFull_HoldsWithoutMining_AndResumesWhenCapacityRises()
+        {
+            // The reported loop: storage full, harvester keeps driving, the
+            // delivery banks nothing, the finite reserve burns anyway. The
+            // pinned lifecycle: full account -> harvester rests, nothing is
+            // mined -> the ceiling rises -> the same order works again.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: EconomySystem.HqBaseCapacityAE);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True,
+                "a completed HQ: the ceiling equals the start balance — the account is exactly full");
+
+            EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
+            entities.GetUnitRef(harvester).HarvestFieldId = 1;
+
+            for (int i = 0; i < 20; i++)
+            {
+                kernel.StepTick();
+            }
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0),
+                "a full account: nothing is gathered");
+            Assert.That(entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)1),
+                "the order is HELD, not dropped");
+            Assert.That(entities.GetUnitRef(harvester).IsReturningCargo, Is.False);
+            Assert.That(economy.TryGetField(1, out AetheriumField field), Is.True);
+            Assert.That(field.RemainingAE, Is.EqualTo(9000L),
+                "the finite reserve is untouched — what was never mined is never lost");
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(EconomySystem.HqBaseCapacityAE),
+                "the balance sits AT the ceiling, never above it — no decay either");
+
+            // The ceiling rises (a completed Storage) — the held order
+            // resumes without any command.
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.Storage), 50, 50).IsValid, Is.True);
+            kernel.StepTick();
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(EconomySystem.HarvestRateAE),
+                "room under the ceiling: gathering resumed on its own");
+
+            for (int i = 0; i < 9; i++)
+            {
+                kernel.StepTick();
+            }
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(10 * EconomySystem.HarvestRateAE));
+            Assert.That(economy.TryGetField(1, out field), Is.True);
+            Assert.That(field.RemainingAE, Is.EqualTo(9000L - (10 * EconomySystem.HarvestRateAE)));
+        }
+
+        [Test]
+        public void Harvest_AccountFull_HoldsFullCargo_UntilSpendingOpensRoom()
+        {
+            // The loop-break half of E-1: a harvester whose cargo is ALREADY
+            // full must not even start the return leg into a full account —
+            // the capped deposit would bank zero and still wipe the honestly
+            // gathered load. The load waits at the field until room exists
+            // (here: the player spends below the ceiling).
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: EconomySystem.HqBaseCapacityAE);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+
+            EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
+            ref UnitState unit = ref entities.GetUnitRef(harvester);
+            unit.HarvestFieldId = 1;
+            unit.CargoAE = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance); // 330 — full
+
+            for (int i = 0; i < 10; i++)
+            {
+                kernel.StepTick();
+            }
+            unit = ref entities.GetUnitRef(harvester);
+            Assert.That(unit.CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
+                "the full load is kept, not fed to a deposit that would bank zero");
+            Assert.That(unit.IsReturningCargo, Is.False,
+                "no return leg starts while the account has no room");
+            Assert.That(unit.HarvestFieldId, Is.EqualTo((ushort)1));
+            Assert.That(economy.TryGetField(1, out AetheriumField field), Is.True);
+            Assert.That(field.RemainingAE, Is.EqualTo(9000L));
+
+            // The player spends below the ceiling — room opens and the held
+            // load starts its return leg on its own.
+            Assert.That(economy.GetPlayerEconomy(0).TrySpendCredits(500), Is.True);
+            kernel.StepTick();
+            unit = ref entities.GetUnitRef(harvester);
+            Assert.That(unit.IsReturningCargo, Is.True,
+                "room under the ceiling: the held load starts its return leg by itself");
+            Assert.That(unit.CargoAE, Is.EqualTo(SimDefinitions.HarvesterCargoCapacityAE(FactionId.Alliance)),
+                "the load survived the wait intact");
+        }
+
+        [Test]
+        public void Harvest_PartialAccountRoom_KeepsGathering()
+        {
+            // The E-1 boundary: "full" means NO room at all, not "less than
+            // a cargo". With a single AE of room the harvester keeps mining;
+            // how much of a delivered cargo then fits is the deposit's
+            // D-024 concern, deliberately unchanged.
+            EntityManager entities = CreateEntities();
+            var kernel = new SimulationKernel(new SimRandom(42UL));
+            var economy = new EconomySystem(entities, startingCredits: EconomySystem.HqBaseCapacityAE - 1);
+            var construction = new ConstructionSystem(entities, economy);
+            kernel.RegisterSystem(economy);
+            kernel.Start();
+            Assert.That(economy.TryAddField(1, new GridPos2D(10, 10), 9000), Is.True);
+            Assert.That(construction.PlaceCompletedBuilding(
+                0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
+
+            EntityId harvester = SpawnHarvester(entities, 0, 10, 10);
+            entities.GetUnitRef(harvester).HarvestFieldId = 1;
+
+            kernel.StepTick();
+            Assert.That(entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(EconomySystem.HarvestRateAE),
+                "one AE of room is still room — only a completely full account holds the harvester");
         }
 
         [Test]
@@ -483,14 +653,14 @@ namespace Nova.SimRunner.Tests
             Assert.That(construction.PlaceCompletedBuilding(
                 0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
 
-            Assert.That(economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE), "one completed HQ: the 2.000 AE base");
+            Assert.That(economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE), "one completed HQ: the 3.000 AE base");
 
-            Assert.That(economy.DepositCapped(0, 1500), Is.EqualTo(1000L),
+            Assert.That(economy.DepositCapped(0, 2500), Is.EqualTo(2000L),
                 "only what fits under the ceiling lands");
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(2000L),
-                "1000 start + 1000 that fit — the remaining 500 are forfeit");
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3000L),
+                "1000 start + 2000 that fit — the remaining 500 are forfeit");
             Assert.That(economy.DepositCapped(0, 500), Is.EqualTo(0L), "at the ceiling nothing more lands");
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(2000L));
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3000L));
             Assert.That(economy.CapacityFor(1), Is.EqualTo(0L), "no buildings, no ceiling — the other slot is unaffected");
         }
 
@@ -578,20 +748,20 @@ namespace Nova.SimRunner.Tests
             Assert.That(construction.PlaceCompletedBuilding(
                 0, SimDefinitions.ToDefinitionId(FactionId.Alliance, UnitRole.HQ), 40, 40).IsValid, Is.True);
 
-            economy.GetPlayerEconomy(0).AddCredits(2000); // raw write: 3.000 total, 1.000 over the 2.000 ceiling
+            economy.GetPlayerEconomy(0).AddCredits(3000); // raw write: 4.000 total, 1.000 over the 3.000 ceiling
             for (int i = 0; i < 9; i++) kernel.StepTick();
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3000L),
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(4000L),
                 "no decay between the per-second decay ticks");
 
             kernel.StepTick(); // tick 10: first decay — 25% of the 1.000 excess
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(2750L));
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3750L));
 
             for (int i = 0; i < 10; i++) kernel.StepTick(); // tick 20: 25% of 750 (floor 187)
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(2563L),
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3563L),
                 "integer floor decay, once per second");
 
             for (int i = 0; i < 80; i++) kernel.StepTick(); // tick 100: converging, minimum-1-AE steps
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(2058L));
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3058L));
         }
 
         [Test]
@@ -608,7 +778,7 @@ namespace Nova.SimRunner.Tests
 
             for (int i = 0; i < 25; i++) kernel.StepTick();
             Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L),
-                "1.000 under the 2.000 ceiling: the decay never runs");
+                "1.000 under the 3.000 ceiling: the decay never runs");
 
             // Without any building the ceiling is zero and even the start
             // stock decays — the no-HQ path defined by D-106.
@@ -627,7 +797,7 @@ namespace Nova.SimRunner.Tests
         {
             EntityManager entities = CreateEntities();
             var kernel = new SimulationKernel(new SimRandom(42UL));
-            var economy = new EconomySystem(entities, startingCredits: 3900);
+            var economy = new EconomySystem(entities, startingCredits: 4900);
             var construction = new ConstructionSystem(entities, economy);
             kernel.RegisterSystem(economy);
             kernel.Start();
@@ -643,7 +813,7 @@ namespace Nova.SimRunner.Tests
             Assert.That(economy.CapacityFor(0), Is.EqualTo(EconomySystem.HqBaseCapacityAE));
             for (int i = 0; i < EconomySystem.ExcessDecayIntervalTicks; i++) kernel.StepTick();
 
-            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(3425L),
+            Assert.That(economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(4425L),
                 "25% of the new 1.900 AE excess decays at tick 10");
         }
 
