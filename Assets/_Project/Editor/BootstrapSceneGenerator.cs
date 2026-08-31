@@ -393,6 +393,14 @@ namespace Nova.Editor
             WireReference(hud, "_runner", runner);
             WireReference(hud, "_input", input);
 
+            // The resource bar is added LAST on purpose: AddComponent order is
+            // the OnGUI paint order, so it draws over the debug status line
+            // instead of under it. It takes no _input — it is a pure readout,
+            // deliberately absent from IsPointerOverHud, and swallows no
+            // clicks (the reasoning sits in ResourceBarHud's docstring).
+            ResourceBarHud resourceBar = uiObject.AddComponent<ResourceBarHud>();
+            WireReference(resourceBar, "_runner", runner);
+
             return uiObject;
         }
 
