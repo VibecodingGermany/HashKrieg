@@ -143,9 +143,16 @@ namespace Nova.PlayMode.Tests
             Assert.Greater(tickBaseline, 0u, "Session tick did not advance");
             Assert.AreEqual(3000L, bootstrap.ActiveConfig.StartingCredits,
                 "D-077 configures the canonical 3.000-AE opening");
-            Assert.That(creditsBaseline,
-                Is.InRange(EconomySystem.HqBaseCapacityAE, 2999L),
-                "D-106 deterministically decays the initial overhang while no completed Storage exists");
+            // There is no initial overhang any more, and that is the point of
+            // #131: the D-077 opening balance (3.000) used to sit ABOVE the HQ
+            // ceiling (2.000), so a third of it decayed away in the first
+            // fifteen seconds of every match while nothing on screen said why.
+            // Raising the ceiling to 3.000 made the two decisions agree, so the
+            // opening balance now simply STAYS. The old assertion read
+            // InRange(ceiling, 2999) and became InRange(3000, 2999) — an
+            // invalid range, which is how this test found the change.
+            Assert.AreEqual(EconomySystem.HqBaseCapacityAE, creditsBaseline,
+                "the opening balance fits under the HQ ceiling and must not decay (#131)");
 
             Camera camera = Camera.main;
             Assert.NotNull(camera, "no main camera in the Bootstrap scene");
