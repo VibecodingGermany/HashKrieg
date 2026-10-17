@@ -562,7 +562,11 @@ namespace Nova.SimRunner.Tests
             // makes it measurable one-sided (defendHomeCells, 0 = off, M001).
             // A revision bump with an unmoved profile hash would have meant a
             // rule nobody can switch off.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r9.1E6E7AE3"),
+            //
+            // r10 moves the identifier and not the canonical match: the fix
+            // only reaches flanked and Turtle personalities, and the canonical
+            // match plays the neutral one.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r10.1E6E7AE3"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 

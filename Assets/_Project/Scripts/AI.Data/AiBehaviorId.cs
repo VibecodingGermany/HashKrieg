@@ -170,8 +170,19 @@ namespace Nova.AI.Data
         /// plays a non-neutral personality is still "r9" — the personality
         /// is printed next to this identifier, not folded into it.
         /// </para>
+        /// <para>
+        /// r10 fixes two defects of r9 found in the review of PR #144. The
+        /// flank pushed the staging cell perpendicular to the diagonal, to
+        /// Chebyshev 22 from the HQ and outside the staging ring at 16, so
+        /// every unit walking there counted as committed and marched alone; the
+        /// flank now turns the cell and keeps it at the staging distance. And
+        /// the Turtle's home radius (14) reached past the staging cell; it now
+        /// stops one cell short. The neutral personality and the canonical
+        /// outcome are untouched — the revision moves because a flanked or
+        /// Turtle personality decides differently than it did under r9.
+        /// </para>
         /// </summary>
-        public const int Revision = 9;
+        public const int Revision = 10;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like

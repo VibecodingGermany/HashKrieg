@@ -120,6 +120,8 @@ namespace Nova.AI.Data
                     army += 4; harvesters = 1; retreat += 5;
                     break;
                 case AiOpening.Turtle:
+                    // home 4 is what the Turtle asks for; Apply caps the result
+                    // under the staging distance (11 on the shipped profile).
                     army += 2; retreat += 5; home = 4; platforms = 1 + (extraDefensePlatform & 1);
                     break;
             }
@@ -133,9 +135,15 @@ namespace Nova.AI.Data
         /// on every machine, which is what lets both peers of a networked match
         /// agree without a message.
         /// <para>
-        /// One hash, independent bit ranges: opening from the low bits, flank
-        /// from the next byte, and so on, so that no field is a function of
-        /// another and 512 seeds cover every combination of the small ones.
+        /// One hash, one shift per field: opening <c>h % 4</c>, flank
+        /// <c>(h &gt;&gt; 8) % 3</c>, layout <c>(h &gt;&gt; 16) % 8</c>, army jitter
+        /// <c>(h &gt;&gt; 24) % 3</c>, retreat jitter <c>(h &gt;&gt; 32) % 3</c>, extra
+        /// platform bit 40. A modulo by 3 reads every bit above its shift, not
+        /// one byte, so the ranges overlap; the shared high bits are mixed with
+        /// bits only that field reads, which keeps the fields as good as
+        /// independent. 4·3·8·3·3·2 = 1728 combinations exist;
+        /// <c>Derive_IsPure_AndCoversEveryBandOver512Seeds</c> checks that every
+        /// band of every field is reached, not that every combination is.
         /// </para>
         /// </summary>
         public static AiPersonality Derive(ulong matchSeed, byte slot)
@@ -174,6 +182,13 @@ namespace Nova.AI.Data
             if (retreat > 0) retreat = Math.Min(95, Math.Max(0, retreat + RetreatPercentDelta));
             int home = baseProfile.DefendHomeCells;
             if (home > 0) home = Math.Max(0, home + DefendHomeCellsDelta);
+            // A wider home guard stops one cell short of the gathering point:
+            // the radius stays under the staging distance, so a skirmish at the
+            // staging cell does not call the waiting wave home (the invariant
+            // on AiProfiles.Ms1Canonical.DefendHomeCells; review of PR #144,
+            // B2). Only what the personality ADDS is capped — a base profile
+            // that set a wider radius itself keeps it.
+            home = Math.Min(home, Math.Max(baseProfile.DefendHomeCells, baseProfile.StagingDistanceCells - 1));
 
             return new AiProfile(
                 profileId: baseProfile.ProfileId + "+" + Opening.ToString().ToLowerInvariant(),
@@ -198,7 +213,7 @@ namespace Nova.AI.Data
                 defendHomeCells: home);
         }
 
-        /// <summary>Compact description for the debug HUD and logs, e.g. <c>Rush, flank +10, layout 5, army 8</c>.</summary>
+        /// <summary>Compact description for the debug HUD and logs, e.g. <c>Rush, flank +10, layout 5, army delta -3</c>.</summary>
         public override string ToString()
         {
             string flank = FlankOffsetCells > 0 ? "+" + FlankOffsetCells : FlankOffsetCells.ToString();

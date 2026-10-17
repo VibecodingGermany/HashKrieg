@@ -148,7 +148,9 @@ namespace Nova.Gameplay.Match
         /// game. Off by default: the canonical seed stays the default for
         /// tests and harnesses (the canonical opening-position hash depends on
         /// it); the main menu switches this on. Network matches take their
-        /// seed from the relay offer and ignore it.
+        /// seed from the relay offer and ignore it. <c>NOVA_MATCH_SEED</c>
+        /// pins the seed of every local start whether this is on or off — see
+        /// <see cref="ApplyLocalMatchSeed"/>.
         /// </summary>
         public bool FreshSeedPerLocalMatch { get; set; }
 
@@ -822,6 +824,16 @@ namespace Nova.Gameplay.Match
         /// otherwise a fresh non-zero seed is drawn when
         /// <see cref="FreshSeedPerLocalMatch"/> is on. The seed is the only
         /// input of the AI personality, so a logged seed reproduces the match.
+        /// <para>
+        /// THE PIN APPLIES TO EVERY LOCAL START, with or without
+        /// <see cref="FreshSeedPerLocalMatch"/> — on purpose: a match reported
+        /// from the menu has to be reproducible through AutoStart and the
+        /// harnesses too. The price is that a variable left in the shell moves
+        /// those starts off the canonical seed, so outside the menu the pin is
+        /// logged as a warning, and a value that does not parse is never
+        /// dropped silently. The value is always read as hex: a decimal
+        /// "12345" pins 0x12345, which the log line shows.
+        /// </para>
         /// </summary>
         private void ApplyLocalMatchSeed(MatchConfig config)
         {
@@ -835,9 +847,21 @@ namespace Nova.Gameplay.Match
                 if (ulong.TryParse(hex, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong parsed))
                 {
                     config.Seed = parsed;
-                    Debug.Log($"[MatchBootstrap] Match seed pinned by NOVA_MATCH_SEED: 0x{parsed:X16}.");
+                    if (FreshSeedPerLocalMatch)
+                    {
+                        Debug.Log($"[MatchBootstrap] Match seed pinned by NOVA_MATCH_SEED: 0x{parsed:X16}.");
+                    }
+                    else
+                    {
+                        Debug.LogWarning(
+                            $"[MatchBootstrap] Match seed pinned by NOVA_MATCH_SEED: 0x{parsed:X16}, " +
+                            "replacing the seed of a start outside the menu (AutoStart, harness, PlayMode).");
+                    }
                     return;
                 }
+                Debug.LogWarning(
+                    $"[MatchBootstrap] NOVA_MATCH_SEED '{pinned}' is not a hex u64 (at most 16 hex digits, " +
+                    "optional 0x) and was ignored; the match seed is not pinned.");
             }
 
             if (!FreshSeedPerLocalMatch) return;

@@ -82,15 +82,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   - **Eröffnung:** ausgewogen; Ansturm (Kaserne vor Raffinerie, kleinere und
     frühere Welle); Ökonom (dritter Sammler, größere Armee); Igel (ein bis zwei
     Abwehrplattformen Richtung Front).
-  - **Sammelpunkt:** um zehn Felder zur Seite versetzt oder mittig.
+  - **Sammelpunkt:** mittig oder zur Seite gedreht (Flanke ±10 Felder), immer
+    im selben Abstand vom HQ wie der mittige.
   - **Bauplätze:** eine von acht Suchrichtungen, damit die Basis jedes Mal
     anders aussieht.
   - **Profilwerte:** kleine Streuung in festen Bändern.
   - Das Debug-HUD (F3) und das Startlog zeigen Persönlichkeit und Seed;
-    `NOVA_MATCH_SEED=<hex>` stellt eine gemeldete Partie nach.
+    `NOVA_MATCH_SEED=<hex>` stellt eine gemeldete Partie nach. Die Variable
+    greift bei jedem lokalen Start, auch außerhalb des Menüs (AutoStart,
+    Harness, PlayMode); dort schreibt sie eine Warnung ins Log. Ein ungültiger
+    Wert wird ebenfalls mit einer Warnung gemeldet, nicht still übergangen.
   - Die neutrale Persönlichkeit spielt exakt wie bisher. Der gepinnte Ausgang
     der kanonischen KI-Partie bleibt stehen, `AiBehaviorId` steigt auf r9.
     Netzpartien sind unberührt.
+  - **Der kanonische Seed spielt nicht mehr neutral.** Er leitet einen
+    Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt also
+    gegen Ansturm, nicht gegen das Verhalten von r8.
   - **Bewusst klein:** Solange die KI nur Infanterie und drei Gebäude kennt,
     variieren Bauordnung, Basisbild, Sammelpunkt und Angriffszeitpunkt, mehr
     nicht. Panzer, Konter-Bau und Tech folgen als Stufe B.
@@ -424,6 +431,36 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Die KI-Flanke hebelt die Angriffswelle nicht mehr aus (D-114, Review von
+  #144).** In zwei Dritteln aller Persönlichkeiten griff die KI nicht in Wellen
+  an, sondern Einheit für Einheit.
+  - **Ursache:** Die Flanke verschob den Sammelpunkt senkrecht zur Linie zum
+    Gegner. Auf der diagonalen Glutrinne bewegte das den Punkt auf beiden
+    Achsen um zehn Felder, also 22 Felder vom HQ statt 12. Der Wellenring
+    reicht aber nur bis 16. Jede Einheit auf dem Weg zum Sammelpunkt galt
+    deshalb als „schon mit einer Welle draußen“ und marschierte allein los.
+    Welle, Stärkegate und Heimverteidigung liefen leer: gemessen 91 bis 222
+    Angriffsbefehle ohne fertige Welle je Partie, ohne Flanke null.
+  - **Behebung:** Die Flanke dreht den Sammelpunkt jetzt um das HQ, statt ihn
+    hinauszuschieben. Er bleibt im Abstand des mittigen Sammelpunkts (12
+    Felder), die Richtung der Verschiebung bleibt erhalten. Gemessen: null
+    Angriffsbefehle ohne fertige Welle, bei beiden Fraktionen und allen
+    Flanken.
+  - **Igel:** Sein erweiterter Heimradius (10 + 4 = 14) reichte über den
+    Sammelpunkt hinaus. Ein Gegner dort rief die ganze wartende Welle nach
+    Hause. Der Radius endet jetzt ein Feld vor dem Sammelpunkt, auf dem
+    ausgelieferten Profil also bei 11. Gedeckelt wird nur, was die
+    Persönlichkeit hinzufügt.
+  - Die neutrale Persönlichkeit und der Pfad ohne Flanke ändern sich nicht;
+    der gepinnte Ausgang der kanonischen KI-Partie bleibt stehen.
+    `AiBehaviorId` steigt auf r10, weil geflankte und Igel-Persönlichkeiten
+    anders entscheiden als unter r9. Eine neue D-ID gibt es nicht, D-114
+    trägt eine Berichtigung.
+  - **Tests:** Der Spiegeltest prüfte bisher den Footprint-Ursprung statt der
+    echten HQ-Zelle. Er liest das HQ jetzt aus der gebauten Partie und
+    vergleicht sich mit dem Sammelpunkt, den die KI selbst meldet. Neu sind
+    ein Regressionstest (keine Angriffsbefehle vor der ersten fertigen Welle)
+    und ein Test für den Igel-Radius.
 - **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
   31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
   zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein
