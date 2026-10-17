@@ -297,6 +297,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Abwehrtürme in menschlichem Maßstab (D-112).** Jedes Gebäude wird auf seinen
+  3×3-Footprint skaliert, ein schlanker Turm maß dadurch vier Soldatenhöhen. Die
+  Türme stehen jetzt auf einem flachen Betonsockel, der den Footprint füllt, und
+  sind selbst rund doppelt so hoch wie ein Soldat. Der Footprint bleibt 3×3; ihn
+  zu verkleinern wäre eine Regeländerung und ist offen
 - **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
   84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
   Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die

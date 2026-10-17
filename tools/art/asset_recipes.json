@@ -113,6 +113,13 @@
         "Alliance": 0.65,
         "Legion": 0.45
       }
+    },
+    "pad": {
+      "height_ratio": 0.7,
+      "tone": [
+        0.34,
+        0.5
+      ]
     }
   },
   "BLDG_Alliance_HQ": {
@@ -284,7 +291,14 @@
       }
     ],
     "path": "Buildings/Legion/DefensePlatform",
-    "faction": "Legion"
+    "faction": "Legion",
+    "pad": {
+      "height_ratio": 0.7,
+      "tone": [
+        0.34,
+        0.5
+      ]
+    }
   },
   "BLDG_Legion_HQ": {
     "path": "Buildings/Legion/HQ",

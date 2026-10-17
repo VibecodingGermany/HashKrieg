@@ -489,7 +489,7 @@ def texture_pass(lod0, tex_path, faction, t, out_dir, stem):
         img.save()
         paths[suffix] = p
     lod0.data.materials.clear()
-    return paths, stats
+    return paths, stats, new_bc
 
 
 # ---------------------------------------------------------------- Teile
@@ -604,6 +604,79 @@ def squash(result, pivots, bb, cfg):
     for name, p in pivots.items():
         p.z = f(p.z)
     print(f"  squash unter z={cut:.2f} auf {k:.0%}")
+
+
+def pick_texel(bc, tone, radius=6):
+    """UV einer ruhigen, ungesaettigten Texturstelle im Helligkeitsband ``tone``.
+
+    Der Sockel bekommt kein eigenes Material (ein Material je Asset); alle
+    seine UVs zeigen auf einen Texel, dessen Umgebung auch in den Mipmaps
+    einfarbig bleibt.
+    """
+    rgb = bc[..., :3]
+    lum = rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    sat = rgb.max(-1) - rgb.min(-1)
+
+    def box(a):
+        c = np.cumsum(np.cumsum(np.pad(a, ((1, 0), (1, 0))), 0), 1)
+        k = 2 * radius + 1
+        return (c[k:, k:] - c[:-k, k:] - c[k:, :-k] + c[:-k, :-k]) / (k * k)
+
+    mean, mean2 = box(lum), box(lum * lum)
+    var = mean2 - mean * mean
+    sat_m = box(sat)
+    score = var * 50 + sat_m + np.where((mean >= tone[0]) & (mean <= tone[1]), 0, 10)
+    y, x = np.unravel_index(np.argmin(score), score.shape)
+    y, x = y + radius, x + radius
+    h, w = lum.shape
+    return (x + 0.5) / w, (y + 0.5) / h, float(mean[y - radius, x - radius])
+
+
+def add_pad(result, pivots, cfg, bc):
+    """Flacher Betonsockel unter einem Turm, der den Gebaeude-Footprint fuellt.
+
+    UnitViewManager skaliert jedes Gebaeude auf die Breite seines 3x3-Footprints.
+    Ein schlanker Turm wurde dadurch vier Soldaten hoch. Der Sockel ist so breit,
+    dass der Turm nach der Skalierung ``height_ratio`` x Footprint misst; der Turm
+    wird um die Sockeldicke angehoben, Pivots wandern mit.
+    """
+    objs0 = list(result["LOD0"].values())
+    mn, mx = world_bbox(objs0)
+    height = mx.z - mn.z
+    side = max(height / cfg["height_ratio"], (mx.x - mn.x) * 1.05, (mx.y - mn.y) * 1.05)
+    thick = side * cfg.get("thickness", 0.035)
+    hull = result["LOD0"]["Hull"]
+    base = [hull.matrix_world @ v.co for v in hull.data.vertices]
+    base = [p for p in base if p.z < mn.z + height * 0.15] or base
+    cx = (min(p.x for p in base) + max(p.x for p in base)) / 2
+    cy = (min(p.y for p in base) + max(p.y for p in base)) / 2
+    u, v, tone = pick_texel(bc, cfg.get("tone", [0.18, 0.34]))
+
+    lift = Vector((0, 0, thick))
+    for d in result.values():
+        for obj in d.values():
+            obj.matrix_world = Matrix.Translation(lift) @ obj.matrix_world
+    for p in pivots.values():
+        p.z += thick
+
+    for lodname, d in result.items():
+        me = bpy.data.meshes.new(f"pad_{lodname}")
+        bm = bmesh.new()
+        bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=Vector((side, side, thick)), verts=bm.verts)
+        bmesh.ops.translate(bm, vec=Vector((cx, cy, mn.z + thick / 2)), verts=bm.verts)
+        top = [e for e in bm.edges if all(vv.co.z > mn.z + thick * 0.9 for vv in e.verts)]
+        bmesh.ops.bevel(bm, geom=top, offset=thick * 0.6, segments=1, affect="EDGES")
+        uv = bm.loops.layers.uv.new("UVMap")
+        for f in bm.faces:
+            for loop in f.loops:
+                loop[uv].uv = (u, v)
+        bm.to_mesh(me)
+        bm.free()
+        obj = bpy.data.objects.new(f"__Pad_{lodname}", me)
+        bpy.context.scene.collection.objects.link(obj)
+        d["Pad"] = obj
+    print(f"  Sockel {side:.2f} m breit, {thick:.2f} m dick, Ton {tone:.2f} bei UV ({u:.3f}, {v:.3f})")
 
 
 # ---------------------------------------------------------------- Export
@@ -738,16 +811,20 @@ def main():
     for o in lods:
         smooth_normals(o, r.get("smooth_angle", 0), merge)
 
-    tex_paths, stats = {}, {}
+    tex_paths, stats, graded = {}, {}, None
     if r["texture"].get("enabled", True) and not a.no_export:
         os.makedirs(out_dir, exist_ok=True)
-        tex_paths, stats = texture_pass(lods[0], src_tex, r["faction"], r["texture"], out_dir, stem)
+        tex_paths, stats, graded = texture_pass(lods[0], src_tex, r["faction"], r["texture"], out_dir, stem)
         print(f"  Textur: {json.dumps(stats)}")
 
     result, pivots, parents, kinds = split_parts(lods, r, bb)
 
     if r.get("squash"):
         squash(result, pivots, bb, r["squash"])
+    if r.get("pad"):
+        if graded is None:
+            graded = image_np(bpy.data.images.load(src_tex)).copy()
+        add_pad(result, pivots, r["pad"], graded)
 
     if a.preview:
         os.makedirs(a.preview, exist_ok=True)

@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.43.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.44.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3678,6 +3678,37 @@ Felder, weil der Referenzvertrag aus D-061 keine URP-Assembly erlaubt
 (`UrpPostProcessingSetup`). Die Bootstrap-Szene wurde neu erzeugt. Color Grading,
 Vignette und Biom-Overrides bleiben offen.
 
+### D-112 | verbindlich | Asset-Pass 2026-10-17 (Abwehrtürme optisch verkleinert, Footprint bleibt)
+
+**Status:** Inhaberhinweis vom 2026-10-17: Die Abwehrtürme wirken mindestens
+doppelt so groß wie sie sein sollten; gegen einen Menschen eher gleich hoch bis
+doppelt so hoch. Neu erstellen oder skalieren ist freigestellt.
+
+**Kontext:** `UnitViewManager` skaliert jedes Gebäude auf die Breite seines
+Footprints (`SimDefinitions.BuildingFootprintCells = 3`). Ein schlanker Turm wird
+dadurch so breit wie eine Fabrik und rund vier Soldatenhöhen hoch. Der Footprint
+ist ein globaler Wert, an über 15 Stellen in Simulation, KI, Platzierung, UI und
+Match-Fingerprint verwendet und im Code als vorläufig markiert.
+
+**Alternativen:**
+
+1. Nur die Darstellung: Turm verkleinern, Footprint mit einem Sockel füllen.
+2. Footprint für Türme verkleinern (1×1 oder 2×2) — Regeländerung.
+3. Türme neu generieren.
+
+**Entscheidung:** Alternative 1. Der Blender-Pass stellt die Türme auf einen
+flachen Sockel, sodass sie nach der Skalierung 0,7 × Footprint hoch sind (rund
+doppelte Soldatenhöhe). Alternative 2 bleibt ausdrücklich offen.
+
+**Begründung:** Das Problem ist das Größenverhältnis, nicht das Modell; neu
+generieren (3) würde bei unverändertem Footprint wieder auf Fabrikbreite
+skaliert. Alternative 2 ist richtig, wenn Türme auch spielerisch dichter stehen
+sollen, verschiebt aber Platzierung, Wegfindung, KI und die
+Determinismus-Baselines und braucht einen eigenen Regel-PR mit Baseline-Fenster.
+
+**Konsequenzen:** Rezeptfeld `pad` in `tools/art/asset_recipes.json`. Die
+blockierte Fläche ist jetzt sichtbar befestigt statt eine unsichtbare Wand.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3758,6 +3789,7 @@ Vignette und Biom-Overrides bleiben offen.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.44.0 | 2026-10-17 | D-112 aufgenommen: Abwehrtürme optisch auf rund doppelte Soldatenhöhe verkleinert (Sockel füllt den 3×3-Footprint), Footprint-Verkleinerung als Regeländerung offen gelassen | Dennis Westermann / Orchestrator |
 | 1.43.0 | 2026-10-17 | D-111 aufgenommen: Bloom als Grundstack des Pipeline-Assets (fehlende `postProcessData` ergänzt, Kamera-Post-Processing an, Emission mit `RealtimeEmissive`), Sonne auf `Euler(50°, 35°)` von der Kameraseite statt Gegenlicht | Dennis Westermann / Orchestrator |
 | 1.42.0 | 2026-10-17 | D-110 aufgenommen: Blickrichtung über **eine** Abbildung Sim-Kurs → Unity-Gier (`ViewHeading`), Knoten-Vertrag `Body`/`Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*` zwischen Blender-Pass und `UnitRigAnimator`, doppelseitige Art-Materialien, neue Leuchttextur `T_*_EM`; Tripo-Modelle werden aufbereitet statt neu erzeugt | Dennis Westermann / Orchestrator |
 | 1.41.0 | 2026-08-18 | **D-108 in der Prämisse berichtigt und in der Sache neu gefasst.** Die Erstfassung behauptete, der Code lasse bereits jedes Gebäude als Bauanker gelten, und wollte das nur aussprechen — tatsächlich prüft `IsInsideBuildInfluence` seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch beim Umsetzen von Paket 21.1 gefunden und angehalten. Der Inhaber hat daraufhin in Kenntnis der Lage neu entschieden: die Ankerliste wird bewusst geöffnet, **jedes eigene fertiggestellte Gebäude wird Anker**. Damit ist D-108 eine Verhaltensänderung (`RulesHash64`, Baselines, kanonischer KI-Pin), keine Festschreibung. `MinimumBuildingDistanceCells` bleibt bei 2 — die Messung aus 21.1 (15/23/23) weist die gemeldete Enge nicht als Abstandsproblem aus | Dennis Westermann / Orchestrator |

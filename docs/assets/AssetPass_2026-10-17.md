@@ -1,6 +1,6 @@
 # Asset-Pass: Blickrichtung, Teile-Animation, Optik
 
-**Version:** 0.3.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
+**Version:** 0.4.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
 
 ## Zweck
 
@@ -156,7 +156,19 @@ Oberkörper zurück. Die Kadenz folgt der gemessenen Geschwindigkeit, ist aber a
 nimmt den laufenden Soldaten zusätzlich als Bildfolge auf
 (`output/demo/motion_infantry_*.png`).
 
-## 8. Was dieser Pass nicht löst
+## 8. Abwehrtürme: Maßstab (D-112)
+
+Jedes Gebäude wird im Spiel auf die Breite seines 3×3-Footprints skaliert. Ein
+schlanker Turm maß dadurch rund vier Soldatenhöhen. Der Pass stellt die Türme
+jetzt auf einen flachen Betonsockel (`pad` im Rezept), der so breit ist, dass der
+Turm nach der Skalierung 0,7 × Footprint hoch ist — rund 2,1 Einheiten, etwa
+doppelte Soldatenhöhe und so groß wie ein Kampfpanzer. Der Sockel füllt die
+blockierte Fläche, statt sie als unsichtbare Wand stehen zu lassen; seine UVs
+zeigen auf eine ruhige, ungesättigte Stelle der Textur, er braucht kein
+eigenes Material. **Der Footprint selbst bleibt 3×3** — ihn zu verkleinern ist
+eine Regeländerung (siehe Offene Punkte).
+
+## 9. Was dieser Pass nicht löst
 
 - **Die Geometrie bleibt Tripo-Qualität.** Flächen sind knubbelig; Glätten und
   doppelseitiges Rendern kaschieren, sie reparieren nicht. Eine
@@ -178,6 +190,11 @@ nimmt den laufenden Soldaten zusätzlich als Bildfolge auf
 
 ## Offene Punkte
 
+- **Footprint der Abwehrtürme** (Inhaberentscheidung): `BuildingFootprintCells = 3`
+  gilt global und ist im Code als vorläufig markiert. Ein 1×1- oder 2×2-Footprint
+  nur für Türme berührt Platzierung, Wegfindung, KI und den Match-Fingerprint und
+  verschiebt die Determinismus-Baselines; er bräuchte einen eigenen Regel-PR.
+
 - Neugenerierung von Legion-Kraftwerk und Legion-Forschungslabor (Kosten pro
   Generierung, Inhaberentscheidung).
 - Spielerische Abnahme in einer gespielten Runde steht aus; dieser Pass ist
@@ -192,3 +209,4 @@ nimmt den laufenden Soldaten zusätzlich als Bildfolge auf
 | 0.1.0 | 2026-10-17 | Erstfassung: Blickrichtungsfehler, Asset-Pass mit Rezepten, Teile-Animation, Prüfwerkzeuge und Grenzen | Technical Art |
 | 0.2.0 | 2026-10-17 | Glow über Bloom, zwei Akzentmasken, Sonne auf der Kameraseite, Radar gestaucht, Showcase in Spielgröße (D-111) | Technical Art |
 | 0.3.0 | 2026-10-17 | Infanterie-Gang mit starren Ober- und Unterschenkeln, Knoten `Leg_*`/`Shin_*` | Technical Art |
+| 0.4.0 | 2026-10-17 | Abwehrtürme auf Sockel verkleinert, Footprint-Frage als offener Punkt (D-112) | Technical Art |
