@@ -915,7 +915,8 @@ namespace Nova.Simulation.Construction
                 // still carry the Builder role and still belong to the site
                 // owner (P2-2 defense-in-depth against tampered snapshots and
                 // stale assignments); a dead, role-changed or foreign builder
-                // is replaced by the lowest-index own Builder.
+                // is replaced by the lowest-index own Builder; an out-of-reach
+                // bound builder yields to the lowest-index own Builder in reach.
                 if (site.AssignedBuilderRaw != 0)
                 {
                     EntityId assignedId = UnitCommandStateView.ToEntityId(site.AssignedBuilderRaw);
@@ -935,7 +936,16 @@ namespace Nova.Simulation.Construction
 
                 EntityId builderId = UnitCommandStateView.ToEntityId(site.AssignedBuilderRaw);
                 ref readonly UnitState builder = ref _entityManager.GetUnitRef(builderId);
-                if (!IsInReachOfFootprint(in builder, site.OriginX, site.OriginY)) continue; // held, not dropped
+                if (!IsInReachOfFootprint(in builder, site.OriginX, site.OriginY))
+                {
+                    // The bound builder is away: hand the site to the lowest-
+                    // index own Builder that stands in reach (a second Builder
+                    // next to the site must be able to build it). Nobody in
+                    // reach: held, not dropped.
+                    uint inReach = FindLowestIndexBuilderInReach(siteUnit.PlayerId, site.OriginX, site.OriginY);
+                    if (inReach == 0) continue;
+                    site.AssignedBuilderRaw = inReach;
+                }
 
                 ref readonly PlayerEconomyState eco = ref _economy.GetPlayerEconomy(siteUnit.PlayerId);
                 site.ProgressRaw += eco.ProductionSpeedMultiplierQ16.RawValue;
@@ -1433,6 +1443,23 @@ namespace Nova.Simulation.Construction
             {
                 ref readonly UnitState unit = ref units[i];
                 if (unit.IsActive && unit.Role == UnitRole.Builder && unit.PlayerId == playerSlot)
+                {
+                    return UnitCommandStateView.ToRawEntityId(unit.Id);
+                }
+            }
+            return 0;
+        }
+
+        /// <summary>Lowest-index living own Builder inside the reach of a footprint, or 0 (ascending-index scan, deterministic).</summary>
+        private uint FindLowestIndexBuilderInReach(byte playerSlot, int originX, int originY)
+        {
+            UnitState[] units = _entityManager.RawUnits;
+            int capacity = _entityManager.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (unit.IsActive && unit.Role == UnitRole.Builder && unit.PlayerId == playerSlot
+                    && IsInReachOfFootprint(in unit, originX, originY))
                 {
                     return UnitCommandStateView.ToRawEntityId(unit.Id);
                 }

@@ -626,6 +626,26 @@ namespace Nova.SimRunner.Tests
         }
 
         [Test]
+        public void SiteProgress_SecondBuilderInReach_TakesOverFromFarLowIndexBuilder()
+        {
+            var f = new Fixture();
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 3, 30, 20).IsValid, Is.True, "HQ prerequisite");
+            Assert.That(f.Construction.PlaceCompletedBuilding(0, 5, 26, 20).IsValid, Is.True, "power provider");
+            EntityId far = f.SpawnBuilder(0, 60, 60);   // lowest index, far away
+            EntityId near = f.SpawnBuilder(0, 19, 20);  // higher index, adjacent to the site
+            f.Step(1);
+            Assert.That(f.Construction.TryPlaceBuilding(0, 7, 20, 20), Is.True);
+
+            f.Step(10);
+            Assert.That(f.Construction.TryGetSite(UnitCommandStateView.ToRawEntityId(SiteEntity(f)), out _, out int progressRaw, out uint assigned),
+                Is.True);
+            Assert.That(progressRaw, Is.GreaterThan(0), "the adjacent second Builder builds the site");
+            Assert.That(assigned, Is.EqualTo(UnitCommandStateView.ToRawEntityId(near)),
+                "the site is reassigned to the in-reach Builder");
+            Assert.That(assigned, Is.Not.EqualTo(UnitCommandStateView.ToRawEntityId(far)));
+        }
+
+        [Test]
         public void SiteProgress_LowPower_ExactlyHalvesProgress()
         {
             var f = new Fixture();
