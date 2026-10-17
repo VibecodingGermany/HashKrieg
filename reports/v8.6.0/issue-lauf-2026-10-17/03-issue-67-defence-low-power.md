@@ -73,3 +73,7 @@ PR-Beschreibung:
 - **Tests:** `dotnet test` 782/782 (778 + 4 neue), Negativkontrolle (Gate aus -> 3 von 4 neuen Tests rot), `check_docs.py` OK, `check_baseline_guard.py --self-test` OK. Kein Pin, keine Baseline bewegt, `RulesHash64` unverändert (Hash-Lücke wie #108, siehe D-122).
 - **Unity-Spuren:** nicht gelaufen — EditMode-Spiegel `CombatSystemTests` (4 neue Tests), `ResourceBarPresenterTests`, `CommandCardPresenterTests`; Unity-Kompilierung der geänderten Presenter.
 - **Spielabnahme:** nicht gespielt. Grund: Lauf headless im Issue-Lauf. Ersatznachweis: vier Sim-Tests mit Negativkontrolle. Restrisiko: Balance (Kraftwerksausfall schaltet nun die gesamte Verteidigung ab), Spielerfalle durch nicht reservierte Baustellen, HUD-Textbreite unter Unity ungeprüft (die Leiste misst die Breite zur Laufzeit).
+
+## Unity-Spuren nachgefahren (Integrator, 2026-10-17)
+
+Nach dem Commit mit `tools/unity-tests/run_unity_tests.py` (Branch #110) auf diesem Worktree, Unity 6000.5.4f1, warme Library: **EditMode 667/667, PlayMode 15/15**, keine Fehlschläge, keine Compile-Fehler, Arbeitsbaum danach sauber. Die Zeile „Unity-Spuren: nicht gelaufen“ oben ist damit überholt; der PR-Text nennt die gemessenen Zahlen.
