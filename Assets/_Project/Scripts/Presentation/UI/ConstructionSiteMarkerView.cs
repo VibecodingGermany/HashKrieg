@@ -46,12 +46,30 @@ namespace Nova.Presentation.UI
         {
             public Vector3 Center;
             public bool Paused;
+            public float Progress01;
         }
 
+        private struct SiteRig
+        {
+            public GameObject Root;
+            public Renderer GroundRenderer;
+            public Transform GantryRing;
+            public Transform CoreBlock;
+            public Renderer[] ScaffoldRenderers;
+        }
+
+        private static readonly Vector2[] CornerOffsets =
+        {
+            new Vector2(-1.32f, -1.32f),
+            new Vector2( 1.32f, -1.32f),
+            new Vector2( 1.32f,  1.32f),
+            new Vector2(-1.32f,  1.32f),
+        };
+
         private readonly List<SiteVisual> _sites = new List<SiteVisual>(8);
-        private readonly List<GameObject> _pool = new List<GameObject>(8);
-        private readonly List<Renderer> _renderers = new List<Renderer>(8);
+        private readonly List<SiteRig> _pool = new List<SiteRig>(8);
         private MaterialPropertyBlock _tintBlock;
+        private Material _scaffoldMaterial;
 
         private void Awake()
         {
@@ -70,17 +88,38 @@ namespace Nova.Presentation.UI
 
             for (int i = 0; i < _pool.Count; i++)
             {
+                SiteRig rig = _pool[i];
                 bool used = i < _sites.Count;
-                if (_pool[i].activeSelf != used) _pool[i].SetActive(used);
+                if (rig.Root.activeSelf != used) rig.Root.SetActive(used);
                 if (!used) continue;
 
-                _pool[i].transform.position = _sites[i].Center;
-                Color color = _sites[i].Paused
+                SiteVisual site = _sites[i];
+                rig.Root.transform.position = site.Center;
+
+                float progress = Mathf.Clamp01(site.Progress01);
+                float gantryY = Mathf.Lerp(0.28f, 1.52f, progress);
+                rig.GantryRing.localPosition = new Vector3(0f, gantryY, 0f);
+
+                float coreHeight = Mathf.Lerp(0.18f, 1.40f, progress);
+                rig.CoreBlock.localPosition = new Vector3(0f, 0.22f + coreHeight * 0.5f, 0f);
+                rig.CoreBlock.localScale = new Vector3(1.90f, coreHeight, 1.90f);
+
+                Color color = site.Paused
                     ? new Color(_pausedColor.r, _pausedColor.g, _pausedColor.b, pulse)
                     : _buildingColor;
                 _tintBlock.Clear();
                 FactionTint.ApplyToPropertyBlock(_tintBlock, color);
-                _renderers[i].SetPropertyBlock(_tintBlock);
+                rig.GroundRenderer.SetPropertyBlock(_tintBlock);
+
+                Color scaffoldColor = site.Paused
+                    ? new Color(_pausedColor.r, _pausedColor.g, _pausedColor.b, Mathf.Clamp01(pulse * 0.85f))
+                    : new Color(_buildingColor.r, _buildingColor.g, _buildingColor.b, 0.72f);
+                _tintBlock.Clear();
+                FactionTint.ApplyToPropertyBlock(_tintBlock, scaffoldColor);
+                for (int r = 0; r < rig.ScaffoldRenderers.Length; r++)
+                {
+                    rig.ScaffoldRenderers[r].SetPropertyBlock(_tintBlock);
+                }
             }
         }
 
@@ -108,7 +147,7 @@ namespace Nova.Presentation.UI
                 if (!unit.IsActive || unit.PlayerId != slot) continue;
                 uint raw = UnitCommandStateView.ToRawEntityId(unit.Id);
                 if (raw == 0) continue;
-                if (!construction.TryGetSite(raw, out _, out _, out uint assignedBuilderRaw)) continue;
+                if (!construction.TryGetSite(raw, out ushort siteDefId, out int siteProgressRaw, out uint assignedBuilderRaw)) continue;
 
                 bool paused = true;
                 if (assignedBuilderRaw != 0
@@ -121,12 +160,19 @@ namespace Nova.Presentation.UI
                         originX, originY, SimDefinitions.BuildingFootprintCells);
                 }
 
+                float progress01 = 0f;
+                if (SimDefinitions.TryGetBuilding(siteDefId, out SimBuildingDefinition def))
+                {
+                    progress01 = Mathf.Clamp01(ConstructionSiteStatus.Progress01(siteProgressRaw, def.BuildTicks));
+                }
+
                 // Presentation boundary: SimFixed -> float happens here.
                 _sites.Add(new SiteVisual
                 {
                     Center = new Vector3(
                         unit.Transform.PositionX.ToFloat(), _markerHeight, unit.Transform.PositionY.ToFloat()),
-                    Paused = paused
+                    Paused = paused,
+                    Progress01 = progress01
                 });
             }
         }
@@ -137,27 +183,100 @@ namespace Nova.Presentation.UI
             return Mathf.Max(0, Mathf.FloorToInt(simCoordinate.ToFloat()));
         }
 
-        /// <summary>Grows the quad pool to <paramref name="count"/>; surplus quads stay pooled (deactivated by LateUpdate).</summary>
+        private Material EnsureScaffoldMaterial()
+        {
+            if (_scaffoldMaterial != null) return _scaffoldMaterial;
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            _scaffoldMaterial = new Material(shader)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            return _scaffoldMaterial;
+        }
+
+        /// <summary>Grows the site-rig pool to <paramref name="count"/>; surplus rigs stay pooled (deactivated by LateUpdate).</summary>
         private void EnsurePool(int count)
         {
+            Material scaffoldMat = EnsureScaffoldMaterial();
             while (_pool.Count < count)
             {
-                GameObject quad = GroundMarkerVisuals.CreateFlatQuad($"SiteMarker_{_pool.Count}", transform);
+                var root = new GameObject($"SiteMarker_{_pool.Count}");
+                root.transform.SetParent(transform, false);
+
+                GameObject quad = GroundMarkerVisuals.CreateFlatQuad("GroundFrame", root.transform);
+                quad.transform.localPosition = Vector3.zero;
                 quad.transform.localScale = new Vector3(
                     SimDefinitions.BuildingFootprintCells, SimDefinitions.BuildingFootprintCells, 1f);
-                _pool.Add(quad);
-                _renderers.Add(quad.GetComponent<MeshRenderer>());
+
+                var scaffoldRenderers = new List<Renderer>(9);
+                const float postHeight = 1.62f;
+                for (int c = 0; c < CornerOffsets.Length; c++)
+                {
+                    GameObject post = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    post.name = $"CornerPylon_{c}";
+                    Destroy(post.GetComponent<Collider>());
+                    post.transform.SetParent(root.transform, false);
+                    post.transform.localPosition = new Vector3(CornerOffsets[c].x, postHeight * 0.5f, CornerOffsets[c].y);
+                    post.transform.localScale = new Vector3(0.11f, postHeight, 0.11f);
+                    var r = post.GetComponent<Renderer>();
+                    r.sharedMaterial = scaffoldMat;
+                    scaffoldRenderers.Add(r);
+                }
+
+                var gantry = new GameObject("GantryRing");
+                gantry.transform.SetParent(root.transform, false);
+                CreateGantryBeam(gantry.transform, "BeamN", new Vector3(0f, 0f, 1.32f), new Vector3(2.74f, 0.07f, 0.07f), scaffoldMat, scaffoldRenderers);
+                CreateGantryBeam(gantry.transform, "BeamS", new Vector3(0f, 0f, -1.32f), new Vector3(2.74f, 0.07f, 0.07f), scaffoldMat, scaffoldRenderers);
+                CreateGantryBeam(gantry.transform, "BeamE", new Vector3(1.32f, 0f, 0f), new Vector3(0.07f, 0.07f, 2.74f), scaffoldMat, scaffoldRenderers);
+                CreateGantryBeam(gantry.transform, "BeamW", new Vector3(-1.32f, 0f, 0f), new Vector3(0.07f, 0.07f, 2.74f), scaffoldMat, scaffoldRenderers);
+
+                GameObject core = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                core.name = "RisingCore";
+                Destroy(core.GetComponent<Collider>());
+                core.transform.SetParent(root.transform, false);
+                var coreRenderer = core.GetComponent<Renderer>();
+                coreRenderer.sharedMaterial = scaffoldMat;
+                scaffoldRenderers.Add(coreRenderer);
+
+                _pool.Add(new SiteRig
+                {
+                    Root = root,
+                    GroundRenderer = quad.GetComponent<MeshRenderer>(),
+                    GantryRing = gantry.transform,
+                    CoreBlock = core.transform,
+                    ScaffoldRenderers = scaffoldRenderers.ToArray()
+                });
             }
+        }
+
+        private static void CreateGantryBeam(
+            Transform parent, string name, Vector3 localPos, Vector3 localScale,
+            Material material, List<Renderer> renderers)
+        {
+            GameObject beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            beam.name = name;
+            Destroy(beam.GetComponent<Collider>());
+            beam.transform.SetParent(parent, false);
+            beam.transform.localPosition = localPos;
+            beam.transform.localScale = localScale;
+            var renderer = beam.GetComponent<Renderer>();
+            renderer.sharedMaterial = material;
+            renderers.Add(renderer);
         }
 
         private void OnDestroy()
         {
             for (int i = 0; i < _pool.Count; i++)
             {
-                if (_pool[i] != null) Destroy(_pool[i]);
+                if (_pool[i].Root != null) Destroy(_pool[i].Root);
             }
             _pool.Clear();
-            _renderers.Clear();
+            if (_scaffoldMaterial != null)
+            {
+                Destroy(_scaffoldMaterial);
+                _scaffoldMaterial = null;
+            }
             GroundMarkerVisuals.DestroyShared();
         }
     }

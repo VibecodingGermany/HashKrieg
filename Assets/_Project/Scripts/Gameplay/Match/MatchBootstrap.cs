@@ -367,6 +367,13 @@ namespace Nova.Gameplay.Match
         /// <summary>Entity handle of the opponent HQ.</summary>
         public EntityId EnemyHq => _hq[ConfiguredEnemySlot];
 
+        /// <summary>
+        /// Chosen faction for local single-player skirmish matches (slot 0);
+        /// slot 1 (AI) receives the opposite faction. Defaults to Alliance so
+        /// existing callers of <see cref="StartGrayboxMatch()"/> stay unchanged.
+        /// </summary>
+        public FactionId LocalSkirmishFaction { get; set; } = FactionId.Alliance;
+
         /// <summary>Entity handle of the human Builder (spawned at 13, 7 — the D-077 opening's only unit).</summary>
         public EntityId LocalBuilder => _builder[ConfiguredLocalSlot];
 
@@ -495,6 +502,7 @@ namespace Nova.Gameplay.Match
             MatchConfig local = MatchConfig.LocalVsAi(
                 _seed, _mapWidth, _mapHeight, _entityCapacity,
                 Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
+            ApplyLocalSkirmishFaction(local);
 
             string relayHost = Environment.GetEnvironmentVariable("NOVA_RELAY_HOST");
             if (string.IsNullOrWhiteSpace(relayHost))
@@ -865,6 +873,7 @@ namespace Nova.Gameplay.Match
                 : MatchConfig.LocalVsAi(
                     _seed, _mapWidth, _mapHeight, _entityCapacity,
                     Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
+            ApplyLocalSkirmishFaction(restartConfig);
             if (Runner != null && Runner.IsRunning)
             {
                 Runner.PauseMatch();
@@ -873,6 +882,18 @@ namespace Nova.Gameplay.Match
             _activeConfig = null;
             StartGrayboxMatch(restartConfig);
             return IsMatchReady;
+        }
+
+        private void ApplyLocalSkirmishFaction(MatchConfig config)
+        {
+            if (config == null || config.IsNetworkMatch || config.FactionPerSlot == null || config.FactionPerSlot.Length < 2)
+            {
+                return;
+            }
+            FactionId humanFaction = LocalSkirmishFaction == FactionId.Legion ? FactionId.Legion : FactionId.Alliance;
+            FactionId aiFaction = humanFaction == FactionId.Legion ? FactionId.Alliance : FactionId.Legion;
+            config.FactionPerSlot[LocalSlot] = humanFaction;
+            config.FactionPerSlot[EnemySlot] = aiFaction;
         }
 
         private static bool Contains(byte[] slots, byte slot)

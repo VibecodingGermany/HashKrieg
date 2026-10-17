@@ -648,6 +648,14 @@ namespace Nova.Presentation.UI
             GUILayout.BeginVertical(HudChrome.PanelStyle);
 
             GUILayout.Label(model.Title, _titleStyle, GUILayout.Height(TitleHeight));
+            if (Event.current.type == EventType.Repaint)
+            {
+                Rect titleRect = GUILayoutUtility.GetLastRect();
+                Color prev = GUI.color;
+                GUI.color = new Color(0.28f, 0.78f, 0.92f, 0.55f);
+                GUI.DrawTexture(new Rect(titleRect.x, titleRect.yMax - 2f, titleRect.width, 1.5f), HudChrome.Pixel);
+                GUI.color = prev;
+            }
             if (model.BuildingPowerText != null)
             {
                 GUILayout.Label(model.BuildingPowerText, _rowStyle, GUILayout.Height(RowHeight));
@@ -669,6 +677,14 @@ namespace Nova.Presentation.UI
                     AudioServiceLocator.Play2D(SoundEventId.UI_Click);
                     _input.FilterSelectionToRole(row.Role);
                 }
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Rect rowRect = GUILayoutUtility.GetLastRect();
+                    Color prev = GUI.color;
+                    GUI.color = HudChrome.RoleAccentColor(row.Role);
+                    GUI.DrawTexture(new Rect(rowRect.x + 2f, rowRect.y + 3f, 3f, rowRect.height - 6f), HudChrome.Pixel);
+                    GUI.color = prev;
+                }
             }
             if (model.ProgressBar01 >= 0f) DrawProgressBar(model.ProgressBar01);
             if (model.SiteStatusText != null)
@@ -687,6 +703,17 @@ namespace Nova.Presentation.UI
                     Dispatch(button, model);
                 }
                 GUI.enabled = wasEnabled;
+
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Rect btnRect = GUILayoutUtility.GetLastRect();
+                    Color prev = GUI.color;
+                    Color accent = ActionAccentColor(button.Action);
+                    if (!button.Enabled) accent = new Color(accent.r * 0.45f, accent.g * 0.45f, accent.b * 0.45f, 0.45f);
+                    GUI.color = accent;
+                    GUI.DrawTexture(new Rect(btnRect.x + 2f, btnRect.y + 3f, 3f, btnRect.height - 6f), HudChrome.Pixel);
+                    GUI.color = prev;
+                }
             }
 
             if (model.QueueHeader != null)
@@ -818,15 +845,43 @@ namespace Nova.Presentation.UI
         {
             Rect rect = GUILayoutUtility.GetRect(10f, ProgressHeight, GUILayout.ExpandWidth(true));
             Color previousColor = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.color = new Color(0.02f, 0.04f, 0.07f, 0.85f);
             GUI.DrawTexture(rect, HudChrome.Pixel);
+            GUI.color = new Color(0.24f, 0.42f, 0.56f, 0.55f);
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 1f), HudChrome.Pixel);
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), HudChrome.Pixel);
             float fill = Mathf.Clamp01(fraction01);
             if (fill > 0f)
             {
-                GUI.color = new Color(0.35f, 0.9f, 0.45f, 0.9f);
-                GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * fill, rect.height), HudChrome.Pixel);
+                float fillWidth = Mathf.Max(2f, (rect.width - 2f) * fill);
+                GUI.color = new Color(0.22f, 0.86f, 0.62f, 0.92f);
+                GUI.DrawTexture(new Rect(rect.x + 1f, rect.y + 1f, fillWidth, rect.height - 2f), HudChrome.Pixel);
+                GUI.color = new Color(0.65f, 0.98f, 0.90f, 0.95f);
+                GUI.DrawTexture(new Rect(rect.x + fillWidth - 1f, rect.y + 1f, 2f, rect.height - 2f), HudChrome.Pixel);
             }
             GUI.color = previousColor;
+        }
+
+        private static Color ActionAccentColor(CardAction action)
+        {
+            switch (action)
+            {
+                case CardAction.AttackPick:
+                    return new Color(0.96f, 0.34f, 0.28f, 0.95f);
+                case CardAction.HarvestPick:
+                case CardAction.ReturnCargo:
+                case CardAction.QueueUnit:
+                    return new Color(0.22f, 0.86f, 0.94f, 0.95f);
+                case CardAction.RepairPick:
+                case CardAction.RepairBuilding:
+                    return new Color(0.98f, 0.76f, 0.22f, 0.95f);
+                case CardAction.Sell:
+                case CardAction.CancelConstruction:
+                case CardAction.CancelProduction:
+                    return new Color(0.92f, 0.48f, 0.24f, 0.95f);
+                default:
+                    return new Color(0.36f, 0.88f, 0.56f, 0.95f);
+            }
         }
 
         private void AddButton(CardModel model, string label, bool enabled, CardAction action, int payload = 0)
@@ -871,19 +926,43 @@ namespace Nova.Presentation.UI
         {
             if (_titleStyle == null)
             {
-                _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, wordWrap = false };
+                _titleStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 13,
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.94f, 0.98f, 1.00f, 1f) }
+                };
             }
             if (_buttonStyle == null)
             {
-                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 11, wordWrap = true };
+                _buttonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = 11,
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true,
+                    padding = new RectOffset(10, 6, 4, 4)
+                };
+                HudChrome.ApplyButtonChrome(_buttonStyle);
             }
             if (_sectionStyle == null)
             {
-                _sectionStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, wordWrap = false };
+                _sectionStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 11,
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.56f, 0.84f, 0.96f, 1f) }
+                };
             }
             if (_rowStyle == null)
             {
-                _rowStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = false };
+                _rowStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 11,
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.88f, 0.92f, 0.96f, 1f) }
+                };
             }
             if (_selectionRowStyle == null)
             {
@@ -898,25 +977,45 @@ namespace Nova.Presentation.UI
                     fontSize = 11,
                     wordWrap = false,
                     alignment = TextAnchor.MiddleLeft,
+                    padding = new RectOffset(10, 6, 2, 2),
                     margin = new RectOffset(
                         _rowStyle.margin.left, _rowStyle.margin.right,
                         _rowStyle.margin.top, _rowStyle.margin.bottom),
                 };
+                HudChrome.ApplyButtonChrome(_selectionRowStyle);
             }
             if (_siteStatusStyle == null)
             {
                 // Wraps: the no-Builder warning is longer than the panel is
                 // wide and must read in full, never clip (SiteStatusHeight
                 // reserves the two lines it needs).
-                _siteStatusStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Italic, wordWrap = true };
+                _siteStatusStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 11,
+                    fontStyle = FontStyle.Italic,
+                    wordWrap = true,
+                    normal = { textColor = new Color(0.98f, 0.84f, 0.42f, 1f) }
+                };
             }
             if (_cancelStyle == null)
             {
-                _cancelStyle = new GUIStyle(GUI.skin.button) { fontSize = 10 };
+                _cancelStyle = new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = 10,
+                    fontStyle = FontStyle.Bold
+                };
+                HudChrome.ApplyButtonChrome(_cancelStyle);
+                _cancelStyle.normal.textColor = new Color(1.0f, 0.55f, 0.50f, 1f);
             }
             if (_hintStyle == null)
             {
-                _hintStyle = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Italic, wordWrap = false };
+                _hintStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 10,
+                    fontStyle = FontStyle.Italic,
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.68f, 0.78f, 0.88f, 0.92f) }
+                };
             }
         }
 

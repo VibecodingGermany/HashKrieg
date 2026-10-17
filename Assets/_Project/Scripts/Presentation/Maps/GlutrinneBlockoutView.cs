@@ -100,8 +100,26 @@ namespace Nova.Presentation.Maps
 
         private static readonly float[] ClusterHeights =
         {
-            1.10f, 0.65f, 0.80f, 0.55f, 0.70f, 0.50f, 0.60f,
+            1.25f, 0.78f, 0.92f, 0.65f, 0.82f, 0.58f, 0.72f,
         };
+
+        private static readonly float[] ClusterWidths =
+        {
+            0.44f, 0.32f, 0.36f, 0.30f, 0.34f, 0.28f, 0.31f,
+        };
+
+        private static readonly Vector3[] ClusterRotations =
+        {
+            new Vector3(4f, 15f, -3f),
+            new Vector3(14f, 42f, -16f),
+            new Vector3(-16f, 118f, 12f),
+            new Vector3(-18f, 205f, -10f),
+            new Vector3(15f, 255f, 14f),
+            new Vector3(-12f, 310f, -18f),
+            new Vector3(17f, 75f, 9f),
+        };
+
+        private static Mesh _crystalShardMesh;
 
         /// <summary>Reserve readout cadence (21.2): the shard stages follow RemainingAE on the HUD's read rail — the harvester-escort interval of RtsDeviceInput, never a per-frame query.</summary>
         private const float ReserveReadIntervalSeconds = 0.5f;
@@ -412,24 +430,149 @@ namespace Nova.Presentation.Maps
             marker.transform.SetParent(transform, false);
             marker.transform.position = new Vector3(cell.x + 0.5f, 0f, cell.y + 0.5f);
 
-            Material crystalMaterial = CreateRuntimeMaterial(_crystalColor);
+            // Mineral socket bed beneath the crystal cluster so shards erupt
+            // from a dark Aetherium ore vein instead of bare flat sand.
+            GameObject bed = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            bed.name = "CrystalBed";
+            bed.transform.SetParent(marker.transform, false);
+            bed.transform.localPosition = new Vector3(0f, 0.03f, 0f);
+            bed.transform.localScale = new Vector3(1.55f, 0.04f, 1.55f);
+            Destroy(bed.GetComponent<Collider>());
+            Color bedColor = Color.Lerp(_rockColor, _crystalColor, 0.22f) * 0.65f;
+            bedColor.a = 1f;
+            bed.GetComponent<Renderer>().sharedMaterial = CreateRuntimeMaterial(bedColor);
+
+            Material crystalMaterial = CreateCrystalMaterial(_crystalColor);
+            Mesh shardMesh = GetOrCreateCrystalShardMesh();
             var shards = new GameObject[ClusterOffsets.Length];
             for (int i = 0; i < ClusterOffsets.Length; i++)
             {
                 float height = ClusterHeights[i];
-                GameObject shard = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                shard.name = $"Crystal_{i}";
+                float width = ClusterWidths[i];
+                var shard = new GameObject($"Crystal_{i}");
                 shard.transform.SetParent(marker.transform, false);
-                shard.transform.localPosition = new Vector3(ClusterOffsets[i].x, height * 0.5f, ClusterOffsets[i].y);
-                shard.transform.localRotation = Quaternion.Euler(0f, 25f * i, 0f);
-                shard.transform.localScale = new Vector3(0.35f, height, 0.35f);
+                shard.transform.localPosition = new Vector3(ClusterOffsets[i].x, height * 0.46f, ClusterOffsets[i].y);
+                shard.transform.localRotation = Quaternion.Euler(ClusterRotations[i]);
+                shard.transform.localScale = new Vector3(width, height, width);
 
-                // Pure marker: no collider, so nothing can ever pick or block a crystal.
-                Destroy(shard.GetComponent<Collider>());
-                shard.GetComponent<Renderer>().sharedMaterial = crystalMaterial;
+                MeshFilter meshFilter = shard.AddComponent<MeshFilter>();
+                meshFilter.sharedMesh = shardMesh;
+                MeshRenderer meshRenderer = shard.AddComponent<MeshRenderer>();
+                meshRenderer.sharedMaterial = crystalMaterial;
                 shards[i] = shard;
             }
             return shards;
+        }
+
+        private static Material CreateCrystalMaterial(Color color)
+        {
+            Material material = CreateRuntimeMaterial(color);
+            if (material.HasProperty("_Smoothness")) material.SetFloat("_Smoothness", 0.86f);
+            if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0.86f);
+            if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0.20f);
+            if (material.HasProperty("_EmissionColor"))
+            {
+                material.EnableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", color * 0.42f);
+            }
+            return material;
+        }
+
+        /// <summary>
+        /// Procedural flat-shaded hexagonal crystal obelisk spanning y = [-0.5, +0.5]
+        /// with a tapered shaft and a sharp pyramidal apex. Flat-duplicated vertices per
+        /// facet give crisp specular highlights under the directional light.
+        /// </summary>
+        private static Mesh GetOrCreateCrystalShardMesh()
+        {
+            if (_crystalShardMesh != null) return _crystalShardMesh;
+
+            const int sides = 6;
+            const float baseRadius = 0.50f;
+            const float shoulderRadius = 0.36f;
+            const float baseY = -0.50f;
+            const float shoulderY = 0.22f;
+            const float tipY = 0.50f;
+
+            var bottomRing = new Vector3[sides];
+            var shoulderRing = new Vector3[sides];
+            for (int i = 0; i < sides; i++)
+            {
+                float angle = i * Mathf.PI * 2f / sides;
+                // Slight asymmetry on alternating vertices for natural crystal faceting.
+                float radialJitter = (i & 1) == 0 ? 1.0f : 0.86f;
+                float cos = Mathf.Cos(angle) * radialJitter;
+                float sin = Mathf.Sin(angle) * radialJitter;
+                bottomRing[i] = new Vector3(cos * baseRadius, baseY, sin * baseRadius);
+                shoulderRing[i] = new Vector3(cos * shoulderRadius, shoulderY, sin * shoulderRadius);
+            }
+            var tip = new Vector3(0f, tipY, 0f);
+            var bottomCenter = new Vector3(0f, baseY, 0f);
+
+            var vertices = new List<Vector3>(sides * 12);
+            var normals = new List<Vector3>(sides * 12);
+            var triangles = new List<int>(sides * 12);
+
+            for (int i = 0; i < sides; i++)
+            {
+                int next = (i + 1) % sides;
+                // Side quad (two triangles): bottom[i], shoulder[i], shoulder[next], bottom[next]
+                AddFlatQuad(vertices, normals, triangles, bottomRing[i], shoulderRing[i], shoulderRing[next], bottomRing[next]);
+                // Apex triangle: shoulder[i], tip, shoulder[next]
+                AddFlatTriangle(vertices, normals, triangles, shoulderRing[i], tip, shoulderRing[next]);
+                // Base cap triangle: bottom[next], bottomCenter, bottom[i]
+                AddFlatTriangle(vertices, normals, triangles, bottomRing[next], bottomCenter, bottomRing[i]);
+            }
+
+            _crystalShardMesh = new Mesh
+            {
+                name = "ProceduralAetheriumShard",
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            _crystalShardMesh.SetVertices(vertices);
+            _crystalShardMesh.SetNormals(normals);
+            _crystalShardMesh.SetTriangles(triangles, 0);
+            _crystalShardMesh.RecalculateBounds();
+            return _crystalShardMesh;
+        }
+
+        private static void AddFlatTriangle(
+            List<Vector3> vertices, List<Vector3> normals, List<int> triangles,
+            Vector3 a, Vector3 b, Vector3 c)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+            int start = vertices.Count;
+            vertices.Add(a);
+            vertices.Add(b);
+            vertices.Add(c);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            triangles.Add(start);
+            triangles.Add(start + 1);
+            triangles.Add(start + 2);
+        }
+
+        private static void AddFlatQuad(
+            List<Vector3> vertices, List<Vector3> normals, List<int> triangles,
+            Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+            int start = vertices.Count;
+            vertices.Add(a);
+            vertices.Add(b);
+            vertices.Add(c);
+            vertices.Add(d);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            normals.Add(normal);
+            triangles.Add(start);
+            triangles.Add(start + 1);
+            triangles.Add(start + 2);
+            triangles.Add(start);
+            triangles.Add(start + 2);
+            triangles.Add(start + 3);
         }
 
         /// <summary>
@@ -461,8 +604,10 @@ namespace Nova.Presentation.Maps
         private void RestoreShard(GameObject shard, int clusterIndex)
         {
             float height = ClusterHeights[clusterIndex];
-            shard.transform.localPosition = new Vector3(ClusterOffsets[clusterIndex].x, height * 0.5f, ClusterOffsets[clusterIndex].y);
-            shard.transform.localScale = new Vector3(0.35f, height, 0.35f);
+            float width = ClusterWidths[clusterIndex];
+            shard.transform.localPosition = new Vector3(ClusterOffsets[clusterIndex].x, height * 0.46f, ClusterOffsets[clusterIndex].y);
+            shard.transform.localRotation = Quaternion.Euler(ClusterRotations[clusterIndex]);
+            shard.transform.localScale = new Vector3(width, height, width);
             shard.GetComponent<Renderer>().SetPropertyBlock(null);
             shard.SetActive(true);
         }
@@ -476,6 +621,7 @@ namespace Nova.Presentation.Maps
         private void ApplyExhaustedStump(GameObject shard)
         {
             shard.transform.localPosition = new Vector3(ClusterOffsets[0].x, ExhaustedStumpHeight * 0.5f, ClusterOffsets[0].y);
+            shard.transform.localRotation = Quaternion.Euler(0f, ClusterRotations[0].y, 0f);
             shard.transform.localScale = new Vector3(0.45f, ExhaustedStumpHeight, 0.45f);
 
             if (_propertyBlock == null) _propertyBlock = new MaterialPropertyBlock();
@@ -483,6 +629,7 @@ namespace Nova.Presentation.Maps
             Color darkened = _crystalColor * 0.30f;
             darkened.a = 1f;
             FactionTint.ApplyToPropertyBlock(_propertyBlock, darkened);
+            _propertyBlock.SetColor("_EmissionColor", Color.black);
             shard.GetComponent<Renderer>().SetPropertyBlock(_propertyBlock);
             shard.SetActive(true);
         }

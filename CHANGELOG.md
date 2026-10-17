@@ -73,6 +73,29 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **RTS-Gefühl, Steuerung & Audio: Angriffsverfolgung, Kontext-Rechtsklick, dynamische Cursor, 3D-Welt und Sound-Cues (#51).**
+  Schließt die offenen Bedien-, Audio- und Darstellungslücken vollständig ab, ohne in
+  die deterministische Simulationslogik einzugreifen:
+  **(1) Kampf & Steuerung:** Kontextsensitiver Rechtsklick (`DispatchContextRightClick` in `RtsDeviceInput`):
+  Rechtsklick auf sichtbare Feinde löst gezielten Angriff mit Zwei-Intent-Annäherung (`MoveTo` in Waffenreichweite + `Attack`)
+  und Verfolgungsschleife (`UpdateAttackPursuit`) aus; Rechtsklick auf Aetherium-Vorkommen mit Sammlern schickt sie
+  zur Ernte (`ResolveHarvestAt`); Rechtsklick auf beschädigte eigene Gebäude mit Baupionieren repariert;
+  Rechtsklick auf freien Boden bewegt Einheiten oder setzt Sammelpunkte für Produktionsgebäude.
+  Feinde im Fog of War sind nicht blind anklickbar.
+  **(2) Visuelles Feedback & Cursors:** Prozedural generierte taktische 32x32-Hardware-Cursor (`RtsCursorController`)
+  mit dynamischem Hover-Switch (`Default`, `Move`, `Attack`, `Harvest`, `Repair`);
+  farbcodierte, animierte Boden-Klick-Pings (`SelectionMarkerView.SpawnClickFeedback` in Grün, Rot, Cyan, Gelb, Orange);
+  sichtbare Zielringe unter anvisierten Feinden; aufgewertete Lebensbalken (`HealthBarHud`) mit 1px Kontrastrahmen,
+  Glanzkante, breiteren Abmessungen (36px Einheiten / 54px Gebäude) und Sofortanzeige bei Einheiten-Hover.
+  **(3) 3D-Darstellung:** Volle Farberhaltung für texturierte 3D-Modelle (`FactionTint.PrefabBaseColor`);
+  Aetherium-Felder als facettierte, schimmernde 3D-Kristallcluster auf Erzbett (`GlutrinneBlockoutView`);
+  mitwachsende 3D-Gerüstkonstruktion für Baustellen und Hologramm-Vorschau beim Platzieren.
+  **(4) In-Game-Audio & Alarmtöne:** Akustische Signale für fertiggestellte Bauwerke (`PRD_UnitReady`),
+  Basis-unter-Beschuss-Warnung (`UI_Deny` mit 20s Abklingzeit bei Treffern auf eigene Gebäude),
+  Stromausfall-Alarm (`UI_Deny` bei Übergang in Defizit in `ResourceBarHud`), sowie Rundenabschluss-Audio
+  (Siegesfanfare vs. Niederlage-Explosion in `MatchFrameHud`).
+  **(5) In-Game-HUD:** `HudChrome`, `BuildMenuHud`, `CommandCardHud` und `ResourceBarHud` mit taktischen
+  Sci-Fi-Buttons, Rollen-Badges (`[HQ]`, `[RAF]`, `[NRG]` usw.), Hotkey-Pills und Fraktionsauswahl im Hauptmenü.
 - **Fahrzeugfabrik und Kaserne reparieren jetzt passiv, was sie bauen können (#55).**
   Der Wunsch stammt aus dem Betatest vom 09.08.2026 und wurde am 31.08.2026
   erneut vermisst: beschädigte Panzerung war bis hierher faktisch dauerhaft —

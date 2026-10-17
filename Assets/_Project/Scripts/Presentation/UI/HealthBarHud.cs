@@ -36,8 +36,8 @@ namespace Nova.Presentation.UI
         [Tooltip("Whole HUD is scaled by this factor, matching the other cockpit panels.")]
         [SerializeField] private float _uiScale = 1.5f;
         [Tooltip("Bar width in scaled GUI pixels over a unit (buildings get 1.5x).")]
-        [SerializeField] private float _barWidth = 26f;
-        [SerializeField] private float _barHeight = 4f;
+        [SerializeField] private float _barWidth = 36f;
+        [SerializeField] private float _barHeight = 5f;
         [Tooltip("World-space height of the bar above the entity's ground position.")]
         [SerializeField] private float _unitHeightOffset = 1.6f;
         [SerializeField] private float _buildingHeightOffset = 3.4f;
@@ -86,7 +86,8 @@ namespace Nova.Presentation.UI
 
                 bool selected = Contains(_input.Selection.SelectedEntities, id);
                 bool damaged = unit.MaxHealth > 0 && unit.CurrentHealth < unit.MaxHealth;
-                if (!selected && !damaged) continue;
+                bool hovered = _input.HoveredEntity.IsValid && _input.HoveredEntity == id;
+                if (!selected && !damaged && !hovered) continue;
 
                 bool isBuilding = SimDefinitions.IsBuildingRole(unit.Role);
                 var world = new Vector3(
@@ -106,17 +107,38 @@ namespace Nova.Presentation.UI
                     ? Mathf.Clamp01((float)unit.CurrentHealth / unit.MaxHealth)
                     : 0f;
 
-                // Selected-and-undamaged entities get a full green bar (the
-                // marker confirms the selection), damaged ones a green-to-red
-                // ramp. Same ramp the health tint on the bodies uses.
-                GUI.color = new Color(0f, 0f, 0f, 0.7f);
+                // 1. Dark outer border for contrast against terrain
+                GUI.color = new Color(0.04f, 0.06f, 0.08f, 0.88f);
+                GUI.DrawTexture(new Rect(x - 1f, y - 1f, width + 2f, _barHeight + 2f), Pixel);
+
+                // 2. Depleted health background
+                GUI.color = new Color(0.16f, 0.06f, 0.06f, 0.75f);
                 GUI.DrawTexture(new Rect(x, y, width, _barHeight), Pixel);
-                GUI.color = fraction > 0.5f
-                    ? new Color(0.25f, 0.85f, 0.3f, 0.95f)
+
+                // 3. Health fill bar
+                Color fillColor = fraction > 0.5f
+                    ? new Color(0.22f, 0.90f, 0.35f, 0.95f)
                     : fraction > 0.25f
-                        ? new Color(0.9f, 0.75f, 0.2f, 0.95f)
-                        : new Color(0.85f, 0.25f, 0.2f, 0.95f);
+                        ? new Color(1.0f, 0.78f, 0.18f, 0.95f)
+                        : new Color(0.92f, 0.22f, 0.18f, 0.95f);
+                GUI.color = fillColor;
                 GUI.DrawTexture(new Rect(x, y, width * fraction, _barHeight), Pixel);
+
+                // 4. Subtle top gloss highlight
+                GUI.color = new Color(1f, 1f, 1f, 0.30f);
+                GUI.DrawTexture(new Rect(x, y, width * fraction, 1.5f), Pixel);
+
+                // 5. Selection / hover indicator pip
+                if (selected)
+                {
+                    GUI.color = new Color(0.35f, 1f, 0.45f, 0.80f);
+                    GUI.DrawTexture(new Rect(x, y - 2f, width, 1f), Pixel);
+                }
+                else if (hovered)
+                {
+                    GUI.color = new Color(0.25f, 0.85f, 1f, 0.80f);
+                    GUI.DrawTexture(new Rect(x, y - 2f, width, 1f), Pixel);
+                }
             }
 
             GUI.color = previousColor;

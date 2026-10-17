@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Nova.Core;
 using Nova.Data;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.CombatFeedback;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Combat;
@@ -150,6 +151,7 @@ namespace Nova.Gameplay.Match
         private readonly List<DeathViewHold> _deathHolds = new List<DeathViewHold>(16);
         private readonly Dictionary<Material, Material> _transparentMaterialCache = new Dictionary<Material, Material>();
         private MaterialPropertyBlock _propertyBlock;
+        private float _lastBaseUnderAttackTime = -20f;
         // Scratch for the all-renderers tint upload (no per-call allocation).
         private readonly List<Renderer> _tintScratch = new List<Renderer>(8);
         // Shared runtime material for graybox primitives: Unity's primitive
@@ -332,6 +334,20 @@ namespace Nova.Gameplay.Match
                 {
                     BeginDeathHold(feedback.TargetId);
                 }
+
+                if ((feedback.Kind == CombatFeedbackKind.Hit || feedback.Kind == CombatFeedbackKind.Death)
+                    && SimDefinitions.IsBuildingRole(feedback.TargetRole))
+                {
+                    if (entities.TryGetUnit(feedback.TargetId, out UnitState targetBuilding)
+                        && targetBuilding.PlayerId == viewerTeam)
+                    {
+                        if (Time.time >= _lastBaseUnderAttackTime + 20f)
+                        {
+                            _lastBaseUnderAttackTime = Time.time;
+                            AudioServiceLocator.Play2D(SoundEventId.UI_Deny);
+                        }
+                    }
+                }
             }
             _combatEffects?.Present(_combatEvents);
 
@@ -351,8 +367,13 @@ namespace Nova.Gameplay.Match
                 // what promotes the view from the site pad to the finished
                 // building look.
                 bool spawned = false;
-                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != EffectiveViewRole(in unit))
+                UnitRole newEffectiveRole = EffectiveViewRole(in unit);
+                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != newEffectiveRole)
                 {
+                    if (_boundIds[slot] == id && _viewRoles[slot] == UnitRole.Unit && SimDefinitions.IsBuildingRole(newEffectiveRole) && unit.PlayerId == viewerTeam)
+                    {
+                        AudioServiceLocator.Play2D(SoundEventId.PRD_UnitReady);
+                    }
                     ReleaseView(slot);
                     AcquireView(slot, in unit);
                     spawned = true;
@@ -511,7 +532,12 @@ namespace Nova.Gameplay.Match
             }
             else
             {
-                GetRoleShape(EffectiveViewRole(in unit), out PrimitiveType primitive, out Vector3 scale);
+                UnitRole effectiveRole = EffectiveViewRole(in unit);
+                GetRoleShape(effectiveRole, out PrimitiveType primitive, out Vector3 scale);
+                if (effectiveRole == UnitRole.Unit && SimDefinitions.IsBuildingRole(unit.Role))
+                {
+                    scale = new Vector3(2.60f, 0.28f, 2.60f);
+                }
                 shapeKey = (int)primitive;
                 groundOffset = GroundOffset(primitive, scale);
 
@@ -903,6 +929,7 @@ namespace Nova.Gameplay.Match
             _combatDiffer.Reset(_viewInstances != null ? _viewInstances.Length : 0);
             _combatSamples.Clear();
             _combatEvents.Clear();
+            _lastBaseUnderAttackTime = -20f;
             CompleteAllDeathHolds();
             _combatEffects?.ResetEffects();
         }
@@ -950,7 +977,8 @@ namespace Nova.Gameplay.Match
             GameObject instance = _viewInstances[slot];
             if (instance == null) return;
 
-            Color color = TintFor(playerId, healthStep);
+            bool isPrefab = _viewShapeKeys[slot] == PrefabShapeKey;
+            Color color = TintFor(playerId, healthStep, isPrefab);
             _propertyBlock.Clear();
             // Built-in RP reads _Color, URP/HDRP read _BaseColor. Setting both
             // keeps the graybox tinted through the pipeline migration instead
@@ -974,20 +1002,19 @@ namespace Nova.Gameplay.Match
 
         /// <summary>
         /// Owner colour, darkened toward <see cref="_damagedColor"/> by the
-        /// health bucket. A full-health unit returns the owner colour
-        /// unchanged, so undamaged views look exactly as they did before the
-        /// readout existed; <see cref="_healthTintFloor"/> keeps a share of the
-        /// owner hue at the brink so colour never stops answering "whose is
-        /// it?".
+        /// health bucket. Textured 3D prefabs use <see cref="FactionTint.PrefabBaseColor"/>
+        /// so their authored BaseColor maps are not crushed by dark primitive tints.
         /// </summary>
-        private Color TintFor(byte playerId, int healthStep)
+        private Color TintFor(byte playerId, int healthStep, bool isPrefab)
         {
-            Color owner = ColorForOwner(playerId);
+            Color owner = ColorForOwner(playerId, isPrefab);
             if (healthStep >= HealthTintSteps) return owner;
 
             float fraction = (float)healthStep / HealthTintSteps;
-            float blend = Mathf.Lerp(Mathf.Clamp01(_healthTintFloor), 1f, fraction);
-            return Color.Lerp(_damagedColor, owner, blend);
+            float floor = isPrefab ? Mathf.Max(0.42f, Mathf.Clamp01(_healthTintFloor)) : Mathf.Clamp01(_healthTintFloor);
+            float blend = Mathf.Lerp(floor, 1f, fraction);
+            Color damagedTarget = isPrefab ? new Color(0.62f, 0.22f, 0.18f, 1f) : _damagedColor;
+            return Color.Lerp(damagedTarget, owner, blend);
         }
 
         /// <summary>
@@ -1015,14 +1042,15 @@ namespace Nova.Gameplay.Match
         /// (no economy wired, slot outside the declared range) fall back to
         /// <see cref="_unknownPlayerColor"/> instead of throwing.
         /// </summary>
-        private Color ColorForOwner(byte playerId)
+        private Color ColorForOwner(byte playerId, bool isPrefab)
         {
             EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
             if (economy != null && playerId < EconomySystem.MaxPlayers)
             {
-                return FactionTint.BaseColor(economy.GetSlotFaction(playerId));
+                FactionId faction = economy.GetSlotFaction(playerId);
+                return isPrefab ? FactionTint.PrefabBaseColor(faction) : FactionTint.BaseColor(faction);
             }
-            return _unknownPlayerColor;
+            return isPrefab ? Color.white : _unknownPlayerColor;
         }
 
         /// <summary>
