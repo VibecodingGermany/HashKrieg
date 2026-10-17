@@ -63,7 +63,8 @@ Die rig-lose Sparte ist in einer ersten, schlanken Form gebaut — ohne
 - **`UnitRigAnimator`** (`Nova.Gameplay.Match`) hängt an jeder Art-Ansicht und
   bewegt die vom Blender-Pass benannten Knoten: `Body` (Federung, bei Infanterie
   Schritt-Wippen), `Turret` (Gier zum sichtbaren Angriffsziel, gedeckelte Rate),
-  `Gun` (Rückstoß), `Wheel_*`, `Arm_*`, `Spin_*`, `Scan_*`; Gebäude pulsieren über
+  `Gun` (Rückstoß), `Wheel_*`, `Arm_*`, `Spin_*`, `Scan_*`, `Leg_*`/`Shin_*`
+  (Infanterie-Gang mit starren Gliedern); Gebäude pulsieren über
   ihre Emission, schneller beim Produzieren. Knoten-Vertrag und Werkzeuge:
   [../assets/AssetPass_2026-10-17.md](../assets/AssetPass_2026-10-17.md).
 - **Eingaben** kommen aus `UnitViewManager` und sind reine View-Daten: gemessene
@@ -72,8 +73,8 @@ Die rig-lose Sparte ist in einer ersten, schlanken Form gebaut — ohne
   `VisibleCombatFrameDiffer`, Arbeitszustand aus Ernte, Baustellen-Zuweisung und
   eigener Produktionsschlange.
 - **Abweichung von diesem Entwurf:** Die Turmrate ist ein View-Wert, nicht aus
-  der Sim gespiegelt — die Sim kennt keinen Turm. Infanterie hat noch kein
-  Mecanim-Rig. Der Emissionspuls schreibt wie die Fraktionstönung über
+  der Sim gespiegelt — die Sim kennt keinen Turm. Infanterie geht über starre
+  Bein-Knoten statt über ein Mecanim-Rig. Der Emissionspuls schreibt wie die Fraktionstönung über
   `MaterialPropertyBlock`.
 
 ## Animations-LOD (3 Stufen, Pflicht)

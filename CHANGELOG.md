@@ -73,6 +73,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Infanterie geht.** Die vier Infanteristen haben in Blender abgetrennte Ober-
+  und Unterschenkel (`Leg_*`/`Shin_*`); `UnitRigAnimator` fährt daraus einen
+  Zwei-Gelenk-Gang mit Hüftsenkung, damit die Füße am Boden bleiben, und einen
+  Rückstoß des Oberkörpers beim Schuss. Die Kadenz folgt der Geschwindigkeit,
+  gedeckelt auf 3,2 Schritte/s, weil die verkleinerten Soldaten sonst zappeln.
+  Starre Glieder, kein Skelett; per Kamera im laufenden Spiel geprüft, **nicht
+  gespielt**
 - **Glow und Licht von der Kameraseite (D-111).** Leuchtakzente der Art blühen
   jetzt über URP-Bloom: Das Projekt renderte bisher ganz ohne Post-Processing,
   weil dem Renderer die `postProcessData` fehlte; dazu kamen ein Bloom-Profil als

@@ -121,7 +121,7 @@ Submesh-/Objektnamen mit Suffix `_LOD0` / `_LOD1` / `_LOD2`, z. B.
 im selben FBX-Export. Der Root-Dateiname trägt kein LOD-Suffix.
 
 **Animierbare Assets (D-110)** tragen statt dreier flacher Objekte eine
-Knoten-Hierarchie (`Root` → `Body` → `Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*`);
+Knoten-Hierarchie (`Root` → `Body` → `Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*`/`Leg_*` → `Shin_*`);
 jedes Teil liegt je LOD-Stufe als eigenes Objekt mit Suffix `_LOD0..2` darunter.
 Der Prefab-Bau sammelt alle Renderer einer Stufe in deren `LODGroup`-Eintrag.
 Vertrag und Werkzeuge: [AssetPass_2026-10-17.md](AssetPass_2026-10-17.md).

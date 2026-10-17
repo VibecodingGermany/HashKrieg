@@ -162,7 +162,7 @@ gelisteten Kernverträge.
   Paket ausserhalb des Repos liegen, Inhalt und Installationsablauf
 - [AssetImport_Tripo_2026-08-06](assets/AssetImport_Tripo_2026-08-06.md) –
   Importprotokoll der 34 Tripo-Assets (GLB → FBX, LODs, Texturen)
-- [AssetPass_2026-10-17](assets/AssetPass_2026-10-17.md) (0.2.0, Entwurf) –
+- [AssetPass_2026-10-17](assets/AssetPass_2026-10-17.md) (0.3.0, Entwurf) –
   Blickrichtung, Teile-Animation und Optik der 34 Tripo-Assets, Werkzeuge und Grenzen
 - [VerticalSlice_MS1](assets/VerticalSlice_MS1.md) (0.2.0, Entwurf) –
   Vertical-Slice-Spezifikation der vier Erst-Assets

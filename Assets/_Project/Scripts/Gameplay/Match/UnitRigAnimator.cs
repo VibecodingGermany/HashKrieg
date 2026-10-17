@@ -44,6 +44,9 @@ namespace Nova.Gameplay.Match
     /// <item><c>Spin_*</c> — turn continuously (radar dishes, rotors).</item>
     /// <item><c>Scan_*</c> — sweep back and forth (dishes mounted off-axis).</item>
     /// <item><c>Arm_*</c> — swing while the unit works.</item>
+    /// <item><c>Leg_*</c> / <c>Shin_*</c> — rigid thighs and shins of infantry:
+    /// a two-joint walk cycle whose cadence follows the measured speed, so feet
+    /// do not slide; <c>_R</c> runs half a cycle behind <c>_L</c>.</item>
     /// </list>
     /// <para>
     /// Axes are measured once in each node's parent space from the root's
@@ -62,6 +65,22 @@ namespace Nova.Gameplay.Match
         public const string SpinPrefix = "Spin_";
         public const string ArmPrefix = "Arm_";
         public const string ScanPrefix = "Scan_";
+        public const string LegPrefix = "Leg_";
+        public const string ShinPrefix = "Shin_";
+
+        /// <summary>Thigh swing to either side of vertical, in degrees.</summary>
+        private const float ThighSwing = 25f;
+
+        /// <summary>Knee bend at the height of the swing phase, in degrees.</summary>
+        private const float KneeBend = 35f;
+
+        /// <summary>
+        /// Cadence ceiling. Views are scaled to their graybox size while the
+        /// sim moves infantry 4 cells/s — about 1 m of soldier sprinting
+        /// 4 m/s. A slide-free cadence would be ~9 steps/s and read as
+        /// twitching; above this rate the feet slide a little instead.
+        /// </summary>
+        private const float MaxStepsPerSecond = 3.2f;
 
         [SerializeField] private float _turretTurnRate = 140f;
         [SerializeField] private float _spinRate = 55f;
@@ -98,6 +117,11 @@ namespace Nova.Gameplay.Match
         private readonly List<Node> _spins = new List<Node>(2);
         private readonly List<Node> _arms = new List<Node>(2);
         private readonly List<Node> _scans = new List<Node>(1);
+        private readonly List<Node> _legs = new List<Node>(2);
+        private readonly List<Node> _shins = new List<Node>(2);
+        private float _hipHeight;     // root-local units, from the Leg_ pivots
+        private float _gaitPhase;
+        private float _fireKick;
 
         private Renderer[] _glowRenderers = System.Array.Empty<Renderer>();
         private Color[] _glowBase = System.Array.Empty<Color>();
@@ -153,6 +177,10 @@ namespace Nova.Gameplay.Match
             for (int i = 0; i < _spins.Count; i++) Restore(_spins[i], true);
             for (int i = 0; i < _arms.Count; i++) Restore(_arms[i], true);
             for (int i = 0; i < _scans.Count; i++) Restore(_scans[i], true);
+            for (int i = 0; i < _legs.Count; i++) Restore(_legs[i], true);
+            for (int i = 0; i < _shins.Count; i++) Restore(_shins[i], true);
+            _gaitPhase = 0f;
+            _fireKick = 0f;
         }
 
         /// <summary>Advances every animated node by one rendered frame.</summary>
@@ -254,14 +282,27 @@ namespace Nova.Gameplay.Match
             Vector3 offset = Vector3.zero;
             float pitchTarget, rollTarget;
 
-            if (_infantryGait)
+            if (input.Fired) _fireKick = 1f;
+            _fireKick = Mathf.MoveTowards(_fireKick, 0f, dt * 5f);
+
+            if (_legs.Count > 0)
             {
-                // Two steps per ~1.4 m: a vertical bob at step rate, a sway at
-                // stride rate and a slight forward lean while moving.
+                TickLegs(speed, dt);
+                // Rigid legs get shorter as they spread (cos of the swing); the
+                // hips drop by exactly that, so the feet stay on the ground.
+                float spread = Mathf.Abs(Mathf.Sin(_gaitPhase)) * ThighSwing * _moveBlend;
+                offset = -_body.Up * (_hipHeight * (1f - Mathf.Cos(spread * Mathf.Deg2Rad)));
+                pitchTarget = 5f * _moveBlend - 6f * _fireKick;
+                rollTarget = Mathf.Sin(_gaitPhase) * 3f * _moveBlend;
+            }
+            else if (_infantryGait)
+            {
+                // No leg nodes: a vertical bob at step rate, a sway at stride
+                // rate and a slight forward lean while moving.
                 _bobPhase += speed * dt / 0.7f * Mathf.PI;
                 float bob = Mathf.Abs(Mathf.Sin(_bobPhase)) * 0.06f * _size * _moveBlend;
                 offset = _body.Up * bob;
-                pitchTarget = 6f * _moveBlend;
+                pitchTarget = 6f * _moveBlend - 6f * _fireKick;
                 rollTarget = Mathf.Sin(_bobPhase) * 4f * _moveBlend;
             }
             else
@@ -283,6 +324,34 @@ namespace Nova.Gameplay.Match
             _body.T.localRotation = Quaternion.AngleAxis(_pitch, _body.Right)
                                     * Quaternion.AngleAxis(_roll, _body.Forward)
                                     * _body.RestRot;
+        }
+
+        /// <summary>
+        /// Walk cycle: half a cycle per step, one step per ~0.85 hip heights
+        /// of ground covered (capped at <see cref="MaxStepsPerSecond"/>). Thighs swing about the hip (negative angle =
+        /// foot forward), the knee folds while the leg swings forward
+        /// (cos &gt; 0) and straightens for the stance.
+        /// </summary>
+        private void TickLegs(float speed, float dt)
+        {
+            float rootScale = Mathf.Max(1e-4f, transform.lossyScale.y);
+            float stride = Mathf.Max(0.05f, _hipHeight * rootScale * 0.85f);
+            float stepsPerSecond = Mathf.Min(speed / stride, MaxStepsPerSecond);
+            _gaitPhase = Mathf.Repeat(_gaitPhase + stepsPerSecond * dt * Mathf.PI, Mathf.PI * 2f);
+            if (_moveBlend <= 0f) _gaitPhase = Mathf.MoveTowards(_gaitPhase, Mathf.Round(_gaitPhase / Mathf.PI) * Mathf.PI, dt * 4f);
+
+            for (int i = 0; i < _legs.Count; i++)
+            {
+                Node leg = _legs[i];
+                float thigh = -Mathf.Sin(_gaitPhase + leg.Phase) * ThighSwing * _moveBlend;
+                leg.T.localRotation = Quaternion.AngleAxis(thigh, leg.Right) * leg.RestRot;
+            }
+            for (int i = 0; i < _shins.Count; i++)
+            {
+                Node shin = _shins[i];
+                float knee = Mathf.Max(0f, Mathf.Cos(_gaitPhase + shin.Phase)) * KneeBend * _moveBlend;
+                shin.T.localRotation = Quaternion.AngleAxis(knee, shin.Right) * shin.RestRot;
+            }
         }
 
         private void TickTurret(in UnitRigInput input, float dt)
@@ -371,6 +440,22 @@ namespace Nova.Gameplay.Match
                     Node s = Capture(t);
                     s.Phase = _spins.Count * 47f;
                     _spins.Add(s);
+                }
+                else if (n.StartsWith(LegPrefix, System.StringComparison.Ordinal)
+                         || n.StartsWith(ShinPrefix, System.StringComparison.Ordinal))
+                {
+                    Node limb = Capture(t);
+                    limb.Phase = n.EndsWith("_R", System.StringComparison.Ordinal) ? Mathf.PI : 0f;
+                    if (n.StartsWith(LegPrefix, System.StringComparison.Ordinal))
+                    {
+                        _legs.Add(limb);
+                        float hip = transform.InverseTransformPoint(t.position).y;
+                        _hipHeight = Mathf.Max(_hipHeight, hip);
+                    }
+                    else
+                    {
+                        _shins.Add(limb);
+                    }
                 }
                 else if (n.StartsWith(ScanPrefix, System.StringComparison.Ordinal))
                 {

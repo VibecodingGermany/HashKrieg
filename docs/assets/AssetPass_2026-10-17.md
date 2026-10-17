@@ -1,6 +1,6 @@
 # Asset-Pass: Blickrichtung, Teile-Animation, Optik
 
-**Version:** 0.2.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
+**Version:** 0.3.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
 
 ## Zweck
 
@@ -87,6 +87,7 @@ Unity -batchmode -projectPath . -executeMethod Nova.Editor.ArtPreviewCapture.Cap
    | `Arm_*` | pendelt beim Arbeiten (Abbauen, Bauen) | Allianz-Sammler, beide Bauer |
    | `Spin_*` | dreht dauernd | Allianz-Radar, Allianz-Raffinerie (Kristall), Allianz-HQ (Antenne) |
    | `Scan_*` | schwenkt hin und her | Legion-Radar |
+   | `Leg_*` / `Shin_*` | Oberschenkel um die Hüfte, Unterschenkel ums Knie: Schrittzyklus | alle vier Infanteristen |
 
    Gebäude „atmen“ zusätzlich über ihre Leuchtakzente und pulsieren schneller,
    solange sie produzieren (nur eigene Gebäude, sonst verriete der Puls fremde
@@ -141,7 +142,21 @@ Elternknotens umgerechnet.
   die Hauptkamera (mit Post-Processing) aus 18, 30 und 42 m Höhe nach
   `output/demo/showcase_*.png`.
 
-## 7. Was dieser Pass nicht löst
+## 7. Infanterie-Gang (dritter Schritt)
+
+Die Beine der vier Infanteristen sind in Blender als starre Glieder abgetrennt
+(Oberschenkel mit Pivot an der Hüfte, Unterschenkel am Knie; die Boxen lassen
+herabhängende Hände und Waffen am Körper). `UnitRigAnimator` fährt daraus einen
+Zwei-Gelenk-Gang: Oberschenkel ±25°, Knie bis 35° in der Schwungphase, rechts
+einen halben Zyklus hinter links; die Hüfte senkt sich genau um die Verkürzung
+der gespreizten Beine, damit die Füße am Boden bleiben, und beim Schuss zuckt der
+Oberkörper zurück. Die Kadenz folgt der gemessenen Geschwindigkeit, ist aber auf
+3,2 Schritte/s gedeckelt: Im Spiel ist ein Soldat rund 1 Einheit groß und läuft
+4 Einheiten/s, rutschfrei wären das etwa 9 Schritte/s. `UnitMotionPresentationTests`
+nimmt den laufenden Soldaten zusätzlich als Bildfolge auf
+(`output/demo/motion_infantry_*.png`).
+
+## 8. Was dieser Pass nicht löst
 
 - **Die Geometrie bleibt Tripo-Qualität.** Flächen sind knubbelig; Glätten und
   doppelseitiges Rendern kaschieren, sie reparieren nicht. Eine
@@ -149,8 +164,10 @@ Elternknotens umgerechnet.
   schwarz. Sie ist deshalb im Rezept abgeschaltet.
 - **Legion-Kraftwerk und Legion-Forschungslabor sind als Panzer generiert**
   (Wanne, Kettenlaufwerk, Turm). Das ist nur durch Neugenerierung zu beheben.
-- **Infanterie hat kein Skelett.** Sie wippt und neigt sich beim Gehen, die Beine
-  bewegen sich nicht. Ein Humanoid-Rig ist ein eigener Schritt.
+- **Infanterie geht mit starren Gliedern, ohne Skelett.** Ober- und Unterschenkel
+  sind abgetrennte Teile; an Hüfte und Knie entstehen beim Schwingen kleine
+  Fugen, Arme und Waffe bleiben starr. Aus RTS-Distanz liest sich das als Gehen;
+  ein Humanoid-Rig mit Gewichtung bleibt ein eigener Schritt.
 - **Ketten laufen nicht.** Die Kettentextur liegt verstreut im Tripo-Atlas, ein
   UV-Scrollen ist nicht möglich.
 - **Leuchtpuls über `MaterialPropertyBlock`.** Wie schon die Fraktionstönung;
@@ -174,3 +191,4 @@ Elternknotens umgerechnet.
 |---|---|---|---|
 | 0.1.0 | 2026-10-17 | Erstfassung: Blickrichtungsfehler, Asset-Pass mit Rezepten, Teile-Animation, Prüfwerkzeuge und Grenzen | Technical Art |
 | 0.2.0 | 2026-10-17 | Glow über Bloom, zwei Akzentmasken, Sonne auf der Kameraseite, Radar gestaucht, Showcase in Spielgröße (D-111) | Technical Art |
+| 0.3.0 | 2026-10-17 | Infanterie-Gang mit starren Ober- und Unterschenkeln, Knoten `Leg_*`/`Shin_*` | Technical Art |

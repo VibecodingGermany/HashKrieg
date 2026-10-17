@@ -105,6 +105,8 @@ namespace Nova.PlayMode.Tests
             }
 
             bool shot = false;
+            int gaitShots = 0;
+            float start = Time.time;
             float until = Time.time + 1.6f;
             while (Time.time < until)
             {
@@ -121,6 +123,16 @@ namespace Nova.PlayMode.Tests
                     float angle = Vector3.Angle(Flat(v.transform.forward), d);
                     if (angle < 25f) aligned[i]++;
                     worst[i] = Mathf.Max(worst[i], angle);
+                }
+
+                // A close strip of the walking soldier (legs are rigged since the
+                // infantry pass): four frames 0.09 s apart.
+                int infantry = System.Array.FindIndex(Plan, p => p.Role == UnitRole.BasicInfantry);
+                if (gaitShots < 4 && Time.time > start + 0.2f + gaitShots * 0.09f
+                    && views.TryGetView(ids[infantry], out GameObject soldier) && soldier != null)
+                {
+                    CaptureRts($"{ShotDir}/motion_infantry_{gaitShots}.png", soldier.transform.position, 3.2f);
+                    gaitShots++;
                 }
 
                 if (!shot && Time.time > until - 0.8f)

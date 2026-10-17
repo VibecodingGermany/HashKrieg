@@ -335,7 +335,101 @@
   },
   "UNIT_Alliance_AntiArmorInfantry": {
     "path": "Units/Alliance/AntiArmorInfantry",
-    "faction": "Alliance"
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.2,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.37,
+          0.68,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          [
+            0.5,
+            0.86,
+            0,
+            1,
+            0,
+            0.47
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.68,
+          0.68,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.2,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.37,
+          0.68,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          [
+            0.5,
+            0.86,
+            0,
+            1,
+            0,
+            0.25
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.68,
+          0.68,
+          0.25
+        ]
+      }
+    ]
   },
   "UNIT_Alliance_Artillery": {
     "parts": [
@@ -365,7 +459,81 @@
   },
   "UNIT_Alliance_BasicInfantry": {
     "path": "Units/Alliance/BasicInfantry",
-    "faction": "Alliance"
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.32,
+          0.72,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          0.5,
+          1,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.71,
+          0.72,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.32,
+          0.72,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          0.5,
+          1,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.71,
+          0.72,
+          0.25
+        ]
+      }
+    ]
   },
   "UNIT_Alliance_BattleTank": {
     "parts": [
@@ -549,7 +717,81 @@
   },
   "UNIT_Legion_AntiArmorInfantry": {
     "path": "Units/Legion/AntiArmorInfantry",
-    "faction": "Legion"
+    "faction": "Legion",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.45
+        ],
+        "pivot": [
+          0.33,
+          0.55,
+          0.45
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          0.5,
+          0.8,
+          0,
+          1,
+          0,
+          0.45
+        ],
+        "pivot": [
+          0.66,
+          0.55,
+          0.45
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.33,
+          0.55,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          0.5,
+          0.8,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.66,
+          0.55,
+          0.25
+        ]
+      }
+    ]
   },
   "UNIT_Legion_Artillery": {
     "parts": [
@@ -587,7 +829,101 @@
   },
   "UNIT_Legion_BasicInfantry": {
     "path": "Units/Legion/BasicInfantry",
-    "faction": "Legion"
+    "faction": "Legion",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.33,
+          0.5,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          [
+            0.5,
+            0.83,
+            0,
+            1,
+            0,
+            0.47
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.67,
+          0.5,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.27
+        ],
+        "pivot": [
+          0.33,
+          0.5,
+          0.27
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          [
+            0.5,
+            0.83,
+            0,
+            1,
+            0,
+            0.27
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.67,
+          0.5,
+          0.27
+        ]
+      }
+    ]
   },
   "UNIT_Legion_BattleTank": {
     "parts": [
