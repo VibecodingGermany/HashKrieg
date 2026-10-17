@@ -18,6 +18,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Entschieden
+- **D-118: Jeder Bauer kann bauen.** Steht der an eine Baustelle gebundene Bauer
+  nicht in Reichweite, übernimmt der eigene Bauer mit dem kleinsten Index, der dort
+  steht. Ersetzt die Nur-kleinster-Index-Regel aus D-085; mit einem Bauer
+  byte-identisch, Fingerprints und KI-Pin bleiben
+- **D-119: Legion-Kraftwerk, -Fabrik, -Labor und -Kaserne prozedural.** Neu
+  modelliert nach neuen Konzeptbildern statt neu generiert; Hunyuan3D wurde
+  erprobt und verworfen, weil dessen Lizenz in der EU nicht gilt
 - **D-108 berichtigt und neu gefasst: jedes eigene Gebäude wird Bauanker.** Die
   Erstfassung vom 2026-08-17 behauptete, der Code lasse *jedes* Gebäude als Anker
   gelten, und wollte diesen Zustand nur aussprechen. Das war falsch:
@@ -73,6 +80,38 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Sammler zeigen ihre Ladung und kippen sie ab.** Auf der Mulde des
+  Legion-Lasters bzw. dem Rücken des Allianz-Roboters wächst mit dem Füllstand
+  eine Erzladung mit leuchtenden Aetherium-Kristallen. An der Raffinerie kippt die
+  Mulde nach hinten (Roboter: lehnt sich zurück), die Ladung rutscht unter
+  leuchtendem Staub heraus, danach fährt der Sammler weiter; der eigene Sammler
+  wartet dafür kurz an der Raffinerie. Beim Sammeln vibriert der Motor. Die
+  Legion-Mulde ist ein eigenes Teil (`Bed`), `ArtPreviewCapture -captureDump`
+  zeigt die Kipp-Phase. Per Kamera im Spielrenderer geprüft, **nicht gespielt**
+- **Befehlsleiste je Einheitentyp.** Unpassende Befehle werden ausgeblendet statt
+  ausgegraut: Sammler und Bauer haben keine Patrouille, Wache, Angriffsbewegung,
+  Verteilen oder Formationen. Sammler zeigen stattdessen einen Ladungsbalken
+  („Ladung 210 / 300“) und ihren Zustand (fährt zum Feld, sammelt, fährt zur
+  Raffinerie …), bei Mehrfachauswahl summiert. W/K/J/M wirken nur noch auf die
+  kampffähigen Einheiten der Auswahl
+- **Befehlsleiste im Stil von Command & Conquer: Zero Hour, mit Gruppenbefehlen und
+  Formationen (D-117).** Ausgewählte Einheiten bekommen unten rechts eine Leiste in UI
+  Toolkit: Typ-Chips (Klick wählt nur diesen Typ), ein Raster aus quadratischen
+  Knöpfen mit gezeichneten Icons, Tastenkürzel und Tooltip. Neu: **Angriffsbewegung**
+  (A auf freien Boden), **Patrouille** (K), **Bewachen** (W), **Verteilen** (J) und fünf
+  **Formationen** — Locker, Linie, Kolonne, Keil, Block (M wechselt) —, die bei jedem
+  Gruppenbefehl gelten. Alles läuft als Client-Auftrag über die vorhandenen Befehle
+  Move, Stop und AttackTarget, das Befehlsregister bleibt unverändert. Die alte Karte
+  zeigt nur noch Gebäude. Per Kamera im laufenden Spiel geprüft, **nicht gespielt**
+- **Zerstörte Einheiten und Gebäude bleiben als Wrack liegen (D-115).** Zu jedem
+  der 34 Assets erzeugt der Blender-Pass eine Wrack-Variante (verdrehter Turm,
+  hängendes Rohr, liegender Soldat, eingestürzte Ruine mit Trümmern, verkohlte
+  Textur), die im selben Prefab liegt. Beim Tod wird das Modell kurz schwarz,
+  wechselt aufs Wrack und qualmt; ältere Wracks versinken erst ab 60 Einheiten-
+  bzw. 20 Gebäudewracks, ein Neubau räumt seine Fläche. Dazu Umgebungsbewegung:
+  Staubfahnen hinter Fahrzeugen, Schornsteinrauch der Legion, suchende Türme im
+  Leerlauf, atmende und sich umschauende Infanterie, Motorvibration. Neuer
+  PlayMode-Test lässt acht Einheiten im Kampf sterben und prüft die Wracks
 - **Infanterie geht.** Die vier Infanteristen haben in Blender abgetrennte Ober-
   und Unterschenkel (`Leg_*`/`Shin_*`); `UnitRigAnimator` fährt daraus einen
   Zwei-Gelenk-Gang mit Hüftsenkung, damit die Füße am Boden bleiben, und einen
@@ -297,6 +336,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Stimmiges Größenverhältnis (D-113).** Einheiten wurden bisher auf die Größe
+  ihres Graybox-Primitivs gezwungen: ein Kampfpanzer war doppelt so hoch wie ein
+  Soldat und fast so breit wie eine Kaserne, ein Sammler kleiner als ein leichter
+  Panzer. Jetzt gilt eine Regel je Klasse (`ArtViewScale`): Gebäude füllen ihren
+  Footprint, alle Fahrzeuge teilen einen metrischen Faktor, sodass ihre
+  Proportionen erhalten bleiben, Infanterie und Bauer bekommen eine lesbare
+  Mindesthöhe. Der Auswahlring folgt der Modellgröße. Abwehrtürme stehen jetzt
+  auf Panzerhöhe. Neue Größen-Aufstellung in `ArtPreviewCapture`
 - **Abwehrtürme in menschlichem Maßstab (D-112).** Jedes Gebäude wird auf seinen
   3×3-Footprint skaliert, ein schlanker Turm maß dadurch vier Soldatenhöhen. Die
   Türme stehen jetzt auf einem flachen Betonsockel, der den Footprint füllt, und
@@ -468,6 +515,28 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Der zweite Bauer baut (D-118).** Bisher konnte nur der Bauer mit dem
+  kleinsten Index eine Baustelle fortschreiben, jeder weitere stand daneben,
+  und beim Platzieren lief immer der erste los. Jetzt geht der ausgewählte Bauer
+  zur Baustelle und baut, ein Rechtsklick mit Bauern auf die eigene Baustelle
+  schickt sie dorthin. Die Meldung aus #135 war damals als Bauzonen-Radius
+  fehldiagnostiziert worden
+- **Legion-Gebäude sind wieder Gebäude (D-119).** Fahrzeugfabrik, Kraftwerk und
+  Forschungslabor waren als Panzer generiert, die Kaserne zerfiel in zwei Hälften
+  mit schwebendem Wachturm. Neu: Wellblech-Montagehalle mit Rolltor und Kran,
+  Generatorblock mit Doppelschornstein (zwei Rauchfahnen), verschweißter
+  Containerstapel mit Antennen und Schüssel, Wellblechhütten mit Planenvordach und
+  Wachturm (`tools/art/procedural/`). Die Art liegt wie bisher nur lokal; das
+  Asset-Paket muss neu gebaut werden
+- **Einheiten fahren gerade, machen Platz und drehen sich nicht mehr weg (D-116).**
+  Die Wegfindung rechnete Diagonalschritte durch einen Ganzzahlfehler
+  (`14 / 10` = 1) so teuer wie gerade — Einheiten fuhren Treppen statt Geraden. Jetzt
+  oktil 10/14. Der Kurs folgt dem Pfad statt der Abstoßung (höchstens 30° je Tick),
+  Einheiten halten Abstand je Typ (Infanterie dicht, Panzer weit), große Fahrzeuge
+  bekommen Gruppenplätze mit freiem Rand, und stehende eigene Einheiten weichen
+  einer gleich großen oder größeren fahrenden Einheit seitlich aus. Gemessen:
+  fahrende Einheiten schauen in 100 % der Frames in Fahrtrichtung, ein Panzer fährt
+  ohne Abweichung durch neun Soldaten. Regel-Revision V4, KI-Pin 2726 → 2721
 - **Einheiten schauen in ihre Fahrtrichtung.** Die Ansicht setzte den
   mathematischen Sim-Kurs (0° = Osten, gegen den Uhrzeigersinn) direkt als
   Unity-Gier (0° = Norden, im Uhrzeigersinn) ein und spiegelte jede Einheit an der

@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.44.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.50.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -2019,7 +2019,9 @@ richtig so: das Register ist der MP-Vertrag.
 
 ### D-085 | verbindlich | Baumodell: Builder-Modell bleibt, Auto-Dispatch per Move-Intent
 
-**Status:** verbindlich — Inhaberentscheidung vom 2026-08-06 (Dennis
+**Status:** verbindlich, in einem Punkt ersetzt durch D-118 (nicht mehr nur der
+Bauer mit kleinstem Index baut; die Baustelle geht an den eigenen Bauer in
+Reichweite, der Client schickt den ausgewählten Bauer) — Inhaberentscheidung vom 2026-08-06 (Dennis
 Westermann) aus der Spielsitzung desselben Tages, schriftlich fixiert in
 [hashkrieg/10_Sprint_Baubarkeit_und_Kartenbild.md](hashkrieg/10_Sprint_Baubarkeit_und_Kartenbild.md)
 §3; hier protokolliert wie angeordnet.
@@ -3709,6 +3711,240 @@ Determinismus-Baselines und braucht einen eigenen Regel-PR mit Baseline-Fenster.
 **Konsequenzen:** Rezeptfeld `pad` in `tools/art/asset_recipes.json`. Die
 blockierte Fläche ist jetzt sichtbar befestigt statt eine unsichtbare Wand.
 
+### D-113 | verbindlich | Asset-Pass 2026-10-17 (Größenverhältnis der Art im Spiel)
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („mach mit dem Größenverhältnis weiter“).
+
+**Kontext:** `UnitViewManager` skalierte jede Einheit auf die horizontale Größe
+ihres Graybox-Primitivs. Die Tabelle stammte aus der Graybox-Zeit und kannte keine
+Modelle. Gemessen in einer Größen-Aufstellung: Kampfpanzer 2,3 Felder lang und
+2,0–2,3 hoch bei 1,0 hohen Soldaten, Sammler kürzer als ein leichter Panzer,
+Allianz-Bauroboter kleiner als ein Soldat. Die Tripo-Modelle selbst sind in
+Metern im Maßstab des Art-Standards (1 Feld = 3 m) aufbereitet.
+
+**Alternativen:**
+
+1. Eine Regel je Klasse: Gebäude auf Footprint, Fahrzeuge mit einem gemeinsamen
+   metrischen Faktor, kleine Einheiten mit Mindesthöhe.
+2. Die Graybox-Tabelle je Rolle nachjustieren.
+3. Alles real-maßstäblich (1 Feld = 3 m auch für Einheiten).
+
+**Entscheidung:** Alternative 1 mit 0,22 Feldern je Meter für Fahrzeuge,
+Mindesthöhe 0,85 (Infanterie), 0,9 (Panzerfaust), 1,1 (Bauer); Abwehrtürme
+0,55 × Footprint hoch. Umgesetzt in `ArtViewScale`, der Auswahlring folgt der
+Modellgröße.
+
+**Begründung:** Eine Regel erhält die Verhältnisse der Modelle untereinander
+und gilt automatisch für jedes neue Modell; eine Tabelle je Rolle (2) wäre
+wieder Handarbeit ohne Maßstab. Real-maßstäblich (3) machte Soldaten 0,6 Felder
+hoch und aus der RTS-Kamera unlesbar. Der Fahrzeugfaktor liegt unter dem
+Gebäudemaßstab, damit ein Panzer etwa halbe Gebäudebreite hat und Nachbarn bei
+einem Kollisionsradius von einem halben Feld weniger überlappen.
+
+**Konsequenzen:** Reine Darstellung, keine Simulationsänderung. Lebensbalken
+sitzen weiter auf fester Höhe über dem Boden; das passt jetzt besser, ist aber
+nicht an die Modellhöhe gekoppelt.
+
+### D-115 | verbindlich | Asset-Pass 2026-10-17 (Wracks bleiben liegen, Umgebungsbewegung)
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („zu jedem Asset eine
+zerstörte Einheit; zerstörte Einheiten sollen sichtbar bleiben; weitere
+Bewegungen“).
+
+**Kontext:** Eine tote Einheit sank 0,8 s lang durchsichtig in den Boden und war
+weg; [CoreGameplay.md](../vision/CoreGameplay.md) sah 20–30 s Wrack vor, gebaut
+war es nie. Zerstörte Modelle gab es keine.
+
+**Entscheidung:**
+
+1. Der Blender-Pass (`tools/art/asset_wreck.py`) erzeugt zu jedem der 34 Assets
+   eine Wrack-Variante aus den getrennten Teilen: Fahrzeuge mit verdrehtem Turm,
+   hängendem Rohr, schiefer Wanne; Infanterie liegend; Gebäude oberhalb einer
+   gezackten Bruchkante weggebrochen, Aufbauten daneben, Trümmer im Footprint.
+   Verkohlte Textur, kein Leuchten. Sie liegt als inaktives Kind `Wreck` im
+   selben Prefab — Registry und Datenmodell bleiben unverändert.
+2. Wracks **bleiben liegen**. Zwei Obergrenzen (60 Einheiten-, 20
+   Gebäudewracks) lassen die ältesten versinken; ein Neubau räumt die Wracks auf
+   seiner Fläche. Wracks sind reine Ansicht: blockieren nichts, sind nicht
+   wählbar, ignorieren den Nebel (der Spieler hat sie sterben sehen) und qualmen
+   neun Sekunden.
+3. Umgebungsbewegung: Staubfahnen hinter fahrenden Fahrzeugen,
+   Schornsteinrauch (Knoten `Smoke_*`), Leerlauf-Suchschwenk der Türme, Atmen und
+   Umschauen der Infanterie, Motorvibration stehender Fahrzeuge — über zwei
+   geteilte Partikelsysteme für alle Einheiten (`AmbientFx`).
+
+**Begründung:** Ein Wrack, das nach 30 s verschwindet, erzählt die Schlacht
+nicht zu Ende; die Obergrenzen halten trotzdem jede Partie beschränkt. Das Wrack
+im Prefab vermeidet eine zweite Asset-Zuordnung und einen Ladeweg.
+
+**Konsequenzen:** Ersetzt die 20–30 s aus CoreGameplay.md. Graybox-Primitive
+und Art ohne Wrack behalten das kurze Ausblenden.
+
+### D-116 | verbindlich | Bewegung: oktile Wegkosten, Abstand je Einheitentyp, Platzmachen, Kurs folgt dem Pfad
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („Einheiten sollen
+aufeinander reagieren, Platz machen, damit ein Panzer durchfahren kann;
+möglichst natürlich; sie stehen zu dicht und drehen sich komisch weg“).
+
+**Kontext:** Am Code gemessen:
+
+1. **Fehler in der Wegfindung:** `IntegrationField` gewichtete Diagonalen mit
+   `cellCost * 14 / 10`, auf offenem Gelände ganzzahlig 1 — Diagonalen kosteten so
+   viel wie gerade Schritte. Bei Gleichstand nimmt das Flussfeld die erste Richtung
+   in N-, NO-, O-Reihenfolge: Ein Panzer, der 14 Felder nach Osten fahren sollte,
+   fuhr erst 6 Felder nach Nordost und dann zurück. Ein Test hielt das sogar als
+   „Baseline“ fest.
+2. Der Kurs einer fahrenden Einheit war `Atan2(Pfad + Abstoßung)`; im Gedränge
+   kippte er bis 180° je Tick.
+3. Alle Einheiten hatten Abstandsradius 0,5; seit D-113 ist ein Kampfpanzer aber
+   1,6 Felder lang — geparkte Panzer standen sichtbar ineinander, Infanterie einen
+   ganzen Meter auseinander.
+4. Gruppenziele lagen ein Feld auseinander, große Fahrzeuge ruckelten dort
+   endlos an Berührdistanz (Issue #42 „Zittern im Pulk“).
+5. Platzmachen gab es nicht.
+
+**Entscheidung:** Oktile Kosten (10/14, gesättigt). Kurs = Pfadrichtung, höchstens
+30° je Tick. Abstandsradius je Rolle (`MovementSpacing`: Infanterie 0,30,
+Panzerfaust 0,32, Bauer/Scout 0,50, leichter Panzer 0,62, Sammler 0,70,
+Kampfpanzer/Artillerie 0,78) — nur für Bewegung, der Kampfradius bleibt 0,5, damit
+Reichweiten nicht wandern. Große Einheiten beanspruchen ihren Gruppenplatz samt
+Nachbarfeldern. Stehende **eigene** Einheiten im Fahrweg einer gleich großen oder
+größeren fahrenden Einheit weichen seitlich aus; deren Abstoßung auf den Fahrer
+ist auf ein Viertel gedämpft, er hält seine Linie. Regel-Revision **V4**.
+
+**Begründung:** Platzmachen ist C&C-Standard und lässt sich deterministisch und
+lokal (5×5-Fenster) bauen; ORCA bleibt Post-MVP (D-034). Der Kampfradius bleibt,
+weil sonst eine Bewegungsentscheidung die Balance verschöbe.
+
+**Konsequenzen:** Gemessen: In der laufenden Partie schauen fahrende Einheiten in
+100 % der Frames in Fahrtrichtung (vorher 90–100 %, Ausreißer bis 85°); ein
+Kampfpanzer fährt mit 0,00 Feldern Abweichung durch neun stehende Soldaten. Der
+kanonische KI-Pin bewegt sich (Tick 2726 → 2721, Endzustand
+`0x4A861D9FA2E57C6F` → `0x6E15320BCC3F3EE4`, KI-Kennung unverändert
+`r8.1E6E7AE3`); `RulesHash64` V4 = `0x7E2E3E8C4CF1591E`. Die vier bewachten
+Baseline-Dateien bleiben unberührt. Nebenbefund: `tools/Nova.SimRunner` (das
+Programm, nicht die Tests) baut auf `main` nicht, `LobbyContracts.cs` braucht
+Newtonsoft — DETERMINISM_10000 ließ sich deshalb nicht nachmessen.
+
+### D-117 | verbindlich | Befehlsleiste im Stil von Zero Hour, Gruppenbefehle ohne neue CommandKinds
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („UI, wo man beim Anklicken
+von Einheiten Aktionen ausführen kann, z. B. Patrouille, und bei mehreren
+Einheiten eine Aufstellung wählen; orientiere dich an Command &amp; Conquer
+Zero Hour“).
+
+**Kontext:** Die Einheitenkarte war eine senkrechte IMGUI-Knopfliste ohne Icons
+und Tooltips; D-083 schreibt für neue Oberflächen UI Toolkit vor und erklärt das
+IMGUI-HUD zur Wegwerfversion. Das Befehlsregister ist eingefroren (D-084,
+D-087): Patrouille, Bewachen und Angriffsbewegung als Sim-Befehle bräuchten neue
+CommandKinds, Golden-Byte-Tests und eine API-Prüfung. Angriffsverfolgung und
+Sammler-Eskorte laufen dagegen schon auf dem Client über normale Moves.
+
+**Alternativen:**
+
+1. Neue CommandKinds (Patrol, Guard, AttackMove) mit Zustand in der Simulation.
+2. Client-Aufträge über die vorhandenen Kinds, Befehlsleiste in UI Toolkit.
+3. Client-Aufträge, Leiste in der bestehenden IMGUI-Karte.
+
+**Entscheidung:** Alternative 2. Angriffsbewegung, Patrouille, Bewachen,
+Verteilen und fünf Formationen (Locker, Linie, Kolonne, Keil, Block) sind
+Client-Aufträge (`FormationPlanner`, `StandingOrders`), die in Move, Stop und
+AttackTarget münden. Die neue `UnitCommandBar` (UI Toolkit, gezeichnete Icons,
+Tastenkürzel, Tooltip, Typ-Chips) übernimmt die Einheitenauswahl; die IMGUI-Karte
+zeigt nur noch Gebäude und Baustellen. **A** auf freien Boden wird
+Angriffsbewegung wie in C&C.
+
+**Begründung:** Alternative 2 liefert alle gewünschten Befehle sofort, ohne das
+Register zu öffnen; die gesendeten Moves werden aufgezeichnet, Replays und
+Relay bleiben exakt. Ein Sim-Befehl wäre nur nötig, wenn Aufträge ohne den
+auslösenden Client weiterlaufen müssten (Verbindungsabbruch) — das bleibt ein
+späterer, eigener Schritt. Alternative 3 widerspräche D-083.
+
+**Konsequenzen:** Der Auftragszustand ist lokaler UI-Zustand und überlebt
+keinen Spielstand. Der Feindblick der Aufträge ist nebelgebunden. Nachweis:
+EditMode-Tests für Formationen und Aufträge, PlayMode-Test startet über den
+Menüpfad, wählt sechs Panzer, schickt sie in Linie auf Patrouille und prüft das
+Umkehren.
+
+### D-118 | verbindlich | Jeder Bauer kann bauen: die Baustelle geht an den Bauer, der dort steht
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („das Problem mit dem zweiten
+Ingenieur oder Vorarbeiter ist immer noch nicht gelöst, der kann immer noch keine
+Aktionen ausführen“). Ersetzt den Teil von D-085, nach dem nur der Bauer mit dem
+kleinsten Entity-Index eine Baustelle fortschreiben darf.
+
+**Kontext:** `ConstructionSystem.CreateSite` bindet jede Baustelle an den eigenen
+Bauer mit dem kleinsten Index, und `ProgressSites` prüft nur dessen Reichweite;
+gewechselt wurde nur bei Tod oder Rollenwechsel. Der Client schickte beim
+Platzieren immer denselben Bauer los, unabhängig von der Auswahl. Ein zweiter
+Bauer konnte dadurch nie bauen. Die Meldung #135 wurde damals als
+Bauzonen-Radius erklärt und nur mit besseren Ablehnungstexten beantwortet; die
+Zuweisungsregel blieb unberührt.
+
+**Alternativen:**
+
+1. Neuer CommandKind „Bauer an Baustelle“ mit expliziter Zuweisung.
+2. Übergabe in der Simulation: steht der gebundene Bauer nicht in Reichweite, geht
+   die Baustelle an den eigenen Bauer mit dem kleinsten Index, der in Reichweite
+   steht; der Client schickt bevorzugt den ausgewählten Bauer.
+3. Nur Client: ausgewählten Bauer losschicken (wirkungslos, die Simulation
+   ignoriert ihn).
+
+**Entscheidung:** Alternative 2. Beim Platzieren bleibt die Bindung an den
+kleinsten Index (Snapshot-Format und `ValidateAssignedBuilder` unverändert); in
+`ProgressSites` übernimmt der kleinste eigene Bauer in Reichweite, wenn der
+gebundene fehlt oder fern ist. Der Client schickt den ersten ausgewählten Bauer
+zur Baustelle, ein Rechtsklick mit Bauern auf die eigene Baustelle schickt sie an
+deren Anfahrtszelle.
+
+**Begründung:** Deterministisch (aufsteigender Index-Scan) und ohne neuen
+Befehl; mit einem einzigen Bauer byte-identisch, deshalb bewegen sich weder
+Fingerprints noch die kanonische KI-Partie (headless 775/775 grün). Alternative 1
+öffnete das eingefrorene Register (D-084, D-087) für etwas, das die Simulation
+aus der Position ableiten kann.
+
+**Konsequenzen:** Zwei Bauer an einer Baustelle bauen nicht schneller, der
+Fortschritt läuft weiter über genau einen Bauer. Die KI hält weiterhin nur einen
+Bauer. Nachweis: Regressionstest mit zwei lebenden Bauern, der ferne mit kleinem
+Index, der nahe mit großem (`SiteProgress_SecondBuilderInReach_TakesOverFromFarLowIndexBuilder`).
+
+### D-119 | verbindlich | Legion-Kraftwerk, -Fabrik, -Labor und -Kaserne prozedural statt generiert
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („Fahrzeuge sind auf einmal zu
+Gebäuden geworden, vor allem bei der Fahrzeugfabrik und beim Kraftwerk, und die
+Kaserne sieht auch komisch aus“; „falls Dinge unklar sind, entscheide selber“).
+Löst den offenen Punkt „Neugenerierung Legion-Kraftwerk und
+-Forschungslabor“ aus dem Asset-Pass-Protokoll.
+
+**Kontext:** Schon die Konzeptbilder von Fabrik, Kraftwerk und Labor waren
+Panzer: Die erste Bildgeneration nutzte den Legion-Panzer als Referenzbild. Die
+Kaserne zerfiel als Tripo-Modell in zwei Hälften mit schwebendem Wachturm.
+Neue Konzeptbilder entstanden über `generate_v2.py` (Materialtafel statt Form).
+Für die 3D-Form wurde Hunyuan3D 2.1 erprobt; dessen Tencent-Community-Lizenz gilt
+ausdrücklich nicht in der Europäischen Union.
+
+**Alternativen:**
+
+1. Tripo-Neugenerierung aus den neuen Konzeptbildern (Kosten je Generierung,
+   Handarbeit im Web, gleiche Mehrschalen-Qualität).
+2. Hunyuan3D-2.1-Formen (frei verfügbar, aber in der EU nicht lizenziert).
+3. Prozedurale Geometrie in Blender nach dem Konzeptbild, Textur aus dem
+   Konzeptbild projiziert und gebacken.
+
+**Entscheidung:** Alternative 3 für alle vier Gebäude (`tools/art/procedural/`).
+Die Hunyuan-Formen wurden verworfen und nicht verwendet.
+
+**Begründung:** Rechtlich sauber und reproduzierbar (Skript statt Webdienst),
+saubere Geometrie ohne Splitter, und die Silhouette folgt dem Konzept genau:
+Wellblech-Montagehalle mit Rolltor und Kran, Generatorblock mit Doppelschornstein,
+verschweißter Containerstapel, Wellblechhütten mit Wachturm.
+
+**Konsequenzen:** Die vier Gebäude sind kantiger und detailärmer als Tripo-Modelle,
+dafür formtreu. `glb_to_unity_fbx.py` bekommt `--keep-slivers`, weil der
+Splitterfilter dünne modellierte Teile (Leitern, Antennen) an UV-Nähten für
+Generatorsplitter hält. Altstand liegt unter
+`Hashkrieg_Assets/3d/unity_ready/_replaced_2026-10-17`.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3789,6 +4025,11 @@ blockierte Fläche ist jetzt sichtbar befestigt statt eine unsichtbare Wand.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.50.0 | 2026-10-17 | D-118 und D-119 aufgenommen: jeder Bauer kann bauen (Übergabe der Baustelle an den eigenen Bauer in Reichweite, ersetzt die Nur-kleinster-Index-Regel aus D-085); Legion-Kraftwerk, -Fabrik, -Labor und -Kaserne prozedural nach Konzeptbild statt generiert, Hunyuan3D wegen fehlender EU-Lizenz verworfen | Dennis Westermann / Orchestrator |
+| 1.49.0 | 2026-10-17 | D-117 aufgenommen: Befehlsleiste im Stil von Zero Hour in UI Toolkit; Angriffsbewegung, Patrouille, Bewachen, Verteilen und Formationen als Client-Aufträge über Move/Stop/AttackTarget statt neuer CommandKinds | Dennis Westermann / Orchestrator |
+| 1.48.0 | 2026-10-17 | D-116 aufgenommen: oktile Wegkosten (Ganzzahlfehler 14/10 → 1 behoben), Abstand je Einheitentyp, größenabhängige Gruppenplätze, Platzmachen, pfadgeführter Kurs; Regel-Revision V4, kanonischer KI-Pin bewegt | Dennis Westermann / Orchestrator |
+| 1.47.0 | 2026-10-17 | D-115 aufgenommen: Wrack-Variante je Asset im Prefab, Wracks bleiben liegen (Obergrenzen 60/20, Neubau räumt), Umgebungsbewegung über geteilte Partikelsysteme. Version 1.46.0 trägt D-114 (KI-Strang, PR #144) | Dennis Westermann / Orchestrator |
+| 1.45.0 | 2026-10-17 | D-113 aufgenommen: Größenverhältnis der Art über eine Regel je Klasse (`ArtViewScale`) statt der Graybox-Tabelle; Fahrzeuge 0,22 Felder je Meter, Mindesthöhen für Infanterie und Bauer, Abwehrtürme auf Panzerhöhe | Dennis Westermann / Orchestrator |
 | 1.44.0 | 2026-10-17 | D-112 aufgenommen: Abwehrtürme optisch auf rund doppelte Soldatenhöhe verkleinert (Sockel füllt den 3×3-Footprint), Footprint-Verkleinerung als Regeländerung offen gelassen | Dennis Westermann / Orchestrator |
 | 1.43.0 | 2026-10-17 | D-111 aufgenommen: Bloom als Grundstack des Pipeline-Assets (fehlende `postProcessData` ergänzt, Kamera-Post-Processing an, Emission mit `RealtimeEmissive`), Sonne auf `Euler(50°, 35°)` von der Kameraseite statt Gegenlicht | Dennis Westermann / Orchestrator |
 | 1.42.0 | 2026-10-17 | D-110 aufgenommen: Blickrichtung über **eine** Abbildung Sim-Kurs → Unity-Gier (`ViewHeading`), Knoten-Vertrag `Body`/`Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*` zwischen Blender-Pass und `UnitRigAnimator`, doppelseitige Art-Materialien, neue Leuchttextur `T_*_EM`; Tripo-Modelle werden aufbereitet statt neu erzeugt | Dennis Westermann / Orchestrator |

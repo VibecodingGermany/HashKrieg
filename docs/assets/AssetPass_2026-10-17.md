@@ -1,6 +1,6 @@
 # Asset-Pass: Blickrichtung, Teile-Animation, Optik
 
-**Version:** 0.4.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
+**Version:** 0.7.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
 
 ## Zweck
 
@@ -161,21 +161,67 @@ nimmt den laufenden Soldaten zusätzlich als Bildfolge auf
 Jedes Gebäude wird im Spiel auf die Breite seines 3×3-Footprints skaliert. Ein
 schlanker Turm maß dadurch rund vier Soldatenhöhen. Der Pass stellt die Türme
 jetzt auf einen flachen Betonsockel (`pad` im Rezept), der so breit ist, dass der
-Turm nach der Skalierung 0,7 × Footprint hoch ist — rund 2,1 Einheiten, etwa
-doppelte Soldatenhöhe und so groß wie ein Kampfpanzer. Der Sockel füllt die
+Turm nach der Skalierung 0,55 × Footprint hoch ist — rund 1,7 Einheiten, also
+etwa doppelte Soldatenhöhe und so hoch wie ein Kampfpanzer. Der Sockel füllt die
 blockierte Fläche, statt sie als unsichtbare Wand stehen zu lassen; seine UVs
 zeigen auf eine ruhige, ungesättigte Stelle der Textur, er braucht kein
 eigenes Material. **Der Footprint selbst bleibt 3×3** — ihn zu verkleinern ist
 eine Regeländerung (siehe Offene Punkte).
 
-## 9. Was dieser Pass nicht löst
+## 9. Größenverhältnis (D-113)
+
+Bis hierhin bekam jede Einheit die Größe ihres Graybox-Primitivs. Das ergab
+Zufallsverhältnisse: ein Kampfpanzer doppelt so hoch wie ein Soldat und drei
+Viertel so breit wie eine Kaserne, ein Sammler kürzer als ein leichter Panzer,
+der Allianz-Bauroboter kleiner als ein Soldat. Jetzt gilt eine Regel
+(`ArtViewScale`):
+
+| Klasse | Regel | Ergebnis (Felder) |
+|---|---|---|
+| Gebäude | Breite = Footprint (3) | 3 breit, 2,8–5,4 hoch |
+| Fahrzeuge | 0,22 Felder je Meter Modellmaß, für alle gleich | Kampfpanzer 1,5–1,7, leichter Panzer 1,3, Scout 1,0, Sammler 1,5–1,8 |
+| Infanterie | Mindesthöhe 0,85 (Panzerfaust 0,9), unabhängig von der Waffenbreite | Soldat 0,85 hoch |
+| Bauer | Mindesthöhe 1,1 | Allianz-Roboter 1,1, Legion-Bagger 1,4 |
+
+Die Tripo-Modelle sind in Metern im selben Maßstab erzeugt, ihre Verhältnisse
+untereinander bleiben damit erhalten. Ein Soldat reicht einem Kampfpanzer bis
+etwa zur halben Höhe, ein Panzer hat ungefähr halbe Gebäudebreite: für ein RTS
+leicht überzeichnet, aber lesbar. Der Auswahlring folgt jetzt der Modellgröße,
+statt fest 2,4 Felder zu messen. Prüfwerkzeug: `ArtPreviewCapture -captureLineup`
+stellt alle Modelle einer Fraktion in Spielgröße auf ein Feldraster und
+protokolliert die Maße.
+
+## 10. Wracks und Umgebungsbewegung (D-115)
+
+`tools/art/asset_wreck.py` baut aus den getrennten Teilen der LOD0-Stufe ein
+statisches Wrack-Mesh (`SM_*_Wreck.fbx`, 0,9–7,8 Tsd. Dreiecke) und eine
+verkohlte Textur (`T_*_Wreck_BC.png`). Zufallswerte hängen am Asset-Namen, zwei
+Läufe ergeben dasselbe Wrack. Erfahrungen:
+
+- **Wracks aus LOD1 zerfallen**: die reduzierte Stufe der Tripo-Mehrschalen
+  zeigt zerfetzte Flächen. Quelle ist deshalb LOD0.
+- **Verbeulen nicht entlang der Normalen**: Hunderte loser Schalen zeigen in alle
+  Richtungen und reißen auf. Ein glattes Vektorfeld verbiegt das Ganze wie Blech.
+- **Bruchkante nach der höchsten Ecke**, nicht nach dem Mittelpunkt, sonst ragen
+  große Dreiecke als Spieße über die Ruine; dünne Antennen werden nicht umgelegt.
+
+Der Prefab-Bau hängt das Wrack als inaktives Kind `Wreck` mit eigenem Material
+`M_*_Wreck` an. `ViewWrecks` schaltet beim Tod um (kurzes Schwarzwerden, Sprung,
+Aufsetzen), lässt das Wrack neun Sekunden qualmen und liegen.
+
+Umgebungsbewegung über `AmbientFx` (ein Staub- und ein Rauchsystem für alle):
+Staubfahnen hinter fahrenden Fahrzeugen, Rauch aus `Smoke_*`-Knoten
+(Legion-Raffinerie, -Kraftwerk, -HQ; Rezeptfeld `emitters`), Suchschwenk der
+Türme nach 2,5 s ohne Ziel, Atmen und Umschauen der Infanterie, Motorvibration.
+
+## 11. Was dieser Pass nicht löst
 
 - **Die Geometrie bleibt Tripo-Qualität.** Flächen sind knubbelig; Glätten und
   doppelseitiges Rendern kaschieren, sie reparieren nicht. Eine
   Geometrie-AO war ein Fehlschlag: Auf überlappenden Schalen backen ganze Flächen
   schwarz. Sie ist deshalb im Rezept abgeschaltet.
-- **Legion-Kraftwerk und Legion-Forschungslabor sind als Panzer generiert**
-  (Wanne, Kettenlaufwerk, Turm). Das ist nur durch Neugenerierung zu beheben.
+- ~~Legion-Kraftwerk und Legion-Forschungslabor sind als Panzer generiert.~~
+  Erledigt mit D-119, siehe Abschnitt 12.
 - **Infanterie geht mit starren Gliedern, ohne Skelett.** Ober- und Unterschenkel
   sind abgetrennte Teile; an Hüfte und Knie entstehen beim Schwingen kleine
   Fugen, Arme und Waffe bleiben starr. Aus RTS-Distanz liest sich das als Gehen;
@@ -188,6 +234,41 @@ eine Regeländerung (siehe Offene Punkte).
 - **TeamMask (B-Kanal) ist leer.** Spiegelpartien (Allianz gegen Allianz) sind
   farblich nicht unterscheidbar.
 
+## 12. Legion-Gebäude und Sammler (Nachtrag, D-119)
+
+**Vertauschte Gebäude.** Fahrzeugfabrik, Kraftwerk und Forschungslabor der Legion
+waren schon im Konzeptbild Panzer: Die erste Bildgeneration (`generate.py`) gab
+den Legion-Panzer als Referenzbild mit. Neue Konzeptbilder kommen aus
+`generate_v2.py` (Materialtafel statt Form; Fabrik und Labor mit dem Zusatz
+„Außenansicht eines Gebäudes, kein Fahrzeug“, liegen unter
+`Hashkrieg_Assets/img/v2test`). Die Kaserne zerfiel als Tripo-Modell in zwei
+Hälften mit schwebendem Wachturm.
+
+Alle vier sind jetzt prozedural in Blender gebaut (`tools/art/procedural/`,
+`build_all.sh`), die Textur kommt aus dem Konzeptbild: Box-Projektion (Front aus
+dem Objektausschnitt, Seiten aus einem Wandstreifen, Dach aus einer ruhigen
+Plattentextur), in Cycles auf Smart-UV gebacken, linear auf mittlere Luminanz
+0,11 gehoben. Eine Gamma-Anhebung ließ den Asset-Pass-Grade ausbleichen.
+
+Fallen:
+
+- **Der Splitterfilter frisst modellierte Teile.** `glb_to_unity_fbx.py` trennt
+  an UV-Nähten und hält dünne Leiterholme und Antennen für Generatorsplitter.
+  Abhilfe: `--keep-slivers`; im Rezept zusätzlich `drop_needles: false` und
+  `smooth_angle: 0`.
+- **Hunyuan3D 2.1** (frei auf Hugging Face, ZeroGPU-Kontingent nach zwei Formen
+  erschöpft) liefert gute Formen, ist aber in der EU nicht lizenziert und wurde
+  deshalb verworfen.
+
+**Sammler.** Der Legion-Laster hat eine eigene Mulde `Bed` (Scharnier hinten
+unten), der Allianz-Roboter einen leeren Knoten `Cargo_Anchor` auf dem Rücken.
+`UnitRigAnimator` hängt daran zur Laufzeit eine Erzladung (dunkles Gestein,
+16 Aetherium-Kristalle), die mit `CargoAE` wächst. Beim Entladen (Kante
+`CargoAE` > 0 → 0) kippt die Mulde 50° (Roboter: Körper 11°), die Ladung rutscht
+heraus, Gesamtdauer 1,85 s. Weil die Simulation in einem Tick entlädt, hält die
+Client-Eskorte den eigenen Sammler 1,9 s an der Raffinerie. KI-Sammler fahren
+sofort weiter.
+
 ## Offene Punkte
 
 - **Footprint der Abwehrtürme** (Inhaberentscheidung): `BuildingFootprintCells = 3`
@@ -195,8 +276,6 @@ eine Regeländerung (siehe Offene Punkte).
   nur für Türme berührt Platzierung, Wegfindung, KI und den Match-Fingerprint und
   verschiebt die Determinismus-Baselines; er bräuchte einen eigenen Regel-PR.
 
-- Neugenerierung von Legion-Kraftwerk und Legion-Forschungslabor (Kosten pro
-  Generierung, Inhaberentscheidung).
 - Spielerische Abnahme in einer gespielten Runde steht aus; dieser Pass ist
   automatisiert und per Kamera geprüft, nicht gespielt.
 - Das Asset-Paket ([AssetPackage.md](AssetPackage.md)) muss neu gebaut werden,
@@ -210,3 +289,6 @@ eine Regeländerung (siehe Offene Punkte).
 | 0.2.0 | 2026-10-17 | Glow über Bloom, zwei Akzentmasken, Sonne auf der Kameraseite, Radar gestaucht, Showcase in Spielgröße (D-111) | Technical Art |
 | 0.3.0 | 2026-10-17 | Infanterie-Gang mit starren Ober- und Unterschenkeln, Knoten `Leg_*`/`Shin_*` | Technical Art |
 | 0.4.0 | 2026-10-17 | Abwehrtürme auf Sockel verkleinert, Footprint-Frage als offener Punkt (D-112) | Technical Art |
+| 0.5.0 | 2026-10-17 | Größenverhältnis über eine Regel je Klasse, Turm auf 0,55 × Footprint, Größen-Aufstellung (D-113) | Technical Art |
+| 0.6.0 | 2026-10-17 | Wrack-Varianten aller Assets und Umgebungsbewegung (D-115) | Technical Art |
+| 0.7.0 | 2026-10-17 | Legion-Kraftwerk, -Fabrik, -Labor, -Kaserne prozedural (D-119), Sammler-Ladung und Abkippen | Technical Art |
