@@ -957,7 +957,7 @@ namespace Nova.Gameplay.Match
                 viewTransform.position = targetPos;
                 if (!isBuilding)
                 {
-                    viewTransform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                    viewTransform.rotation = ViewHeading.Rotation(unit.Transform.Rotation);
                 }
                 return;
             }
@@ -967,7 +967,7 @@ namespace Nova.Gameplay.Match
             viewTransform.position = Vector3.Lerp(viewTransform.position, targetPos, blend);
             if (!isBuilding)
             {
-                Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                Quaternion targetRot = ViewHeading.Rotation(unit.Transform.Rotation);
                 viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
             }
         }
