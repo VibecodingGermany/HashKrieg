@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Nova.Core;
 using Nova.Simulation.CommandsV1;
@@ -112,8 +113,8 @@ namespace Nova.Simulation.Replays
         public const ushort RulesRevisionV1 = 1;
 
         /// <summary>
-        /// Current deterministic rules revision; adds the Sprint-16.6 C4 low-power
-        /// radar and repair behavior to revision 1.
+        /// Sprint-16.6 C4 low-power radar and repair behavior layered onto
+        /// revision 1. Historical: frozen as a literal row (#138, D-120).
         /// </summary>
         public const ushort RulesRevisionV2 = 2;
 
@@ -123,7 +124,12 @@ namespace Nova.Simulation.Replays
         /// </summary>
         public const ushort RulesRevisionV3 = 3;
 
-        /// <summary>The rules revision emitted by current hosts.</summary>
+        /// <summary>
+        /// The rules revision emitted by current hosts. Revisions are append
+        /// only (#138, D-120): changing a hashed rules constant means
+        /// appending the next revision with its own frozen literal row, never
+        /// editing an existing row or re-pinning its golden hash.
+        /// </summary>
         public const ushort CurrentRulesRevision = RulesRevisionV3;
 
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
@@ -264,74 +270,228 @@ namespace Nova.Simulation.Replays
         }
 
         /// <summary>
-        /// Canonical rules identity for one supported simulation revision.
-        /// This compatibility entry point exists so replay and relay tests can
-        /// represent prior rules exactly; hosts must use
-        /// <see cref="ComputeCurrentRulesHash64"/>. Unknown revisions are
-        /// rejected rather than guessed.
+        /// Canonical rules identity of one supported simulation revision, read
+        /// exclusively from that revision's frozen literal row (#138, D-120).
+        /// A row is written once, when its revision is appended, and never
+        /// edited, so a later change to a live rules constant cannot move a
+        /// historical identity: replay and relay tests represent prior rules
+        /// exactly. Hosts must use <see cref="ComputeCurrentRulesHash64"/>.
+        /// Unknown revisions are rejected rather than guessed.
+        /// <para>
+        /// Known, accepted gap (D-120): #131 raised HqBaseCapacityAE from
+        /// 2,000 to 3,000 without a revision bump, so builds from 2026-08-10
+        /// to 2026-08-31 emitted revision 3 as 0x05CCA8475789AD4A. The frozen
+        /// revision-3 row carries the post-#131 values (0xD1B683837D12FCEF);
+        /// the earlier revision-3 identity is not representable.
+        /// </para>
         /// </summary>
         public static ulong ComputeRulesHash64(ushort rulesRevision)
         {
-            if (rulesRevision != RulesRevisionV1
-                && rulesRevision != RulesRevisionV2
-                && rulesRevision != RulesRevisionV3)
+            return HashRulesRow(rulesRevision, GetFrozenRulesRow(rulesRevision));
+        }
+
+        /// <summary>
+        /// Canonical rules identity for the current simulation: the layout of
+        /// <see cref="CurrentRulesRevision"/>, written from the LIVE rules
+        /// constants. Revision 3 retains D-106 and Sprint-16.6 C4 from
+        /// revisions 1/2, then binds the D-104 footprint, influence,
+        /// field-spacing, repair-price and single-winner behavior that can
+        /// diverge without changing snapshot bytes or definition rows. Old/new
+        /// peers and replays therefore fail the exact-fingerprint gate before
+        /// executing tick 1. This is the only rules-hash path that reads live
+        /// constants (#138, D-120); <see cref="DescribeCurrentRulesDrift"/>
+        /// is the tripwire that keeps it equal to the frozen row of the
+        /// current revision.
+        /// </summary>
+        public static ulong ComputeCurrentRulesHash64()
+        {
+            return HashRulesRow(CurrentRulesRevision, BuildLiveCurrentRulesRow());
+        }
+
+        /// <summary>
+        /// Tripwire for the append-only revision rule (#138, D-120): compares
+        /// the live rules constants field by field (tag, width, value) with
+        /// the frozen literal row of <see cref="CurrentRulesRevision"/> and
+        /// returns one line per difference; an empty array means they agree.
+        /// A non-empty result means a hashed rules constant changed under an
+        /// existing revision number. The remedy is to append the next rules
+        /// revision with its own literal row, never to edit a frozen row or
+        /// re-pin a golden hash.
+        /// </summary>
+        public static string[] DescribeCurrentRulesDrift()
+        {
+            RulesField[] frozen = GetFrozenRulesRow(CurrentRulesRevision);
+            RulesField[] live = BuildLiveCurrentRulesRow();
+            var drift = new List<string>();
+            if (frozen.Length != live.Length)
             {
-                throw new ArgumentOutOfRangeException(nameof(rulesRevision), rulesRevision, "Unknown rules revision.");
+                drift.Add($"revision {CurrentRulesRevision}: the frozen row has {frozen.Length} fields, "
+                    + $"the live layout has {live.Length}");
             }
 
+            int shared = Math.Min(frozen.Length, live.Length);
+            for (int i = 0; i < shared; i++)
+            {
+                RulesField frozenField = frozen[i];
+                RulesField liveField = live[i];
+                if (frozenField.Tag != liveField.Tag
+                    || frozenField.IsInt64 != liveField.IsInt64
+                    || frozenField.Value != liveField.Value)
+                {
+                    drift.Add($"revision {CurrentRulesRevision} field {frozenField.Tag} ({liveField.Name}): "
+                        + $"frozen {frozenField.Describe()}, live {liveField.Describe()}");
+                }
+            }
+            return drift.ToArray();
+        }
+
+        /// <summary>
+        /// Writes one rules-identity stream. The byte layout is unchanged from
+        /// the pre-#138 writer: stub tag 1, the u32 field count (field 1 plus
+        /// the row), field 1 = the revision as u16, then every row field as
+        /// its tag followed by an i64 or i32 value, in row order.
+        /// </summary>
+        private static ulong HashRulesRow(ushort rulesRevision, RulesField[] row)
+        {
             var hash = SimHashWriter.ForDefinitions();
             hash.WriteFieldTag((uint)MatchContentStub.Rules);
-            hash.WriteUInt32(rulesRevision == RulesRevisionV1
-                ? 5u
-                : rulesRevision == RulesRevisionV2 ? 7u : 14u); // ordered rule fields below
+            hash.WriteUInt32((uint)row.Length + 1u); // field 1 (the revision) plus the ordered rule fields
             hash.WriteFieldTag(1);
             hash.WriteUInt16(rulesRevision);
-            hash.WriteFieldTag(2);
-            hash.WriteInt64(EconomySystem.HqBaseCapacityAE);
-            hash.WriteFieldTag(3);
-            hash.WriteInt64(EconomySystem.StorageCapacityBonusAE);
-            hash.WriteFieldTag(4);
-            hash.WriteInt32(EconomySystem.ExcessDecayPercent);
-            hash.WriteFieldTag(5);
-            hash.WriteInt32(EconomySystem.ExcessDecayIntervalTicks);
-            if (rulesRevision >= RulesRevisionV2)
+            for (int i = 0; i < row.Length; i++)
             {
-                hash.WriteFieldTag(6);
-                hash.WriteInt32(ConstructionSystem.RepairRateHpPerTick);
-                hash.WriteFieldTag(7);
-                hash.WriteInt32(ConstructionSystem.LowPowerRepairRateHpPerTick);
-            }
-            if (rulesRevision >= RulesRevisionV3)
-            {
-                hash.WriteFieldTag(8);
-                hash.WriteInt32(SimDefinitions.BuildingFootprintCells);
-                hash.WriteFieldTag(9);
-                hash.WriteInt32(ConstructionSystem.RepairCostPercent);
-                hash.WriteFieldTag(10);
-                hash.WriteInt32(ConstructionSystem.BuildInfluenceRadiusCells);
-                hash.WriteFieldTag(11);
-                hash.WriteInt32(ConstructionSystem.MinimumBuildingDistanceCells);
-                hash.WriteFieldTag(12);
-                hash.WriteInt32(ConstructionSystem.RefineryMinimumFieldDistanceCells);
-                hash.WriteFieldTag(13);
-                hash.WriteInt32(ConstructionSystem.RefineryMaximumFieldDistanceCells);
-                hash.WriteFieldTag(14);
-                hash.WriteInt32(ConstructionSystem.MinimumNonRefineryFieldDistanceCells);
+                hash.WriteFieldTag(row[i].Tag);
+                if (row[i].IsInt64)
+                {
+                    hash.WriteInt64(row[i].Value);
+                }
+                else
+                {
+                    hash.WriteInt32((int)row[i].Value);
+                }
             }
             return hash.Digest();
         }
 
         /// <summary>
-        /// Canonical rules identity for the current simulation. Revision 3
-        /// retains D-106 and Sprint-16.6 C4 from revisions 1/2, then binds the
-        /// D-104 footprint, influence, field-spacing, repair-price and
-        /// single-winner behavior that can diverge without changing snapshot
-        /// bytes or definition rows. Old/new peers and replays therefore fail
-        /// the exact-fingerprint gate before executing tick 1.
+        /// The layout of <see cref="CurrentRulesRevision"/> read from the live
+        /// rules constants — the only place the rules hash touches them
+        /// (#138, D-120). Appending a revision extends this row with the live
+        /// reads of the new fields in the same order as the new frozen row.
         /// </summary>
-        public static ulong ComputeCurrentRulesHash64()
+        private static RulesField[] BuildLiveCurrentRulesRow()
         {
-            return ComputeRulesHash64(CurrentRulesRevision);
+            return new[]
+            {
+                RulesField.Int64(2, nameof(EconomySystem.HqBaseCapacityAE), EconomySystem.HqBaseCapacityAE),
+                RulesField.Int64(3, nameof(EconomySystem.StorageCapacityBonusAE), EconomySystem.StorageCapacityBonusAE),
+                RulesField.Int32(4, nameof(EconomySystem.ExcessDecayPercent), EconomySystem.ExcessDecayPercent),
+                RulesField.Int32(5, nameof(EconomySystem.ExcessDecayIntervalTicks), EconomySystem.ExcessDecayIntervalTicks),
+                RulesField.Int32(6, nameof(ConstructionSystem.RepairRateHpPerTick), ConstructionSystem.RepairRateHpPerTick),
+                RulesField.Int32(7, nameof(ConstructionSystem.LowPowerRepairRateHpPerTick), ConstructionSystem.LowPowerRepairRateHpPerTick),
+                RulesField.Int32(8, nameof(SimDefinitions.BuildingFootprintCells), SimDefinitions.BuildingFootprintCells),
+                RulesField.Int32(9, nameof(ConstructionSystem.RepairCostPercent), ConstructionSystem.RepairCostPercent),
+                RulesField.Int32(10, nameof(ConstructionSystem.BuildInfluenceRadiusCells), ConstructionSystem.BuildInfluenceRadiusCells),
+                RulesField.Int32(11, nameof(ConstructionSystem.MinimumBuildingDistanceCells), ConstructionSystem.MinimumBuildingDistanceCells),
+                RulesField.Int32(12, nameof(ConstructionSystem.RefineryMinimumFieldDistanceCells), ConstructionSystem.RefineryMinimumFieldDistanceCells),
+                RulesField.Int32(13, nameof(ConstructionSystem.RefineryMaximumFieldDistanceCells), ConstructionSystem.RefineryMaximumFieldDistanceCells),
+                RulesField.Int32(14, nameof(ConstructionSystem.MinimumNonRefineryFieldDistanceCells), ConstructionSystem.MinimumNonRefineryFieldDistanceCells),
+            };
+        }
+
+        // <frozen-rules-rows>
+        // Frozen literal rows, one per rules revision (#138, D-120). APPEND
+        // ONLY: a row is written once, when its revision is introduced, and is
+        // never edited afterwards. Every value is a literal, never a reference
+        // to a live constant; the FrozenRevisions_ReadNoLiveConstants tests
+        // check this region as source text. Field 1 (the revision number) is
+        // written by HashRulesRow and is not part of a row.
+        //
+        // To append revision N: declare RulesRevisionVN; add FrozenRulesRowVN
+        // = the previous row with today's values as literals plus the new
+        // fields; add its case to GetFrozenRulesRow; extend
+        // BuildLiveCurrentRulesRow with the live reads of the new fields; move
+        // CurrentRulesRevision; pin the new golden hash next to the old ones.
+
+        /// <summary>Revision 1 (e1970a9, D-106): HQ/storage capacity and excess decay.</summary>
+        private static readonly RulesField[] FrozenRulesRowV1 =
+        {
+            RulesField.Int64(2, "HqBaseCapacityAE", 2000L),
+            RulesField.Int64(3, "StorageCapacityBonusAE", 2000L),
+            RulesField.Int32(4, "ExcessDecayPercent", 25),
+            RulesField.Int32(5, "ExcessDecayIntervalTicks", 10),
+        };
+
+        /// <summary>Revision 2 (8512e9f, Sprint-16.6 C4): revision 1 plus repair rates.</summary>
+        private static readonly RulesField[] FrozenRulesRowV2 =
+        {
+            RulesField.Int64(2, "HqBaseCapacityAE", 2000L),
+            RulesField.Int64(3, "StorageCapacityBonusAE", 2000L),
+            RulesField.Int32(4, "ExcessDecayPercent", 25),
+            RulesField.Int32(5, "ExcessDecayIntervalTicks", 10),
+            RulesField.Int32(6, "RepairRateHpPerTick", 10),
+            RulesField.Int32(7, "LowPowerRepairRateHpPerTick", 5),
+        };
+
+        /// <summary>
+        /// Revision 3 (4cdcf07, D-104), values as of e4faa75 (#131: HQ 3,000).
+        /// The pre-#131 identity of revision 3 is the accepted D-120 gap.
+        /// </summary>
+        private static readonly RulesField[] FrozenRulesRowV3 =
+        {
+            RulesField.Int64(2, "HqBaseCapacityAE", 3000L),
+            RulesField.Int64(3, "StorageCapacityBonusAE", 2000L),
+            RulesField.Int32(4, "ExcessDecayPercent", 25),
+            RulesField.Int32(5, "ExcessDecayIntervalTicks", 10),
+            RulesField.Int32(6, "RepairRateHpPerTick", 10),
+            RulesField.Int32(7, "LowPowerRepairRateHpPerTick", 5),
+            RulesField.Int32(8, "BuildingFootprintCells", 3),
+            RulesField.Int32(9, "RepairCostPercent", 30),
+            RulesField.Int32(10, "BuildInfluenceRadiusCells", 8),
+            RulesField.Int32(11, "MinimumBuildingDistanceCells", 2),
+            RulesField.Int32(12, "RefineryMinimumFieldDistanceCells", 1),
+            RulesField.Int32(13, "RefineryMaximumFieldDistanceCells", 3),
+            RulesField.Int32(14, "MinimumNonRefineryFieldDistanceCells", 2),
+        };
+
+        private static RulesField[] GetFrozenRulesRow(ushort rulesRevision)
+        {
+            switch (rulesRevision)
+            {
+                case RulesRevisionV1: return FrozenRulesRowV1;
+                case RulesRevisionV2: return FrozenRulesRowV2;
+                case RulesRevisionV3: return FrozenRulesRowV3;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(rulesRevision), rulesRevision, "Unknown rules revision.");
+            }
+        }
+        // </frozen-rules-rows>
+
+        /// <summary>
+        /// One tagged, typed value of a rules-identity row (#138, D-120). The
+        /// name is diagnostic only and never hashed or compared, so renaming
+        /// a constant does not trip the drift check.
+        /// </summary>
+        private readonly struct RulesField
+        {
+            private RulesField(uint tag, string name, bool isInt64, long value)
+            {
+                Tag = tag;
+                Name = name;
+                IsInt64 = isInt64;
+                Value = value;
+            }
+
+            public uint Tag { get; }
+            public string Name { get; }
+            public bool IsInt64 { get; }
+            public long Value { get; }
+
+            public static RulesField Int64(uint tag, string name, long value) => new RulesField(tag, name, true, value);
+
+            public static RulesField Int32(uint tag, string name, int value) => new RulesField(tag, name, false, value);
+
+            public string Describe() => $"{Value} ({(IsInt64 ? "i64" : "i32")}, tag {Tag})";
         }
 
         /// <summary>Occupancy of one reserved slot (index 0..7).</summary>

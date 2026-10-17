@@ -424,6 +424,15 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Historische Regelrevisionen sind wieder eingefroren (#138, D-120-Entwurf).**
+  `MatchFingerprint.ComputeRulesHash64` hashte für jede Revision die heutigen
+  Konstanten; #131 hatte so die Identität von Revision 1 und 2 rückwirkend
+  verschoben. Jede Revision trägt jetzt eine Literalzeile, nur
+  `ComputeCurrentRulesHash64` liest live. Die Pins kehren zu den Originalwerten
+  zurück (Rev 1 `0x531CE8F614A16CB5`, Rev 2 `0x07725EA26668C9F8`), der aktuelle
+  `RulesHash64` bleibt `0xD1B683837D12FCEF`. Ein Stolperdraht-Test nennt
+  künftig die geänderte Konstante und verlangt eine neue Revision statt eines
+  neuen Pins.
 - **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
   31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
   zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein

@@ -3662,6 +3662,114 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-120 | Entwurf | Regelrevisionen werden append-only und tragen eingefrorene Literalzeilen
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#138); verbindlich mit
+dem Merge des PR.
+
+**Kontext:** `MatchFingerprint.ComputeRulesHash64(rev)` sollte laut Docstring
+frühere Regeln „exactly“ abbilden. Tatsächlich war nur die **Feldzahl** (5/7/14)
+revisionsabhängig; die **Werte** las die Funktion für jede Revision live aus
+`EconomySystem`, `ConstructionSystem` und `SimDefinitions`. Am Code geprüft
+(`main` @ `a6858d1`): Von den 13 gehashten Konstanten hat sich seit ihrer
+Einführung genau eine bewegt, `HqBaseCapacityAE` von 2.000 auf 3.000 in
+`e4faa75` (#131, 2026-08-31). Das hat drei Identitäten umgeschrieben:
+
+- Revision 1 `0x531CE8F614A16CB5` → `0x1163158B8146B168`,
+- Revision 2 `0x07725EA26668C9F8` → `0x259E6977B751109B`,
+- Revision 3, die aktuelle, `0x05CCA8475789AD4A` → `0xD1B683837D12FCEF` –
+  **ohne Revisionssprung**, entgegen dem Append-only-Sinn von D-104 Punkt 8.
+
+Die Pins wurden in `e4faa75` neu gesetzt, mit einem Testkommentar „NOT actually
+frozen“. Kein Produktivpfad berechnet historische Revisionen (`MatchBootstrap`
+und `Determinism10000Scenario` nutzen nur `ComputeCurrentRulesHash64`); der
+Defekt betraf die Aussagekraft der Replay-/Relay-Tests und des Docstrings.
+`Scripts/Simulation/Replays/` ist „niemand ohne D-ID“
+([13-15_Parallelbetrieb.md](hashkrieg/13-15_Parallelbetrieb.md)). Überholt sind
+damit auch die Aussagen in `reports/v8.6.0/sprint-23/13-kimi-reparatur.md`
+(Abschnitt zu `MatchFingerprintTests.cs`), Rev-1/2-Pins blieben unverändert und
+ein Revisionssprung friere Revision 3 ein: Beim Schreiben (`c1a5ebf`) stimmten
+beide Aussagen noch, waren unter dem alten Code aber nicht dauerhaft gesichert
+und wurden 13 Minuten später durch #131 (`e4faa75`) überholt.
+
+**Alternativen:**
+
+1. **Nur V1/V2 als Literale einfrieren.** Billig, Pins kehren zurück. Der
+   Defekt wandert aber nur zur aktuellen Revision: Die nächste Änderung einer
+   gehashten Konstante deutet V3 wieder still um, genau wie #131. Verworfen.
+2. **Alle Revisionen als Literalzeilen, Live-Pfad nur für den aktuellen Build,
+   dazu ein Stolperdraht.** V1/V2 kehren zu ihren Originalwerten zurück, V3
+   friert den Stand seit `e4faa75` ein, der aktuelle `RulesHash64` bewegt sich
+   nicht. Ein Test vergleicht die Live-Konstanten Feld für Feld mit der
+   Literalzeile der aktuellen Revision. Kosten: Jede Balanceänderung an einer
+   der gehashten Konstanten erzwingt eine neue Revision. Die Identität von
+   Revision 3 vor #131 bleibt nicht abbildbar.
+3. **Revision 3 rückwirkend teilen** (V3 = HQ 2.000, heutiger Stand = V4).
+   Wirkt lückenlos, ist es aber nicht: Revisionsnummer und Feldzahl gehen in den
+   Hash ein, der heutige Stand als V4 ergibt zwangsläufig einen anderen Wert als
+   `0xD1B683837D12FCEF`. Damit verlöre man die Identität aller Builds seit
+   2026-08-31, also das jüngere, betarelevante Fenster, und jeder verteilte
+   Build würde ungültig. Verworfen.
+4. **In #108 aufgehen lassen.** Kein eigener Eingriff jetzt; bis dahin bleibt
+   der Testkommentar die einzige Absicherung, und jede weitere
+   Konstantenänderung überschreibt die Historie erneut. Verworfen.
+5. **Tabelle bekannter Identitäten mit zwei Zeilen für Revision 3** (vor und
+   nach #131, über einen Variantenschlüssel). Wäre tatsächlich lückenlos, ohne
+   den aktuellen Hash zu bewegen, braucht aber einen Schlüssel neben der
+   Revisionsnummer, den kein Fingerprint transportiert. Ohne Produktivkonsumenten
+   lohnt das nicht. Verworfen.
+
+**Entscheidung:** Alternative 2.
+
+1. **Regelrevisionen sind append-only.** Jede Revision trägt eine eingefrorene
+   Literalzeile in `MatchFingerprint.cs`; eine Zeile wird einmal geschrieben,
+   wenn ihre Revision angelegt wird, und danach nie mehr geändert.
+2. `ComputeRulesHash64(rev)` liest **nur** diese Literalzeilen. Unbekannte
+   Revisionen werfen weiter.
+3. Nur `ComputeCurrentRulesHash64()` liest die lebenden Konstanten, im Layout
+   von `CurrentRulesRevision`.
+4. **Jede Wertänderung einer gehashten Konstante bedeutet eine neue
+   Regelrevision** mit eigener Literalzeile. Einen Golden-Hash neu zu pinnen
+   oder eine Literalzeile zu ändern, ist nie die Abhilfe.
+5. Der Stolperdraht `MatchFingerprint.DescribeCurrentRulesDrift()` vergleicht
+   Live-Konstanten und Literalzeile der aktuellen Revision Feld für Feld (Tag,
+   Breite, Wert); der Test `CurrentLiveRules_MatchTheFrozenCurrentRevision`
+   meldet dann die geänderte Konstante mit „nächste RulesRevision anhängen,
+   nicht neu pinnen“. Ein Quelltextwächter
+   (`FrozenRevisions_ReadNoLiveConstants`) prüft, dass der markierte
+   Literalbereich keine lebenden Konstanten referenziert.
+6. Werte: V1 = 2.000/2.000/25/10 (`e1970a9`), V2 = zusätzlich 10/5
+   (`8512e9f`), V3 = 3.000/2.000/25/10/10/5/3/30/8/2/1/3/2 (`4cdcf07`, Stand
+   seit `e4faa75`). Pins: V1 `0x531CE8F614A16CB5`, V2 `0x07725EA26668C9F8`,
+   V3 und aktuell `0xD1B683837D12FCEF`.
+7. **Hingenommene Lücke:** Die Identität von Revision 3 vor #131
+   (`0x05CCA8475789AD4A`, Builds vom 2026-08-10 bis 2026-08-31) ist nicht
+   abbildbar. Dass #131 Revision 3 ohne Revisionssprung umgedeutet hat, darf
+   sich nicht wiederholen; Punkt 4 und der Stolperdraht verhindern es.
+
+**Begründung:** Nur Literalzeilen machen die Zusicherung „frozen“ nachweisbar
+wahr; die Original-Pins aus `e1970a9` und `8512e9f` kommen bitgenau zurück. Der
+aktuelle `RulesHash64` bleibt `0xD1B683837D12FCEF`, kein verteilter Build wird
+ungültig, keine der vier Guard-Baselines (D-091) bewegt sich. Der Stolperdraht
+verwandelt die stille Umdeutung aus #131 in einen roten Test, der die
+Konstante beim Namen nennt.
+
+**Konsequenzen:**
+
+- **Mehr Reibung bei Balance.** Jede Änderung an einer der 13 gehashten
+  Konstanten (z. B. `RepairCostPercent`, Q-047) wird eine neue Regelrevision in
+  `Replays/`. Ob das Anhängen einer reinen Wertrevision durch diese D-ID
+  stehend freigegeben ist oder je eine eigene D-ID braucht, entscheidet der
+  Inhaber beim Merge.
+- **Anhängen ist mechanisch:** `RulesRevisionVN` deklarieren, Literalzeile
+  `FrozenRulesRowVN` anlegen (heutige Werte als Literale plus neue Felder;
+  `SimFixed`-Felder als Rohwert), Fall in `GetFrozenRulesRow` ergänzen,
+  `BuildLiveCurrentRulesRow` um die Live-Lesungen erweitern,
+  `CurrentRulesRevision` umstellen, neuen Pin neben die alten setzen.
+- **Folgearbeiten:** Die `RulesRevisionV4` des Art-Strangs (Bewegung, Felder
+  15/16) und #108 hängen ihre Revisionen nach diesem Muster als Literalzeilen
+  an; wer zuerst landet, bekommt V4, der andere die nächste Nummer.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
