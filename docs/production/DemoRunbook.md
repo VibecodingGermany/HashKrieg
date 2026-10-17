@@ -1,6 +1,6 @@
 # Demo-Runbook – erste spielbare Runde (Glutrinne-Graybox)
 
-**Version:** 0.6.1 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
+**Version:** 0.6.2 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -140,7 +140,8 @@ steht davor und dauert so lange, wie man ihn zeigen will.
    Harvester bestellen; den Kreislauf am Feld beobachten (ernten → abliefern →
    Credits steigen).
 5. **Ausbau (3:00):** Kaserne (Shift+B); danach ist ein Kraftwerk (B) fällig
-   (LOW POWER halbiert die Produktionsgeschwindigkeit). Infanterie (Shift+Q)
+   (LOW POWER halbiert die Produktionsgeschwindigkeit und schaltet
+   Verteidigungsplattformen ab). Infanterie (Shift+Q)
    zur Verteidigung — **die Legion baut in dieser Zeit ihre eigene Basis auf.**
 6. **Gegenwehr (6:00):** Die erste gegnerische Angriffswelle trifft ein.
    Infanterie per Box auswählen, mit A auf einen Angreifer klicken; Schaden
@@ -159,7 +160,10 @@ steht davor und dauert so lange, wie man ihn zeigen will.
   Spieler (kein Konter, kein Rückzug). Ihre Peer-Session ist nicht
   snapshot-serialisiert.
 - **Zielerfassung bleibt schlicht:** Bewaffnete Einheiten und fertige
-  Verteidigungsplattformen erfassen Ziele automatisch und erwidern Feuer. Ein
+  Verteidigungsplattformen erfassen Ziele automatisch und erwidern Feuer —
+  die Plattformen jedoch nur bei gedecktem Strom: im Strommangel (Statusleiste
+  „LOW POWER“, Warnung „Türme aus“) schweigen sie, bis die Bilanz wieder
+  stimmt (#67, D-122). Ein
   A-Befehl ohne Gegner unter dem Cursor bleibt jedoch ein schlichtes Move;
   Attack-Move und Zielerfassung bei der Ankunft sind nicht implementiert.
 - `Stop` löscht Bewegung und das aktuelle Angriffsziel. Die automatische
@@ -280,3 +284,4 @@ der Editor in der Konsole, wenn das Schreiben fehlschlägt.
 | 0.5.0 | 2026-08-06 | Bedienbares HUD (D-084): §2 um Bauleiste/Ghost-Platzierung, Command Card, Minimap, sichtbaren Nebel und Selektionsmarker ergänzt; §3 um MMB-Drag-Rotation, Space-Reset und die tastaturfreien Wege über Bauleiste/Command Card erweitert | Agent |
 | 0.6.0 | 2026-08-10 | D-102/Sprint 16.7 nachgezogen: fünf endliche Aetheriumfelder samt Markerpositionen und Reserven ersetzen die alte Zwei-Feld-Beschreibung; Angriffswege bleiben G4-Scope | Codex / Dennis Westermann |
 | 0.6.1 | 2026-08-10 | D-097/Paket 16.10 nachgezogen: Stop löscht das aktuelle Angriffsziel; automatische Neuerfassung im Folgetick und das weiterhin fehlende Halte-Feuer ehrlich abgegrenzt; die benachbarte überholte Behauptung fehlender Auto-Zielerfassung auf den aktuellen Combat-Stand korrigiert | Codex / Dennis Westermann |
+| 0.6.2 | 2026-10-17 | #67/D-122 (Entwurf): §5 Zielerfassung berichtigt – Verteidigungsplattformen feuern nur bei gedecktem Strom | Agent (Issue-Lauf 2026-10-17, unter Delegation) |

@@ -1,6 +1,6 @@
 # Wirtschaftssystem (Economy)
 
-**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.7.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -69,6 +69,8 @@ Harvester sind unbewaffnet (Allianz/Legion) und haben mittlere Panzerung; Evolvi
 4. Superwaffen-Countdown pausiert.
 
 Reihenfolge ist fest: Radar und Verteidigung fallen **immer** zuerst, Produktion wird pauschal halbiert – keine spielerseitige Priorisierung im MVP (UI-/Balancing-Aufwand, siehe Offene Punkte). Rückkehr zu positivem Saldo stellt alle Systeme sofort wieder her.
+
+**MS-1-Stand der Low-Power-Regel (#67, D-122):** Umgesetzt sind Radar offline, Produktions-, Bau- und Reparaturgeschwindigkeit −50 % sowie **Verteidigungsplattformen offline**. Eine Plattform im Besitz eines Spielers mit Defizit erfasst keine Ziele, feuert nicht und verwirft ihr gehaltenes Ziel; ihr Cooldown läuft weiter, bei Rückkehr des Stroms feuert sie sofort wieder und erfasst das nächstgelegene Ziel neu. Einheiten sind nie betroffen. Die Bilanz wird zu Beginn des Combat-Schritts gelesen (ein Tick Latenz). Forschung (−50 %, D-030) und der Superwaffen-Countdown bleiben Vollspielziel. **Spielerfalle:** laufende Baustellen reservieren keinen Strom; wer mehrere Stromverbraucher (z. B. Plattformen) knapp nacheinander setzt, kann das Defizit mit deren Fertigstellung selbst auslösen und damit die gesamte Verteidigung abschalten. Die UI nennt die Folgen daher an Ressourcenleiste und Baubar („Türme aus“).
 
 ## Einkommensraten-Ziele (AE/min, Richtwerte)
 
@@ -166,3 +168,4 @@ Leitplanke: Gesamt-AE-Fluss pro Spieler über ein typisches 25-min-Match ≈ 25.
 | 0.4.0 | 2026-07-21 | F-03 vollständig geschlossen: Harvester-Kosten in der Fraktions-Wirtschaftsmodifier-Tabelle durch Verweis auf die führende Quelle [Vehicles.md](./Vehicles.md) ersetzt (D-047) – keine dritte Zahl mehr neben Vehicles.md (700/550/620 AE) | Lead Gameplay Designer |
 | 0.5.0 | 2026-08-10 | MS-1-Start auf 3.000 AE (D-077) nachgezogen und D-106 präzisiert: eine HQ-Basis je Konto, +2.000 je fertigem Lager, harte Einzahlungskappung sowie zustandsloser 25-%-Abbau des aktuellen Überhangs pro Sekunde | Codex / Dennis Westermann |
 | 0.6.0 | 2026-08-10 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |
+| 0.7.0 | 2026-10-17 | #67/D-122 (Entwurf): MS-1-Stand der Low-Power-Regel ergänzt – Verteidigungsplattformen offline (Ziel verwerfen, Cooldown läuft weiter, ein Tick Latenz), Spielerfalle durch nicht reservierte Baustellen benannt | Agent (Issue-Lauf 2026-10-17, unter Delegation) |

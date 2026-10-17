@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.8.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.9.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -71,7 +71,7 @@ Bei Widerspruch übersteuert dieser Abschnitt den nachfolgenden Vollspielentwurf
 
 - **Führende Quelle für Gebäudewerte (Review F-03, Grundsatzregel D-047):** Dieses Dokument ist die alleinige Quelle für Gebäudekosten, Energiewerte (Erzeugung/Verbrauch) und Bauzeiten. [./Economy.md](./Economy.md) verweist hierher und enthält nur Systemlogik (Einkommensraten, Low-Power-Regel, Lager-Kapazität); doppelte Zahlenpflege ist unzulässig.
 - **12 Typen pro Fraktion, identische Rollen, eigene Namen und Werte-Deltas** (D-008, D-011). Die Rolle ist fraktionsübergreifend balancierbar; Kosten/TP/Bauzeit tragen die Fraktionsidentität (Allianz teuer/präzise, Legion günstig/massig, Evolvierte regenerativ/wachsend).
-- **Energiebilanz:** Kraftwerke produzieren, fast alles andere verbraucht. Im ausgelieferten MS-1 halbiert ein Defizit Produktion, Bau und Reparatur; Radar und Minimap fallen aus. Forschung, Superwaffen-Ladung und stromabhängige Verteidigungsplattformen bleiben Ziele des nachfolgenden Vollspielentwurfs und sind im aktuellen Combat-Pfad nicht als Low-Power-Effekt implementiert.
+- **Energiebilanz:** Kraftwerke produzieren, fast alles andere verbraucht. Im ausgelieferten MS-1 halbiert ein Defizit Produktion, Bau und Reparatur; Radar und Minimap fallen aus, und die Verteidigungsplattformen des betroffenen Besitzers schalten sich ab (#67, D-122: kein Feuer, kein gehaltenes Ziel; Einheiten sind nie betroffen). Forschung und Superwaffen-Ladung bleiben Ziele des nachfolgenden Vollspielentwurfs und sind nicht als Low-Power-Effekt implementiert.
 - **Lagerkapazität (D-024/D-096/D-106):** Genau eine HQ-Basiskapazität von 2.000 AE je Konto, sobald mindestens ein fertiges HQ lebt; +2.000 AE je fertigem Lager. Neue Einzahlungen werden hart gedeckelt. Vorhandener Überhang verliert unabhängig von seiner Ursache einmal pro Sekunde 25 % des aktuellen Überhangs (Abrundung, mindestens 1 AE) bis zur Grenze.
 - **Eroberung (D-022):** Feindliche Gebäude sind eroberbar – eine Capture-Einheit kanalisiert 5 s am Ziel (Abbruch bei Schaden) und wird bei Erfolg verbraucht. Capture-Einheiten: Engineer (Allianz), Saboteur (Legion), Tunnelgräber (Evolvierte). Regelwerk und Details in [./Infantry.md](./Infantry.md) und [./NeutralUnits.md](./NeutralUnits.md); gilt ebenso für neutrale Geschütztürme (D-016).
 - **Trefferpunkt-Klassen:** Leicht (400–800 TP), Mittel (900–1.500 TP), Schwer (1.600–2.500 TP). Klasse statt Pseudo-Präzision; exakte Werte entstehen im Balancing-Pass.
@@ -192,7 +192,7 @@ Voraussetzungsschlüssel: HQ = Hauptquartier, KW = Kraftwerk, Raff = Raffinerie,
 | Legion | Geschützstellung | 300 AE | 10 s | −8 | Mittel |
 | Evolvierte | Rankenturm | 350 AE | 11 s (Reifung) | −8 | Mittel |
 
-- Rolle: stationäre Verteidigung; Basis ist ein unbewaffnetes Podest, Bewaffnung über Module (§3). „Offline bei Low Power“ bleibt Vollspielziel; der aktuelle MS-1-Combat-Pfad schaltet die Plattform bei Strommangel noch nicht ab.
+- Rolle: stationäre Verteidigung; Basis ist ein unbewaffnetes Podest, Bewaffnung über Module (§3). **Offline bei Low Power (#67, D-122):** Solange der Besitzer im Strommangel ist (Verbrauch > Erzeugung), erfasst die Plattform keine Ziele, feuert nicht und verwirft ein gehaltenes Ziel; der Waffen-Cooldown läuft weiter, sodass sie bei Rückkehr des Stroms sofort wieder feuert und das nächstgelegene Ziel neu erfasst. Die Bilanz gilt vom Tickanfang (ein Tick Latenz). Eine offline Plattform verbraucht weiter Strom; laufende Baustellen reservieren dagegen keinen (Platzierungsprüfung liest nur die fertige Bilanz), sodass mehrere kurz nacheinander gesetzte Stromverbraucher das Defizit auslösen können, wenn sie fertig werden.
 - **Aggressions-Modi (D-031.6):** Die Plattform nutzt dieselben drei Aggressions-Modi wie Einheiten – **Halten / Abwehren (Standard) / Freies Feuer** –, umschaltbar über die Befehlskachel der Auswahl; Logik identisch zu [../vision/CoreGameplay.md](../vision/CoreGameplay.md) (Abschnitt Aggressions-Modi). Der Modus gilt unverändert für alle Modul-Stufen (MG/Flak/Rakete).
 - Voraussetzung: Kaserne (MG-Modul), Radar (Flak-Modul), FL (Raketen-Modul).
 
@@ -328,3 +328,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.7.0 | 2026-08-10 | Die neun fraktionsgleichen All-of-Platzierungsvoraussetzungen samt Trennung von Plattformbasis und Modulen gemäß D-103 festgeschrieben | Agent (unter Delegation) / Dennis Westermann |
 | 0.8.0 | 2026-08-10 | D-104-MS-1-Override ergänzt: einheitliche 3×3-Footprints, footprintbasierte Einfluss-, Gelände-, Gebäude- und Feldabstände sowie kumulative 30-%-Reparaturkosten mit 10/5 TP pro Tick; nicht implementierte Vollspielziele klar abgegrenzt | Agent (unter Delegation) / Dennis Westermann |
 | 0.8.1 | 2026-08-10 | Paket 16.10 nachgezogen: der Bauknopf erklärt All-of-Voraussetzungen, AE, Energie und Baustellenlimit; Energie bleibt informativ und blockiert den Platzierungsmodus nicht | Codex / Dennis Westermann |
+| 0.9.0 | 2026-10-17 | #67/D-122 (Entwurf): Verteidigungsplattformen fallen bei Strommangel aus (Grundprinzip „Energiebilanz“ und Abschnitt Verteidigungsplattform berichtigt; Vollspielziel nur noch für Forschung und Superwaffen) | Agent (Issue-Lauf 2026-10-17, unter Delegation) |

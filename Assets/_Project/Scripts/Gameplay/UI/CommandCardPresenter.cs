@@ -362,13 +362,15 @@ namespace Nova.Gameplay
 
         /// <summary>
         /// Compact live grid balance for the build bar. Low power must name
-        /// its gameplay consequence where the player makes build decisions.
+        /// its gameplay consequence where the player makes build decisions —
+        /// including that the defence platforms go offline (#67, D-122), so a
+        /// deficit caused by one's own build-out is not a silent trap.
         /// </summary>
         public static string FormatPowerBalance(int powerProvided, int powerRequired)
         {
             string balance = $"Strom {powerProvided}/{powerRequired}";
             return powerRequired > powerProvided
-                ? balance + " · LOW POWER: Produktion ½"
+                ? balance + " · LOW POWER: Produktion ½ · Türme aus"
                 : balance;
         }
 
