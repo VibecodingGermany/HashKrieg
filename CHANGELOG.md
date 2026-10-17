@@ -18,6 +18,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Entschieden
+- **D-123 (Entwurf): `MapDefinitionSO` abgeschafft.** Typ, `MapBiomeType`, `MAP_Glutrinne.asset`, der zugehörige EditMode-Test, der Generator-Abschnitt und `MatchBootstrap.CanonicalHqCentreCells` entfallen; das Asset hatte keinen Laufzeitleser (#127).
 - **D-108 berichtigt und neu gefasst: jedes eigene Gebäude wird Bauanker.** Die
   Erstfassung vom 2026-08-17 behauptete, der Code lasse *jedes* Gebäude als Anker
   gelten, und wollte diesen Zustand nur aussprechen. Das war falsch:

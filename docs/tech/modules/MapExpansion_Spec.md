@@ -1,10 +1,10 @@
 # Modulspezifikation – Map- & Biom-Erweiterung (`Nova.Presentation.Maps`)
 
-**Version:** 1.1.1 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Level Designer / Lead Technical Director | **Sprint:** Phase 2 (Modul 19)
+**Version:** 1.1.2 | **Status:** historischer Prototyp-/Scaffolding-Stand gemäß D-055 – nicht verbindlich | **Verantwortungsbereich:** Level Designer / Lead Technical Director | **Sprint:** Phase 2 (Modul 19)
 
 ## Zweck
 
-Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweiterung** von *Hashkrieg*. Das Modul verwaltet Karten-Layouts (`MapDefinitionSO`) für 1v1- und 2v2-Gefechte, 2 bis 4 Spieler-Spawn-Punkte, Aetherium-Kristallknoten-Positionen sowie drei Biom-Umgebungen (`Desert`, `Snow`, `JungleIndustrial`).
+Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweiterung** von *Hashkrieg*. Das Modul sollte Karten-Layouts für 1v1- und 2v2-Gefechte, 2 bis 4 Spieler-Spawn-Punkte, Aetherium-Kristallknoten-Positionen sowie drei Biom-Umgebungen (`Desert`, `Snow`, `JungleIndustrial`) verwalten. Die dafür gedachten Typen `MapDefinitionSO` und `MapBiomeType` samt Datenasset wurden mit #127 (D-123) entfernt, weil sie keinen Laufzeitkonsumenten hatten; dieser Text beschreibt nur noch den historischen Entwurf.
 
 
 ## Abhängigkeiten
@@ -34,7 +34,7 @@ Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweite
 [ MatchRunner / Game Setup ]
               │
               ▼
-    [ MapDefinitionSO ] ──► Validate Map Dimensions & Spawn Points (IsValid)
+    [ Kartendefinition (entfernt, D-123) ] ──► Validate Map Dimensions & Spawn Points (historisch: IsValid)
               │
               ├── Spawn Base HQs ─────► ConstructionSystem
               └── Spawn Aetherium ───► ResourceHarvestingSystem
@@ -44,7 +44,7 @@ Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweite
 
 ## 2. Qualitätssicherung & Tests
 
-* **Unit Tests:** [`MapDefinitionTests.cs`](../../../Assets/Tests/EditMode/Data/MapDefinitionTests.cs) (Validierung von Kartenabmessungen, Spawn-Punkten und Biom-Typen).
+* **Unit Tests:** entfallen mit #127 (D-123); `MapDefinitionTests.cs` prüfte nur die Selbstvalidierung des entfernten Typs.
 
 ## Offene Punkte
 
@@ -64,3 +64,4 @@ Dieses Dokument beschreibt die Präsentations-Struktur der **Map- & Biom-Erweite
 | 1.0.0 | 2026-07-24 | Historischen Prototyp-/Scaffolding-Stand dokumentiert | Modulverantwortliche |
 | 1.1.0 | 2026-07-24 | Freigabe gemäß D-055 entzogen und aktive Recovery-Verträge als führend verankert | Lead Technical Director |
 | 1.1.1 | 2026-07-25 | Testpfad korrigiert: `MapDefinitionSO`/`MapBiomeType` liegen nach der G0-B-Assembly-Bereinigung in `Nova.Data`, der Test in `Nova.Data.Tests` | Lead Technical Director |
+| 1.1.2 | 2026-10-17 | `MapDefinitionSO`, `MapBiomeType`, Datenasset und Test entfernt (#127, D-123); toten Testlink gestrichen | Orchestrator |
