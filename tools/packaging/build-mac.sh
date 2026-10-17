@@ -7,6 +7,11 @@
 #   tools/packaging/build-mac.sh --fast       # nur bauen, ad-hoc signiert, kein DMG
 #   tools/packaging/build-mac.sh --skip-build # vorhandenen Build nur neu verpacken
 #   tools/packaging/build-mac.sh --open       # nach dem Bauen starten
+#   tools/packaging/build-mac.sh --allow-dirty # trotz unsauberem Baum (Stempel '-dirty')
+#   tools/packaging/build-mac.sh --check-only # nur Quellstand pruefen, kein Unity
+#
+# Voll- und --skip-build-Laeufe brechen bei unsauberem Arbeitsbaum ab (#132).
+# --fast ist fuer die eigene Iteration und darf unsauber sein.
 #
 # WARUM DAS EIN SKRIPT IST UND KEINE ANLEITUNG:
 # Der Relay sperrt Matches zwischen ungleichen Builds (Sprint 12, A4 —
@@ -23,13 +28,15 @@
 # Dylibs, dann die Plugin-Bundles als Einheit, das Hauptbundle zuletzt.
 set -euo pipefail
 
-FAST=0 SKIP_BUILD=0 OPEN_AFTER=0
+FAST=0 SKIP_BUILD=0 OPEN_AFTER=0 ALLOW_DIRTY=0 CHECK_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --fast)       FAST=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --open)       OPEN_AFTER=1; shift ;;
-    -h|--help)    sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --allow-dirty) ALLOW_DIRTY=1; shift ;;
+    --check-only) CHECK_ONLY=1; shift ;;
+    -h|--help)    sed -n '2,24p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *)            echo "FEHLER: unbekannte Option: $1" >&2; exit 1 ;;
   esac
 done
@@ -38,6 +45,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENTITLEMENTS="$REPO/tools/packaging/Nova.entitlements"
 BUILD_DIR="$REPO/Builds/MacOSArm64"
 APP="$BUILD_DIR/ProjectNova.app"
+SIDECAR="$BUILD_DIR/.build-commit"
 DIST="$REPO/Builds/dist"
 NOTARIZE="$HOME/.claude/skills/apple-upload/scripts/notarize.sh"
 
@@ -45,6 +53,69 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 die()  { printf '\033[31mFEHLER: %s\033[0m\n' "$1" >&2; exit 1; }
 
 # --- Preflight --------------------------------------------------------------
+# --- Quellstand pruefen (#132, D-124) -----------------------------------------
+# Ein Paket, das die Testpartie spielt, muss aus einem Commit fallen, den ein
+# frischer Klon reproduzieren kann. Deshalb steht diese Pruefung VOR jedem
+# Unity-Aufruf: ein unsauberer Baum (auch untrackte Dateien — Unity kompiliert
+# alles unter Assets/ mit) bricht ab. Gleiche Definition wie BuildCommitStamp.cs:
+# `git status --porcelain` ueber den ganzen Baum.
+step "Quellstand"
+
+HEAD_FULL="$(git -C "$REPO" rev-parse HEAD)"
+COMMIT="$(git -C "$REPO" rev-parse --short HEAD)"
+TREE_STATE=clean
+DIRTY_LIST="$(git -C "$REPO" status --porcelain)"
+if [ -n "$DIRTY_LIST" ]; then
+  TREE_STATE=dirty
+  if [ "$ALLOW_DIRTY" -eq 1 ] || [ "$FAST" -eq 1 ]; then
+    COMMIT="$COMMIT-dirty"
+    echo "    WARNUNG: Arbeitsbaum nicht sauber — Paket heisst '$COMMIT'."
+    echo "             Ein '-dirty'-Build laesst sich nicht rekonstruieren."
+  else
+    {
+      echo "Geaenderte oder untrackte Dateien (git status --porcelain, erste 20):"
+      printf '%s\n' "$DIRTY_LIST" | head -20 | sed 's/^/    /'
+    } >&2
+    die "Arbeitsbaum nicht sauber. Beta-Pakete entstehen aus einem sauberen Commit, am besten aus einem frischen Worktree von origin/main (siehe tools/packaging/README.md). Ausweg fuer lokale Pakete: --allow-dirty (Stempel behaelt '-dirty')."
+  fi
+fi
+echo "    Commit: $COMMIT"
+
+# --skip-build verpackt einen vorhandenen Build neu. Ohne Gegenprobe bekaeme ein
+# alter Build das Etikett des aktuellen Commits. Der Sidecar entsteht nach einem
+# erfolgreichen Unity-Build und haelt fest, aus welchem HEAD er stammt.
+if [ "$SKIP_BUILD" -eq 1 ]; then
+  [ -f "$SIDECAR" ] \
+    || die "Kein $SIDECAR — woher der vorhandene Build stammt, ist unbekannt. Erst ohne --skip-build bauen."
+  SC_HEAD="$(sed -n 's/^head=//p' "$SIDECAR")"
+  SC_STATE="$(sed -n 's/^state=//p' "$SIDECAR")"
+  [ "$SC_HEAD" = "$HEAD_FULL" ] \
+    || die "Der vorhandene Build stammt aus ${SC_HEAD:-unbekannt}, HEAD ist $HEAD_FULL. Neu bauen statt --skip-build."
+  [ "$SC_STATE" = "$TREE_STATE" ] \
+    || die "Der vorhandene Build entstand aus einem Baum mit Zustand '${SC_STATE:-unbekannt}', jetzt ist er '$TREE_STATE'. Neu bauen statt --skip-build."
+  echo "    Build-Sidecar: passt zu HEAD ($SC_STATE)"
+fi
+
+# Nur eine Warnung: ein Beta-Paket soll normalerweise main sein, ob ein Branch-
+# Paket (etwa fuer einen Test) trotzdem rausgehen darf, entscheidet der Inhaber.
+# Offline darf das nie abbrechen — daher `if !` unter `set -e`.
+if ! GIT_TERMINAL_PROMPT=0 git -C "$REPO" fetch --quiet origin main >/dev/null 2>&1; then
+  echo "    HINWEIS: git fetch origin main fehlgeschlagen (offline oder kein 'origin') — Vergleich nur mit dem Stand des letzten Fetch."
+fi
+ORIGIN_MAIN="$(git -C "$REPO" rev-parse --verify --quiet origin/main || true)"
+if [ -z "$ORIGIN_MAIN" ]; then
+  echo "    WARNUNG: origin/main unbekannt — HEAD kann nicht gegen main verglichen werden."
+elif [ "$ORIGIN_MAIN" != "$HEAD_FULL" ]; then
+  echo "    WARNUNG: HEAD ist nicht origin/main (${ORIGIN_MAIN:0:7}). Ein Beta-Paket soll aus main fallen."
+else
+  echo "    HEAD = origin/main"
+fi
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  echo "    --check-only: Quellstand geprueft, Abbruch vor Unity."
+  exit 0
+fi
+
 step "Preflight"
 
 UNITY_VERSION="$(sed -n 's/^m_EditorVersion: //p' "$REPO/ProjectSettings/ProjectVersion.txt")"
@@ -57,14 +128,6 @@ echo "    Unity:  $UNITY_VERSION"
 if [ "$SKIP_BUILD" -eq 0 ] && [ -f "$REPO/Library/EditorInstance.json" ]; then
   die "Der Unity-Editor hat das Projekt offen. Erst schliessen, dann bauen."
 fi
-
-COMMIT="$(git -C "$REPO" rev-parse --short HEAD)"
-if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
-  COMMIT="$COMMIT-dirty"
-  echo "    WARNUNG: Arbeitsbaum nicht sauber — Paket heisst '$COMMIT'."
-  echo "             Ein '-dirty'-Build laesst sich nicht rekonstruieren."
-fi
-echo "    Commit: $COMMIT"
 
 if [ "$FAST" -eq 0 ]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
@@ -92,6 +155,9 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     die "Unity-Build fehlgeschlagen."
   fi
   echo "    Log: $LOG"
+
+  # Sidecar fuer --skip-build: aus welchem HEAD und Baumzustand dieser Build kam.
+  printf 'head=%s\nstate=%s\n' "$HEAD_FULL" "$TREE_STATE" > "$SIDECAR"
 fi
 [ -d "$APP" ] || die "kein Build unter $APP"
 

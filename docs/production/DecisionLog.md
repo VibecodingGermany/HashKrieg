@@ -3662,6 +3662,84 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-124 | Entwurf | Beta-Pakete nur aus sauberem Baum (harte Sperre in den Packaging-Skripten)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#132); verbindlich mit dem
+Merge des PR. Die Endnummer vergibt der Integrator.
+
+**Kontext:** Issue #132 beschreibt eine Falle: eine untrackte Datei unter
+`Assets/` (`InputGateDiagnostic.cs`) kompiliert in jeden Build aus der
+Arbeitskopie, nicht aber aus einem frischen Klon. Teil 1 (die Datei) ist
+überholt — sie liegt in keiner Arbeitskopie mehr und war nie getrackt. Teil 2
+(Betas nur aus sauberem Stand) stand bisher nur in
+`tools/packaging/README.md`; `build-mac.sh` und `build-linux.sh` hängten bei
+unsauberem Baum lediglich `-dirty` an und warnten. `--skip-build` schrieb
+außerdem das Etikett des aktuellen Commits auf einen beliebig alten Build. Der
+Editor-Hook `BuildCommitStamp` stempelt `-dirty` für den ganzen Baum
+(`git status --porcelain`), also auch für harmlose untrackte Dateien.
+
+**Alternativen:**
+
+1. **Status quo** (Doku plus `-dirty`-Stempel). Kostenlos, aber die Regel wird
+   nicht erzwungen: ein `-dirty`-Paket kann rausgehen, und ein Tester meldet
+   dann ein Verhalten, das kein anderer Rechner reproduziert.
+2. **Harte Sperre in den Skripten** vor dem Unity-Aufruf, `--allow-dirty` als
+   bewusster Ausweg, Sidecar-Datei für `--skip-build`. Klein, wirkt dort, wo
+   Pakete entstehen, und lässt den Editor-Code unberührt. Preis: Pakete aus
+   der Arbeitskopie mit Art-Änderungen gehen nur noch mit `--allow-dirty`.
+3. **Eigenes Klon-Skript**, das `origin/main` in ein Scratch-Verzeichnis klont
+   und dort baut. Strengste Garantie, aber Unity-Kaltimport bei jedem Lauf und
+   ein zweiter Pfad neben den bestehenden Skripten; ohne Art-Paket im Klon
+   zeigt der Beta Graybox.
+4. **Abbruch im Editor-Build-Hook** (`BuildCommitStamp`). Würde auch
+   Editor-Builds sperren und braucht Unity-Code, der in keiner CI läuft.
+
+**Entscheidung:** Alternative 2.
+
+- Beide Skripte prüfen **vor** jedem Unity-Aufruf `git status --porcelain` über
+  den ganzen Baum (deckungsgleich mit `BuildCommitStamp`) und brechen bei
+  nicht leerer Ausgabe ab. `--allow-dirty` erlaubt den Lauf, der Stempel behält
+  `-dirty`. `build-mac.sh --fast` (lokale Iteration, kein DMG) ist ausgenommen
+  und stempelt ebenfalls `-dirty`.
+- Nach einem erfolgreichen Unity-Build steht `Builds/<Plattform>/.build-commit`
+  (voller HEAD, Zustand `clean`/`dirty`). `--skip-build` läuft durch dieselbe
+  Prüfung und bricht ab, wenn die Datei fehlt oder nicht zu HEAD und Zustand
+  passt. Die Datei kommt nicht ins Linux-`tar.gz`.
+- HEAD ≠ `origin/main` (nach `git fetch origin main`) ist **nur eine Warnung**.
+  Ein fehlgeschlagener Fetch (offline) bricht nichts ab. Ob ein Release-DMG
+  zwingend `main` sein muss, ist damit bewusst nicht entschieden.
+- Neue Option `--check-only` beider Skripte: nur Prüfungen, Ausstieg vor Unity.
+- Bauort: frischer Worktree von `origin/main` samt `skip-worktree` auf
+  `AssetMappingRegistry.asset`, weil `ArtAssetAutoSync` sie beim Import
+  verändert. README 2.0.0 → 2.1.0.
+- Teil 1 von #132: die Datei wird nicht eingecheckt; der Inhaber bestätigt
+  außerhalb des Repos, dass auf keinem Rechner eine Kopie liegt.
+
+**Begründung:** Die Sperre sitzt dort, wo Pakete entstehen, und kostet keinen
+Editor-Code. Dass sie vor Unity greift, spart den teuren Lauf, und der Sidecar
+schließt die Lücke, durch die ein alter Build ein neues Etikett bekam. Dass die
+Prüfung den ganzen Baum erfasst und nicht nur build-relevante Pfade, ist
+absichtlich: es ist dieselbe Definition wie im Stempel, und eine Pfadliste
+würde genau die Falle wieder öffnen, die das Issue beschreibt (untrackte
+Dateien unter `Assets/`).
+
+**Konsequenzen:**
+
+- Ein Beta-Paket aus der Arbeitskopie mit Art-Änderungen bricht ab. Der Weg ist
+  ein frischer Worktree von `origin/main`; für lokale Pakete gibt es
+  `--allow-dirty`.
+- Auch harmlose untrackte Dateien (Screenshots, `.playwright-mcp/`) sperren
+  ein Vollpaket. Das ist der Preis der deckungsgleichen Definition.
+- Die Prüfung sieht den Stand vor dem Unity-Lauf. Verändert Unity den Baum
+  beim Import (Registry), stempelt der Editor-Hook `-dirty`, obwohl das Skript
+  „clean“ gesehen hat — daher `skip-worktree` im Bauort-Worktree.
+- Nicht Teil der Entscheidung: die gitignorierte Kopie `tools/build/build-mac.sh`
+  (der Inhaber löscht sie lokal) und eine Pfadbegrenzung auf build-relevante
+  Dateien.
+- Die Skripte laufen in keiner CI. Geprüft ist die Vorstufe (Sauberkeit,
+  Sidecar, Fetch) in einem Wegwerf-Repo; die Unity-Erzeugung und das
+  Schreiben des Sidecars nach einem echten Build sind nicht gelaufen.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
