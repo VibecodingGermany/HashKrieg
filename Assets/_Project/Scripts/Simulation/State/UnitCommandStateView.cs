@@ -434,6 +434,61 @@ namespace Nova.Simulation.State
         /// <summary>Maximum Chebyshev ring of the formation slot search around a move target.</summary>
         private const int FormationMaxRing = 16;
 
+        /// <summary>
+        /// First cell, in ring order around (<paramref name="gx"/>, <paramref name="gy"/>),
+        /// that a unit may claim; stamps it (and, for a large unit, its ring
+        /// of neighbours). False when the search radius is exhausted.
+        /// </summary>
+        private bool TryClaimFormationCell(int gx, int gy, bool large, int width, out int cx, out int cy)
+        {
+            CostField field = _pathfindingSystem.CostField;
+            for (int ring = 0; ring <= FormationMaxRing; ring++)
+            {
+                for (int dy = -ring; dy <= ring; dy++)
+                {
+                    for (int dx = -ring; dx <= ring; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
+                        cx = gx + dx;
+                        cy = gy + dy;
+                        if (!field.IsInBounds(cx, cy) || !field.IsWalkable((ushort)cx, (ushort)cy)) continue;
+                        if (_formationCellStamps[cy * width + cx] == _formationStamp) continue;
+                        if (large && !NeighboursUnclaimed(cx, cy, width, field)) continue;
+
+                        _formationCellStamps[cy * width + cx] = _formationStamp;
+                        if (large) StampNeighbours(cx, cy, width, field);
+                        return true;
+                    }
+                }
+            }
+            cx = cy = 0;
+            return false;
+        }
+
+        private bool NeighboursUnclaimed(int cx, int cy, int width, CostField field)
+        {
+            for (int ny = cy - 1; ny <= cy + 1; ny++)
+            {
+                for (int nx = cx - 1; nx <= cx + 1; nx++)
+                {
+                    if (!field.IsInBounds(nx, ny)) continue;
+                    if (_formationCellStamps[ny * width + nx] == _formationStamp) return false;
+                }
+            }
+            return true;
+        }
+
+        private void StampNeighbours(int cx, int cy, int width, CostField field)
+        {
+            for (int ny = cy - 1; ny <= cy + 1; ny++)
+            {
+                for (int nx = cx - 1; nx <= cx + 1; nx++)
+                {
+                    if (field.IsInBounds(nx, ny)) _formationCellStamps[ny * width + nx] = _formationStamp;
+                }
+            }
+        }
+
         private void ApplyMove(in MovePayload move)
         {
             // Canonical world-to-grid mapping: floor, also for negative values
@@ -479,34 +534,23 @@ namespace Nova.Simulation.State
 
             // Formation distribution: ring 0 is the target cell itself, then
             // expanding Chebyshev rings in ascending (y, x) order — the
-            // convention of ProductionSystem's spawn search. A cell is
-            // claimable when it is walkable and not already claimed by this
-            // command; the stamp array tracks claims without allocation.
+            // convention of ProductionSystem's spawn search. Each unit, in
+            // ascending entity order, takes the first claimable cell: walkable
+            // and not yet claimed by this command. Large units (D-116,
+            // MovementSpacing.IsLarge) also need the 8 cells around their slot
+            // unclaimed and claim them too, so two tanks never park on
+            // adjacent cells and jostle at contact distance forever. For a
+            // group of small units this is exactly the former single sweep.
+            // The stamp array tracks claims without allocation.
             _formationStamp++;
             int next = 0;
-            for (int ring = 0; ring <= FormationMaxRing && next < count; ring++)
+            int width = _pathfindingSystem.CostField.Width;
+            for (; next < count; next++)
             {
-                for (int dy = -ring; dy <= ring && next < count; dy++)
-                {
-                    for (int dx = -ring; dx <= ring && next < count; dx++)
-                    {
-                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
-                        int cx = gridX + dx;
-                        int cy = gridY + dy;
-                        if (!_pathfindingSystem.CostField.IsInBounds(cx, cy)
-                            || !_pathfindingSystem.CostField.IsWalkable((ushort)cx, (ushort)cy))
-                        {
-                            continue;
-                        }
-                        int cellIndex = cy * _pathfindingSystem.CostField.Width + cx;
-                        if (_formationCellStamps[cellIndex] == _formationStamp) continue;
-
-                        _formationCellStamps[cellIndex] = _formationStamp;
-                        _entityManager.GetUnitRef(ToEntityId(_formationIds[next]))
-                            .SetTarget(target, new GridPos2D(cx, cy));
-                        next++;
-                    }
-                }
+                ref UnitState member = ref _entityManager.GetUnitRef(ToEntityId(_formationIds[next]));
+                bool large = Movement.MovementSpacing.IsLarge(in member);
+                if (!TryClaimFormationCell(gridX, gridY, large, width, out int cx, out int cy)) break;
+                member.SetTarget(target, new GridPos2D(cx, cy));
             }
 
             // More units than claimable cells (map edge, huge group): the

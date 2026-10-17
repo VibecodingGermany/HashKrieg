@@ -72,9 +72,18 @@ namespace Nova.Simulation.Pathfinding
 
                     if (cellCost >= CostField.ImpassableCost) continue;
 
-                    // Diagonal movement cost weighting (14 vs 10 for cardinal)
-                    ushort stepCost = (dx != 0 && dy != 0) ? (ushort)(cellCost * 14 / 10) : cellCost;
-                    ushort newDist = (ushort)(currentDist + stepCost);
+                    // Octile weighting: 10 per cardinal, 14 per diagonal step
+                    // (~sqrt 2). The former `cellCost * 14 / 10` truncated to
+                    // 1 on open ground (cost 1), so a diagonal cost exactly a
+                    // straight step: every staircase was as short as the
+                    // straight line, and the flow took the first strictly
+                    // shorter neighbour in N, NE, E... order — units drove
+                    // diagonal-first zigzags instead of straight lines (D-116).
+                    // Saturates below Unreachable, so a pathological maze
+                    // degrades to ties instead of wrapping around.
+                    int stepCost = (dx != 0 && dy != 0) ? cellCost * 14 : cellCost * 10;
+                    int summed = currentDist + stepCost;
+                    ushort newDist = (ushort)(summed < Unreachable ? summed : Unreachable - 1);
 
                     int neighborIndex = nY * Width + nX;
                     if (newDist < _distances[neighborIndex])

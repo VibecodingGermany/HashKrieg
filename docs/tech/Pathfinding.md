@@ -1,6 +1,6 @@
 # Pathfinding
 
-**Version:** 1.0.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead AI Programmer | **Sprint:** 7
+**Version:** 1.1.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead AI Programmer | **Sprint:** 7
 
 ## Zweck
 
@@ -39,6 +39,13 @@ Physics und autoritative Unity-Mathematik sind verboten.
 Movement wird nach Production/Construction und vor FoW ausgeführt. Combat liest
 die danach committed Sicht.
 
+**Integrationskosten (D-116):** oktil, 10 je gerader und 14 je diagonaler
+Schritt, mal Zellkosten, gesättigt unter `Unreachable`. Bis D-116 stand dort
+`cellCost * 14 / 10`, was auf offenem Gelände ganzzahlig 1 ergab: Diagonalen
+kosteten so viel wie gerade Schritte, das Flussfeld wählte bei Gleichstand die
+erste Richtung in N-, NO-, O-Reihenfolge, und Einheiten fuhren Treppen statt
+Geraden.
+
 ## 3. Flow-Field-Key
 
 Ein kanonischer Key enthält:
@@ -69,7 +76,11 @@ liefern, bevor die Simulation fortgesetzt wird.
 ## 5. Spatial Hash
 
 Movement pflegt eine deterministische SpatialHash-Ansicht für Separation und
-V5a. Combat darf später dieselbe committed räumliche Indizierung lesen, aber
+V5a. Seit D-116 fragt die Separation ein 5×5-Fenster ab, weil der Abstand je
+Einheitentyp (`MovementSpacing`, Infanterie 0,3 bis Kampfpanzer 0,78) eine
+Berührdistanz bis 1,56 Zellen ergibt. Stehende eigene Einheiten im Fahrweg
+einer gleich großen oder größeren fahrenden Einheit weichen seitlich aus, der
+Kurs folgt dem Pfad (nicht der Abstoßung) mit höchstens 30° je Tick. Combat darf später dieselbe committed räumliche Indizierung lesen, aber
 nicht in den Movement-State zurückschreiben. Bucket- und Entityreihenfolge sind
 stabil; Full-Scan O(n²) ist im Scale-Fixture unzulässig.
 
@@ -128,3 +139,4 @@ und exakte Feld-/Hash-/Byteparität.
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead AI Programmer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings) | Lead AI Programmer |
 | 1.0.0 | 2026-07-24 | Pathfinding auf 128²-MS-1, Q16.16, deterministischen 32-/8-MiB-Cache und getrennte 100-/500-Gates rebaselined | Lead AI Programmer |
+| 1.1.0 | 2026-10-17 | D-116: oktile Integrationskosten (Ganzzahlfehler behoben), 5×5-Separation mit Abstand je Einheitentyp, Platzmachen, pfadgeführter Kurs | Technical Art / Orchestrator |
