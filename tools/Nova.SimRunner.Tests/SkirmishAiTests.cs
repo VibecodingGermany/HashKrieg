@@ -176,8 +176,12 @@ namespace Nova.SimRunner.Tests
             ulong seed,
             AiProfile? profile = null,
             IAiGoalObserver goalObserver = null,
-            IAiGoalOverride goalOverride = null)
+            IAiGoalOverride goalOverride = null,
+            AiPersonality personality = default,
+            FactionId aiFaction = FactionId.Legion)
         {
+            FactionId humanFaction = aiFaction == FactionId.Legion ? FactionId.Alliance : FactionId.Legion;
+            string aiFactionName = aiFaction.ToString();
             // Mirror of MatchRunner.InitializeMatch(seed, ..., enableSkirmishAi: true).
             var kernel = new SimulationKernel(new SimRandom(seed));
 
@@ -198,14 +202,16 @@ namespace Nova.SimRunner.Tests
             var aiSession = new MatchSession(AiSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
             var aiIngress = new CommandIngress(aiSession);
             _ = new AiPeerCommandTransport(aiIngress, ingress);
+            AiFactionProfile baseProfile = profile.HasValue
+                ? new AiFactionProfile(aiFactionName, profile.Value)
+                : new AiFactionProfile(aiFactionName,
+                    targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2);
+            // Applied the way MatchRunner does it: deltas into the profile, the rest by argument.
             var ai = new SkirmishAiSystem(
                 AiSlot,
-                profile.HasValue
-                    ? new AiFactionProfile("Legion", profile.Value)
-                    : new AiFactionProfile("Legion",
-                        targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2),
+                baseProfile.WithPersonality(personality),
                 aiIngress, entities, economy, construction, production, fogOfWar, victory,
-                goalObserver, goalOverride);
+                goalObserver, goalOverride, personality);
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -221,8 +227,8 @@ namespace Nova.SimRunner.Tests
 
             // Faction assignment BEFORE Kernel.Start() (the SetSlotFaction
             // guard): slot 0 Alliance, slot 1 Legion — the canonical match.
-            economy.SetSlotFaction(HumanSlot, FactionId.Alliance);
-            economy.SetSlotFaction(AiSlot, FactionId.Legion);
+            economy.SetSlotFaction(HumanSlot, humanFaction);
+            economy.SetSlotFaction(AiSlot, aiFaction);
 
             kernel.Start();
             return new AiHost
@@ -287,9 +293,11 @@ namespace Nova.SimRunner.Tests
             ulong seed,
             AiProfile? profile = null,
             IAiGoalObserver goalObserver = null,
-            IAiGoalOverride goalOverride = null)
+            IAiGoalOverride goalOverride = null,
+            AiPersonality personality = default,
+            FactionId aiFaction = FactionId.Legion)
         {
-            AiHost host = BuildAiHost(seed, profile, goalObserver, goalOverride);
+            AiHost host = BuildAiHost(seed, profile, goalObserver, goalOverride, personality, aiFaction);
             ApplyOpeningPosition(host);
             return host;
         }
@@ -554,7 +562,7 @@ namespace Nova.SimRunner.Tests
             // makes it measurable one-sided (defendHomeCells, 0 = off, M001).
             // A revision bump with an unmoved profile hash would have meant a
             // rule nobody can switch off.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r8.1E6E7AE3"),
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r9.1E6E7AE3"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 

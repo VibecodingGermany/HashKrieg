@@ -716,6 +716,8 @@ namespace Nova.Presentation.UI
             // belongs to the fresh match rather than to the empty scene.
             // A match that already ran is restarted cleanly instead of being
             // stacked (RestartMatch rebuilds the kernel and every system).
+            // The player-facing start plays a fresh match; tests keep the canonical seed.
+            _bootstrap.FreshSeedPerLocalMatch = true;
             if (_bootstrap.IsMatchReady)
             {
                 _bootstrap.RestartMatch();

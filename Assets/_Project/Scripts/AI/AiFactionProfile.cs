@@ -92,6 +92,13 @@ namespace Nova.AI
         }
 
         /// <summary>
+        /// The same faction with <paramref name="personality"/>'s deltas applied to its numbers.
+        /// The neutral personality returns an equal profile.
+        /// </summary>
+        public AiFactionProfile WithPersonality(AiPersonality personality) =>
+            new AiFactionProfile(FactionName, personality.Apply(Profile));
+
+        /// <summary>
         /// Equality over the faction name AND every number.
         /// <para>
         /// The previous version compared the faction name alone, so two

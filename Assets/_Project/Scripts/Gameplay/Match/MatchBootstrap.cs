@@ -142,6 +142,16 @@ namespace Nova.Gameplay.Match
         /// <summary>Canonical scenario seed (DeterminismOptions.Seed). Required for InitialStateHash parity: the PRNG words are hashed into the kernel state block.</summary>
         public const ulong CanonicalSeed = 0xDE7E000000010271UL;
 
+        /// <summary>
+        /// When true, every LOCAL match (start and restart) draws a fresh seed,
+        /// so the skirmish AI's per-match personality differs from game to
+        /// game. Off by default: the canonical seed stays the default for
+        /// tests and harnesses (the canonical opening-position hash depends on
+        /// it); the main menu switches this on. Network matches take their
+        /// seed from the relay offer and ignore it.
+        /// </summary>
+        public bool FreshSeedPerLocalMatch { get; set; }
+
         /// <summary>One Aetherium field of the canonical map (16.7, C1).</summary>
         private struct FieldLayout
         {
@@ -499,6 +509,7 @@ namespace Nova.Gameplay.Match
             string relayHost = Environment.GetEnvironmentVariable("NOVA_RELAY_HOST");
             if (string.IsNullOrWhiteSpace(relayHost))
             {
+                ApplyLocalMatchSeed(local);
                 StartGrayboxMatch(local);
                 return;
             }
@@ -805,12 +816,53 @@ namespace Nova.Gameplay.Match
             SetupSlot(EnemyLayout);
         }
 
+        /// <summary>
+        /// Chooses the seed of a LOCAL match. <c>NOVA_MATCH_SEED</c> (hex u64,
+        /// optional 0x) pins it — the hook for reproducing a reported match —
+        /// otherwise a fresh non-zero seed is drawn when
+        /// <see cref="FreshSeedPerLocalMatch"/> is on. The seed is the only
+        /// input of the AI personality, so a logged seed reproduces the match.
+        /// </summary>
+        private void ApplyLocalMatchSeed(MatchConfig config)
+        {
+            if (config.IsNetworkMatch) return;
+
+            string pinned = Environment.GetEnvironmentVariable("NOVA_MATCH_SEED");
+            if (!string.IsNullOrWhiteSpace(pinned))
+            {
+                string hex = pinned.Trim();
+                if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) hex = hex.Substring(2);
+                if (ulong.TryParse(hex, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong parsed))
+                {
+                    config.Seed = parsed;
+                    Debug.Log($"[MatchBootstrap] Match seed pinned by NOVA_MATCH_SEED: 0x{parsed:X16}.");
+                    return;
+                }
+            }
+
+            if (!FreshSeedPerLocalMatch) return;
+
+            var bytes = new byte[8];
+            ulong fresh = 0;
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                while (fresh == 0)
+                {
+                    rng.GetBytes(bytes);
+                    fresh = BitConverter.ToUInt64(bytes, 0);
+                }
+            }
+            config.Seed = fresh;
+        }
+
         private void LogLocalMatchStarted()
         {
+            string personality = Runner.SkirmishAi != null ? $", AI personality {Runner.AiPersonality}" : string.Empty;
             Debug.Log(
                 $"[MatchBootstrap] Graybox match started (seed 0x{_seed:X16}, {_mapWidth}x{_mapHeight}, " +
                 $"capacity {_entityCapacity}, definition stats {UseDefinitionStats}, " +
-                $"start credits {Runner.Economy.GetPlayerEconomy(ConfiguredLocalSlot).AetheriumCredits} AE).");
+                $"start credits {Runner.Economy.GetPlayerEconomy(ConfiguredLocalSlot).AetheriumCredits} AE" +
+                $"{personality}).");
         }
 
         private void SubmitNetworkProof(MatchConfig config)
@@ -865,6 +917,7 @@ namespace Nova.Gameplay.Match
                 : MatchConfig.LocalVsAi(
                     _seed, _mapWidth, _mapHeight, _entityCapacity,
                     Nova.Simulation.Economy.EconomySystem.CanonicalMatchStartingCreditsAE);
+            ApplyLocalMatchSeed(restartConfig);
             if (Runner != null && Runner.IsRunning)
             {
                 Runner.PauseMatch();
