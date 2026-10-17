@@ -319,6 +319,12 @@ namespace Nova.Presentation.UI
             {
                 BuildBuildingModel(model, in lead, rawLead, slot, faction, entities);
             }
+            else if (UnitCommandBar.ShowsUnits)
+            {
+                // Mobile units live on the UI Toolkit command bar (D-117).
+                model.Visible = false;
+                return;
+            }
             else
             {
                 BuildUnitModel(model, faction, in lead, selected, entities);

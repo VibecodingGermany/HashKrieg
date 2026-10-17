@@ -95,7 +95,7 @@ namespace Nova.Presentation.UI
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-200)]
-    public sealed class RtsDeviceInput : MonoBehaviour
+    public sealed partial class RtsDeviceInput : MonoBehaviour
     {
         [Header("Wiring (scene generator)")]
         [SerializeField] private MatchRunner _runner;
@@ -167,6 +167,8 @@ namespace Nova.Presentation.UI
             Attack,
             Harvest,
             Repair,
+            AttackMove,
+            Patrol,
         }
 
         private readonly SelectionManager _selection = new SelectionManager();
@@ -234,6 +236,12 @@ namespace Nova.Presentation.UI
         private float _harvesterEscortNextTime;
         private string _harvesterEscortLastWarning;
         private readonly HashSet<uint> _autoAssignedHarvesters = new HashSet<uint>();
+        // Presentation hold after an unload: the sim empties the bed in one tick and the
+        // harvester would turn back to the field at once, so the dump animation
+        // (UnitRigAnimator, ~1.85 s) would play while driving away. Escort only.
+        private const float HarvesterUnloadHoldSeconds = 1.9f;
+        private readonly Dictionary<uint, int> _harvesterLastCargo = new Dictionary<uint, int>();
+        private readonly Dictionary<uint, float> _harvesterHoldUntil = new Dictionary<uint, float>();
 
         // Attack pursuit cadence and target tracking (sprint 18.2, #51):
         // explicit attack orders dispatch Move + Attack and periodically update
@@ -587,6 +595,7 @@ namespace Nova.Presentation.UI
             HandleBuildZoneOverlayToggle();
             UpdateHarvesterEscort();
             UpdateAttackPursuit();
+            UpdateStandingOrders();
             HudPointerLink.Publish(IsPointerOverHud(mouse));
             HandleSelection(mouse);
             HandleOrders(mouse);
@@ -643,6 +652,7 @@ namespace Nova.Presentation.UI
             _focusedAttackTarget = EntityId.Invalid;
             _pursuitTargets.Clear();
             _autoAssignedHarvesters.Clear();
+            _standing.ClearAll();
             return true;
         }
 
@@ -900,7 +910,11 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void DispatchBuilderToConstructionSite(int originX, int originY)
         {
-            if (!CommandCardPresenter.TryFindRepairBuilder(_runner.Entities, _dispatcher.LocalSlot, out EntityId builder))
+            EntityId builder = EntityId.Invalid;
+            ReadOnlySpan<EntityId> selectedBuilders = BuilderSelection(out int selectedBuilderCount);
+            if (selectedBuilderCount > 0) builder = selectedBuilders[0];
+            if (!builder.IsValid
+                && !CommandCardPresenter.TryFindRepairBuilder(_runner.Entities, _dispatcher.LocalSlot, out builder))
             {
                 _lastCommandStatus += $" — {ConstructionSiteStatus.NoBuilderWarning}";
                 Debug.LogWarning("[RtsDeviceInput] Placed without a living own Builder — the site will pause until one is built (U at the HQ).");
@@ -975,6 +989,12 @@ namespace Nova.Presentation.UI
                 if (!unit.IsActive || unit.PlayerId != slot || unit.Role != UnitRole.Harvester) continue;
 
                 uint rawId = UnitCommandStateView.ToRawEntityId(unit.Id);
+                if (_harvesterLastCargo.TryGetValue(rawId, out int lastCargo) && lastCargo > 0 && unit.CargoAE == 0
+                    && unit.HarvestFieldId != 0)
+                {
+                    _harvesterHoldUntil[rawId] = Time.time + HarvesterUnloadHoldSeconds;
+                }
+                _harvesterLastCargo[rawId] = unit.CargoAE;
                 if (unit.HarvestFieldId != 0 || unit.IsReturningCargo || unit.CargoAE > 0)
                 {
                     _autoAssignedHarvesters.Add(rawId);
@@ -1011,6 +1031,7 @@ namespace Nova.Presentation.UI
                 {
                     ushort fieldId = unit.HarvestFieldId;
                     if (fieldId == 0) continue;
+                    if (_harvesterHoldUntil.TryGetValue(rawId, out float holdUntil) && Time.time < holdUntil) continue;
                     if (!economy.TryGetField(fieldId, out AetheriumField field)) continue;
                     if (field.IsExhausted) continue;
                     if (InFieldReach(cellX, cellY, field.GridPos.X, field.GridPos.Y)) continue;
@@ -1330,6 +1351,12 @@ namespace Nova.Presentation.UI
             }
 
             if (Input.GetKeyDown(KeyCode.S)) OrderStop();
+            // D-117 group orders (free letters: W Wache, K Patrouille,
+            // J Verteilen, M Marschordnung).
+            if (Input.GetKeyDown(KeyCode.W)) OrderGuard();
+            if (Input.GetKeyDown(KeyCode.K)) RequestPatrolOrder();
+            if (Input.GetKeyDown(KeyCode.J)) OrderScatter();
+            if (Input.GetKeyDown(KeyCode.M)) CycleFormation();
 
             if (Input.GetKeyDown(KeyCode.A) && TryScreenPointToGround(mouse, out Vector3 attackAt))
             {
@@ -1532,6 +1559,7 @@ namespace Nova.Presentation.UI
         {
             return IsPointerOverBuildMenu(mouse)
                 || (_commandCard != null && _commandCard.IsPointerOverPanel(mouse))
+                || UnitCommandBar.IsPointerOverAny(mouse)
                 || (_minimap != null && _minimap.IsPointerOverMinimap(mouse));
         }
 
@@ -1581,6 +1609,14 @@ namespace Nova.Presentation.UI
                 case PendingOrder.Repair:
                     if (TryResolveRepairAt(at)) _pendingOrder = PendingOrder.None;
                     break;
+                case PendingOrder.AttackMove:
+                    ResolveAttackMoveAt(at);
+                    _pendingOrder = PendingOrder.None;
+                    break;
+                case PendingOrder.Patrol:
+                    ResolvePatrolAt(at);
+                    _pendingOrder = PendingOrder.None;
+                    break;
             }
         }
 
@@ -1614,6 +1650,14 @@ namespace Nova.Presentation.UI
                 return;
             }
 
+            // 3a. Own active construction site with Builders selected -> walk
+            // them to the site's approach cell (the sim hands the site to
+            // whichever own Builder stands in reach)
+            if (HasBuilderInSelection(mobile) && TryResolveBuildSiteAt(moveTo))
+            {
+                return;
+            }
+
             // 3. Repair for builders
             if (HasBuilderInSelection(mobile) && TryResolveRepairAt(moveTo))
             {
@@ -1622,6 +1666,49 @@ namespace Nova.Presentation.UI
 
             // 4. Default move
             ResolveMoveAt(moveTo);
+        }
+
+        /// <summary>
+        /// Right-click on an OWN active construction site with Builders in the
+        /// selection: sends the selected Builders to the site's deterministic
+        /// approach cell instead of treating the click as repair/move. The
+        /// site unit sits on the centre cell of its 3x3 footprint (origin + 1).
+        /// </summary>
+        private bool TryResolveBuildSiteAt(Vector3 at)
+        {
+            EntityManager entities = _runner.Entities;
+            ConstructionSystem construction = _runner.Construction;
+            if (entities == null || construction == null) return false;
+
+            int cx = Nova.Core.SimFixed.WorldToGrid(Nova.Core.SimFixed.FromFloat(at.x));
+            int cy = Nova.Core.SimFixed.WorldToGrid(Nova.Core.SimFixed.FromFloat(at.z));
+            int f = SimDefinitions.BuildingFootprintCells;
+            byte slot = _dispatcher.LocalSlot;
+            UnitState[] units = entities.RawUnits;
+            int capacity = entities.Capacity;
+            for (int i = 0; i < capacity; i++)
+            {
+                ref readonly UnitState unit = ref units[i];
+                if (!unit.IsActive || unit.PlayerId != slot) continue;
+                if (!construction.IsActiveSite(unit.Id)) continue;
+
+                int originX = Nova.Core.SimFixed.WorldToGrid(unit.Transform.PositionX) - 1;
+                int originY = Nova.Core.SimFixed.WorldToGrid(unit.Transform.PositionY) - 1;
+                if (cx < originX || cx >= originX + f || cy < originY || cy >= originY + f) continue;
+
+                ReadOnlySpan<EntityId> builders = BuilderSelection(out int builderCount);
+                if (builderCount == 0) return false;
+
+                ConstructionSiteStatus.ApproachCell(originX, originY, f, ConstructionSystem.GridSize,
+                    out int cellX, out int cellY);
+                ClearPursuitAndMarkHarvesters(builders);
+                _focusedAttackTarget = EntityId.Invalid;
+                Report("Move (build site)", _dispatcher.MoveTo(builders,
+                    Nova.Core.SimFixed.FromInt(cellX), Nova.Core.SimFixed.FromInt(cellY)));
+                _markerView?.SpawnClickFeedback(at, ClickFeedbackKind.Move);
+                return true;
+            }
+            return false;
         }
 
         /// <summary>The plain move order; shared by RMB and the card's Move pick.</summary>
@@ -1636,7 +1723,7 @@ namespace Nova.Presentation.UI
             {
                 ClearPursuitAndMarkHarvesters(mobile);
                 _focusedAttackTarget = EntityId.Invalid;
-                Report("Move", _dispatcher.MoveTo(mobile, moveTo.x, moveTo.z));
+                IssueGroupMove(mobile, moveTo);
                 _markerView?.SpawnClickFeedback(moveTo, ClickFeedbackKind.Move);
             }
         }
@@ -1662,10 +1749,9 @@ namespace Nova.Presentation.UI
             }
             else
             {
-                ClearPursuitAndMarkHarvesters(mobile);
-                _focusedAttackTarget = EntityId.Invalid;
-                Report("Move (no target)", _dispatcher.MoveTo(mobile, attackAt.x, attackAt.z));
-                _markerView?.SpawnClickFeedback(attackAt, ClickFeedbackKind.Move);
+                // No enemy under the cursor: C&C attack-move (D-117) — drive
+                // there and fight whatever shows up on the way.
+                ResolveAttackMoveAt(attackAt);
             }
         }
 
@@ -1715,6 +1801,7 @@ namespace Nova.Presentation.UI
             for (int i = 0; i < entities.Length; i++)
             {
                 _pursuitTargets.Remove(entities[i]);
+                _standing.Clear(entities[i]);
                 if (mgr != null && mgr.TryGetUnit(entities[i], out UnitState unit) && unit.Role == UnitRole.Harvester)
                 {
                     _autoAssignedHarvesters.Add(UnitCommandStateView.ToRawEntityId(unit.Id));

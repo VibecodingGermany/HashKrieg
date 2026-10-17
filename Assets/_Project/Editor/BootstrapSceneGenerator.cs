@@ -383,6 +383,21 @@ namespace Nova.Editor
 
             WireReference(input, "_commandCard", card);
 
+            // The unit command bar (D-117): UI Toolkit, Zero-Hour layout, on a
+            // child so the menu's HUD-root toggle hides it with the rest. It
+            // shares the menu's PanelSettings and sits below the menu overlay.
+            var barObject = new GameObject("UnitCommandBar");
+            barObject.transform.SetParent(uiObject.transform, false);
+            UIDocument barDocument = barObject.AddComponent<UIDocument>();
+            barDocument.panelSettings = MenuAssetSetup.LoadOrCreatePanelSettings();
+            barDocument.sortingOrder = -10f;
+            UnitCommandBar bar = barObject.AddComponent<UnitCommandBar>();
+            WireReference(bar, "_document", barDocument);
+            WireReference(bar, "_input", input);
+            WireReference(bar, "_buildMenu", menu);
+            WireReference(bar, "_titleFont", MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.TitleFontPath));
+            WireReference(bar, "_bodyFont", MenuAssetSetup.LoadRequired<Font>(MenuAssetSetup.BodyFontPath));
+
             FogOfWarOverlayView fog = uiObject.AddComponent<FogOfWarOverlayView>();
             WireReference(fog, "_runner", runner);
 

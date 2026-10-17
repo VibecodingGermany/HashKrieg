@@ -1,6 +1,6 @@
 # Eingabesystem
 
-**Version:** 1.0.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 7
+**Version:** 1.1.0 | **Status:** verbindlich für MS-1 – G0 aktiv | **Verantwortungsbereich:** Lead UI/UX Designer | **Sprint:** 7
 
 ## Zweck
 
@@ -48,6 +48,17 @@ MS-1 benötigt:
 - QueueUnit und CancelProduction;
 - SetRallyPoint;
 - InstallDefenseModule.
+
+**Gruppenbefehle ohne neue CommandKinds (D-117):** Angriffsbewegung,
+Patrouille, Bewachen, Verteilen und Formationen sind lokale Aufträge, die der
+Client in die bestehenden Kinds Move, Stop und AttackTarget übersetzt — wie die
+Angriffsverfolgung. Formationen schicken einen Move je Einheit auf ihren Platz;
+Daueraufträge (`StandingOrders`) prüfen alle 0,5 s, ob ein sichtbarer Feind
+bekämpft oder das nächste Ziel angefahren werden muss. Der Feindblick ist
+nebelgebunden. Tasten: **A** auf freien Boden = Angriffsbewegung, **W**
+Bewachen, **K** Patrouille, **J** Verteilen, **M** Formation wechseln, **S**
+Stopp. Die Befehlsleiste (`UnitCommandBar`, UI Toolkit nach D-083) zeigt alle
+Befehle mit Kürzel und Tooltip.
 
 Pause, Save und Load sind versionierte Session-Aktionen an einer Tickgrenze,
 keine direkte State-Mutation. Zurückgestellte Ability-, Research-, Capture-,
@@ -109,3 +120,4 @@ Rohes Binding-JSON ist kein Replay-/Save-Payload.
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead UI/UX Designer |
 | 1.0.0 | 2026-07-24 | Input auf CommandIntent-Vertrauensgrenze, ≤100-ms-Feedback, Rebinding und MS-1-Accessibility rebaselined | Lead UI/UX Designer |
+| 1.1.0 | 2026-10-17 | Gruppenbefehle (Angriffsbewegung, Patrouille, Bewachen, Verteilen, Formationen) als Client-Aufträge über Move/Stop/AttackTarget, Tastenbelegung, Befehlsleiste (D-117) | Orchestrator |

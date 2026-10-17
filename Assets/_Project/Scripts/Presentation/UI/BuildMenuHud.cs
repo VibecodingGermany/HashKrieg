@@ -146,6 +146,9 @@ namespace Nova.Presentation.UI
         /// </summary>
         public float OccupiedHeight => StatusLineHeight + StatusLineGap + _buttonHeight + _barMargin;
 
+        /// <summary>IMGUI scale of the bar; OccupiedHeight times this is screen pixels.</summary>
+        public float UiScale => Mathf.Max(1f, _uiScale);
+
         /// <summary>
         /// Screen-space hit test used by RtsDeviceInput: a pointer over the
         /// bar belongs to the HUD, so world selection drags and placement
