@@ -154,6 +154,66 @@ namespace Nova.PlayMode.Tests
             }
         }
 
+        /// <summary>
+        /// D-116 in the running match: a battle tank drives east straight
+        /// through a block of standing infantry. The soldiers must open a lane
+        /// and the tank must keep its line. Evidence strip:
+        /// output/demo/makeway_*.png.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Tank_DrivesThroughInfantry_ThatMakesWay()
+        {
+            Directory.CreateDirectory(ShotDir);
+            yield return SceneManager.LoadSceneAsync(ScenePath, LoadSceneMode.Single);
+            var bootstrap = Object.FindAnyObjectByType<MatchBootstrap>();
+            bootstrap.StartGrayboxMatch();
+            Assert.IsTrue(bootstrap.IsMatchReady);
+            MatchRunner runner = bootstrap.Runner;
+            FactionId faction = runner.Economy.GetSlotFaction(Slot);
+            CostField cost = runner.Pathfinding.CostField;
+
+            Assert.IsTrue(FindOpenLane(cost, 30, 26, 1, 0, 22, out int sx, out int sy), "setup: no open lane");
+            Assert.IsTrue(SimDefinitions.TryGetUnit(faction, UnitRole.BattleTank, out SimUnitDefinition tankDef));
+            Assert.IsTrue(SimDefinitions.TryGetUnit(faction, UnitRole.BasicInfantry, out SimUnitDefinition infDef));
+            EntityId tank = runner.Entities.SpawnUnit(Slot, new Transform2D(SimFixed.FromInt(sx), SimFixed.FromInt(sy)), tankDef.MoveSpeed, role: tankDef.Role);
+            var soldiers = new List<EntityId>();
+            for (int x = 0; x < 3; x++)
+            {
+                for (int y = -1; y <= 1; y++)
+                {
+                    soldiers.Add(runner.Entities.SpawnUnit(Slot,
+                        new Transform2D(SimFixed.FromInt(sx + 9 + x), SimFixed.FromInt(sy + y)),
+                        infDef.MoveSpeed, role: infDef.Role));
+                }
+            }
+            yield return new WaitForSeconds(0.8f);
+
+            var focus = new Vector3(sx + 10f, 0f, sy);
+            CaptureRts($"{ShotDir}/makeway_0.png", focus, 9f);
+            Assert.AreEqual(CommandIngressResult.Accepted, runner.Ingress.TrySubmitIntent(CommandIntent.Create(
+                new MovePayload(new[] { UnitCommandStateView.ToRawEntityId(tank) }, SimFixed.FromInt(sx + 20), SimFixed.FromInt(sy))), out _));
+
+            float maxDrift = 0f;
+            int shot = 1;
+            float start = Time.time;
+            while (Time.time < start + 7f)
+            {
+                yield return null;
+                if (!runner.Entities.TryGetUnit(tank, out UnitState t)) break;
+                maxDrift = Mathf.Max(maxDrift, Mathf.Abs(t.Transform.PositionY.ToFloat() - sy));
+                if (shot < 6 && Time.time > start + 0.8f + shot * 0.55f)
+                {
+                    CaptureRts($"{ShotDir}/makeway_{shot}.png", focus, 9f);
+                    shot++;
+                }
+                if (!t.IsMoving && Time.time > start + 1f) break;
+            }
+            Assert.IsTrue(runner.Entities.TryGetUnit(tank, out UnitState done));
+            Assert.That(SimFixed.WorldToGrid(done.Transform.PositionX), Is.EqualTo(sx + 20), "the tank arrived");
+            Assert.That(maxDrift, Is.LessThan(0.6f), "the tank kept its line through the group");
+            Debug.Log($"[UnitMotionPresentation] make-way: tank drift max {maxDrift:F2} cells");
+        }
+
         private static Vector3 Flat(Vector3 v)
         {
             v.y = 0f;

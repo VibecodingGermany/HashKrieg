@@ -35,6 +35,14 @@ namespace Nova.Editor
 
         private const string UrpLitShader = "Universal Render Pipeline/Lit";
 
+        /// <summary>
+        /// Name of the inactive child that carries the destroyed state
+        /// (SM_*_Wreck.fbx, D-115); ViewWrecks swaps to it on death.
+        /// </summary>
+        public const string WreckNode = Nova.Gameplay.Match.ViewWrecks.WreckNode;
+
+        private const string WreckSuffix = "_Wreck";
+
         /// <summary>HDR gain on the _EM map: accents must read under the full desert sun.</summary>
         private const float EmissionIntensity = 2.0f;
 
@@ -66,6 +74,8 @@ namespace Nova.Editor
                     string fbxPath = AssetDatabase.GUIDToAssetPath(guid);
                     string stem = Path.GetFileNameWithoutExtension(fbxPath);
                     if (!stem.StartsWith("SM_", System.StringComparison.Ordinal)) continue;
+                    // Wreck meshes ride inside their parent's prefab, never alone.
+                    if (stem.EndsWith(WreckSuffix, System.StringComparison.Ordinal)) continue;
 
                     // SM_UNIT_Alliance_LightTank -> PF_UNIT_Alliance_LightTank
                     string suffix = stem.Substring("SM_".Length);
@@ -241,6 +251,8 @@ namespace Nova.Editor
                 group.SetLODs(levels.ToArray());
                 group.RecalculateBounds();
 
+                AttachWreck(instance, fbxPath, dir, prefabName);
+
                 PrefabUtility.SaveAsPrefabAsset(instance, $"{dir}/{prefabName}.prefab");
                 return true;
             }
@@ -248,6 +260,47 @@ namespace Nova.Editor
             {
                 Object.DestroyImmediate(instance);
             }
+        }
+        /// <summary>
+        /// Adds the sibling <c>SM_*_Wreck.fbx</c> as an inactive child named
+        /// <see cref="WreckNode"/> with its own charred material
+        /// (<c>M_*_Wreck</c> on <c>T_*_Wreck_BC</c>). The wreck is not part of
+        /// the LODGroup: it is a single mesh, shown alone once the live model
+        /// is switched off. No wreck file — no child, the view keeps the
+        /// fade-out death.
+        /// </summary>
+        private static void AttachWreck(GameObject instance, string fbxPath, string dir, string prefabName)
+        {
+            string wreckPath = fbxPath.Substring(0, fbxPath.Length - ".fbx".Length) + WreckSuffix + ".fbx";
+            var wreckModel = AssetDatabase.LoadAssetAtPath<GameObject>(wreckPath);
+            if (wreckModel == null) return;
+
+            string suffix = prefabName.Substring("PF_".Length) + WreckSuffix;
+            string matPath = $"{dir}/M_{suffix}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (material == null)
+            {
+                material = new Material(Shader.Find(UrpLitShader));
+                AssetDatabase.CreateAsset(material, matPath);
+            }
+            var baseMap = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_BC.png");
+            material.SetTexture("_BaseMap", baseMap);
+            material.SetFloat("_Metallic", 0.1f);
+            material.SetFloat("_Smoothness", 0.12f);
+            material.SetFloat("_Cull", (float)CullMode.Off);
+            material.doubleSidedGI = true;
+            EditorUtility.SetDirty(material);
+
+            var wreck = (GameObject)PrefabUtility.InstantiatePrefab(wreckModel);
+            PrefabUtility.UnpackPrefabInstance(wreck, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            wreck.name = WreckNode;
+            wreck.transform.SetParent(instance.transform, false);
+            foreach (Renderer r in wreck.GetComponentsInChildren<Renderer>(true))
+            {
+                r.sharedMaterial = material;
+                r.shadowCastingMode = ShadowCastingMode.On;
+            }
+            wreck.SetActive(false);
         }
     }
 }

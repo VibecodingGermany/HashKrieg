@@ -818,6 +818,11 @@ def main():
         print(f"  Textur: {json.dumps(stats)}")
 
     result, pivots, parents, kinds = split_parts(lods, r, bb)
+    # Emitter: leere Knoten (Smoke_* ...), an denen Unity Partikel ausstoesst
+    for em in r.get("emitters", []):
+        pivots[em["name"]] = denorm(bb, em["pos"])
+        parents[em["name"]] = em.get("parent", "Body")
+        kinds[em["name"]] = "emitter"
 
     if r.get("squash"):
         squash(result, pivots, bb, r["squash"])
@@ -825,6 +830,17 @@ def main():
         if graded is None:
             graded = image_np(bpy.data.images.load(src_tex)).copy()
         add_pad(result, pivots, r["pad"], graded)
+
+    if r.get("wreck", {}).get("enabled", True) and (not a.no_export or a.preview):
+        import asset_wreck  # noqa: E402  (Blender-Python, gleiches Verzeichnis)
+        if graded is None:
+            graded = image_np(bpy.data.images.load(src_tex)).copy()
+        category = "unit" if stem.startswith("UNIT_") else "building"
+        wreck_dir = out_dir if not a.no_export else (a.preview or out_dir)
+        os.makedirs(wreck_dir, exist_ok=True)
+        asset_wreck.build_wreck(result, pivots, kinds, r, stem, category, graded, wreck_dir,
+                                lod=r.get("wreck", {}).get("lod", "LOD0"),
+                                preview_png=os.path.join(a.preview, f"{stem}_wreck.png") if a.preview else "")
 
     if a.preview:
         os.makedirs(a.preview, exist_ok=True)

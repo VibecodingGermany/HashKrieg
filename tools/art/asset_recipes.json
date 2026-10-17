@@ -115,7 +115,7 @@
       }
     },
     "pad": {
-      "height_ratio": 0.7,
+      "height_ratio": 0.55,
       "tone": [
         0.34,
         0.5
@@ -263,7 +263,9 @@
   },
   "BLDG_Legion_Barracks": {
     "path": "Buildings/Legion/Barracks",
-    "faction": "Legion"
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
   },
   "BLDG_Legion_DefensePlatform": {
     "drop_boxes": [
@@ -293,7 +295,7 @@
     "path": "Buildings/Legion/DefensePlatform",
     "faction": "Legion",
     "pad": {
-      "height_ratio": 0.7,
+      "height_ratio": 0.55,
       "tone": [
         0.34,
         0.5
@@ -302,11 +304,27 @@
   },
   "BLDG_Legion_HQ": {
     "path": "Buildings/Legion/HQ",
-    "faction": "Legion"
+    "faction": "Legion",
+    "emitters": [
+      {
+        "name": "Smoke_Chimney",
+        "pos": [
+          0.25,
+          0.62,
+          0.86
+        ]
+      }
+    ]
   },
   "BLDG_Legion_Power": {
     "path": "Buildings/Legion/Power",
-    "faction": "Legion"
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0,
+    "emitters": [
+      {"name": "Smoke_ChimneyL", "pos": [0.27, 0.59, 1.0]},
+      {"name": "Smoke_ChimneyR", "pos": [0.47, 0.59, 1.0]}
+    ]
   },
   "BLDG_Legion_Radar": {
     "parts": [
@@ -333,11 +351,23 @@
   },
   "BLDG_Legion_Refinery": {
     "path": "Buildings/Legion/Refinery",
-    "faction": "Legion"
+    "faction": "Legion",
+    "emitters": [
+      {
+        "name": "Smoke_Chimney",
+        "pos": [
+          0.62,
+          0.35,
+          1.0
+        ]
+      }
+    ]
   },
   "BLDG_Legion_ResearchLab": {
     "path": "Buildings/Legion/ResearchLab",
-    "faction": "Legion"
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
   },
   "BLDG_Legion_Storage": {
     "path": "Buildings/Legion/Storage",
@@ -345,7 +375,9 @@
   },
   "BLDG_Legion_VehicleFactory": {
     "path": "Buildings/Legion/VehicleFactory",
-    "faction": "Legion"
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
   },
   "UNIT_Alliance_AntiArmorInfantry": {
     "path": "Units/Alliance/AntiArmorInfantry",
@@ -644,6 +676,12 @@
           0.6,
           0.92
         ]
+      }
+    ],
+    "emitters": [
+      {
+        "name": "Cargo_Anchor",
+        "pos": [0.4, 0.83, 0.69]
       }
     ],
     "path": "Units/Alliance/Harvester",
@@ -1006,6 +1044,10 @@
     "faction": "Legion"
   },
   "UNIT_Legion_Harvester": {
+    "drop_boxes": [
+      [0.07, 0.93, 0.62, 0.96, 0.46, 1],
+      [0, 1, 0.62, 1, 0.74, 1]
+    ],
     "parts": [
       {
         "name": "Wheel_FL",
@@ -1019,7 +1061,7 @@
           0,
           0.14
         ],
-        "islands": 0.7
+        "islands": 0.55
       },
       {
         "name": "Wheel_FR",
@@ -1033,7 +1075,7 @@
           0.86,
           1
         ],
-        "islands": 0.7
+        "islands": 0.55
       },
       {
         "name": "Wheel_RL",
@@ -1047,7 +1089,7 @@
           0,
           0.14
         ],
-        "islands": 0.7
+        "islands": 0.4
       },
       {
         "name": "Wheel_RR",
@@ -1061,7 +1103,16 @@
           0.86,
           1
         ],
-        "islands": 0.7
+        "islands": 0.4
+      },
+      {
+        "name": "Bed",
+        "kind": "bed",
+        "box": [
+          [0, 1, 0.62, 1, 0.43, 1],
+          [0.1, 0.9, 0.62, 1, 0.37, 0.43]
+        ],
+        "pivot": [0.5, 0.99, 0.45]
       }
     ],
     "path": "Units/Legion/Harvester",

@@ -18,8 +18,8 @@ namespace Nova.Editor
     /// draws it — without anybody opening the editor.
     /// <code>
     /// Unity -batchmode -projectPath . -executeMethod Nova.Editor.ArtPreviewCapture.CaptureFromCommandLine \
-    ///       -captureOut /abs/dir [-captureFilter BattleTank] [-captureHeading 0] [-captureTime 0.0]
-    ///       [-captureBuildPrefabs] -logFile log -quit
+    ///       -captureOut /abs/dir [-captureFilter BattleTank] [-captureHeading 0] [-captureTime 0.0] [-captureDump 0.7]
+    ///       [-captureBuildPrefabs] [-captureWreck] [-captureLineup] -logFile log -quit
     /// </code>
     /// Per prefab it writes <c>&lt;name&gt;_top.png</c> (orthographic, from
     /// above, with a red bar pointing along the simulated move direction) and
@@ -39,6 +39,7 @@ namespace Nova.Editor
             string filter = Arg("-captureFilter", "");
             float heading = float.Parse(Arg("-captureHeading", "0"), System.Globalization.CultureInfo.InvariantCulture);
             float time = float.Parse(Arg("-captureTime", "0"), System.Globalization.CultureInfo.InvariantCulture);
+            PreviewDumpSeconds = float.Parse(Arg("-captureDump", "-1"), System.Globalization.CultureInfo.InvariantCulture);
             int written = 0;
             try
             {
@@ -49,7 +50,9 @@ namespace Nova.Editor
                     ArtAssetPrefabBuilder.Build();
                     ArtAssetAutoSync.SyncRegistry();
                 }
-                written = Capture(outDir, filter, heading, time);
+                written = HasFlag("-captureLineup")
+                    ? CaptureLineup(outDir)
+                    : Capture(outDir, filter, heading, time);
             }
             catch (Exception e)
             {
@@ -92,6 +95,7 @@ namespace Nova.Editor
                     if (HasFlag("-captureDump")) Dump(instance.transform, "");
                     ApplyFactionTint(instance, path);
                     PoseAnimation(instance, path, animationTime);
+                    if (HasFlag("-captureWreck")) ShowWreck(instance);
 
                     Bounds b = WorldBounds(instance);
                     float extent = Mathf.Max(b.extents.x, b.extents.z, b.extents.y * 0.7f, 0.5f);
@@ -108,6 +112,104 @@ namespace Nova.Editor
                 }
             }
             return paths.Count;
+        }
+
+        /// <summary>
+        /// Size line-up per faction: every prefab at exactly the scale the
+        /// game gives it (<see cref="ArtViewScale"/>), buildings in a back
+        /// row, units in front, a 1-cell grid on the ground. Writes
+        /// <c>lineup_&lt;Faction&gt;_rts.png</c> (RTS pitch) and
+        /// <c>_side.png</c> (eye level), and logs each model's view size in
+        /// cells — the table proportion decisions are made from.
+        /// </summary>
+        public static int CaptureLineup(string outDir)
+        {
+            Directory.CreateDirectory(outDir);
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            SetUpStage();
+            GridLines(40);
+
+            int count = 0;
+            foreach (string faction in new[] { "Alliance", "Legion" })
+            {
+                var placed = new List<GameObject>();
+                float bx = -13.5f, ux = -12f;
+                foreach (string path in PrefabPaths($"_{faction}_"))
+                {
+                    string stem = Path.GetFileNameWithoutExtension(path);
+                    string roleName = stem.Substring(stem.LastIndexOf('_') + 1);
+                    bool building = stem.StartsWith("PF_BLDG_", StringComparison.Ordinal);
+
+                    GameObject go = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+                    Bounds raw = WorldBounds(go);
+                    if (!ArtViewScale.TryFactor(roleName, raw.size, out float f))
+                    {
+                        UnityEngine.Object.DestroyImmediate(go);
+                        continue;
+                    }
+                    go.transform.localScale = Vector3.one * f;
+                    ApplyFactionTint(go, path);
+                    Bounds b = WorldBounds(go);
+
+                    float width = building ? 3.4f : Mathf.Max(b.size.x, 0.6f) + 0.5f;
+                    float x = building ? bx + width * 0.5f : ux + width * 0.5f;
+                    go.transform.position += new Vector3(x - b.center.x, -b.min.y, (building ? 3f : -1.2f) - b.center.z);
+                    if (building) bx += width; else ux += width;
+                    placed.Add(go);
+                    count++;
+                    Debug.Log($"[ArtPreviewCapture:lineup] {faction,-8} {roleName,-18} factor={f:F3}  width={b.size.x:F2} depth={b.size.z:F2} height={b.size.y:F2} cells");
+                }
+
+                Bounds all = new Bounds(Vector3.zero, Vector3.one);
+                foreach (GameObject go in placed) all.Encapsulate(WorldBounds(go));
+                const int W = 1600, H = 560;
+                Camera rts = NewCamera();
+                rts.fieldOfView = 24f;
+                rts.aspect = (float)W / H;
+                Quaternion rot = Quaternion.Euler(55f, 0f, 0f);
+                rts.transform.SetPositionAndRotation(all.center - rot * Vector3.forward * (all.extents.x * 2.0f), rot);
+                Shoot(rts, Path.Combine(outDir, $"lineup_{faction}_rts.png"), W, H);
+
+                Camera side = NewCamera();
+                side.orthographic = true;
+                side.aspect = (float)W / H;
+                side.orthographicSize = all.extents.x * 1.04f * H / W;
+                side.transform.SetPositionAndRotation(new Vector3(all.center.x, side.orthographicSize * 0.92f, -30f), Quaternion.identity);
+                Shoot(side, Path.Combine(outDir, $"lineup_{faction}_side.png"), W, H);
+
+                foreach (GameObject go in placed) UnityEngine.Object.DestroyImmediate(go);
+            }
+            return count;
+        }
+
+        private static List<string> PrefabPaths(string contains)
+        {
+            var paths = new List<string>();
+            foreach (string guid in AssetDatabase.FindAssets("t:Prefab PF_", new[] { "Assets/_Project/Art" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (Path.GetFileName(path).StartsWith("PF_", StringComparison.Ordinal) && path.Contains(contains)) paths.Add(path);
+            }
+            paths.Sort(StringComparer.Ordinal);
+            return paths;
+        }
+
+        /// <summary>Thin dark lines every cell, so sizes read off the picture.</summary>
+        private static void GridLines(int half)
+        {
+            var dark = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            dark.SetColor("_BaseColor", new Color(0.45f, 0.37f, 0.27f));
+            for (int i = -half; i <= half; i++)
+            {
+                foreach (bool alongX in new[] { true, false })
+                {
+                    GameObject line = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    UnityEngine.Object.DestroyImmediate(line.GetComponent<Collider>());
+                    line.GetComponent<Renderer>().sharedMaterial = dark;
+                    line.transform.localScale = alongX ? new Vector3(half * 2f, 0.01f, 0.03f) : new Vector3(0.03f, 0.01f, half * 2f);
+                    line.transform.position = alongX ? new Vector3(0f, 0.005f, i) : new Vector3(i, 0.005f, 0f);
+                }
+            }
         }
 
         /// <summary>Same sun, ambient and sand ground as the generated Bootstrap scene.</summary>
@@ -152,13 +254,28 @@ namespace Nova.Editor
         /// (turret swung toward a target front-right, gun recoiling), exactly
         /// as UnitViewManager would attach it at runtime.
         /// </summary>
+        /// <summary>-captureDump: seconds into a harvester unload to show; negative = no unload.</summary>
+        private static float PreviewDumpSeconds = -1f;
+
         private static void PoseAnimation(GameObject instance, string path, float seconds)
         {
             if (seconds <= 0f) return;
             UnitRigAnimator rig = instance.GetComponent<UnitRigAnimator>();
             if (rig == null) rig = instance.AddComponent<UnitRigAnimator>();
             rig.InfantryGait = path.Contains("Infantry");
-            rig.PreviewPose(seconds);
+            rig.PreviewPose(seconds, PreviewDumpSeconds);
+        }
+
+        /// <summary>Switches a view to its destroyed state, exactly as ViewWrecks does on death.</summary>
+        private static void ShowWreck(GameObject instance)
+        {
+            Transform wreck = ViewWrecks.FindWreck(instance);
+            if (wreck == null) return;
+            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!r.transform.IsChildOf(wreck)) r.enabled = false;
+            }
+            wreck.gameObject.SetActive(true);
         }
 
         private static GameObject MoveMarker(Bounds b, Vector3 dir, float extent)
@@ -207,9 +324,9 @@ namespace Nova.Editor
             return cam;
         }
 
-        private static void Shoot(Camera cam, string file)
+        private static void Shoot(Camera cam, string file, int width = Size, int height = Size)
         {
-            var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
             try
             {
                 var request = new RenderPipeline.StandardRequest { destination = rt };
@@ -226,8 +343,8 @@ namespace Nova.Editor
 
                 RenderTexture previous = RenderTexture.active;
                 RenderTexture.active = rt;
-                var tex = new Texture2D(Size, Size, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, Size, Size), 0, 0);
+                var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 tex.Apply();
                 RenderTexture.active = previous;
                 File.WriteAllBytes(file, tex.EncodeToPNG());

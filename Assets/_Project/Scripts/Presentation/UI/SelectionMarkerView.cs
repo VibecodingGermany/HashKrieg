@@ -53,7 +53,7 @@ namespace Nova.Presentation.UI
         [Header("Marker look")]
         [Tooltip("Height above the ground plane; avoids z-fighting with the ground quad and the map blockout markers.")]
         [SerializeField] private float _markerHeight = 0.06f;
-        [Tooltip("Edge length of the unit marker in world units — slightly larger than the biggest graybox vehicle body.")]
+        [Tooltip("Upper bound of the unit marker edge in world units; below it the marker follows the view's footprint.")]
         [SerializeField] private float _unitMarkerSize = 2.4f;
         [Tooltip("Extra edge the building marker gains over the 3x3 footprint, so the outline is not fully hidden under the body.")]
         [SerializeField] private float _buildingMarkerMargin = 0.4f;
@@ -223,6 +223,12 @@ namespace Nova.Presentation.UI
             float size = building
                 ? SimDefinitions.BuildingFootprintCells + _buildingMarkerMargin
                 : _unitMarkerSize;
+            // Units: hug the model (ArtViewScale sizes vary from a 0.4-cell
+            // soldier to a 1.8-cell artillery piece), capped at the old fixed size.
+            if (!building && _views != null && _views.TryGetViewFootprint(id, out float footprint))
+            {
+                size = Mathf.Clamp(footprint * 1.2f + 0.25f, 0.8f, _unitMarkerSize);
+            }
             float shift = building ? 0.5f : 0f; // footprint centre, see class remarks
 
             Transform markerTransform = marker.transform;

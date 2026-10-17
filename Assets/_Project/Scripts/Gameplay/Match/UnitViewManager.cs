@@ -78,19 +78,19 @@ namespace Nova.Gameplay.Match
         private const float PrefabGroundOffset = 0f;
 
         /// <summary>
-        /// Uniform scale factor that shrinks a prefab's horizontal extent to
-        /// its simulation footprint when the measured bounds come out larger
-        /// than the footprint. Art is authored at the ArtAssetStandard.md
-        /// convention (1 grid cell = 3 m) while the simulation world runs 1
-        /// cell = 1 world unit, so the raw PF_* meshes are ~3x too large and
-        /// would overlap (GB-005 finding). Normalizing here — at the view
-        /// boundary, from the mesh's own bounds — keeps every future drop-in
-        /// model swappable without touching prefabs or game logic. Art that
-        /// arrives SMALLER than its footprint keeps its authored scale
-        /// (factor 1): upscaling a detailed miniature reads worse than a
-        /// slightly small model, and the authored look is preserved.
+        /// Uniform scale factor per source prefab, measured once in
+        /// <see cref="NormalizePrefabScale"/>. Art is authored at the
+        /// ArtAssetStandard.md convention (1 grid cell = 3 m) while the
+        /// simulation world runs 1 cell = 1 world unit, so the raw PF_* meshes
+        /// are ~3x too large and would overlap (GB-005 finding). Normalizing
+        /// here — at the view boundary, from the mesh's own bounds — keeps
+        /// every future drop-in model swappable without touching prefabs or
+        /// game logic.
         /// </summary>
         private readonly Dictionary<GameObject, float> _prefabScaleFactors = new Dictionary<GameObject, float>();
+
+        /// <summary>Scaled horizontal extent (max of width, depth) per source prefab, measured with the factor.</summary>
+        private readonly Dictionary<GameObject, float> _prefabFootprints = new Dictionary<GameObject, float>();
 
         [Header("References")]
         [SerializeField] private MatchRunner _matchRunner;
@@ -136,7 +136,10 @@ namespace Nova.Gameplay.Match
         // rendered position/yaw so speed and turn rate are measured on the
         // VIEW — the smoothed motion the player sees, not the 10-Hz sim steps.
         private UnitRigAnimator[] _viewRigs;
+        private float[] _viewFootprints;
         private Vector3[] _lastViewPositions;
+        /// <summary>Cargo of each bound harvester view on its previous frame: the unload edge (>0 to 0) starts the dump animation.</summary>
+        private int[] _lastCargoAE;
         private float[] _lastViewYaws;
         private bool[] _firedThisFrame;
         private bool[] _buildingThisFrame;
@@ -193,6 +196,11 @@ namespace Nova.Gameplay.Match
         /// <summary>Views currently held outside the slot table for the 0.8-second death presentation.</summary>
         public int ActiveDeathHoldCount => _deathHolds.Count;
 
+        /// <summary>Destroyed art views currently lying on the field (D-115).</summary>
+        public int WreckCount => _wrecks != null ? _wrecks.Count : 0;
+
+        private ViewWrecks _wrecks;
+
         /// <summary>
         /// Team slot whose committed Fog-of-War view drives the rendered set.
         /// Negative means "follow <see cref="MatchSession.LocalSlot"/>".
@@ -243,6 +251,22 @@ namespace Nova.Gameplay.Match
         /// is what keeps world picking Fog-of-War legal
         /// (docs/tech/CameraSystem.md section 1).
         /// </summary>
+        /// <summary>
+        /// Horizontal size of an entity's view in world units (the larger of
+        /// width and depth at its authored orientation), for markers that
+        /// should hug the model rather than a fixed graybox size.
+        /// </summary>
+        public bool TryGetViewFootprint(EntityId id, out float size)
+        {
+            size = 0f;
+            if (_viewInstances == null || !id.IsValid) return false;
+            int slot = id.Index;
+            if (slot < 0 || slot >= _viewInstances.Length) return false;
+            if (_boundIds[slot] != id || _viewInstances[slot] == null) return false;
+            size = _viewFootprints[slot];
+            return size > 0f;
+        }
+
         public bool TryGetEntityId(GameObject viewObject, out EntityId id)
         {
             id = EntityId.Invalid;
@@ -265,6 +289,7 @@ namespace Nova.Gameplay.Match
         private void LateUpdate()
         {
             AdvanceDeathHolds(Time.deltaTime);
+            _wrecks?.Advance(Time.deltaTime);
             if (_matchRunner == null || !_matchRunner.IsRunning) return;
 
             EntityManager entities = _matchRunner.Entities;
@@ -488,7 +513,9 @@ namespace Nova.Gameplay.Match
             _lastSeenFrame = new int[capacity];
             _tracked = new bool[capacity];
             _viewRigs = new UnitRigAnimator[capacity];
+            _viewFootprints = new float[capacity];
             _lastViewPositions = new Vector3[capacity];
+            _lastCargoAE = new int[capacity];
             _lastViewYaws = new float[capacity];
             _firedThisFrame = new bool[capacity];
             _buildingThisFrame = new bool[capacity];
@@ -538,6 +565,14 @@ namespace Nova.Gameplay.Match
             int shapeKey;
             float groundOffset;
             GameObject sourcePrefab = ResolveViewPrefab(in unit);
+
+            // A building (or its site) going up clears the wrecks on its
+            // footprint, so a ruin never pokes through a fresh wall.
+            if (_wrecks != null && SimDefinitions.IsBuildingRole(unit.Role))
+            {
+                _wrecks.ClearArea(new Vector3(unit.Transform.PositionX.ToFloat(), 0f, unit.Transform.PositionY.ToFloat()),
+                    SimDefinitions.BuildingFootprintCells * 0.85f);
+            }
 
             if (sourcePrefab != null)
             {
@@ -619,6 +654,9 @@ namespace Nova.Gameplay.Match
                 rig.ResetPose();
             }
             _viewRigs[slot] = rig;
+            _viewFootprints[slot] = sourcePrefab != null && _prefabFootprints.TryGetValue(sourcePrefab, out float footprint)
+                ? footprint
+                : Mathf.Max(instance.transform.localScale.x, instance.transform.localScale.z);
 
             if (!_tracked[slot])
             {
@@ -671,56 +709,32 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// Measures the freshly instantiated prefab view and caches the
-        /// uniform scale factor that brings its horizontal extent down to the
-        /// simulation footprint of its role (see the field remarks on
-        /// <see cref="_prefabScaleFactors"/>). The instance must be unscaled
-        /// (fresh <c>Instantiate</c>) and parented under this transform —
-        /// world bounds and the local scale applied afterwards share the same
-        /// parent, so the ratio stays exact. Meshes without renderers, or art
-        /// already smaller than its footprint, keep factor 1.
+        /// Measures the freshly instantiated prefab view once per source
+        /// prefab and caches the uniform scale <see cref="ArtViewScale"/>
+        /// prescribes for its role.
         /// </summary>
         private float NormalizePrefabScale(GameObject sourcePrefab, GameObject instance, in UnitState unit)
         {
             float factor = 1f;
-
-            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length > 0)
+            Transform wreck = ViewWrecks.FindWreck(instance);
+            bool any = false;
+            Bounds bounds = default;
+            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
             {
-                Bounds bounds = renderers[0].bounds;
-                for (int i = 1; i < renderers.Length; i++)
-                {
-                    bounds.Encapsulate(renderers[i].bounds);
-                }
-
-                float target = TargetViewSize(EffectiveViewRole(in unit));
-                float current = Mathf.Max(bounds.size.x, bounds.size.z);
-                if (current > target && current > 1e-4f)
-                {
-                    factor = target / current;
-                }
+                // The inactive wreck child may sprawl wider (rubble); the live
+                // model alone decides the scale.
+                if (wreck != null && r.transform.IsChildOf(wreck)) continue;
+                if (!any) { bounds = r.bounds; any = true; }
+                else bounds.Encapsulate(r.bounds);
+            }
+            if (any)
+            {
+                factor = ArtViewScale.Factor(EffectiveViewRole(in unit), bounds.size);
+                _prefabFootprints[sourcePrefab] = Mathf.Max(bounds.size.x, bounds.size.z) * factor;
             }
 
             _prefabScaleFactors[sourcePrefab] = factor;
             return factor;
-        }
-
-        /// <summary>
-        /// Horizontal world size a view of this role should occupy. Buildings
-        /// fill their 3x3-cell footprint (<see cref="SimDefinitions.BuildingFootprintCells"/>,
-        /// 1 cell = 1 world unit); units reuse the graybox shape table's
-        /// larger horizontal extent so art and primitive fallback read at the
-        /// same size for the same role.
-        /// </summary>
-        private static float TargetViewSize(UnitRole role)
-        {
-            if (SimDefinitions.IsBuildingRole(role))
-            {
-                return SimDefinitions.BuildingFootprintCells;
-            }
-
-            GetRoleShape(role, out _, out Vector3 primitiveScale);
-            return Mathf.Max(primitiveScale.x, primitiveScale.z);
         }
 
         /// <summary>
@@ -774,6 +788,31 @@ namespace Nova.Gameplay.Match
 
             GameObject instance = _viewInstances[slot];
             _viewObjectToSlot.Remove(instance);
+
+            // Art with a wreck child stays on the field as a wreck (D-115);
+            // graybox primitives and art without one keep the fade-out.
+            Transform wreck = _viewSourcePrefabs[slot] != null ? ViewWrecks.FindWreck(instance) : null;
+            if (wreck != null)
+            {
+                Collider[] wreckColliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
+                var wreckColliderStates = new bool[wreckColliders.Length];
+                for (int i = 0; i < wreckColliders.Length; i++)
+                {
+                    wreckColliderStates[i] = wreckColliders[i] != null && wreckColliders[i].enabled;
+                    if (wreckColliders[i] != null) wreckColliders[i].enabled = false;
+                }
+                if (_wrecks == null) _wrecks = new ViewWrecks(ReturnInstanceToPool);
+                _wrecks.Begin(instance, wreck, _viewShapeKeys[slot], _viewSourcePrefabs[slot],
+                    SimDefinitions.IsBuildingRole(_viewRoles[slot]), wreckColliders, wreckColliderStates);
+                _viewRigs[slot] = null;
+                _viewInstances[slot] = null;
+                _viewRenderers[slot] = null;
+                _boundIds[slot] = EntityId.Invalid;
+                _viewSourcePrefabs[slot] = null;
+                _viewOwners[slot] = -1;
+                _viewHealthSteps[slot] = -1;
+                return true;
+            }
 
             Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(includeInactive: true);
             Collider[] colliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
@@ -883,6 +922,7 @@ namespace Nova.Gameplay.Match
 
         private void CompleteAllDeathHolds()
         {
+            _wrecks?.CompleteAll();
             for (int i = _deathHolds.Count - 1; i >= 0; i--)
             {
                 CompleteDeathHoldAt(i);
@@ -1041,10 +1081,13 @@ namespace Nova.Gameplay.Match
             Transform t = _viewInstances[slot].transform;
             Vector3 pos = t.position;
             float yaw = t.eulerAngles.y;
+            // A (re)bound view starts from the unit's current load, so a harvester
+            // entering view empty or full never counts as having just unloaded.
             if (rig == null || spawned)
             {
                 _lastViewPositions[slot] = pos;
                 _lastViewYaws[slot] = yaw;
+                _lastCargoAE[slot] = unit.CargoAE;
                 return;
             }
 
@@ -1071,7 +1114,30 @@ namespace Nova.Gameplay.Match
                               || IsProducingForViewer(in unit)),
             };
             input.HasTarget = TryGetTargetViewPosition(in unit, out input.TargetPosition);
+            if (unit.Role == UnitRole.Harvester)
+            {
+                int capacity = HarvesterCapacityAE(in unit);
+                int previous = _lastCargoAE[slot];
+                input.CargoFill = Mathf.Clamp01(unit.CargoAE / (float)capacity);
+                if (previous > 0 && unit.CargoAE <= 0)
+                {
+                    input.Dump = true;
+                    input.DumpFromFill = Mathf.Clamp01(previous / (float)capacity);
+                }
+                _lastCargoAE[slot] = unit.CargoAE;
+            }
             rig.Tick(in input, dt);
+        }
+
+        /// <summary>Cargo capacity of this harvester's faction; the global ceiling when the faction cannot be resolved.</summary>
+        private int HarvesterCapacityAE(in UnitState unit)
+        {
+            EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
+            if (economy != null && unit.PlayerId < EconomySystem.MaxPlayers)
+            {
+                return Mathf.Max(1, SimDefinitions.HarvesterCargoCapacityAE(economy.GetSlotFaction(unit.PlayerId)));
+            }
+            return SimDefinitions.MaxHarvesterCargoCapacityAE;
         }
 
         /// <summary>
