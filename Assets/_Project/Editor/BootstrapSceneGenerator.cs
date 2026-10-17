@@ -4,7 +4,6 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
-using Nova.Data;
 using Nova.Gameplay.Audio;
 using Nova.Gameplay.CombatFeedback;
 using Nova.Gameplay.Match;
@@ -71,7 +70,6 @@ namespace Nova.Editor
             GameObject ui = CreateUiObject(runner, camera);
             CreateMainMenuObject(runner, camera, ui, audio.MusicGroup);
             CreateVersionBadgeObject();
-            EnsureGlutrinneMapAsset();
 
             // The drop-in registry is rebuilt from whatever PF_* prefabs
             // currently exist under Assets/_Project/Art (usually zero — the
@@ -265,45 +263,6 @@ namespace Nova.Editor
             var blockout = mapObject.AddComponent<GlutrinneBlockoutView>();
             WireReference(blockout, "_bootstrap", runner.GetComponent<MatchBootstrap>());
             WireReference(blockout, "_groundRenderer", ground.GetComponent<Renderer>());
-        }
-
-        /// <summary>
-        /// The data-layer map asset. It records exactly the graybox-accurate
-        /// subset of the Glutrinne manifest layout — the two spawn points and
-        /// the five aetherium fields the canonical match registers since
-        /// Sprint 16.7. Primary-route dressing remains G4 scope
-        /// (docs/production/ScopeLedger.md) and is deliberately not invented here.
-        /// </summary>
-        private static void EnsureGlutrinneMapAsset()
-        {
-            const string mapPath = "Assets/_Project/Data/Maps/MAP_Glutrinne.asset";
-
-            MapDefinitionSO map = AssetDatabase.LoadAssetAtPath<MapDefinitionSO>(mapPath);
-            if (map == null)
-            {
-                ArtAssetAutoSync.EnsureFolder("Assets/_Project/Data/Maps");
-                map = ScriptableObject.CreateInstance<MapDefinitionSO>();
-                AssetDatabase.CreateAsset(map, mapPath);
-            }
-
-            // Both lists are READ from MatchBootstrap, never restated here.
-            // They used to be literals, and they went stale: this baked the
-            // five-field layout with a comment claiming it was what
-            // MatchBootstrap registers, straight through the map changes of
-            // sprint 21 that took it to fifteen. Nobody caught it because
-            // MapDefinitionSO has no runtime consumer — which makes a wrong
-            // value cheap today and expensive on the day someone reads it.
-            Vector2Int[] hqCentres = MatchBootstrap.CanonicalHqCentreCells;
-            Vector2Int[] fieldCells = MatchBootstrap.CanonicalFieldCells;
-
-            map.Initialize(
-                "Glutrinne",
-                MapBiomeType.Desert,
-                128,
-                128,
-                System.Array.ConvertAll(hqCentres, c => new Vector2(c.x, c.y)),
-                System.Array.ConvertAll(fieldCells, c => new Vector2(c.x, c.y)));
-            EditorUtility.SetDirty(map);
         }
 
         /// <summary>

@@ -3662,6 +3662,56 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-123 | Entwurf | MapDefinitionSO wird abgeschafft (statt einen Konsumenten zu bekommen)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#127); verbindlich mit dem
+Merge des PR.
+
+**Kontext:** `MapDefinitionSO` (Typ, `MapBiomeType`, Asset `MAP_Glutrinne.asset`)
+wurde nur von `BootstrapSceneGenerator` beschrieben und von einem eigenen
+EditMode-Test geprüft; kein Laufzeitcode las es. Genau deshalb blieb sein Inhalt
+seit Sprint 21 falsch (fünf statt fünfzehn Felder), bis #125 den Generator auf
+`MatchBootstrap.CanonicalFieldCells` umstellte. Die Gegenprobe über die GUIDs
+findet in Szenen, Prefabs und Assets keinen weiteren Verweis. Die Karte lebt
+tatsächlich in `MatchBootstrap.FieldLayouts`, den HQ-Slots, `MatchConfig` und
+dem C#-Prädikat `GlutrinneTerrainMap`. Die Headless-Lane kompiliert `Nova.Data`
+nicht und kann ein ScriptableObject nie lesen. Weitere Karten sind Post-MVP und
+erst nach G5 mit eigener D-ID geplant (D-056).
+
+**Alternativen:**
+
+1. **Konsument geben:** `MatchBootstrap` liest die Lage aus dem Asset. Das Asset
+   hat nur `Vector2`-Listen für Spawns und Ressourcenknoten, keine Reserven,
+   kein Terrain, keine Feld-IDs, und die Sim kennt nur ganzzahlige Zellen. Die
+   Headless-Lane könnte es nicht lesen, es bliebe also eine zweite Wahrheit
+   neben der Sim. Ohne zweite Karte kauft das nichts.
+2. **Behalten, wie es ist:** ein gepflegtes Artefakt ohne Zweck; jede
+   Kartenänderung müsste es mitziehen, ohne dass jemand sagen kann, wofür.
+3. **Abschaffen:** Typ, Enum, Asset, Test und Generator-Abschnitt entfallen, die
+   kanonische Lage steht nur dort, wo sie gebraucht wird.
+
+**Entscheidung:** Alternative 3. `MapDefinitionSO`, `MapBiomeType`,
+`MAP_Glutrinne.asset`, `MapDefinitionTests` und `EnsureGlutrinneMapAsset` werden
+samt `.meta`-Dateien entfernt, ebenso `MatchBootstrap.CanonicalHqCentreCells`
+(einziger Leser war der Generator). `CanonicalFieldCells` bleibt, weil
+`AllFieldCells` darauf beruht. Eine Wiedereinführung ist nur als engine-freie
+Kartendefinition (lesbar auch von der Headless-Lane) nach G5 mit eigener D-ID
+zulässig.
+
+**Begründung:** Ohne Leser ist ein Datenartefakt nur Pflegelast und eine
+Fehlerquelle. Vor der Mehrkarten-Entscheidung ist Abschaffen die ehrlichere
+Variante; ein späterer Anlauf braucht ohnehin ein anderes Format.
+
+**Konsequenzen:**
+
+- Keine Sim-, Snapshot- oder Baseline-Änderung; die Headless-Tests sind nicht
+  betroffen.
+- Die Feldlage steht weiterhin an mehreren Stellen literal (Unity-Host,
+  Headless-Szenario, Testspiegel). Diese Klasse von Spiegelstellen bleibt
+  ausdrücklich offen und ist nicht Teil dieser Entscheidung.
+- Unity-Spuren (Kompilieren von `Nova.Editor`/`Nova.Data.Tests`, Generator-Lauf)
+  sind lokal nachzuholen; ältere Doku nennt das Asset historisch weiter.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
