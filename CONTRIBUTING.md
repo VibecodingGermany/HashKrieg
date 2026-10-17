@@ -1,6 +1,6 @@
 # Beitragen zu Hashkrieg
 
-**Version:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
+**Version:** 5.1.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Branch-, PR- und Review-Ablauf für Menschen und KI-Agenten. Detailregeln stehen
 in [AGENTS.md](AGENTS.md), Dokumentregeln in
@@ -57,9 +57,24 @@ Pflicht auf jedem PR:
   CLA-Zustimmung und die Freigabe des Projektinhabers auf dem aktuellen Head
   vorliegen.
 
-Unity-EditMode-Tests laufen mangels CI-Lizenz nicht automatisch. Wer die
-Präsentationsschicht (`Assets/_Project/Scripts/{Presentation,Gameplay}`) anfasst,
-führt sie lokal aus und schreibt das Ergebnis in den PR.
+**Unity-Spuren – lokal, vor dem Merge (D-125).** Die Unity-Tests (EditMode und
+PlayMode unter `Assets/Tests/`) laufen in keiner CI; es gibt dort keine
+Unity-Lizenz. Wer einen PR vorbereitet, der
+`Assets/_Project/Scripts/{Simulation,Core,AI,AI.Data,Data,Gameplay,Presentation}/`,
+`Assets/_Project/Editor/`, `Assets/_Project/Scenes/` oder `Assets/Tests/`
+berührt, fährt beide Spuren selbst – auch bei einer reinen Simulationsänderung,
+die einen PlayMode-Test brechen kann (#141):
+
+```bash
+python3 tools/unity-tests/run_unity_tests.py all
+```
+
+Das Skript setzt nie `-quit` (Unity beendet sich damit vor dem Testlauf und
+meldet trotzdem Erfolg), bricht bei offenem Editor ab, lässt PlayMode mit Grafik
+laufen und prüft Ergebnisdatei, Frische, Testanzahl und Fehlschläge. Das
+Ergebnis kommt in die Zeile „Unity-Spuren“ der PR-Vorlage. „Nicht gelaufen“
+samt Grund ist erlaubt, muss aber dastehen; der Inhaber sieht es beim Merge.
+Wer Unity nicht hat, sagt das, statt es zu überspringen.
 
 ## 4. Zugänge und Reviews (Tier 2)
 
@@ -156,3 +171,4 @@ sind keine Game-Releases. Es gibt bisher kein veröffentlichtes Release.
 | 4.0.0 | 2026-08-08 | D-091: Tier 2 aktiviert; Maintainer-Peer-Review auf aktuellem Head für jeden PR, Fork-only plus CLA für externe Beiträge, Baseline-Wächter und zwei festgelegte Merge-Accounts dokumentiert | Dennis Westermann / Michael Falk |
 | 4.0.1 | 2026-08-08 | CLA-Wirkung nicht rückwirkend präzisiert und D-ID-Pflicht auf echte Entscheidungen vereinheitlicht | Dennis Westermann |
 | 5.0.0 | 2026-08-10 | D-105: `@cubetribe` als alleinigen Projektinhaber und Mergeberechtigten festgelegt; Inhaber-Selbst-Merge, externe aktuelle Freigabe und ehrliche Spielabnahme-Zurückstellung geregelt | Dennis Westermann |
+| 5.1.0 | 2026-10-17 | D-125 (Entwurf): Unity-Spuren als lokale Pflichtspur mit Skript, Auslöserliste und Nachweiszeile im PR (#110) | Orchestrator |

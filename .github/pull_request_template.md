@@ -7,6 +7,11 @@
 
 ## Checkliste
 - [ ] `dotnet test tools/Nova.SimRunner.Tests` lokal grün
+- [ ] **Unity-Spuren:** EditMode N/N, PlayMode M/M — oder „nicht gelaufen“ mit Grund.
+      Pflichtzeile, wenn der PR `Assets/_Project/Scripts/{Simulation,Core,AI,AI.Data,Data,Gameplay,Presentation}/`,
+      `Assets/_Project/Editor/`, `Assets/_Project/Scenes/` oder `Assets/Tests/` berührt;
+      sonst „nicht betroffen“. Kommando: `python3 tools/unity-tests/run_unity_tests.py all`
+      (siehe [CONTRIBUTING.md](../CONTRIBUTING.md) §3)
 - [ ] Zeile unter `[Unreleased]` in [CHANGELOG.md](../CHANGELOG.md)
 - [ ] Echte Entscheidung getroffen? → D-ID im [DecisionLog](../docs/production/DecisionLog.md), sonst streichen
 - [ ] Bei Simulationsänderung: keine Determinismus-Baseline im selben PR geändert

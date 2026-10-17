@@ -3662,6 +3662,138 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-125 | Entwurf | Unity-Spuren als lokale Pflichtspur (kein CI-Lauf)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#110); verbindlich mit dem
+Merge des PR. Die Endnummer vergibt der Integrator.
+
+**Kontext:** `.github/workflows/tests.yml` fährt ausschließlich
+`dotnet test tools/Nova.SimRunner.Tests`. Die zwei Unity-Spuren unter
+`Assets/Tests/` (EditMode, PlayMode) laufen in keiner CI, weil es dort keine
+Unity-Lizenz gibt. Der Zustand war weder verboten noch geregelt, und er hat
+mehrfach gekostet:
+
+1. **#110:** `MainMenuTests.NetworkPanel_ValidatesMasksAndCancelsWithoutStartingGameplay`
+   war auf `main` rot, und niemand hat es bemerkt. Die Erwartung war seit
+   Sprint 14 (D-092) überholt; sie wurde mit `e3149f9` berichtigt.
+2. **#141 (`e4faa75`):** ein Wirtschaftsfix, der nur `Scripts/Simulation/Economy/`
+   und Tests anfasste, machte `GrayboxDemoProofTests` rot. Die headless-Kette war
+   mit 754/754 grün, der PR wurde gemergt. Die bisherige Regel in
+   [CONTRIBUTING.md](../../CONTRIBUTING.md) und [AGENTS.md](../../AGENTS.md)
+   verlangte den Unity-Lauf nur bei Änderungen an Präsentation und Gameplay und
+   nannte nur EditMode.
+3. **#143 (`85c912b`):** die Reparatur dazu. Aufgefallen war es nur, weil der
+   Orchestrator vor dem Bauen von Hand `-runTests -testPlatform PlayMode`
+   gefahren hat. Danach meldete er EditMode 663/663 und PlayMode 15/15.
+4. **#144 (`a6858d1`)** änderte `MainMenuController.cs` und zwei `.asmdef` ohne
+   erwähnten Unity-Lauf.
+
+Treffender als „läuft nirgends“ ist also: **Die Spuren laufen sporadisch, ohne
+Pflicht, ohne Auslöser und ohne Zuständigen.** Dazu kommt eine Falle, die nur
+in Test-Docstrings und im Graybox-Log stand: `-quit` zusammen mit `-runTests`
+beendet Unity vor dem Testlauf, schreibt keine Ergebnisdatei und meldet
+trotzdem Erfolg; das hat in Sprint 21 einen grünen Eindruck erzeugt, den es nie
+gab. PlayMode braucht außerdem ein Grafikgerät (kein `-nographics`;
+Screenshot-Capture und UI Toolkit rendern, vgl.
+[GrayboxLog.md](GrayboxLog.md), `GrayboxDemoProofTests`).
+
+Die Empfehlung des Arbeiters aus Sprint 21 (Weg A, GameCI, „EditMode und
+PlayMode beide headless“) liegt nur außerhalb des Repos und ist in einem Punkt
+**falsch**: PlayMode läuft nicht ohne Grafik. Sie wird hier ausdrücklich
+verworfen, nicht stillschweigend übergangen.
+
+**Alternativen:**
+
+1. **A – GameCI `unity-test-runner` in GitHub Actions.** Ein neuer Workflow
+   fährt Unity `6000.5.4f1` im Docker-Image mit einem Lizenz-Secret.
+   - *Für:* schützt auch gegen vergessene Läufe; ein roter Check ist sichtbar.
+   - *Gegen:* ein Lizenz-Secret im Repo-Kontext und ein neuer Workflow sind eine
+     Sicherheitsfläche mit eigener Prüfung (`@ci-security-guardian`,
+     `@security`). Fork-PRs bekommen keine Secrets, der Check liefe gerade für
+     externe Beiträge nicht. Ob Unity Personal in CI zulässig ist und ob ein
+     Image für `6000.5.4f1` existiert, ist unverifiziert. PlayMode bräuchte
+     xvfb und Software-Rendering, ob die UI-Toolkit-Tests so laufen, ist
+     unverifiziert. Ein flackernder Pflichtcheck blockiert den alleinigen
+     Mergenden. Aufwand L bis XL.
+2. **B – selbstgehosteter Runner auf dem Rechner des Inhabers.** Echte GPU, kaum
+   Kosten. *Gegen:* das Repository ist öffentlich und nimmt Fork-PRs an
+   (`external-contributor-review`). Der Runner würde fremden Code auf dem
+   Inhaberrechner ausführen; GitHub rät bei öffentlichen Repositories davon ab.
+   **Verworfen.**
+3. **C – ausdrücklich „nur lokal, vor dem Merge“, mit Skript, Auslöserliste,
+   Zuständigem und Nachweiszeile im PR.** Keine Secrets, keine
+   Workflow-Änderung. *Gegen:* nichts erzwingt den Lauf; die Regel trägt nur,
+   wenn der Zuständige sie fährt. Die Zeile im PR macht ein Auslassen sichtbar,
+   nicht unmöglich. Aufwand M.
+4. **Status quo** (nur der Satz „laufen mangels CI-Lizenz nur lokal“). Er hat
+   #141 nicht verhindert. **Verworfen.**
+
+**Entscheidung:** **C**, mit vertagter Wiedervorlage von **A nur für
+EditMode**.
+
+- `tools/unity-tests/run_unity_tests.py` (`edit | play | all`, `--self-test`) ist
+  das eine Kommando:
+  - Editor-Version aus `ProjectSettings/ProjectVersion.txt`;
+  - Abbruch bei offenem Editor (`Library/EditorInstance.json`, Prozess lebt);
+  - **nie `-quit`**; `-nographics` nur für EditMode;
+  - alte Ergebnis-XML wird vorher gelöscht;
+  - danach Prüfung von Existenz, Frische, Testanzahl größer null und
+    `failed == 0`. Eine fehlende, leere, veraltete, kaputte oder rote Datei ist
+    Exit 1, ein Unity-Exitcode ungleich null ebenso;
+  - `git status` vor und nach dem Lauf wird verglichen und warnt vor Resten
+    (`ProjectSettings.asset`, `InitTestScene*`); das Skript räumt nichts auf.
+- **Auslöser** ist jede Änderung unter
+  `Assets/_Project/Scripts/{Simulation,Core,AI,AI.Data,Data,Gameplay,Presentation}/`,
+  `Assets/_Project/Editor/`, `Assets/_Project/Scenes/` und `Assets/Tests/`, nicht
+  mehr nur Präsentation und Gameplay (Beleg: #141).
+- **Zuständig** ist, wer den PR vorbereitet (bei der Sprint-Integration der
+  Orchestrator); der Inhaber prüft die Zeile beim Merge. Ein Agent in einer
+  Umgebung ohne Unity (isolierter Worktree, fremde Maschine) fährt die Spur
+  nicht und meldet „nicht gelaufen“.
+- **Nachweis:** Die PR-Vorlage trägt die Pflichtzeile „Unity-Spuren: EditMode
+  N/N, PlayMode M/M — oder nicht gelaufen mit Grund“. „Nicht gelaufen“ bleibt
+  erlaubt, muss aber dastehen (analog zur ehrlichen Spielabnahme-Zurückstellung
+  aus D-105).
+- **Keine Testanzahlen** in `AGENTS.md`, `CONTRIBUTING.md` oder der Vorlage;
+  das Skript gibt sie aus.
+- `tests.yml` bleibt unangetastet. Auch der `--self-test` des Skripts läuft
+  nicht in der CI: ihn dort einzuhängen, hieße `.github/workflows/` ändern. Er
+  läuft von Hand mit dem Skript und ist ein Kandidat für die Wiedervorlage.
+- **Wiedervorlage von A (nur EditMode, `-nographics`)**, sobald eine dieser
+  Bedingungen eintritt: (a) externe PRs werden wieder erwartet (der letzte
+  externe Beitragende ist seit 2026-08-21 inaktiv); (b) der Inhaber hat geklärt,
+  dass Unity Personal in CI zulässig ist, und ein Lizenzweg steht; (c) trotz
+  Pflichtzeile geht ein weiterer rot gemergter Unity-Test auf `main`. PlayMode
+  bleibt dauerhaft lokal.
+
+**Begründung:** Das Projekt hat faktisch einen Entwickler und einen
+Orchestrator auf dem Inhaberrechner, auf dem Unity liegt. Eine CI für PlayMode
+ist ohne Grafikgerät unverifiziert, ein Lizenz-Secret plus Workflow ist eine
+Sicherheitsfläche, und ein Runner auf dem Inhaberrechner (B) ist bei einem
+öffentlichen Repository mit Fork-PRs zu gefährlich. Was sich heute zuverlässig
+beheben lässt, ist der Zwischenzustand: ein Kommando, das nicht lügen kann
+(kein `-quit`, Ergebnisdatei erzwungen), ein Auslöser, der #141 erfasst hätte,
+ein Name und eine Zeile im PR. Was engine-frei ist, gehört weiterhin in die
+`dotnet`-Kette (Vorbild: der Geländespiegel aus #126).
+
+**Konsequenzen:**
+
+- **Die Regel erzwingt nichts.** Wer die Zeile ehrlich mit „nicht gelaufen“
+  füllt, darf mergen lassen. Der Schutz hängt an der Prüfung des Inhabers beim
+  Merge. Das ist bewusst: es ist die Ehrlichkeitsregel aus
+  [AGENTS.md](../../AGENTS.md) Regel 5, angewandt auf Unity.
+- **Das Skript läuft nur auf Rechnern mit Unity `6000.5.4f1`.** Worker in
+  isolierten Worktrees ohne Editor liefern „nicht gelaufen“; der Lauf bleibt
+  beim Orchestrator oder Inhaber.
+- **Ein offener Editor blockiert den Lauf** (gewollt, mit klarer Meldung).
+- **Ein Lauf kann den Arbeitsbaum verändern.** Das Skript meldet das, räumt aber
+  nicht auf; wer committet, prüft `git status`.
+- **Beide Dokumente bekommen Version 5.1.0** und eine Verlaufszeile.
+- **#110 schließt der Inhaber**, nicht dieser PR.
+- **Offen und getrennt zu behandeln:** das SENTIS-Define in
+  `ProjectSettings.asset` (seit #143 auf `main` verloren) ist ein eigener Befund,
+  nicht Teil dieser Entscheidung.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
