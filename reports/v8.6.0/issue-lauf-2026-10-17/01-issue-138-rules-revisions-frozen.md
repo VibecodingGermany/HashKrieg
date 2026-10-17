@@ -120,3 +120,7 @@ Landet der Art-Strang zuerst, zieht dieses Paket nach. Dann friert es zusätzlic
 > **Folgen:** Der Art-Strang (RulesRevisionV4, D-116) und #108 hängen ihre Revisionen als Literalzeilen an. Vor dem Selbst-Merge ist ein unabhängiges Read-only-Review nötig (AGENTS.md §3).
 >
 > Fixes #138, Refs #108
+
+## Unity-Spuren nachgefahren (Integrator, 2026-10-17)
+
+Nach dem Commit mit `tools/unity-tests/run_unity_tests.py` (Branch #110) auf diesem Worktree, Unity 6000.5.4f1, warme Library: **EditMode 666/666, PlayMode 15/15**, keine Fehlschläge, keine Compile-Fehler, Arbeitsbaum danach sauber. Die Zeile „Unity-Spuren: nicht gelaufen“ oben ist damit überholt; der PR-Text nennt die gemessenen Zahlen.
