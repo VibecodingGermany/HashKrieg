@@ -154,3 +154,7 @@ Vier bewertete Alternativen: Sim-Weg (gewählt), der Client-Weg aus `73f54b5`, g
 >   neuen Testbuild ausgeben.
 >
 > 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+## Unity-Spuren nachgefahren (Integrator, 2026-10-17)
+
+Nach dem Commit mit `tools/unity-tests/run_unity_tests.py` (Branch #110) auf diesem Worktree, Unity 6000.5.4f1, warme Library: **EditMode 671/671, PlayMode 15/15**, keine Fehlschläge, keine Compile-Fehler, Arbeitsbaum danach sauber. Die Zeile „Unity-Spuren: nicht gelaufen“ oben ist damit überholt; der PR-Text nennt die gemessenen Zahlen.
