@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Nova.AI;
+using Nova.AI.Data;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
@@ -114,7 +116,8 @@ namespace Nova.AI.Tests
             }
         }
 
-        private static AiHost BuildAiHost(ulong seed)
+        private static AiHost BuildAiHost(
+            ulong seed, IAiGoalObserver goalObserver = null, AiPersonality personality = default)
         {
             // Mirror of MatchRunner.InitializeMatch(seed, ..., enableSkirmishAi: true).
             var kernel = new SimulationKernel(new SimRandom(seed));
@@ -136,11 +139,14 @@ namespace Nova.AI.Tests
             var aiSession = new MatchSession(AiSlot, activeSlots: new byte[] { HumanSlot, AiSlot }, inputDelayTicks: 1);
             var aiIngress = new CommandIngress(aiSession);
             _ = new AiPeerCommandTransport(aiIngress, ingress);
+            // Applied the way MatchRunner does it: deltas into the profile, the rest by argument.
             var ai = new SkirmishAiSystem(
                 AiSlot,
                 new AiFactionProfile("Legion",
-                    targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2),
-                aiIngress, entities, economy, construction, production, fogOfWar, victory);
+                    targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2)
+                    .WithPersonality(personality),
+                aiIngress, entities, economy, construction, production, fogOfWar, victory,
+                goalObserver, null, personality);
 
             kernel.RegisterSystem(economy);
             kernel.RegisterSystem(construction);
@@ -212,9 +218,10 @@ namespace Nova.AI.Tests
             }
         }
 
-        private static AiHost BuildMatch(ulong seed)
+        private static AiHost BuildMatch(
+            ulong seed, IAiGoalObserver goalObserver = null, AiPersonality personality = default)
         {
-            AiHost host = BuildAiHost(seed);
+            AiHost host = BuildAiHost(seed, goalObserver, personality);
             ApplyOpeningPosition(host);
             return host;
         }
@@ -475,6 +482,120 @@ namespace Nova.AI.Tests
             Assert.That(first.Victory.Outcome, Is.EqualTo(second.Victory.Outcome));
             Assert.That(first.Kernel.CalculateStateHash(), Is.EqualTo(second.Kernel.CalculateStateHash()),
                 "the full AI loop (intents through the sealed stream) must reproduce the identical end state");
+        }
+
+        // ----------------------------------------------------------------
+        // (f) The flanked staging cell (r11, #101, D-127)
+        //
+        // Mirror of the .NET lane SkirmishGoalTests flank block: a D-114
+        // flank of ten put the staging cell outside the commit ring, so no
+        // unit held there and the army marched piecemeal before its wave
+        // was ready.
+        // ----------------------------------------------------------------
+
+        private sealed class RecordingObserver : IAiGoalObserver
+        {
+            public readonly List<(uint Tick, AiArmyGoal Goal)> Army = new List<(uint, AiArmyGoal)>();
+            public readonly List<(uint Tick, AiUnitGoal Goal)> Units = new List<(uint, AiUnitGoal)>();
+
+            public void OnArmyGoal(byte slot, uint tick, in AiArmyGoal army) => Army.Add((tick, army));
+
+            public void OnUnitGoal(byte slot, uint tick, in AiUnitGoal goal) => Units.Add((tick, goal));
+        }
+
+        [TestCase(10)]
+        [TestCase(-10)]
+        public void SkirmishAi_FlankedStagingCellIsInsideTheRing_AndProducesHold(int flank)
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var observer = new RecordingObserver();
+            AiHost host = BuildMatch(Seed, observer, AiPersonality.Create(AiOpening.Balanced, flank, layoutVariant: 0));
+            Assert.That(TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True);
+            uint firstWave = RunToFirstWave(host, observer);
+            Assert.That(firstWave, Is.Not.Zero, $"flank {flank}: the first wave never marched");
+
+            AiArmyGoal army = FirstEngagingArmy(observer);
+            int stagingDistance = Math.Max(Math.Abs(army.StagingCellX - hqX), Math.Abs(army.StagingCellY - hqY));
+            Assert.That(stagingDistance, Is.GreaterThan(shipped.StagingDistanceCells + shipped.StagingToleranceCells),
+                $"flank {flank}: the staging cell is inside the unflanked ring, so this scene does not reproduce #101");
+            Assert.That(stagingDistance, Is.LessThanOrEqualTo(shipped.StagingDistanceCells + Math.Abs(flank)));
+
+            int holds = 0;
+            foreach ((uint tick, AiArmyGoal goal) in observer.Army)
+            {
+                if (tick >= firstWave || !goal.Engages) continue;
+                Assert.That(goal.Committed, Is.Zero,
+                    $"flank {flank}, tick {tick}: units counted as already out before any wave marched");
+            }
+            foreach ((uint tick, AiUnitGoal goal) in observer.Units)
+            {
+                if (tick < firstWave && goal.Goal == GoalKind.Hold) holds++;
+            }
+            Assert.That(holds, Is.GreaterThan(0),
+                $"flank {flank}: not one unit was told to hold at the staging cell before the first wave");
+        }
+
+        [TestCase(10)]
+        [TestCase(-10)]
+        [TestCase(0)]
+        public void SkirmishAi_NoAttackBeforeWaveReady_WhenFlanked(int flank)
+        {
+            var observer = new RecordingObserver();
+            AiHost host = BuildMatch(Seed, observer, AiPersonality.Create(AiOpening.Balanced, flank, layoutVariant: 0));
+            uint firstWave = RunToFirstWave(host, observer);
+            Assert.That(firstWave, Is.Not.Zero, $"flank {flank}: the first wave never marched");
+
+            int attacksAtTheWave = 0;
+            foreach ((uint tick, AiUnitGoal goal) in observer.Units)
+            {
+                if (goal.Goal != GoalKind.Attack) continue;
+                Assert.That(tick, Is.GreaterThanOrEqualTo(firstWave),
+                    $"flank {flank}: unit {goal.EntityRaw} was sent to attack at tick {tick}, "
+                    + $"before the first wave was ready at tick {firstWave}");
+                if (tick == firstWave) attacksAtTheWave++;
+            }
+            Assert.That(attacksAtTheWave, Is.GreaterThan(0),
+                $"flank {flank}: the wave was reported ready at tick {firstWave} and nobody marched");
+        }
+
+        private static uint RunToFirstWave(AiHost host, RecordingObserver observer)
+        {
+            for (int budget = 0; budget < EndToEndBudgetTicks && !host.Victory.IsDecided; budget++)
+            {
+                host.Step();
+                for (int i = observer.Army.Count - 1; i >= 0; i--)
+                {
+                    if (observer.Army[i].Goal.Engages && observer.Army[i].Goal.WaveReady) return observer.Army[i].Tick;
+                }
+            }
+            return 0;
+        }
+
+        private static AiArmyGoal FirstEngagingArmy(RecordingObserver observer)
+        {
+            foreach ((uint _, AiArmyGoal goal) in observer.Army)
+            {
+                if (goal.Engages && goal.StagingCellX >= 0) return goal;
+            }
+            Assert.Fail("the army never engaged with a resolved staging cell");
+            return default;
+        }
+
+        private static bool TryHqCell(AiHost host, byte slot, out int cellX, out int cellY)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (!u.IsActive || u.PlayerId != slot || u.Role != UnitRole.HQ) continue;
+                if (host.Construction.IsActiveSite(u.Id)) continue;
+                cellX = SimFixed.WorldToGrid(u.Transform.PositionX);
+                cellY = SimFixed.WorldToGrid(u.Transform.PositionY);
+                return true;
+            }
+            cellX = -1;
+            cellY = -1;
+            return false;
         }
     }
 }

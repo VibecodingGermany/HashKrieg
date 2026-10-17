@@ -628,7 +628,12 @@ namespace Nova.SimRunner.Tests
             // harvesters get a Harvest intent, no new number. The canonical
             // outcome moved in the same PR, but from the production change
             // underneath — measured on the same head with and without r10.
-            Assert.That(AiBehaviorId.Value, Is.EqualTo("r10.1E6E7AE3"),
+            //
+            // r11 (#101, D-127) moves the revision only as well: the commit
+            // ring grows by the personality's flank, no number is added. The
+            // neutral personality has no flank, so the canonical outcome stays
+            // where r10 left it; only flanked matches decide differently.
+            Assert.That(AiBehaviorId.Value, Is.EqualTo("r11.1E6E7AE3"),
                 "the AI identifier changed — bump the revision and write the journal entry");
         }
 

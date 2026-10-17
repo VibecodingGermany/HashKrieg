@@ -954,6 +954,9 @@ namespace Nova.AI
         /// later flip the cell mid-match, and the unshifted cell never had one
         /// either. That the shifted cells stay off the rock is pinned for the
         /// canonical map by <c>AiPersonalityTests.FlankedStagingCells_AreInsideTheGridAndWalkable</c>.
+        /// The commit ring in <see cref="IsCommittedToTheWave"/> grows by the
+        /// same offset, so the shifted cell stays a place where units WAIT
+        /// (r11, D-127).
         /// </para>
         /// <para>
         /// Integer division truncates, which is deterministic and identical on
@@ -1197,8 +1200,27 @@ namespace Nova.AI
         /// size forever and the army oscillated between the base and the
         /// staging point for 11.000 ticks while a single enemy unit ground
         /// down its HQ. The ring is the whole area inside
-        /// <c>StagingDistanceCells + StagingToleranceCells</c>, so where
-        /// exactly a unit stands while it waits does not matter.
+        /// <c>StagingDistanceCells + |FlankOffsetCells| + StagingToleranceCells</c>,
+        /// so where exactly a unit stands while it waits does not matter.
+        /// </para>
+        /// <para>
+        /// THE FLANK IS PART OF THE RING (r11, #101, D-127). A personality
+        /// shifts the staging cell sideways by
+        /// <see cref="AiPersonality.FlankOffsetCells"/>, and the ring used to
+        /// ignore that: with a flank of ten the cell sat 22 cells from the HQ
+        /// on the canonical map, outside a ring of 16. Every unit that arrived
+        /// there counted as committed, none was ever told to hold, each one
+        /// marched on its own before the wave was full, and DefendHome, which
+        /// only takes units that are not committed, had nobody left to call
+        /// back — in two of three menu matches (flank bands -10, 0, +10).
+        /// The ring grows by the flank's size, still measured from the HQ: the
+        /// shift is <c>|flank| * max(|dx|, |dy|) / span</c> cells at most, and
+        /// span IS that maximum, so in Chebyshev distance the shifted cell is
+        /// never further than <c>StagingDistanceCells + |flank|</c> from the HQ
+        /// (clamping into the grid only pulls it closer, the HQ being on the
+        /// grid). Measuring around the staging cell instead was rejected for
+        /// the reason above — it is the version that oscillated. A neutral
+        /// personality has flank 0 and keeps the ring it always had.
         /// </para>
         /// </summary>
         private bool IsCommittedToTheWave(in UnitState unit, int hqCellX, int hqCellY)
@@ -1207,7 +1229,9 @@ namespace Nova.AI
             int cellY = GridCellOf(unit.Transform.PositionY);
             int dx = Math.Abs(cellX - hqCellX);
             int dy = Math.Abs(cellY - hqCellY);
-            int ring = _profile.Profile.StagingDistanceCells + _profile.Profile.StagingToleranceCells;
+            int ring = _profile.Profile.StagingDistanceCells
+                + Math.Abs(Personality.FlankOffsetCells)
+                + _profile.Profile.StagingToleranceCells;
             return Math.Max(dx, dy) > ring;
         }
 

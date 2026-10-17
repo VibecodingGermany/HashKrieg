@@ -440,6 +440,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Die KI sammelt auch am seitlich versetzten Sammelpunkt (Refs #101, D-127).**
+  Der D-114-Flankenversatz von ±10 Feldern legte den Sammelpunkt 22 Felder vom
+  HQ entfernt, der Commit-Ring maß aber nur 16. Jede ankommende Einheit galt als
+  ausgerückt: kein `Hold`, Einzelangriffe ab Tick 1.100 statt der vollen Welle
+  ab Tick 1.540, und `DefendHome` fand keine Wartenden mehr – in zwei von drei
+  Menüpartien. Der Ring misst jetzt `StagingDistanceCells + |Flanke| +
+  StagingToleranceCells`, weiter ab dem HQ. `AiBehaviorId` r11, Profil-Hash und
+  kanonischer KI-Ausgang unverändert (neutrale Persönlichkeit ohne Flanke)
 - **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
   31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
   zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein

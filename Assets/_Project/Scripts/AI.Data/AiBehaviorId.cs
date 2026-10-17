@@ -185,8 +185,22 @@ namespace Nova.AI.Data
         /// with the production change underneath, not with this rule (both
         /// measured on the same head, see CanonicalAiOutcomeTests).
         /// </para>
+        /// <para>
+        /// r11 widens the commit ring by the personality's flank (#101,
+        /// D-127). r9 shifted the staging cell sideways but left the ring that
+        /// tells "still gathering" from "already out" at
+        /// <c>StagingDistanceCells + StagingToleranceCells</c>; with a flank of
+        /// ten the shifted cell lay outside it, so every arriving unit counted
+        /// as committed — no Hold, a piecemeal march long before the wave was
+        /// ready, and no gatherer left for DefendHome. The ring is now
+        /// <c>StagingDistanceCells + |FlankOffsetCells| + StagingToleranceCells</c>,
+        /// still around the HQ. No number moved, so <see cref="ProfileHash"/> is
+        /// unchanged; the NEUTRAL personality has flank 0 and plays r10 tick for
+        /// tick, so the canonical outcome pin does not move either. Only
+        /// flanked personalities change — two of the three flank bands.
+        /// </para>
         /// </summary>
-        public const int Revision = 10;
+        public const int Revision = 11;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
