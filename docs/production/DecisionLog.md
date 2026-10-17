@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.41.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.46.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3583,6 +3583,85 @@ sie braucht deshalb ein eigenes, mit dem Einheitenstrang abgestimmtes
 Merge-Fenster. Verteidigungsbalance an den Zufahrten und KI-Verhalten in der
 Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
 
+### D-114 | verbindlich | KI-Strang (eine Persönlichkeit je Partie statt Zufallszügen im Spiel)
+
+**Status:** Inhaberentscheidung vom 2026-10-17. Die Nummern D-110 bis D-113 sind
+vom Asset-Pass auf `feat/generals-look-and-feel` belegt.
+
+**Kontext:** Jede lokale Partie gegen die KI lief identisch ab. Am Code geprüft
+(`main` @ `85c912b`), stapeln sich drei Ursachen:
+
+1. Die Skirmish-KI ist bewusst zustandslos und ohne Zufall. Jede Entscheidung
+   ist eine reine Funktion aus Tick und committed Zustand.
+2. Die lokale Partie startet immer mit `MatchBootstrap.CanonicalSeed`.
+3. Das Repertoire ist klein: eine Bauordnung, nur Basisinfanterie, drei von
+   neun Gebäuderollen.
+
+Der KI-Strang ist seit Arns letzter Aktivität (2026-08-21) unbesetzt; der
+Inhaber übernimmt ihn. Als Vorbild dient C&C Generals: der offene EA-Quellcode
+(GPL-3), aus dem nur Konzepte übernommen werden, kein Code. Generals wählt unter
+gleich priorisierten Teams per Spielzufall aus dem Simulations-Seed und zieht
+das Fähigkeiten-Set des Computergegners je Partie neu.
+
+**Alternativen:**
+
+1. Die KI zieht während der Partie aus dem Simulations-PRNG (`SimRandom`). Das
+   greift in den Zufallsstrom aller Systeme ein. Außerdem hinge jede
+   KI-Entscheidung vom Ziehzeitpunkt ab, und Save/Restore bräuchte KI-Zustand.
+2. Die KI bekommt einen eigenen PRNG-Zustand im Sidecar
+   ([AIArchitecture.md](../tech/AIArchitecture.md) §4). Das braucht einen
+   Snapshot-Block und damit eine eigene Grundsatzentscheidung. Für Abwechslung
+   *zwischen* Partien ist das nicht nötig.
+3. Eine **Persönlichkeit als reine Funktion aus Match-Seed und KI-Slot**, beim
+   Aufbau festgelegt, dazu ein frischer Seed je lokaler Partie aus dem Menü.
+
+**Entscheidung:** Alternative 3.
+
+- `AiPersonality.Derive(seed, slot)` hasht einen Domänen-Tag, den Seed und den
+  Slot (XxHash64). Daraus wählt die Funktion:
+  - eine von vier Eröffnungen:
+    - **Ausgewogen** (heutiges Verhalten mit leichter Streuung);
+    - **Ansturm**: Kaserne vor Raffinerie, kleinere Armee, die früher losschlägt;
+    - **Ökonom**: dritter Sammler und größere Armee;
+    - **Igel**: ein bis zwei Abwehrplattformen zwischen HQ und Sammelpunkt;
+  - einen seitlich versetzten Sammelpunkt (−10, 0 oder +10 Felder);
+  - eine von acht Suchrichtungen für Bauplätze;
+  - kleine Streuungen der Profilwerte in festen Bändern.
+- Die neutrale Persönlichkeit (`default`) spielt exakt wie r8. Der gepinnte
+  Ausgang der kanonischen KI-Partie bewegt sich nicht.
+- Eine Persönlichkeit schaltet keine Regel ein, die das Grundprofil
+  abgeschaltet hat.
+- `MatchBootstrap.FreshSeedPerLocalMatch` ist standardmäßig aus, damit Tests und
+  Harnesses beim kanonischen Seed bleiben. Das Hauptmenü schaltet es ein, und
+  „Neue Runde“ zieht dann ebenfalls neu.
+- `NOVA_MATCH_SEED` pinnt den Seed, um eine gemeldete Partie nachzustellen.
+- Netzpartien sind unberührt; ihr Seed kommt vom Relay.
+- Debug-HUD (F3) und Startlog zeigen Persönlichkeit und Seed.
+- `AiBehaviorId` steigt auf r9. Der Profil-Hash bleibt, weil sich
+  `Ms1Canonical` nicht ändert.
+
+**Begründung:** Für Abwechslung zwischen Partien braucht es keine Zufallszüge
+während der Partie. Als reine Funktion bleibt die KI zustandslos und
+Save/Restore-identisch, und der Seed allein reproduziert den Gegner.
+Snapshot-Format, Determinismus-Baselines und Match-Fingerprint werden nicht
+berührt.
+
+**Konsequenzen:**
+
+- **Die Vielfalt ist bewusst klein.** Mit Infanterie und drei Gebäuderollen
+  variieren nur Bauordnung, Basisbild, Sammelpunkt und Angriffszeitpunkt.
+  Headless gegen einen passiven Gegner entscheiden die Eröffnungen die Partie
+  zwischen rund 2.000 und 3.000 Ticks; kanonisch sind es 2.726.
+- **Stufe B ist der eigentliche Hebel:** Fahrzeugfabrik, Panzer, Konter-Bau
+  nach sichtbarer Gegnerzusammensetzung, Labor und Tier 2. Sie kommt in eigenen
+  PRs.
+- **Stufe C bleibt eine eigene Entscheidung:** Lernen innerhalb der Partie
+  (Generals: Teampriorität steigt nach Erfolg und sinkt nach Misserfolg)
+  braucht KI-Gedächtnis im Spielstand.
+- **Der kanonische Seed spielt nicht mehr neutral.** Er leitet einen
+  Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
+  nicht r8.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3663,6 +3742,7 @@ Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.46.0 | 2026-10-17 | D-114 aufgenommen: Die Skirmish-KI bekommt je Partie eine Persönlichkeit als reine Funktion aus Match-Seed und Slot (Eröffnung, Sammelpunkt-Flanke, Bauplatz-Suchrichtung, Profilstreuung); das Hauptmenü zieht je lokaler Partie einen frischen Seed. Die Versionen 1.42.0 bis 1.45.0 und D-110 bis D-113 trägt der Asset-Pass auf `feat/generals-look-and-feel` | Dennis Westermann / Orchestrator |
 | 1.41.0 | 2026-08-18 | **D-108 in der Prämisse berichtigt und in der Sache neu gefasst.** Die Erstfassung behauptete, der Code lasse bereits jedes Gebäude als Bauanker gelten, und wollte das nur aussprechen — tatsächlich prüft `IsInsideBuildInfluence` seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch beim Umsetzen von Paket 21.1 gefunden und angehalten. Der Inhaber hat daraufhin in Kenntnis der Lage neu entschieden: die Ankerliste wird bewusst geöffnet, **jedes eigene fertiggestellte Gebäude wird Anker**. Damit ist D-108 eine Verhaltensänderung (`RulesHash64`, Baselines, kanonischer KI-Pin), keine Festschreibung. `MinimumBuildingDistanceCells` bleibt bei 2 — die Messung aus 21.1 (15/23/23) weist die gemeldete Enge nicht als Abstandsproblem aus | Dennis Westermann / Orchestrator |
 | 1.40.0 | 2026-08-17 | D-108 und D-109 aufgenommen (Sprint 21, aus Testbericht T-01): Territorium wächst **kriechend an jedem eigenen Bauanker** — die bestehende Regel wird festgeschrieben statt geändert, und die gemeldete Enge wird an `MinimumBuildingDistanceCells` gemessen, bevor ein Wert fällt. Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten, mit der verbindlichen Auflage, dass Begehbarkeit und Optik aus **einer** Struktur stammen — heute streut `GlutrinneBlockoutView` begehbare Deko-Felsen, während niemand ausser `ConstructionSystem` in das `CostField` schreibt | Dennis Westermann / Orchestrator |
 | 1.39.0 | 2026-08-10 | D-107 aufgenommen: Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge abgeleitet um 122; der zweite HQ-Ursprung wird von `(120,120)` auf `(118,118)` korrigiert | Agent (unter Delegation) / Dennis Westermann |

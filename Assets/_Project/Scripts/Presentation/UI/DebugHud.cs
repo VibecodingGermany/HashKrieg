@@ -353,6 +353,9 @@ namespace Nova.Presentation.UI
             // report and an entry in the behaviour journal can be tied to each
             // other without asking anybody what was built that day.
             GUILayout.Label($"AI behaviour {AiBehaviorId.Value}", _labelStyle);
+            // The personality is derived from the seed alone, so seed plus this
+            // line is enough to replay "the match where the AI rushed".
+            GUILayout.Label($"AI personality {_runner.AiPersonality}  (seed 0x{_runner.Seed:X16})", _labelStyle);
 
             // WHICH SIMULATION is this? The definition table's hash plus the
             // five schema versions — the same values the match fingerprint

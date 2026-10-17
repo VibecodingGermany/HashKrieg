@@ -5,6 +5,7 @@
         "Nova.Core",
         "Nova.Simulation",
         "Nova.AI",
+        "Nova.AI.Data",
         "Nova.Data",
         "Nova.Networking"
     ],

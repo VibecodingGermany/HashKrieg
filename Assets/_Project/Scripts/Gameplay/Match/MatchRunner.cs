@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using Nova.AI;
+using Nova.AI.Data;
 using Nova.Core;
 using Nova.Simulation;
 using Nova.Simulation.Combat;
@@ -114,6 +115,9 @@ namespace Nova.Gameplay.Match
         /// <summary>Validated, ownership-safe configuration of the current match.</summary>
         public MatchConfig Config => _config?.ValidateAndClone();
 
+        /// <summary>Seed of the running match; cheap to read every frame, unlike <see cref="Config"/> which clones.</summary>
+        public ulong Seed => _seed;
+
         /// <summary>The bound relay client, or null for the canonical local match.</summary>
         public RelayMatchClient RelayClient => _relayClient;
 
@@ -153,6 +157,12 @@ namespace Nova.Gameplay.Match
 
         /// <summary>The registered MS-1 skirmish opponent (slot 1, Legion); null when disabled.</summary>
         public SkirmishAiSystem SkirmishAi { get; private set; }
+
+        /// <summary>
+        /// The flavour the skirmish AI plays this match, derived from the seed
+        /// and its slot; <c>default</c> (neutral) when there is no AI.
+        /// </summary>
+        public AiPersonality AiPersonality { get; private set; }
 
         public bool IsRunning => Kernel != null && Kernel.IsRunning;
 
@@ -199,6 +209,7 @@ namespace Nova.Gameplay.Match
             AiSession = null;
             AiIngress = null;
             SkirmishAi = null;
+            AiPersonality = default;
 
             // The two lab switches are process-wide statics and a match is not.
             // Without this, a reveal set while watching the AI in a skirmish
@@ -247,14 +258,21 @@ namespace Nova.Gameplay.Match
                 AiSession = new MatchSession(aiSlot, _config.ActiveSlots, _config.InputDelayTicks);
                 AiIngress = new CommandIngress(AiSession);
                 _aiTransport = new AiPeerCommandTransport(AiIngress, Ingress);
-                SkirmishAi = new SkirmishAiSystem(
-                    aiPlayerId: aiSlot,
-                    new AiFactionProfile(_config.FactionPerSlot[aiSlot].ToString(),
+                AiFactionProfile baseProfile = new AiFactionProfile(_config.FactionPerSlot[aiSlot].ToString(),
                         targetPowerMargin: 0,     // power plant only when the margin would go negative
                         targetArmySize: 12,
                         attackSquadThreshold: 6,
-                        targetHarvesterCount: 2),
-                    AiIngress, Entities, Economy, Construction, Production, FogOfWar, Victory);
+                        targetHarvesterCount: 2);
+                // The personality is a pure function of (match seed, AI slot):
+                // a logged seed reproduces the opponent, and the AI itself
+                // stays stateless — nothing to snapshot, nothing to restore.
+                AiPersonality personality = AiPersonality.Derive(_config.Seed, aiSlot);
+                AiPersonality = personality;
+                SkirmishAi = new SkirmishAiSystem(
+                    aiPlayerId: aiSlot,
+                    baseProfile.WithPersonality(personality),
+                    AiIngress, Entities, Economy, Construction, Production, FogOfWar, Victory,
+                    personality: personality);
             }
 
             // Canonical tick order (SimulationCore.md section 2): economy

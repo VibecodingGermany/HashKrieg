@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "Nova.Core",
         "Nova.Simulation",
-        "Nova.AI"
+        "Nova.AI",
+        "Nova.AI.Data"
     ],
     "includePlatforms": [
         "Editor"
