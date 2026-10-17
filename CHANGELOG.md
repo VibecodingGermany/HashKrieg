@@ -258,6 +258,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Beta-Pakete nur aus sauberem Baum: harte Sperre in `build-mac.sh` und
+  `build-linux.sh`.** Unsauberer Arbeitsbaum bricht vor dem Unity-Aufruf ab
+  (`--allow-dirty` als Ausweg, `-dirty` im Stempel bleibt, `build-mac.sh --fast`
+  ausgenommen). `--skip-build` prüft dasselbe und vergleicht gegen die neue
+  Sidecar-Datei `Builds/<Plattform>/.build-commit`. HEAD ≠ `origin/main` ist nur
+  eine Warnung, offline bricht nichts ab. Neu: `--check-only`. README 2.0.0 →
+  2.1.0 mit Bauort-Hinweis. Entwurf D-124 (#132)
 - **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
   84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
   Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die

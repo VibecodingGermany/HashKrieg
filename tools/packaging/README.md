@@ -1,6 +1,6 @@
 # Verteilbare Builds
 
-**Dokumentversion:** 2.0.0 | **Stand:** 2026-08-08 | **Governance-Tier:** 2
+**Dokumentversion:** 2.1.0 | **Stand:** 2026-10-17 | **Governance-Tier:** 2
 
 Reproduzierbare Testpakete für macOS und Linux. macOS wird signiert und
 notarisiert als DMG verteilt; Linux wird als `tar.gz` mit einem von außen
@@ -26,10 +26,14 @@ Ergebnisse:
 | `--fast` | nur bauen, unsigniert, kein DMG | – |
 | `--skip-build` | vorhandenen Build neu verpacken | vorhandenen Build neu stempeln und verpacken |
 | `--open` | Ergebnis danach öffnen | – |
+| `--allow-dirty` | Bauen trotz unsauberem Baum, Stempel behält `-dirty` | wie macOS |
+| `--check-only` | nur den Quellstand prüfen, vor Unity aussteigen | wie macOS |
 
 Für die eigene Iteration ist `--fast` der richtige Weg: Signieren und
 Notarisieren kosten Minuten und bringen auf dem eigenen Rechner nichts. Ein
-lokal gebauter Build hat kein Quarantäne-Attribut und startet ohnehin.
+lokal gebauter Build hat kein Quarantäne-Attribut und startet ohnehin. `--fast`
+ist als einziger Weg von der Sauberkeitsprüfung ausgenommen (siehe unten) und
+trägt bei unsauberem Baum den Stempel `-dirty`.
 
 ## Warum der Commit-Hash im Dateinamen steht
 
@@ -49,9 +53,49 @@ defaults read /Applications/ProjectNova.app/Contents/Info.plist NovaBuildCommit
 cat ProjectNova_Data/NovaBuildCommit.txt
 ```
 
-Ein Build aus einem unsauberen Arbeitsbaum bekommt `-dirty` angehängt und ist
-damit als nicht rekonstruierbar markiert. Für ein gemeinsames Match taugt er
-nicht — verschickt wird nur, was aus einem sauberen Commit fällt.
+## Nur aus sauberem Baum (#132, D-124)
+
+Verschickt wird nur, was aus einem sauberen Commit fällt. Das erzwingen die
+Skripte, die Regel steht nicht mehr nur hier:
+
+- **Vor dem Unity-Aufruf** prüfen beide Skripte `git status --porcelain` über den
+  ganzen Baum — dieselbe Definition wie der Editor-Hook `BuildCommitStamp`. Ist
+  die Ausgabe nicht leer (auch untrackte Dateien: Unity kompiliert alles unter
+  `Assets/` mit), brechen sie ab und nennen die ersten 20 Pfade.
+- **`--allow-dirty`** ist der Ausweg für lokale Pakete. Der Stempel behält dann
+  `-dirty` und markiert das Paket als nicht rekonstruierbar. Für ein gemeinsames
+  Match taugt es nicht.
+- **`--fast`** (nur macOS) ist ausgenommen: kein DMG, nur für den eigenen Rechner.
+- **`--skip-build`** läuft durch dieselbe Prüfung. Nach jedem erfolgreichen
+  Unity-Build schreiben die Skripte `Builds/<Plattform>/.build-commit` (voller
+  HEAD und Baumzustand `clean`/`dirty`). `--skip-build` bricht ab, wenn die Datei
+  fehlt oder nicht zum aktuellen HEAD und Baumzustand passt — sonst bekäme ein
+  alter Build das Etikett des jetzigen Commits. Die Datei kommt nicht ins
+  Linux-`tar.gz`.
+- **HEAD ≠ `origin/main`** ist nur eine Warnung (nach `git fetch origin main`).
+  Offline bricht der Fetch nicht ab; der Vergleich nutzt dann den Stand des
+  letzten Fetch und sagt das.
+- **`--check-only`** führt nur diese Prüfungen aus und steigt vor Unity aus.
+
+### Wo gebaut wird
+
+Beta-Pakete entstehen in einem frischen Worktree von `origin/main`, nicht in der
+Arbeitskopie und nicht im Dauer-Worktree `main-baseline`:
+
+```bash
+git fetch origin main
+git worktree add ../.hashkrieg-worktrees/beta origin/main
+cd ../.hashkrieg-worktrees/beta
+git update-index --skip-worktree Assets/_Project/Data/Registries/AssetMappingRegistry.asset
+tools/packaging/build-mac.sh
+```
+
+`ArtAssetAutoSync` schreibt die `AssetMappingRegistry.asset` beim Import um
+(`Assets/_Project/Editor/ArtAssetAutoSync.cs`). Ohne
+`skip-worktree` auf dieser Datei steht der Baum nach dem ersten Unity-Lauf
+unsauber da, der Editor-Hook stempelt `-dirty`, und ein anschließendes
+`--skip-build` scheitert an der Prüfung. Das Art-Paket liegt außerhalb des Repos
+(DemoRunbook): ohne es zeigt der Beta Graybox-Primitive.
 
 ## Voraussetzungen
 
@@ -103,5 +147,6 @@ protokolliert werden. Die Skripte liefern nur das zuordenbare Artefakt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 2.1.0 | 2026-10-17 | Sauberkeitsprüfung vor Unity, `--allow-dirty`, `--check-only`, Build-Sidecar für `--skip-build`, Bauort-Hinweis (#132, D-124) | Project Nova Team |
 | 2.0.0 | 2026-08-08 | Linux-x64-Build, Commit-Stempel und `tar.gz`-Verteilung ergänzt; offene Netzabnahmen ehrlich benannt | Project Nova Team |
 | 1.0.0 | 2026-08-08 | macOS-Build-, Signatur-, Notarisierungs- und DMG-Weg dokumentiert | Project Nova Team |
