@@ -1,6 +1,6 @@
 # AGENTS.md – Arbeitsregeln für KI-Agenten & Mitwirkende
 
-**Dokumentversion:** 5.0.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
+**Dokumentversion:** 5.1.0 | **Status:** verbindlich | **Verantwortungsbereich:** Project Owner | **Sprint:** 16 | **Governance-Tier:** 2 ([GOVERNANCE.md](GOVERNANCE.md))
 
 Verbindliche Betriebsanleitung für jeden KI-Coding-Agenten (Claude, Kimi, Codex,
 Cursor u. a.) und jede Person, die an *Hashkrieg* arbeitet. **Lies diese Datei
@@ -57,6 +57,9 @@ Zusätzlich, wenn zutreffend:
   stattdessen „nicht gespielt“, Grund, automatisierte Ersatznachweise und
   Restrisiko nennt. Der PR ist dann mergebar, aber nicht spielerisch abgenommen
   und kein Meilenstein-Nachweis.
+- Unity-Auslöser berührt (§4)? → beide Unity-Spuren lokal fahren und die Zeile
+  „Unity-Spuren“ im PR ausfüllen; „nicht gelaufen“ samt Grund ist erlaubt, muss
+  aber dastehen
 - Neues oder entferntes Dokument? → [docs/README.md](docs/README.md)-Index nachziehen
 - Inhaber-PR? → Selbst-Merge erst nach grüner Pflicht-CI und dokumentiertem,
   unabhängigem Read-only-Review.
@@ -81,9 +84,27 @@ im PATH liegt:
 export DOTNET_ROOT="$PWD/.dotnet"; export PATH="$DOTNET_ROOT:$PATH"
 ```
 
-Die CI führt bei jedem PR die Simulationstests aus. Unity-EditMode-Tests laufen
-mangels CI-Lizenz nur lokal – wer die Präsentationsschicht anfasst, führt sie aus
-und schreibt das Ergebnis in den PR.
+Die CI führt bei jedem PR die Simulationstests aus. Die Unity-Spuren (EditMode
+und PlayMode unter `Assets/Tests/`) laufen in keiner CI, sondern **lokal vor dem
+Merge** (D-125). Auslöser ist jede Änderung unter
+`Assets/_Project/Scripts/{Simulation,Core,AI,AI.Data,Data,Gameplay,Presentation}/`,
+`Assets/_Project/Editor/`, `Assets/_Project/Scenes/` oder `Assets/Tests/` –
+auch eine reine Simulationsänderung kann einen PlayMode-Test brechen (#141).
+Zuständig ist, wer den PR vorbereitet (Orchestrator bei der Sprint-Integration),
+und der Inhaber prüft die Zeile „Unity-Spuren“ beim Merge. Ein Agent in einer
+Umgebung ohne Unity meldet „nicht gelaufen“ samt Grund.
+
+```bash
+python3 tools/unity-tests/run_unity_tests.py all      # EditMode, dann PlayMode
+python3 tools/unity-tests/run_unity_tests.py --self-test
+```
+
+Das Skript nimmt die Editor-Version aus `ProjectSettings/ProjectVersion.txt`,
+bricht bei offenem Editor ab, setzt **nie `-quit`** (Unity beendet sich sonst vor
+dem Testlauf, schreibt keine Ergebnisdatei und meldet trotzdem Erfolg), lässt
+PlayMode mit Grafik laufen und prüft Ergebnisdatei, Frische, Testanzahl und
+Fehlschläge. Es warnt außerdem vor Resten im Arbeitsbaum (`ProjectSettings.asset`,
+`InitTestScene*`). Die Zahlen gibt es aus; sie stehen nirgends fest in der Doku.
 
 ## 5. Repository-Struktur
 
@@ -170,3 +191,4 @@ gh pr create --fill --base main
 | 4.0.0 | 2026-08-06 | D-076: auf Governance-Tier 1 zurückgeschnitten. Gate-Kette, Receipt-Verträge und Evidenzpflicht schlafen gelegt; DoD von 13 auf 4 Punkte; Doku-Ritual freiwillig; Sprint-Ritual entfernt; `dotnet test` als kanonischer CI-Check verankert | Orchestrator |
 | 4.1.0 | 2026-08-08 | D-091: Governance-Tier 2 für externe Beiträge aktiviert; Maintainer-Review/CLA für fremde PRs und Versionspflicht für Verträge/öffentliche Doku ergänzt | Dennis Westermann / Michael Falk |
 | 5.0.0 | 2026-08-10 | D-105: Dennis Westermann als alleinigen Projektinhaber, Maintainer, Tier-Entscheider und Mergeberechtigten festgelegt; Selbst-Merge bei grüner Pflicht-CI und unabhängigem Review sowie ehrliche Spielabnahme-Zurückstellung geregelt | Dennis Westermann |
+| 5.1.0 | 2026-10-17 | D-125 (Entwurf): Unity-Spuren als lokale Pflichtspur mit Skript, Auslöserliste, Zuständigkeit und Nachweiszeile im PR; DoD §3 und Testabschnitt §4 ergänzt (#110) | Orchestrator |

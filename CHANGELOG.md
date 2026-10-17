@@ -73,6 +73,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Unity-Spuren sind eine lokale Pflichtspur mit Skript, Auslöserliste und
+  Nachweiszeile im PR (D-125, Entwurf; Refs #110).** EditMode und PlayMode laufen
+  in keiner CI und haben das schon mehrfach gekostet (#110, #141, #143). Das neue
+  `tools/unity-tests/run_unity_tests.py` fährt beide Spuren in einem Kommando:
+  nie mit `-quit`, `-nographics` nur für EditMode, Abbruch bei offenem Editor,
+  alte Ergebnisdatei vorher gelöscht, danach Prüfung auf Frische, Testanzahl und
+  Fehlschläge, dazu eine Warnung vor Resten im Arbeitsbaum. Der Auslöser ist
+  breiter als bisher (auch Simulation, Editor, Szenen und Tests, nicht nur
+  Präsentation und Gameplay). `AGENTS.md` und `CONTRIBUTING.md` (beide 5.1.0)
+  und die PR-Vorlage (Pflichtzeile „Unity-Spuren“, „nicht gelaufen“ mit Grund
+  bleibt erlaubt) ziehen nach. `tests.yml` bleibt unverändert; eine CI-Aufnahme
+  nur für EditMode ist mit Wiedervorlage-Bedingungen vertagt.
 - **Die KI spielt nicht mehr jede Partie gleich (D-114, Stufe A).** Bisher lief
   jede lokale Partie identisch: Die KI würfelt bewusst nie, und das Menü
   startete immer mit demselben Seed. Jetzt zieht „Neues Spiel“ und „Neue Runde“
