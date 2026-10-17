@@ -36,7 +36,7 @@ namespace Nova.Editor
         private const string UrpLitShader = "Universal Render Pipeline/Lit";
 
         /// <summary>HDR gain on the _EM map: accents must read under the full desert sun.</summary>
-        private const float EmissionIntensity = 1.6f;
+        private const float EmissionIntensity = 2.0f;
 
         [MenuItem("Tools/Project Nova/Build Art Prefabs From FBX")]
         public static void BuildMenu()
@@ -159,13 +159,17 @@ namespace Nova.Editor
                 material.SetTexture("_EmissionMap", emission);
                 material.SetColor("_EmissionColor", Color.white * EmissionIntensity);
                 material.EnableKeyword("_EMISSION");
-                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                // URP's material validation keeps _EMISSION only while the GI
+                // flags say "emissive" (BaseShaderGUI.SetMaterialKeywords);
+                // with None it silently strips the keyword on the next import.
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             }
             else
             {
                 material.SetTexture("_EmissionMap", null);
                 material.SetColor("_EmissionColor", Color.black);
                 material.DisableKeyword("_EMISSION");
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
             }
 
             // Tripo meshes are ~1000 loose shells with real gaps between them.

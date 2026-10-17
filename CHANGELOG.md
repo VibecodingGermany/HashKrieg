@@ -73,6 +73,16 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Glow und Licht von der Kameraseite (D-111).** Leuchtakzente der Art blühen
+  jetzt über URP-Bloom: Das Projekt renderte bisher ganz ohne Post-Processing,
+  weil dem Renderer die `postProcessData` fehlte; dazu kamen ein Bloom-Profil als
+  Grundstack des Pipeline-Assets, Post-Processing an der Hauptkamera und
+  Emission, die die URP-Validierung nicht mehr wegstreicht. Die Sonne steht
+  jetzt hoch und von der Kameraseite — vorher lag jede sichtbare Fassade im
+  Gegenlicht, was die Allianz-Basis düster machte. Das Allianz-Radar ist auf
+  Gebäudehöhe gestaucht. Neuer PlayMode-Showcase (`ArtShowcaseTests`) fotografiert
+  beide Basen vollständig in Spielgröße aus 18/30/42 m. Per Kamera geprüft,
+  **nicht gespielt**
 - **Asset-Pass über alle 34 Tripo-Assets: bewegliche Teile, Animation und Optik (D-110).**
   Ein rezeptgesteuerter Blender-Pass (`tools/art/asset_pass.py`,
   `asset_recipes.json`, headless) trennt die Modelle in benannte, gepivotete Teile,

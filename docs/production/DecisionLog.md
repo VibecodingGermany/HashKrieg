@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.42.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.43.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3638,6 +3638,46 @@ dreht die älteren FBX um 180°). Das Asset-Paket muss neu gebaut werden, sonst
 sehen andere den alten Stand. Keine Änderung an der Simulation, keine Bewegung
 der Determinismus-Baselines.
 
+### D-111 | verbindlich | Asset-Pass 2026-10-17 (Licht von der Kameraseite, Bloom für Leuchtakzente)
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („mach mit dem Glow weiter“),
+Folgeschritt zu D-110.
+
+**Kontext:** Die Leuchtakzente aus D-110 glühten nicht. Am Projekt geprüft: Der
+Renderer hatte keine `postProcessData` (URP rendert dann ohne jedes
+Post-Processing), es gab kein Volume-Profil, die Kamera hatte Post-Processing
+aus, und die URP-Validierung strich `_EMISSION`, weil die GI-Flags des
+Materials auf `None` standen. Die Spielkamera-Aufnahmen zeigten außerdem, dass
+die Allianz-Gebäude nicht wegen ihrer Textur dunkel waren, sondern weil die
+Sonne (`Euler(33°, −128°)`) hinter ihnen stand: Jede Fassade, die die nach
+Norden blickende RTS-Kamera zeigt, lag im Eigenschatten, und die Schatten
+fielen zur Kamera hin.
+
+**Alternativen:**
+
+1. Bloom als Grundstack des Pipeline-Assets und Sonne auf die Kameraseite.
+2. Ein Volume-Objekt in der Bootstrap-Szene und die Sonne unverändert lassen,
+   dafür die Allianz-Texturen weiter aufhellen.
+
+**Entscheidung:** Alternative 1. Bloom-Profil (Threshold 1,0) als
+`volumeProfile` des Pipeline-Assets, `renderPostProcessing` an der Hauptkamera,
+`postProcessData` am Renderer, Emission mit GI-Flag `RealtimeEmissive`. Die
+Sonne steht auf `Euler(50°, 35°, 0)`: hoch, wie
+[Lighting.md](../tech/Lighting.md) es für die Wüste vorsieht, und von links
+unten aus Kamerasicht, sodass Schatten nach rechts oben wegfallen.
+
+**Begründung:** Das Pipeline-Profil wirkt in jeder Kamera — auch in
+Vorschauen und Tests — und veraltet nicht mit der generierten Szene.
+Texturen heller zu ziehen, um Gegenlicht auszugleichen, hätte jede Fläche
+ausgewaschen, ohne die dunklen Fassaden zu beleuchten. Der Kommentar im
+Generator führte die alte Sonne auf D-085 zurück; D-085 regelt das Baumodell,
+die Sonnenrichtung war nie entschieden.
+
+**Konsequenzen:** Alle URP-Zugriffe laufen über Reflection und serialisierte
+Felder, weil der Referenzvertrag aus D-061 keine URP-Assembly erlaubt
+(`UrpPostProcessingSetup`). Die Bootstrap-Szene wurde neu erzeugt. Color Grading,
+Vignette und Biom-Overrides bleiben offen.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3718,6 +3758,7 @@ der Determinismus-Baselines.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.43.0 | 2026-10-17 | D-111 aufgenommen: Bloom als Grundstack des Pipeline-Assets (fehlende `postProcessData` ergänzt, Kamera-Post-Processing an, Emission mit `RealtimeEmissive`), Sonne auf `Euler(50°, 35°)` von der Kameraseite statt Gegenlicht | Dennis Westermann / Orchestrator |
 | 1.42.0 | 2026-10-17 | D-110 aufgenommen: Blickrichtung über **eine** Abbildung Sim-Kurs → Unity-Gier (`ViewHeading`), Knoten-Vertrag `Body`/`Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*` zwischen Blender-Pass und `UnitRigAnimator`, doppelseitige Art-Materialien, neue Leuchttextur `T_*_EM`; Tripo-Modelle werden aufbereitet statt neu erzeugt | Dennis Westermann / Orchestrator |
 | 1.41.0 | 2026-08-18 | **D-108 in der Prämisse berichtigt und in der Sache neu gefasst.** Die Erstfassung behauptete, der Code lasse bereits jedes Gebäude als Bauanker gelten, und wollte das nur aussprechen — tatsächlich prüft `IsInsideBuildInfluence` seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch beim Umsetzen von Paket 21.1 gefunden und angehalten. Der Inhaber hat daraufhin in Kenntnis der Lage neu entschieden: die Ankerliste wird bewusst geöffnet, **jedes eigene fertiggestellte Gebäude wird Anker**. Damit ist D-108 eine Verhaltensänderung (`RulesHash64`, Baselines, kanonischer KI-Pin), keine Festschreibung. `MinimumBuildingDistanceCells` bleibt bei 2 — die Messung aus 21.1 (15/23/23) weist die gemeldete Enge nicht als Abstandsproblem aus | Dennis Westermann / Orchestrator |
 | 1.40.0 | 2026-08-17 | D-108 und D-109 aufgenommen (Sprint 21, aus Testbericht T-01): Territorium wächst **kriechend an jedem eigenen Bauanker** — die bestehende Regel wird festgeschrieben statt geändert, und die gemeldete Enge wird an `MinimumBuildingDistanceCells` gemessen, bevor ein Wert fällt. Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten, mit der verbindlichen Auflage, dass Begehbarkeit und Optik aus **einer** Struktur stammen — heute streut `GlutrinneBlockoutView` begehbare Deko-Felsen, während niemand ausser `ConstructionSystem` in das `CostField` schreibt | Dennis Westermann / Orchestrator |

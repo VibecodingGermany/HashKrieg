@@ -1,6 +1,6 @@
 # Asset-Pass: Blickrichtung, Teile-Animation, Optik
 
-**Version:** 0.1.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
+**Version:** 0.2.0 | **Status:** Entwurf – Graybox-/Demo-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art | **Datum:** 2026-10-17
 
 ## Zweck
 
@@ -123,7 +123,25 @@ Elternknotens umgerechnet.
 - Draufsicht und Fahrt-/Kampfpose aller 34 Prefabs mit `ArtPreviewCapture`
   gesichtet.
 
-## 6. Was dieser Pass nicht löst
+## 6. Glow und Licht (zweiter Schritt, D-111)
+
+- **Glow:** Leuchtakzente laufen jetzt durch Bloom. Zwei Masken trennen
+  „einfärben“ (Zierstreifen in Akzentfarbe) von „leuchten“ (strengere Schwelle,
+  0,5–2 % der Textur); unter dem Leuchtakzent bleibt die Grundfarbe dunkel,
+  sonst brennt er weiß aus. URP behält `_EMISSION` nur mit GI-Flag
+  `RealtimeEmissive` — mit `None` strich die Material-Validierung das Keyword,
+  und die ersten Glow-Versuche zeigten schlicht nichts.
+- **Licht:** Die Sonne kommt jetzt von der Kameraseite. Die dunklen
+  Allianz-Gebäude lagen am Gegenlicht, nicht an der Textur; trotzdem ziehen die
+  Rezepte der Allianz-Gebäude etwas heller (`target_mean` 0,42).
+- **Allianz-Radar:** Die 20-m-Säule ist auf 45 % gestaucht (`squash`), sie maß
+  im Spiel mehrere Gebäudehöhen.
+- **Nachweis in Spielgröße:** `ArtShowcaseTests` stellt alle Gebäude und
+  Einheiten beider Fraktionen in die laufende Partie und fotografiert sie durch
+  die Hauptkamera (mit Post-Processing) aus 18, 30 und 42 m Höhe nach
+  `output/demo/showcase_*.png`.
+
+## 7. Was dieser Pass nicht löst
 
 - **Die Geometrie bleibt Tripo-Qualität.** Flächen sind knubbelig; Glätten und
   doppelseitiges Rendern kaschieren, sie reparieren nicht. Eine
@@ -135,15 +153,11 @@ Elternknotens umgerechnet.
   bewegen sich nicht. Ein Humanoid-Rig ist ein eigener Schritt.
 - **Ketten laufen nicht.** Die Kettentextur liegt verstreut im Tripo-Atlas, ein
   UV-Scrollen ist nicht möglich.
-- **Kein Bloom.** Die Emission leuchtet, glüht aber nicht über; das bräuchte ein
-  Post-Processing-Volume in der Bootstrap-Szene.
 - **Leuchtpuls über `MaterialPropertyBlock`.** Wie schon die Fraktionstönung;
   ArtAssetStandard §5 untersagt das für die 500-Objekt-Last. Bis der
   `NovaUnit`-Shader mit Instanzdaten kommt, ist das bewusst so.
 - **TeamMask (B-Kanal) ist leer.** Spiegelpartien (Allianz gegen Allianz) sind
   farblich nicht unterscheidbar.
-- Die Allianz-Gebäude wirken neben den Einheiten noch dunkel; die Farbregeln
-  sind fraktions-, nicht rollenweise eingestellt.
 
 ## Offene Punkte
 
@@ -159,3 +173,4 @@ Elternknotens umgerechnet.
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
 | 0.1.0 | 2026-10-17 | Erstfassung: Blickrichtungsfehler, Asset-Pass mit Rezepten, Teile-Animation, Prüfwerkzeuge und Grenzen | Technical Art |
+| 0.2.0 | 2026-10-17 | Glow über Bloom, zwei Akzentmasken, Sonne auf der Kameraseite, Radar gestaucht, Showcase in Spielgröße (D-111) | Technical Art |

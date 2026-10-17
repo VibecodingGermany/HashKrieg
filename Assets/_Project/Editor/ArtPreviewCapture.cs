@@ -116,7 +116,7 @@ namespace Nova.Editor
             var lightObject = new GameObject("Sun");
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            lightObject.transform.rotation = Quaternion.Euler(33f, -128f, 0f);
+            lightObject.transform.rotation = Quaternion.Euler(BootstrapSceneGenerator.SunPitch, BootstrapSceneGenerator.SunYaw, 0f);
             light.color = new Color(1f, 0.87f, 0.70f);
             light.intensity = 1.15f;
             light.shadows = LightShadows.Soft;
@@ -202,6 +202,8 @@ namespace Nova.Editor
             cam.backgroundColor = new Color(0.16f, 0.17f, 0.19f);
             cam.nearClipPlane = 0.1f;
             cam.farClipPlane = 500f;
+            cam.allowHDR = true;
+            UrpPostProcessingSetup.EnablePostProcessing(cam);
             return cam;
         }
 

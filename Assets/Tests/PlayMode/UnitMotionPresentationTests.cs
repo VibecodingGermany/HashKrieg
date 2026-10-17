@@ -205,21 +205,26 @@ namespace Nova.PlayMode.Tests
             return n > 0 ? sum / n : Vector3.zero;
         }
 
-        /// <summary>The RTS camera's 55-degree pitch at a given height, looking at a point.</summary>
+        /// <summary>
+        /// The RTS camera's 55-degree pitch at a given height, looking at a
+        /// point. Renders through the scene's MAIN camera (moved, then put
+        /// back) so the shot carries what the player sees — post-processing
+        /// included, which a fresh test camera would not have opted into.
+        /// </summary>
         private static void CaptureRts(string path, Vector3 focus, float height)
         {
-            var go = new GameObject("MotionProofCamera");
+            Camera camera = Camera.main;
+            Assert.NotNull(camera, "no main camera in the Bootstrap scene");
+            Transform t = camera.transform;
+            Vector3 oldPos = t.position;
+            Quaternion oldRot = t.rotation;
+            // LDR target: URP renders HDR internally and resolves bloom into it.
+            var rt = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
             try
             {
-                var camera = go.AddComponent<Camera>();
-                camera.fieldOfView = 60f;
-                camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = new Color(0.13f, 0.16f, 0.22f, 1f);
                 Quaternion rot = Quaternion.Euler(55f, 0f, 0f);
                 float distance = height / Mathf.Sin(55f * Mathf.Deg2Rad);
-                camera.transform.SetPositionAndRotation(focus - rot * Vector3.forward * distance, rot);
-
-                var rt = new RenderTexture(1600, 900, 24) { antiAliasing = 4 };
+                t.SetPositionAndRotation(focus - rot * Vector3.forward * distance, rot);
                 camera.targetTexture = rt;
                 camera.Render();
                 RenderTexture.active = rt;
@@ -228,14 +233,14 @@ namespace Nova.PlayMode.Tests
                 tex.Apply();
                 File.WriteAllBytes(path, tex.EncodeToPNG());
                 RenderTexture.active = null;
-                camera.targetTexture = null;
                 Object.DestroyImmediate(tex);
-                rt.Release();
-                Object.DestroyImmediate(rt);
             }
             finally
             {
-                Object.DestroyImmediate(go);
+                camera.targetTexture = null;
+                t.SetPositionAndRotation(oldPos, oldRot);
+                rt.Release();
+                Object.DestroyImmediate(rt);
             }
         }
     }

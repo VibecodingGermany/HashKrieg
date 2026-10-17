@@ -1,6 +1,6 @@
 # Lighting & Post-Processing
 
-**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
@@ -131,6 +131,25 @@ Ein globaler `Volume` mit Basis-Profil; `LightingProfile.PostVolume` legt Biom-O
 
 **Reihenfolge:** FoW Full Screen Pass läuft **vor** Post-Processing (Injektor-Punkt in Rendering.md), damit FoW-Verdunkelung von Bloom/Grading konsistent mitbehandelt wird (Ghost-Gebäude blühen nicht).
 
+
+### Umsetzungsstand (2026-10-17, D-111)
+
+- **Sonne:** `BootstrapSceneGenerator` setzt das Directional Light auf
+  `Euler(50°, 35°, 0)` — hoch und von der Kameraseite, wie die Wüstenzeile
+  oben es verlangt. Die frühere `Euler(33°, −128°, 0)` stand hinter den
+  Gebäuden: Jede Fassade, die die RTS-Kamera (Blick nach Norden) zeigt, lag
+  im Eigenschatten. Farbe, Intensität und Schatten sind unverändert.
+- **Bloom:** Ein Profil `Assets/_Project/Settings/NovaPostProcessProfile.asset`
+  mit Bloom (Threshold 1,0, Intensität 1,0, Scatter 0,65, High-Quality-Filter)
+  ist als `volumeProfile` des Pipeline-Assets eingetragen — es wirkt als
+  Grundstack jeder Kamera, ein Volume-Objekt in der Szene braucht es noch
+  nicht. Die Hauptkamera hat `renderPostProcessing` an. Voraussetzung war
+  `postProcessData` am Renderer, das seit dem URP-Setup fehlte; ohne es
+  rendert URP stillschweigend ganz ohne Post-Processing.
+- **Emissive:** Leuchtakzente der Art (`T_*_EM`, HDR-Faktor 2,0) liegen über
+  dem Threshold, Terrain und unbeleuchtete Flächen darunter. Biom-Overrides,
+  Color Grading, Vignette und das `LightingProfile` sind noch nicht gebaut.
+
 ## Offene Punkte
 
 - **Realtime-only-Verzicht auf jegliches Baking:** Empfehlung dieses Dokuments, aber formale DecisionLog-Entscheidung steht aus (Lighting war keiner der D-033–D-036-Blöcke). Risiko: Kampagne (Phase 3, D-020) mit Nah-Kamera-Momenten könnte APV/Baked-GI-Bedarf erzeugen – Status: offen, Entscheidungsvorlage für Sprint-3-Review.
@@ -157,3 +176,4 @@ Ein globaler `Volume` mit Basis-Profil; `LightingProfile.PostVolume` legt Biom-O
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Graphics Engineer |
 | 0.2.0 | 2026-07-24 | Glutrinne als einzigen MS-1-Lichtumfang und exakten Unity-Pin gemäß D-056/D-060/D-061 festgelegt | Lead Graphics Engineer |
 | 0.2.1 | 2026-07-24 | Nächste Schritte auf klares Glutrinne/V2 begrenzt und Wetter-/Mond-Arbeit aus Sprint 7 entfernt | Lead Graphics Engineer |
+| 0.3.0 | 2026-10-17 | Umsetzungsstand: Sonne auf die Kameraseite, Bloom über das Standard-Volume des Pipeline-Assets, fehlende `postProcessData` ergänzt (D-111) | Technical Art |

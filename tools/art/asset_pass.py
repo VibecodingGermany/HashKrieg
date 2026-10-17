@@ -414,11 +414,18 @@ def grade(bc, ao, edge, faction, t):
     in_band = ((h - lo) % 360) <= ((hi - lo) % 360)
     foreign = ((~in_band) & (s > 0.35) & (v > 0.15)).astype(np.float32)[..., None]
 
+    # Zwei Masken: "paint" faerbt Zierstreifen in der Akzentfarbe ein, "glow"
+    # (strenger) leuchtet zusaetzlich. Eine einzige weite Maske liess ganze
+    # hellblaue Paneele gluehen; eine einzige enge verlor die Zierstreifen.
     acc = t.get("accent") or t["accent_by_faction"][faction]
     hue_ok = ((h - acc["hue"][0]) % 360) <= ((acc["hue"][1] - acc["hue"][0]) % 360)
-    accent = (hue_ok & (s >= acc["sat"]) & (v >= acc["val"])).astype(np.float32)
-    # Akzente sauber aufweiten, damit die Emission an UV-Raendern nicht franst
-    accent = np.maximum(accent, np.roll(accent, 1, 0)); accent = np.maximum(accent, np.roll(accent, 1, 1))
+    def mask(sat, val):
+        m = (hue_ok & (s >= sat) & (v >= val)).astype(np.float32)
+        # sauber aufweiten, damit die Emission an UV-Raendern nicht franst
+        m = np.maximum(m, np.roll(m, 1, 0))
+        return np.maximum(m, np.roll(m, 1, 1))
+    paint = mask(acc["sat"], acc["val"])
+    accent = mask(acc.get("glow_sat", acc["sat"]), acc.get("glow_val", acc["val"]))
 
     painted = gradient_map(np.clip(Ls, 0, 1), PALETTES[faction])
     mix = t["palette_mix_by_faction"][faction]
@@ -430,7 +437,10 @@ def grade(bc, ao, edge, faction, t):
     base = base + edge[..., None] * t["edge_highlight"] * (1.0 - base)
 
     acc_col = hex_rgb(ACCENT[faction])
-    base = base * (1 - accent[..., None]) + (acc_col * 0.85) * accent[..., None]
+    base = base * (1 - paint[..., None]) + (acc_col * 0.85) * paint[..., None]
+    # Unter dem Leuchtakzent bleibt die Grundfarbe dunkel: Die Emission traegt
+    # den Farbton. Hell darunter addiert sich mit der Emission zu Weiss.
+    base = base * (1 - accent[..., None]) + (acc_col * 0.35) * accent[..., None]
     base = np.clip(base, 0, 1)
 
     em = np.zeros_like(bc)
@@ -448,7 +458,8 @@ def grade(bc, ao, edge, faction, t):
     out[..., 3] = 1
     stats = {"lum_in_mean": round(mean, 4), "gain": round(gain, 3),
              "lum_out_mean": round(float((base @ W).mean()), 4),
-             "accent_share": round(float(accent.mean()), 4), "foreign_share": round(float(foreign.mean()), 4)}
+             "paint_share": round(float(paint.mean()), 4), "accent_share": round(float(accent.mean()), 4),
+             "foreign_share": round(float(foreign.mean()), 4)}
     return out, msk, em, stats
 
 
@@ -568,6 +579,31 @@ def part_pivot(obj, cfg, bb):
     if kind == "arm":
         return Vector(((mn.x + mx.x) / 2, mx.y, mn.z))
     return (mn + mx) / 2  # wheel und Rest: Mittelpunkt
+
+
+def squash(result, pivots, bb, cfg):
+    """Staucht alles unterhalb ``below`` (normiert) auf ``factor`` und rueckt
+    den Rest nach. Fuer Tuerme, die im Spiel mehrere Gebaeudehoehen messen
+    (Allianz-Radar: 20 m Saeule unter 6 m Schuessel). Laeuft nach dem Teilen,
+    damit die Rezept-Boxen weiter die Original-Bounding-Box meinen."""
+    cut = bb[0].z + (bb[1].z - bb[0].z) * cfg["below"]
+    k = cfg["factor"]
+
+    def f(z):
+        return bb[0].z + (z - bb[0].z) * k if z < cut else z - (cut - bb[0].z) * (1 - k)
+
+    for d in result.values():
+        for obj in d.values():
+            mw = obj.matrix_world
+            inv = mw.inverted()
+            for v in obj.data.vertices:
+                w = mw @ v.co
+                w.z = f(w.z)
+                v.co = inv @ w
+            obj.data.update()
+    for name, p in pivots.items():
+        p.z = f(p.z)
+    print(f"  squash unter z={cut:.2f} auf {k:.0%}")
 
 
 # ---------------------------------------------------------------- Export
@@ -709,6 +745,9 @@ def main():
         print(f"  Textur: {json.dumps(stats)}")
 
     result, pivots, parents, kinds = split_parts(lods, r, bb)
+
+    if r.get("squash"):
+        squash(result, pivots, bb, r["squash"])
 
     if a.preview:
         os.makedirs(a.preview, exist_ok=True)

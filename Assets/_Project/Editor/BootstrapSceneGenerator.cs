@@ -61,6 +61,10 @@ namespace Nova.Editor
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
 
+            // Bloom for the emissive light strips: renderer post-process data,
+            // the default volume profile and the camera switch (see the class).
+            UrpPostProcessingSetup.Apply();
+
             Camera camera = CreateCamera();
             CreateDirectionalLight();
             ConfigureAtmosphere();
@@ -111,6 +115,10 @@ namespace Nova.Editor
             // edit cannot silently clip the terrain away.
             camera.farClipPlane = Mathf.Max(camera.farClipPlane, 400f);
 
+            // URP renders post-processing (the bloom on emissive accents) only
+            // on cameras that opt in; a plain AddComponent<Camera> does not.
+            UrpPostProcessingSetup.EnablePostProcessing(camera);
+
             // [RequireComponent(typeof(Camera))] — the Camera above satisfies it.
             cameraObject.AddComponent<RtsCameraController>();
 
@@ -123,17 +131,28 @@ namespace Nova.Editor
         }
 
         /// <summary>
-        /// The Glutrinne sun (D-085): low and slanted for long shadows, warm
-        /// in colour temperature, with soft shadows. These are Light
+        /// The Glutrinne sun: high and from the camera side (Lighting.md,
+        /// desert biome; D-110), warm in colour temperature, with soft shadows. These are Light
         /// properties on the generated object, so regeneration keeps them —
         /// hand-tuning the scene YAML would be overwritten here anyway.
         /// </summary>
+        /// <summary>Sun elevation in degrees; shared with ArtPreviewCapture so previews match the game.</summary>
+        public const float SunPitch = 50f;
+
+        /// <summary>Sun yaw: light travels toward the north-east, i.e. it comes from the camera's lower left.</summary>
+        public const float SunYaw = 35f;
+
         private static void CreateDirectionalLight()
         {
             var lightObject = new GameObject("Directional Light");
             Light light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            lightObject.transform.rotation = Quaternion.Euler(33f, -128f, 0f);
+            // From the camera's side (south-west) and high, as Lighting.md asks
+            // for the desert: the RTS camera looks north, and the former
+            // Euler(33, -128) lit the buildings from behind — every facade the
+            // player sees sat in its own shadow, and the shadows fell toward
+            // the camera. Now shadows fall away to the upper right (D-110).
+            lightObject.transform.rotation = Quaternion.Euler(SunPitch, SunYaw, 0f);
             light.color = new Color(1f, 0.87f, 0.70f);
             light.intensity = 1.15f;
             light.shadows = LightShadows.Soft;
