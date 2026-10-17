@@ -250,6 +250,17 @@ namespace Nova.AI.Tests
             return false;
         }
 
+        private static EntityId FirstHarvester(AiHost host, byte slot)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                ref readonly UnitState u = ref units[i];
+                if (u.IsActive && u.PlayerId == slot && u.Role == UnitRole.Harvester) return u.Id;
+            }
+            return EntityId.Invalid;
+        }
+
         private static int MinCombatCellX(AiHost host, byte slot)
         {
             int min = int.MaxValue;
@@ -354,6 +365,56 @@ namespace Nova.AI.Tests
                 "the AI queues harvesters at the completed Refinery (D-077 producer assignment)");
             Assert.That(AnyHarvesterWorking(host, AiSlot), Is.True,
                 "idle harvesters must receive explicit Harvest intents on the own field");
+        }
+
+        /// <summary>
+        /// Regression for the hang behaviour revision 10 closes (#134, D-121).
+        /// Production and the founding grant pick a harvester's field as the
+        /// nearest one to the Refinery; this AI picks the nearest one to its
+        /// HQ. Where the two disagree, the r9 gather escort walked the
+        /// harvester to the AI's field while its order named the other one —
+        /// and the economy HOLDS an out-of-reach order instead of dropping it,
+        /// so the harvester stood there with frozen cargo for good. The
+        /// two-field map of this suite makes both rules agree, so the test
+        /// creates the disagreement directly: a third field away from the AI
+        /// base, and the AI's first harvester ordered onto it the tick it
+        /// appears. Artificial on purpose; the mechanism is the real one.
+        /// </summary>
+        [Test]
+        public void SkirmishAi_RetasksAHarvesterOrderedOntoAForeignField_AndItMines()
+        {
+            AiHost host = BuildMatch(Seed);
+
+            EntityId harvester = EntityId.Invalid;
+            for (int i = 0; i < 2000 && !harvester.IsValid; i++)
+            {
+                host.Step();
+                harvester = FirstHarvester(host, AiSlot);
+            }
+            Assert.That(harvester.IsValid, Is.True, "the AI's Refinery hands out its first harvester");
+
+            const ushort ownFieldId = 2;     // slot 1's field at (117,117), see ApplyOpeningPosition
+            const ushort foreignFieldId = 3; // far from the AI's HQ and Refinery alike
+            Assert.That(host.Economy.TryAddField(foreignFieldId, new GridPos2D(95, 100), FieldReserveAE), Is.True);
+            ref UnitState forced = ref host.Entities.GetUnitRef(harvester);
+            forced.HarvestFieldId = foreignFieldId;
+            forced.IsReturningCargo = false;
+            Assert.That(forced.CargoAE, Is.EqualTo(0), "a fresh harvester carries nothing yet");
+
+            bool retasked = false;
+            bool mined = false;
+            for (int i = 0; i < 1000 && !mined; i++)
+            {
+                host.Step();
+                ref readonly UnitState h = ref host.Entities.GetUnitRef(harvester);
+                if (h.HarvestFieldId == ownFieldId) retasked = true;
+                if (h.CargoAE > 0 || h.IsReturningCargo) mined = true;
+            }
+
+            Assert.That(retasked, Is.True,
+                "the AI re-tasks a harvester whose order names a field other than its own (r10)");
+            Assert.That(mined, Is.True,
+                "the re-tasked harvester mines instead of standing in reach of the wrong field with frozen cargo");
         }
 
         // ----------------------------------------------------------------

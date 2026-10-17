@@ -170,8 +170,23 @@ namespace Nova.AI.Data
         /// plays a non-neutral personality is still "r9" — the personality
         /// is printed next to this identifier, not folded into it.
         /// </para>
+        /// <para>
+        /// r10 widens which harvesters the economy step sends to the own field
+        /// (#134, D-121): not only those without any order, but every one that
+        /// is not returning cargo and holds an order on a DIFFERENT field. A
+        /// produced Harvester is now born with an order (ProductionSystem,
+        /// D-121), chosen like the founding grant's by the nearest field to
+        /// the Refinery — the AI chooses by the nearest field to its HQ. Where
+        /// the two disagree the gather escort walked the harvester to the AI's
+        /// field while its order named the other one, and the economy held
+        /// that out-of-reach order forever. The founding grant could already
+        /// trigger this on main. No number moved, so
+        /// <see cref="ProfileHash"/> is unchanged; the canonical match moves
+        /// with the production change underneath, not with this rule (both
+        /// measured on the same head, see CanonicalAiOutcomeTests).
+        /// </para>
         /// </summary>
-        public const int Revision = 9;
+        public const int Revision = 10;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like

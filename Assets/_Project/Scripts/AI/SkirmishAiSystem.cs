@@ -64,11 +64,13 @@ namespace Nova.AI
     /// Chebyshev reach &lt;= 1 (ConstructionSystem remarks), and a replacement
     /// Builder is queued at the HQ when none is alive; (3) once the Refinery
     /// stands, harvesters are queued up to
-    /// <see cref="AiFactionProfile.TargetHarvesterCount"/>, every idle own
-    /// harvester receives a Harvest intent on the nearest field THAT STILL
+    /// <see cref="AiFactionProfile.TargetHarvesterCount"/>, every own
+    /// harvester that is not returning cargo and is not already ordered onto
+    /// it receives a Harvest intent on the nearest field THAT STILL
     /// HOLDS RESERVE (an exhausted one is skipped — without that test the step
     /// re-issues an order the economy clears again on the same tick, forever;
-    /// issue #85), and harvesters held out of reach are WALKED into the
+    /// issue #85; since r10 a harvester born with an order on ANOTHER field is
+    /// re-tasked too, #134), and harvesters held out of reach are WALKED into the
     /// economy's reach rule with
     /// explicit Move intents (gather leg toward a field-and-footprint
     /// dual-reach cell, return leg toward the footprint — this slice does not
@@ -268,7 +270,6 @@ namespace Nova.AI
             int builders = 0, harvesters = 0, combatCount = 0;
             var combatRaws = new List<uint>();
             var combatUnits = new List<UnitState>();
-            var idleHarvesterRaws = new List<uint>();
             var harvesterRaws = new List<uint>();
             var harvesterUnits = new List<UnitState>();
             var sites = new List<SiteInfo>();
@@ -333,10 +334,6 @@ namespace Nova.AI
                         harvesters++;
                         harvesterRaws.Add(raw);
                         harvesterUnits.Add(u);
-                        if (u.HarvestFieldId == 0 && !u.IsReturningCargo)
-                        {
-                            idleHarvesterRaws.Add(raw);
-                        }
                         break;
                     default:
                         if (IsCombatRole(u.Role))
@@ -425,7 +422,8 @@ namespace Nova.AI
             }
 
             // ---- (4) Economy: keep harvesters queued at the Refinery (the
-            // D-077 producer), send every idle own harvester to the own field
+            // D-077 producer), send every own harvester not yet ordered onto
+            // the own field there (#134: not only the idle ones),
             // and WALK harvesters into reach with explicit Move intents.
             // This slice never submits SetRallyPoint; it does what a human
             // player does and micros the harvesters into the economy's reach
@@ -465,11 +463,36 @@ namespace Nova.AI
                     }
                 }
 
-                if (haveField && idleHarvesterRaws.Count > 0)
+                // Every own harvester that is not on its return leg and does
+                // not already hold an order on THIS field receives a Harvest
+                // intent on it (#134, D-121, behaviour revision 10). Up to r9
+                // only harvesters WITHOUT any order qualified. But production
+                // (#134) and the founding grant (#43) pick their field with
+                // EconomySystem.TryFindNearestField from the Refinery, while
+                // this step picks with TryGetOwnFieldCell from the HQ. Where
+                // the two rules disagree, the escort below walks the harvester
+                // to THIS field while its order names the other one, and the
+                // economy holds an out-of-reach order instead of dropping it:
+                // the harvester stood still with frozen cargo for good. A
+                // harvester already ordered onto this field is left alone, so
+                // the intent goes out once per harvester, not every cadence.
+                if (haveField)
                 {
-                    idleHarvesterRaws.Sort();
-                    SubmitEntityList(idleHarvesterRaws,
-                        ids => CommandIntent.Create(new HarvestPayload(ids, ownFieldId)));
+                    var harvestersToTask = new List<uint>();
+                    for (int h = 0; h < harvesterUnits.Count; h++)
+                    {
+                        UnitState harvester = harvesterUnits[h];
+                        if (!harvester.IsReturningCargo && harvester.HarvestFieldId != ownFieldId)
+                        {
+                            harvestersToTask.Add(harvesterRaws[h]);
+                        }
+                    }
+                    if (harvestersToTask.Count > 0)
+                    {
+                        harvestersToTask.Sort();
+                        SubmitEntityList(harvestersToTask,
+                            ids => CommandIntent.Create(new HarvestPayload(ids, ownFieldId)));
+                    }
                 }
 
                 // Escort targets: the gather leg wants a cell in harvest reach

@@ -145,7 +145,10 @@ namespace Nova.SimRunner
     /// progression), set the completed Refinery's rally point and queue two
     /// Harvesters at it (production — the Refinery, not the HQ, is the
     /// Harvester's producer since D-077), then issue a Harvest order to
-    /// every produced harvester and let the harvest/return auto-cycle
+    /// every own harvester exactly once — a produced Harvester is born
+    /// harvesting since #134 (D-121), so the order re-targets the birth
+    /// order onto the slot's field and keeps the Harvest command kind in
+    /// the recorded stream — and let the harvest/return auto-cycle
     /// (economy) climb the credit curve for the remaining ticks. Movement
     /// and pathfinding run along via the builder walk. Combat orders are no
     /// longer part of the script: D-077 removed the midfield skirmish
@@ -301,16 +304,24 @@ namespace Nova.SimRunner
 
         /// <summary>
         /// Live handles the script queries against (captured at setup) plus
-        /// the two script latches. A latch flips exactly once, as a pure
-        /// function of the tick and the polled host state — the script stays
-        /// a deterministic function of the match, like the fixed tick table
-        /// before D-077.
+        /// the two script latches and the set of harvesters already ordered.
+        /// A latch flips exactly once and a harvester enters the set exactly
+        /// once, as a pure function of the tick and the polled host state —
+        /// the script stays a deterministic function of the match, like the
+        /// fixed tick table before D-077.
         /// </summary>
         private sealed class SlotState
         {
             public EntityId Builder;
             public bool RefineryPlaced;
             public bool HarvestersQueued;
+
+            /// <summary>
+            /// Raw ids of the own harvesters the script has already ordered
+            /// (#134): since D-121 a produced harvester is born with an order,
+            /// so "no standing order" no longer marks the new ones.
+            /// </summary>
+            public readonly HashSet<uint> HarvestersOrdered = new HashSet<uint>();
         }
 
         private sealed class Host
@@ -612,9 +623,11 @@ namespace Nova.SimRunner
         /// reach of the field AND return reach of the footprint, so the
         /// cycle closes without walking) and queues two Harvesters: the
         /// Refinery, not the HQ, is the Harvester's producer since D-077.
-        /// Every harvester without a standing harvest order then receives a
-        /// Harvest command on the slot's field, and the harvest/return
-        /// auto-cycle (EconomySystem) runs unaided for the remaining ticks.
+        /// Every own harvester then receives a Harvest command on the slot's
+        /// field exactly once (#134: produced harvesters are born with an
+        /// order since D-121, so the script tracks whom it has ordered instead
+        /// of reading a missing order), and the harvest/return auto-cycle
+        /// (EconomySystem) runs unaided for the remaining ticks.
         /// Definition ids are faction-resolved per slot (<see cref="DefId"/>):
         /// the same script drives the Alliance rows on slot 0 and the Legion
         /// rows on slot 1.
@@ -664,12 +677,14 @@ namespace Nova.SimRunner
                 }
             }
 
-            // Every harvester without a standing harvest order gets one —
-            // covers each produced harvester exactly once.
-            uint[] idle = IdleHarvesterRaws(host, slot);
-            if (idle.Length > 0)
+            // Every own harvester gets one Harvest order, exactly once — a
+            // produced harvester is born with an order since #134 (D-121), so
+            // the script remembers whom it ordered; the command kind stays in
+            // the recorded stream.
+            uint[] unordered = UnorderedHarvesterRaws(host, slot, state);
+            if (unordered.Length > 0)
             {
-                Submit(host, slot, new HarvestPayload(idle, c.FieldId), ref aiSequence);
+                Submit(host, slot, new HarvestPayload(unordered, c.FieldId), ref aiSequence);
             }
         }
 
@@ -958,17 +973,24 @@ namespace Nova.SimRunner
             return 0;
         }
 
-        /// <summary>Raw ids of all active own harvesters without a standing harvest order, ascending index.</summary>
-        private static uint[] IdleHarvesterRaws(Host host, byte slot)
+        /// <summary>
+        /// Raw ids of all active own harvesters the script has not ordered
+        /// yet, ascending index; each returned id is recorded in
+        /// <paramref name="state"/>, so it is returned exactly once (#134).
+        /// </summary>
+        private static uint[] UnorderedHarvesterRaws(Host host, byte slot, SlotState state)
         {
             var raws = new List<uint>();
             UnitState[] units = host.Entities.RawUnits;
             for (int i = 0; i < host.Entities.Capacity; i++)
             {
-                if (units[i].IsActive && units[i].PlayerId == slot
-                    && units[i].Role == UnitRole.Harvester && units[i].HarvestFieldId == 0)
+                if (units[i].IsActive && units[i].PlayerId == slot && units[i].Role == UnitRole.Harvester)
                 {
-                    raws.Add(UnitCommandStateView.ToRawEntityId(units[i].Id));
+                    uint raw = UnitCommandStateView.ToRawEntityId(units[i].Id);
+                    if (state.HarvestersOrdered.Add(raw))
+                    {
+                        raws.Add(raw);
+                    }
                 }
             }
             return raws.ToArray();
