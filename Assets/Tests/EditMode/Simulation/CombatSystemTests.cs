@@ -244,6 +244,102 @@ namespace Nova.Simulation.Tests
             Assert.That(HealthOf(host, attacker), Is.LessThan(200), "the platform actually fires");
         }
 
+        // ------------------------------------------------------------------
+        // #67, D-122: defence platforms go offline in power deficit
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void LowPower_DefensePlatform_StaysSilent_AndResumesWhenPowerReturns()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId platform = SpawnAt(host, 0, 10, 10, maxHealth: 600);
+            host.Entities.GetUnitRef(platform).Role = UnitRole.DefensePlatform; // armed: 20 dmg, range 10, cd 10
+            EntityId target = SpawnAt(host, 1, 13, 10, maxHealth: 1000);
+
+            // The economy system is not registered in this host, so nothing
+            // recomputes the balance: setting it directly is authoritative.
+            ref PlayerEconomyState eco = ref host.Economy.GetPlayerEconomy(0);
+            eco.PowerProvided = 30;
+            eco.PowerRequired = 40; // deficit
+            Assert.That(host.Economy.GetPlayerEconomy(0).IsLowPower, Is.True);
+
+            host.Step(30);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget.IsValid, Is.False,
+                "offline: no auto-acquisition while the owner is in power deficit");
+            Assert.That(HealthOf(host, target), Is.EqualTo(1000), "offline: no shot");
+            Assert.That(host.Entities.GetUnitRef(platform).WeaponCooldownTicks, Is.EqualTo(0),
+                "the cooldown keeps running down while offline");
+
+            host.Economy.GetPlayerEconomy(0).PowerProvided = 100; // balance restored
+            host.Step(1);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget, Is.EqualTo(target),
+                "power back: the platform acquires again in the very next tick");
+            Assert.That(HealthOf(host, target), Is.EqualTo(1000 - 20),
+                "power back: it fires at once, no warm-up (Economy.md: restores all systems immediately)");
+        }
+
+        [Test]
+        public void LowPower_DoesNotSilenceUnits_OnlyBuildings()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId unit = SpawnAt(host, 0, 10, 10, maxHealth: 100); // generic armed unit role
+            EntityId target = SpawnAt(host, 1, 13, 10, maxHealth: 1000);
+            ref PlayerEconomyState eco = ref host.Economy.GetPlayerEconomy(0);
+            eco.PowerProvided = 0;
+            eco.PowerRequired = 50;
+
+            host.Step(3);
+            Assert.That(host.Entities.GetUnitRef(unit).AttackTarget, Is.EqualTo(target),
+                "a mobile unit is not a power consumer and still acquires");
+            Assert.That(HealthOf(host, target), Is.LessThan(1000),
+                "units keep firing in a power deficit; only building roles fall");
+        }
+
+        [Test]
+        public void LowPower_OnlyTheDeficitOwnersPlatformFalls()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId mine = SpawnAt(host, 0, 10, 10, maxHealth: 600);
+            host.Entities.GetUnitRef(mine).Role = UnitRole.DefensePlatform;
+            EntityId theirs = SpawnAt(host, 1, 13, 10, maxHealth: 600);
+            host.Entities.GetUnitRef(theirs).Role = UnitRole.DefensePlatform;
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 10; // slot 0 in deficit, slot 1 balanced
+
+            host.Step(3);
+            Assert.That(HealthOf(host, mine), Is.LessThan(600),
+                "the balanced owner's platform shoots the deficit owner's platform");
+            Assert.That(HealthOf(host, theirs), Is.EqualTo(600),
+                "the deficit owner's platform is offline");
+        }
+
+        [Test]
+        public void LowPower_OutageDropsTheHeldTarget_SoRecoveryReacquiresTheNearest()
+        {
+            var host = TestHost.Create(Seed);
+            EntityId platform = SpawnAt(host, 0, 10, 10, maxHealth: 600);
+            host.Entities.GetUnitRef(platform).Role = UnitRole.DefensePlatform;
+            EntityId first = SpawnAt(host, 1, 13, 10, maxHealth: 5000);
+            host.Step(2);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget, Is.EqualTo(first),
+                "precondition: the platform holds the first hostile");
+
+            ref PlayerEconomyState eco = ref host.Economy.GetPlayerEconomy(0);
+            eco.PowerProvided = 0;
+            eco.PowerRequired = 10; // outage
+            host.Step(1);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget.IsValid, Is.False,
+                "an outage drops the held target (failure behaviour F, D-122)");
+
+            Teleport(host, first, 40, 10); // the old target walks off
+            EntityId second = SpawnAt(host, 1, 12, 10, maxHealth: 5000);
+            host.Economy.GetPlayerEconomy(0).PowerRequired = 0; // recovery
+            host.Step(1);
+            Assert.That(host.Entities.GetUnitRef(platform).AttackTarget, Is.EqualTo(second),
+                "recovery acquires the nearest hostile instead of resuming a stale lock");
+            host.Step(12);
+            Assert.That(HealthOf(host, second), Is.LessThan(5000));
+        }
+
         [Test]
         public void ActiveDefensePlatformSite_NeitherAcquiresNorExecutesExplicitAttack()
         {

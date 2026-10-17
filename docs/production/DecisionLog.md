@@ -3662,6 +3662,119 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-122 | Entwurf | Verteidigungsplattformen fallen bei Strommangel aus (#67)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#67); verbindlich mit dem
+Merge des PR. Die Endnummer vergibt der Integrator beim Merge.
+
+**Kontext:** Die Low-Power-Regel in [Economy.md](../gamedesign/Economy.md)
+verlangt „Verteidigungsplattformen offline“, und Strang C hatte „Radar und
+Verteidigung fallen immer zuerst“ vorgesehen. Umgesetzt waren seit Paket 16.6
+(PR #78) nur Radar, Produktion, Bau und Reparatur. Ob eine Plattform feuert,
+entschied allein `WeaponProfile.IsArmed` in `CombatSystem`; `Simulation/Combat/`
+kannte keinen Strombegriff (null Treffer für „power“), und das Issue #67 hielt
+die Lücke fest: Ein Angriff auf das gegnerische Kraftwerk ließ die Produktion
+einbrechen, die Türme schossen weiter. `PlayerEconomyState.IsLowPower`
+existiert und wird vom `EconomySystem` jeden Tick neu berechnet; Economy läuft
+vor Combat. Alle Konstruktionsstellen von `CombatSystem` übergeben bereits ein
+konkretes `EconomySystem`. Bewaffnet ist im MS-1 nur die `DefensePlatform`.
+Zwei Teilfragen waren offen: **wie** Combat den Strom erreicht und **was**
+mit dem gehaltenen Ziel beim Ausfall geschieht.
+
+**Alternativen:**
+
+1. **Dritter Konstruktorparameter wird `EconomySystem` (statt
+   `ISlotFactionLookup`).** Combat liest `GetPlayerEconomy(owner).IsLowPower`
+   direkt. Bewertung: kleinster Eingriff (eine Quelldatei, kein Aufrufer ändert
+   sich), gleiches Muster wie `FogOfWarSystem` und `ConstructionSystem`. Die
+   schmale Schnittstelle verliert hier an Reinheit, ein zweiter Implementierer
+   existiert aber nicht.
+2. **Neue schmale Schnittstelle `ISlotPowerLookup` als fünfter Parameter.**
+   Entkoppelt Combat von der Wirtschaft, kostet aber 20 mechanische
+   Aufrufstellen in Spiel, Harness und beiden Testspuren, eine neue Datei samt
+   `.meta` und größere Konfliktfläche, ohne dass es einen zweiten
+   Implementierer gäbe. Mehraufwand ohne Nutzen.
+3. **`ISlotFactionLookup` um `IsSlotLowPower` erweitern.** Keine
+   Aufruferänderung, aber der Name lügt, und `EntityManager.TryValidateState`
+   hängt an derselben Schnittstelle (`State/` ist teilweise „niemand ohne
+   D-ID“). Unscharfe Verantwortung.
+4. **Die Wirtschaft erzwingt die Abschaltung von außen** (Cooldown oder
+   Zielfeld der Türme manipulieren). Schreibt fremden Zustand, verwischt die
+   Systemgrenze und ist im Verhalten schwer zu begründen. Verworfen.
+
+Teilentscheidung **Ausfallverhalten:** (E) Ziel behalten und nach Rückkehr des
+Stroms am alten Ziel weiterfeuern, oder (F) Ziel beim Ausfall verwerfen und nach
+der Rückkehr neu erfassen. Bewertung: E ist ein Zeilenunterschied weniger, hält
+aber den bekannten Mangel fest, dass ein Turm ein Ziel behält, das die
+Reichweite verlassen hat, und nie neu erfasst. F entschärft das nach jedem
+Ausfall nebenbei und liefert ein klares Bild: ein Neustart der Zielwahl.
+
+Teilentscheidung **Regel-Hash:** `RulesHash64` hasht nur Konstanten und die
+Revisionsnummer; die Regel bewegt das Verhalten, aber keine hashbare Konstante.
+Bewertung: eine eigene Regelrevision jetzt anzuheben berührt `Replays/`
+(„niemand ohne D-ID“) und kollidiert mit der Revision V4, die der Art-Strang
+bereits für das Bewegungsgefühl baut. Ohne Hashbewegung auszuliefern entspricht
+der Praxis bei D-108 und #55 (Lücke, dokumentiert in #108); die Low-Power-Regeln
+aus 16.6 haben dagegen die Revision angehoben.
+
+**Entscheidung:** Alternative 1 mit Ausfallverhalten F.
+
+- `CombatSystem` bekommt als dritten Konstruktorparameter das `EconomySystem`
+  (Feld und Parameter heißen jetzt `_economy`/`economy`).
+- `IsOffline(attacker)` ist wahr, wenn die Rolle des Angreifers eine
+  Gebäuderolle ist (`SimDefinitions.IsBuildingRole`) **und** der Besitzer
+  `IsLowPower` ist. Einheiten sind nie betroffen.
+- Phase 2 (Auto-Erfassung) überspringt offline Angreifer. Phase 3 (Engagement)
+  setzt deren `AttackTarget` auf ungültig und überspringt sie: kein Schuss,
+  kein gehaltenes Ziel.
+- Der Cooldown in Phase 1 läuft weiter. Kehrt der Strom zurück, feuert die
+  Plattform sofort wieder („stellt alle Systeme sofort wieder her“,
+  Economy.md) und erfasst das nächstgelegene Ziel neu.
+- Die Bilanz gilt vom Tickanfang (Economy vor Combat): ein im selben Tick
+  zerstörtes Kraftwerk wirkt ab dem Folgetick, ein Tick Latenz,
+  deterministisch.
+- **Regel-Hash:** Die Regel wird jetzt **nicht** mit eigener Revision
+  gebunden; `RulesHash64` bewegt sich nicht. Landet dieser PR vor dem
+  V4-PR des Art-Strangs auf `main`, deckt V4 die Regel implizit ab; sonst ist
+  sie in #108 als vierter Fall nachzutragen (Inhaber stimmt die Reihenfolge ab).
+- UI: Ressourcenleiste („… Radar aus · Türme aus“) und Baubar
+  („LOW POWER: Produktion ½ · Türme aus“) nennen die Folge, weil die UI die
+  Low-Power-Regel erklären muss ([TargetAudience.md](../vision/TargetAudience.md)).
+
+**Begründung:** Die Designentscheidung liegt in Economy.md bereits vor; offen war
+nur der Stromeingang. Alternative 1 ist der kleinste Eingriff mit etabliertem
+Muster und lässt jede Aufrufstelle unverändert. F kostet dieselbe Zeile wie E,
+vermeidet aber ein Weiterfeuern auf ein womöglich längst unpassendes Ziel und
+mildert den Mangel des nie neu erfassten Ziels. Cooldown-Weiterlauf und
+Tickanfangs-Bilanz halten die Regel einfach und deterministisch; der Strom ist
+abgeleiteter Zustand, daher ändern sich weder Snapshot-Format noch
+State-Layout.
+
+**Konsequenzen:**
+
+- **Hash-Lücke:** Ein Build mit und einer ohne diese Regel melden dieselbe
+  `RulesHash64`. Abgefedert durch den Build-Commit-Abgleich der Lobby und die
+  Desync-Erkennung, nicht durch den Fingerprint. Nach dem Merge ist ein neuer
+  Testbuild für alle Plattformen fällig.
+- **Offline verbraucht weiter Strom:** `RecomputePower` zählt die Plattform mit;
+  das Defizit kann sich dadurch halten. Verkaufen oder ein neues Kraftwerk
+  sind die Gegenmaßnahmen.
+- **Spielerfalle:** Laufende Baustellen reservieren keinen Strom
+  (`EconomySystem.RecomputePower` überspringt sie, die Platzierungsprüfung liest
+  nur die fertige Bilanz). Wer mehrere Stromverbraucher knapp nacheinander setzt,
+  kann das Defizit mit deren Fertigstellung selbst auslösen und schaltet dann die
+  gesamte Verteidigung ab. Hier nur durch den Warntext gemildert; die
+  Überzeichnung selbst ist ein eigener Nebenbefund (Q-040).
+- **Künftige Ausnahmen:** Eroberte neutrale Türme sollen laut
+  [NeutralUnits.md](../gamedesign/NeutralUnits.md) keine Energie brauchen. Die
+  Regel erfasste sie, sobald solche Rollen existieren; die Ausnahme ist dann
+  nachzurüsten.
+- **Ungelöst bleibt** der Mangel, dass ein Turm ein Ziel außer Reichweite hält
+  und nie neu erfasst (nur nach Stromausfällen durch F abgemildert; verwandt mit
+  #51).
+- Forschung und Superwaffen-Countdown bleiben Vollspielziel
+  ([Economy.md](../gamedesign/Economy.md)).
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.

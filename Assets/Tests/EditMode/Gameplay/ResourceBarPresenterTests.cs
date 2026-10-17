@@ -186,7 +186,7 @@ namespace Nova.Gameplay.Tests
 
             Assert.IsTrue(model.IsLowPower);
             Assert.AreEqual("Strom 60/80", model.PowerText);
-            Assert.AreEqual("Strommangel — Produktion ½ · Reparatur ½ · Radar aus", model.WarningText);
+            Assert.AreEqual("Strommangel — Produktion ½ · Reparatur ½ · Radar aus · Türme aus", model.WarningText);
             Assert.IsTrue(model.IsCritical);
         }
 
@@ -196,7 +196,7 @@ namespace Nova.Gameplay.Tests
             ResourceBarModel model = ResourceBarPresenter.BuildModel(3000, 3000, 60, 80);
 
             Assert.AreEqual(
-                "Lager voll — Einnahmen verfallen   |   Strommangel — Produktion ½ · Reparatur ½ · Radar aus",
+                "Lager voll — Einnahmen verfallen   |   Strommangel — Produktion ½ · Reparatur ½ · Radar aus · Türme aus",
                 model.WarningText);
             Assert.IsTrue(model.IsCritical, "the deficit is an active penalty — the join escalates to red");
         }

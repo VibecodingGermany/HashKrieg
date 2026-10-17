@@ -258,6 +258,18 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Verteidigungsplattformen fallen bei Strommangel aus (#67, D-122).** Ein
+  Besitzer im Defizit (`PlayerEconomyState.IsLowPower`) verliert die Feuerkraft
+  seiner Gebäuderollen: `CombatSystem` erfasst keine Ziele, feuert nicht und
+  verwirft ein gehaltenes Ziel; der Cooldown läuft weiter, bei Rückkehr des
+  Stroms feuert die Plattform sofort wieder. Einheiten sind nie betroffen; die
+  Bilanz gilt vom Tickanfang (ein Tick Latenz). Dritter Konstruktorparameter von
+  `CombatSystem` ist jetzt das `EconomySystem` (alle Aufrufer übergaben es
+  schon). Ressourcenleiste und Baubar nennen „Türme aus“; Buildings.md,
+  Economy.md und DemoRunbook.md nachgezogen. **Keine Baseline und kein Pin
+  bewegt sich, `RulesHash64` ebenfalls nicht** – ein weiterer Beleg für die
+  Hash-Lücke aus #108 (Reihenfolge zur Regelrevision V4 offen, siehe D-122).
+  Die Unity-EditMode-Tests (Spiegel und UI-Texte) sind nicht gelaufen.
 - **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
   84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
   Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die

@@ -1,6 +1,7 @@
 using System;
 using Nova.Core;
 using Nova.Simulation.Construction;
+using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
 
@@ -97,6 +98,24 @@ namespace Nova.Simulation.Combat
     /// self-computed sight exists on this path.
     /// </para>
     /// <para>
+    /// LOW-POWER OFFLINE RULE (#67, D-122; docs/gamedesign/Economy.md): a
+    /// BUILDING-role entity (<see cref="Definitions.SimDefinitions.IsBuildingRole"/>
+    /// — in MS-1 that is the DefensePlatform, the only armed building) whose
+    /// owner is in power deficit (<see cref="PlayerEconomyState.IsLowPower"/>)
+    /// is OFFLINE: it neither acquires a target (phase 2) nor holds one — its
+    /// attack order is DROPPED (phase 3) so that, once power returns, the next
+    /// acquisition re-picks the nearest hostile instead of resuming an old
+    /// lock. Units are never affected. The weapon cooldown keeps ticking down
+    /// in phase 1 on purpose: a platform whose power returns fires again
+    /// immediately ("restores all systems at once", Economy.md). The balance
+    /// is read from the economy state as it stands at the START of the combat
+    /// phase — the Economy system is registered (and therefore runs) before
+    /// Combat, so a power plant destroyed in tick N takes the platforms
+    /// offline from tick N+1 on: one tick of latency, fully deterministic.
+    /// The power balance is derived state, so the rule adds nothing to
+    /// snapshots or state layout.
+    /// </para>
+    /// <para>
     /// Per-unit-type weapons from docs/gamedesign/Weapons.md ARE wired now —
     /// the flat 15-damage-for-everyone placeholder is gone. What remains
     /// provisional: same-team attack orders are not filtered in this slice
@@ -129,27 +148,30 @@ namespace Nova.Simulation.Combat
 
         private readonly EntityManager _entityManager;
         private readonly FogOfWarSystem _fogOfWar;
-        private readonly ISlotFactionLookup _factions;
+        private readonly EconomySystem _economy;
         private readonly ConstructionSystem _construction;
 
         public string Name => "CombatSystem";
 
         /// <summary>
-        /// Combat needs the slot factions because weapon profiles are
-        /// faction-resolved (faction identity slice): the same role fights
-        /// with different numbers depending on the owner slot's faction.
-        /// The lookup is the economy state — the single home of the faction
-        /// assignment — injected at construction like the FoW reference.
+        /// Combat needs the economy for two reads: the slot factions, because
+        /// weapon profiles are faction-resolved (faction identity slice — the
+        /// same role fights with different numbers depending on the owner
+        /// slot's faction), and the owner's power balance, because defence
+        /// platforms go offline in power deficit (#67, D-122). The economy
+        /// state is the single home of both — injected at construction like
+        /// the FoW reference (same pattern as Fog of War and Construction)
+        /// and registered BEFORE combat so the balance is current.
         /// </summary>
         public CombatSystem(
             EntityManager entityManager,
             FogOfWarSystem fogOfWar,
-            ISlotFactionLookup factions,
+            EconomySystem economy,
             ConstructionSystem construction)
         {
             _entityManager = entityManager ?? throw new ArgumentNullException(nameof(entityManager));
             _fogOfWar = fogOfWar ?? throw new ArgumentNullException(nameof(fogOfWar));
-            _factions = factions ?? throw new ArgumentNullException(nameof(factions));
+            _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _construction = construction ?? throw new ArgumentNullException(nameof(construction));
         }
 
@@ -191,8 +213,9 @@ namespace Nova.Simulation.Combat
                 if (!attacker.IsActive || attacker.AttackTarget.IsValid
                     || _construction.IsActiveSite(attacker.Id)) continue;
 
-                WeaponProfile weapon = WeaponProfiles.Get(_factions.GetSlotFaction(attacker.PlayerId), attacker.Role);
+                WeaponProfile weapon = WeaponProfiles.Get(_economy.GetSlotFaction(attacker.PlayerId), attacker.Role);
                 if (!weapon.IsArmed) continue;
+                if (IsOffline(in attacker)) continue; // #67, D-122: no acquisition in power deficit
                 if (attacker.PlayerId >= _fogOfWar.TeamCount) continue;
                 TeamView view = _fogOfWar.GetTeamView(attacker.PlayerId);
 
@@ -260,8 +283,18 @@ namespace Nova.Simulation.Combat
                 // range and cadence. An unarmed role (base damage 0) holds
                 // its order exactly like an out-of-range one — it simply has
                 // nothing to fire, so it never starts a cooldown either.
-                WeaponProfile weapon = WeaponProfiles.Get(_factions.GetSlotFaction(attacker.PlayerId), attacker.Role);
+                WeaponProfile weapon = WeaponProfiles.Get(_economy.GetSlotFaction(attacker.PlayerId), attacker.Role);
                 if (!weapon.IsArmed) continue;
+
+                // #67, D-122: an offline platform neither fires nor holds its
+                // target. Dropping the order (instead of keeping it) means the
+                // recovery re-acquires the nearest hostile in phase 2. The
+                // cooldown is untouched — phase 1 keeps counting it down.
+                if (IsOffline(in attacker))
+                {
+                    attacker.AttackTarget = EntityId.Invalid;
+                    continue;
+                }
 
                 // Legality: range AND committed visibility. A living target
                 // that fails either check is held, never dropped.
@@ -277,7 +310,7 @@ namespace Nova.Simulation.Combat
                 int damage = DamageMatrix.Resolve(
                     weapon.AttackDamage,
                     weapon.DamageType,
-                    WeaponProfiles.GetArmorClass(_factions.GetSlotFaction(target.PlayerId), target.Role));
+                    WeaponProfiles.GetArmorClass(_economy.GetSlotFaction(target.PlayerId), target.Role));
 
                 target.CurrentHealth -= damage;
                 attacker.WeaponCooldownTicks = weapon.AttackCooldownTicks;
@@ -291,6 +324,18 @@ namespace Nova.Simulation.Combat
 
         public void Shutdown()
         {
+        }
+
+        /// <summary>
+        /// Low-power offline rule (#67, D-122): true for a building-role
+        /// attacker whose owner slot is currently in power deficit. Units are
+        /// never offline. Reads the balance the Economy system left at the
+        /// start of this tick (one tick of latency, deterministic).
+        /// </summary>
+        private bool IsOffline(in UnitState attacker)
+        {
+            return Definitions.SimDefinitions.IsBuildingRole(attacker.Role)
+                && _economy.GetPlayerEconomy(attacker.PlayerId).IsLowPower;
         }
 
         /// <summary>

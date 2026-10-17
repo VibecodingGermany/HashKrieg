@@ -298,7 +298,7 @@ namespace Nova.Gameplay.Tests
         {
             Assert.AreEqual("Strom 30/20", CommandCardPresenter.FormatPowerBalance(30, 20));
             Assert.AreEqual(
-                "Strom 20/40 · LOW POWER: Produktion ½",
+                "Strom 20/40 · LOW POWER: Produktion ½ · Türme aus",
                 CommandCardPresenter.FormatPowerBalance(20, 40));
 
             Assert.IsTrue(SimDefinitions.TryGetBuilding(

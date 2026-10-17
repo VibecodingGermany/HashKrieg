@@ -99,8 +99,8 @@ namespace Nova.Gameplay
         /// <summary>Warning while the balance sits ABOVE the ceiling: the excess decays 25%/s (D-024/D-106), so the warning names the action (red).</summary>
         public const string StorageOverflowWarning = "Überschuss verfällt — Lager bauen!";
 
-        /// <summary>Warning under low power, naming the three live consequences so the rule stops being invisible (16.6 C4, Sprint-16 production factor).</summary>
-        public const string LowPowerWarning = "Strommangel — Produktion ½ · Reparatur ½ · Radar aus";
+        /// <summary>Warning under low power, naming the four live consequences so the rule stops being invisible (16.6 C4, Sprint-16 production factor; "Türme aus" since #67, D-122).</summary>
+        public const string LowPowerWarning = "Strommangel — Produktion ½ · Reparatur ½ · Radar aus · Türme aus";
 
         /// <summary>
         /// The storage situation, with the two edges the account can sit on:
