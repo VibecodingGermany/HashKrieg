@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.41.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.42.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3583,6 +3583,61 @@ sie braucht deshalb ein eigenes, mit dem Einheitenstrang abgestimmtes
 Merge-Fenster. Verteidigungsbalance an den Zufahrten und KI-Verhalten in der
 Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
 
+### D-110 | verbindlich | Asset-Pass 2026-10-17 (Blickrichtung, Teile-Animation, Optik der Tripo-Assets)
+
+**Status:** Im Auftrag des Inhabers vom 2026-10-17 („alle Assets Stück für Stück
+verbessern, korrekte Bewegungsrichtung, Animation der Fahrzeuge und Gebäude, mit
+Blender“). Neugenerierung einzelner Modelle bleibt Inhaberentscheidung.
+
+**Kontext:** Einheiten fuhren sichtbar seitwärts oder rückwärts, die 34
+Tripo-Modelle waren starre Einzelmeshes mit Rissen und sehr dunklen Texturen.
+Am Code geprüft: Die Blickrichtung war kein Asset-, sondern ein Abbildungsfehler
+– `UnitViewManager` setzte den mathematischen Sim-Kurs (`SimTrig.Atan2`, 0 = +X,
+gegen den Uhrzeigersinn) direkt als Unity-Gier (0 = +Z, im Uhrzeigersinn) ein und
+spiegelte so jede Einheit an der Nordost-Diagonale. Die Modelle zeigen korrekt
+nach +Z. [AnimationSystem.md](../tech/AnimationSystem.md) sieht für Fahrzeuge und
+Gebäude bereits rig-lose Code-Animation vor, nur gab es nichts zu bewegen.
+
+**Alternativen:**
+
+1. Die vorhandenen Tripo-Modelle in Blender per Skript aufbereiten: in
+   benannte, gepivotete Teile trennen, reparieren, Texturen auf die
+   D-072-Paletten heben; Unity animiert die Teile im Code.
+2. Alle Modelle mit höherer Generator-Qualität neu erzeugen.
+3. Alle Modelle in Blender von Hand neu bauen.
+
+**Entscheidung:** Alternative 1, mit diesen verbindlichen Festlegungen:
+
+1. **Eine Stelle für Sim-Kurs → Unity-Gier:** `ViewHeading` (Gier =
+   90° − Sim-Grad). Kein anderer Code rechnet die Abbildung selbst.
+2. **Knoten-Vertrag zwischen Art und Code:** `Body`, `Turret`, `Gun`, `Wheel_*`,
+   `Arm_*`, `Spin_*`, `Scan_*`; Meshes darunter enden auf `_LOD0..2`.
+   `UnitRigAnimator` findet sie über den Namen. Animation bleibt reine View und
+   liest nur, was der Betrachter sehen darf (Ziel nur mit sichtbarer Ansicht,
+   Produktionspuls nur an eigenen Gebäuden).
+3. **Art-Materialien rendern doppelseitig.** Die Tripo-Schalen haben echte
+   Lücken; mit Culling sieht man den Boden hindurch.
+4. **Neue Textur `T_*_EM`** (Leuchtakzente) neben `_BC` und `_MSK`.
+5. **Reproduzierbar:** Quelle ist immer das unveränderte Konvertat außerhalb des
+   Repos, die Rezepte (`tools/art/asset_recipes.json`) und Werkzeuge liegen im
+   Repo.
+
+**Begründung:** Alternative 1 liefert alle drei Wünsche sofort für alle 34
+Assets, kostet keine Generator-Guthaben und hält die vom Inhaber gewählte
+Art-Richtung. Alternative 2 kostet je Modell, liefert wieder Einzelmeshes ohne
+Teile und müsste trotzdem durch dieselbe Teile-Trennung. Alternative 3 ist der
+größte Aufwand und verwirft die vorhandene Formensprache. Die Grenzen von
+Alternative 1 sind bewusst in Kauf genommen und benannt: Die Geometrie bleibt
+Tripo-Qualität, Legion-Kraftwerk und Legion-Forschungslabor sind als Panzer
+generiert und nur durch Neugenerierung zu retten.
+
+**Konsequenzen:** Prüfung und Grenzen stehen in
+[AssetPass_2026-10-17.md](../assets/AssetPass_2026-10-17.md). Der FBX-Import
+setzt `preserveHierarchy` und ausdrücklich `bakeAxisConversion = false` (Letzteres
+dreht die älteren FBX um 180°). Das Asset-Paket muss neu gebaut werden, sonst
+sehen andere den alten Stand. Keine Änderung an der Simulation, keine Bewegung
+der Determinismus-Baselines.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.
@@ -3663,6 +3718,7 @@ Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.42.0 | 2026-10-17 | D-110 aufgenommen: Blickrichtung über **eine** Abbildung Sim-Kurs → Unity-Gier (`ViewHeading`), Knoten-Vertrag `Body`/`Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*` zwischen Blender-Pass und `UnitRigAnimator`, doppelseitige Art-Materialien, neue Leuchttextur `T_*_EM`; Tripo-Modelle werden aufbereitet statt neu erzeugt | Dennis Westermann / Orchestrator |
 | 1.41.0 | 2026-08-18 | **D-108 in der Prämisse berichtigt und in der Sache neu gefasst.** Die Erstfassung behauptete, der Code lasse bereits jedes Gebäude als Bauanker gelten, und wollte das nur aussprechen — tatsächlich prüft `IsInsideBuildInfluence` seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch beim Umsetzen von Paket 21.1 gefunden und angehalten. Der Inhaber hat daraufhin in Kenntnis der Lage neu entschieden: die Ankerliste wird bewusst geöffnet, **jedes eigene fertiggestellte Gebäude wird Anker**. Damit ist D-108 eine Verhaltensänderung (`RulesHash64`, Baselines, kanonischer KI-Pin), keine Festschreibung. `MinimumBuildingDistanceCells` bleibt bei 2 — die Messung aus 21.1 (15/23/23) weist die gemeldete Enge nicht als Abstandsproblem aus | Dennis Westermann / Orchestrator |
 | 1.40.0 | 2026-08-17 | D-108 und D-109 aufgenommen (Sprint 21, aus Testbericht T-01): Territorium wächst **kriechend an jedem eigenen Bauanker** — die bestehende Regel wird festgeschrieben statt geändert, und die gemeldete Enge wird an `MinimumBuildingDistanceCells` gemessen, bevor ein Wert fällt. Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten, mit der verbindlichen Auflage, dass Begehbarkeit und Optik aus **einer** Struktur stammen — heute streut `GlutrinneBlockoutView` begehbare Deko-Felsen, während niemand ausser `ConstructionSystem` in das `CostField` schreibt | Dennis Westermann / Orchestrator |
 | 1.39.0 | 2026-08-10 | D-107 aufgenommen: Die bestehende Glutrinne-Layoutachse spiegelt Punkte um 124 und 3×3-Footprint-Ursprünge abgeleitet um 122; der zweite HQ-Ursprung wird von `(120,120)` auf `(118,118)` korrigiert | Agent (unter Delegation) / Dennis Westermann |

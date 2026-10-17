@@ -132,6 +132,16 @@ namespace Nova.Gameplay.Match
         private int[] _lastSeenFrame;
         private bool[] _tracked;
 
+        // Rig animation (UnitRigAnimator): one per prefab view, plus the last
+        // rendered position/yaw so speed and turn rate are measured on the
+        // VIEW — the smoothed motion the player sees, not the 10-Hz sim steps.
+        private UnitRigAnimator[] _viewRigs;
+        private Vector3[] _lastViewPositions;
+        private float[] _lastViewYaws;
+        private bool[] _firedThisFrame;
+        private bool[] _buildingThisFrame;
+        private byte _lastViewerTeam;
+
         // Compact list of slots that currently own a view, so the per-frame
         // sweep is O(visible) instead of O(entity capacity).
         private readonly List<int> _activeIndices = new List<int>(256);
@@ -275,6 +285,7 @@ namespace Nova.Gameplay.Match
             EnsureBuffers();
 
             byte viewerTeam = ResolveViewerTeam(fog);
+            _lastViewerTeam = viewerTeam;
             _frameStamp++;
 
             // 1) The committed team view is the ONLY source of renderable
@@ -351,6 +362,16 @@ namespace Nova.Gameplay.Match
             }
             _combatEffects?.Present(_combatEvents);
 
+            MarkWorkingBuilders(entities);
+            System.Array.Clear(_firedThisFrame, 0, _firedThisFrame.Length);
+            for (int i = 0; i < _combatEvents.Count; i++)
+            {
+                CombatFeedbackEvent feedback = _combatEvents[i];
+                if (feedback.Kind != CombatFeedbackKind.Shot) continue;
+                int sourceSlot = feedback.SourceId.Index;
+                if (sourceSlot >= 0 && sourceSlot < _firedThisFrame.Length) _firedThisFrame[sourceSlot] = true;
+            }
+
             float blend = 1f - Mathf.Exp(-Mathf.Max(0f, _interpolationSpeed) * Time.deltaTime);
             for (int i = 0; i < _visibleScratch.Count; i++)
             {
@@ -392,6 +413,7 @@ namespace Nova.Gameplay.Match
 
                 _lastSeenFrame[slot] = _frameStamp;
                 ApplyTransform(slot, in unit, spawned ? 1f : blend);
+                AnimateRig(slot, in unit, spawned);
             }
 
             // 2) Everything not visible now is either already detached into a
@@ -465,6 +487,11 @@ namespace Nova.Gameplay.Match
             _viewHealthSteps = new int[capacity];
             _lastSeenFrame = new int[capacity];
             _tracked = new bool[capacity];
+            _viewRigs = new UnitRigAnimator[capacity];
+            _lastViewPositions = new Vector3[capacity];
+            _lastViewYaws = new float[capacity];
+            _firedThisFrame = new bool[capacity];
+            _buildingThisFrame = new bool[capacity];
 
             for (int i = 0; i < capacity; i++)
             {
@@ -580,6 +607,18 @@ namespace Nova.Gameplay.Match
             _viewOwners[slot] = -1;       // forces a tint on this frame
             _viewHealthSteps[slot] = -1;  // ... including the health bucket of the recycled instance
             _viewObjectToSlot[instance] = slot;
+
+            // Art prefabs get the rig animation; graybox primitives stay still.
+            UnitRigAnimator rig = null;
+            if (sourcePrefab != null)
+            {
+                rig = instance.GetComponent<UnitRigAnimator>();
+                if (rig == null) rig = instance.AddComponent<UnitRigAnimator>();
+                rig.InfantryGait = IsInfantryRole(unit.Role);
+                rig.EmissivePulse = SimDefinitions.IsBuildingRole(unit.Role);
+                rig.ResetPose();
+            }
+            _viewRigs[slot] = rig;
 
             if (!_tracked[slot])
             {
@@ -703,6 +742,11 @@ namespace Nova.Gameplay.Match
             }
 
             _viewObjectToSlot.Remove(instance);
+            if (_viewRigs[slot] != null)
+            {
+                _viewRigs[slot].ResetPose();
+                _viewRigs[slot] = null;
+            }
             int shapeKey = _viewShapeKeys[slot];
             GameObject sourcePrefab = _viewSourcePrefabs[slot];
             ReturnInstanceToPool(instance, shapeKey, sourcePrefab);
@@ -777,7 +821,9 @@ namespace Nova.Gameplay.Match
                 SimDefinitions.IsBuildingRole(_viewRoles[slot])));
 
             // Detach only. The active-slot sweep owns _tracked/_activeIndices
-            // and removes this slot later in the same LateUpdate.
+            // and removes this slot later in the same LateUpdate. The corpse
+            // keeps its last rig pose; the pool resets it on reuse.
+            _viewRigs[slot] = null;
             _viewInstances[slot] = null;
             _viewRenderers[slot] = null;
             _boundIds[slot] = EntityId.Invalid;
@@ -952,12 +998,26 @@ namespace Nova.Gameplay.Match
             // receive position writes only.
             bool isBuilding = SimDefinitions.IsBuildingRole(_viewRoles[slot]);
 
+            Quaternion targetRot = ViewHeading.Rotation(unit.Transform.Rotation);
+            if (!isBuilding && !unit.IsMoving && TryGetTargetViewPosition(in unit, out Vector3 aim))
+            {
+                // A standing unit without a turret turns its whole body onto
+                // the target; a turreted one keeps the hull and lets the rig
+                // swing the turret. View-only: the sim heading is untouched.
+                UnitRigAnimator rig = _viewRigs[slot];
+                if (rig == null || !rig.HasTurret)
+                {
+                    float yaw = ViewHeading.YawToward(viewTransform.position, aim, targetRot.eulerAngles.y);
+                    targetRot = Quaternion.Euler(0f, yaw, 0f);
+                }
+            }
+
             if (blend >= 1f)
             {
                 viewTransform.position = targetPos;
                 if (!isBuilding)
                 {
-                    viewTransform.rotation = ViewHeading.Rotation(unit.Transform.Rotation);
+                    viewTransform.rotation = targetRot;
                 }
                 return;
             }
@@ -967,9 +1027,109 @@ namespace Nova.Gameplay.Match
             viewTransform.position = Vector3.Lerp(viewTransform.position, targetPos, blend);
             if (!isBuilding)
             {
-                Quaternion targetRot = ViewHeading.Rotation(unit.Transform.Rotation);
                 viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
             }
+        }
+
+        /// <summary>
+        /// Feeds the rig animation of a prefab view with this frame's view
+        /// motion, the visible attack target and the shot flag.
+        /// </summary>
+        private void AnimateRig(int slot, in UnitState unit, bool spawned)
+        {
+            UnitRigAnimator rig = _viewRigs[slot];
+            Transform t = _viewInstances[slot].transform;
+            Vector3 pos = t.position;
+            float yaw = t.eulerAngles.y;
+            if (rig == null || spawned)
+            {
+                _lastViewPositions[slot] = pos;
+                _lastViewYaws[slot] = yaw;
+                return;
+            }
+
+            float dt = Time.deltaTime;
+            float speed = 0f, turnRate = 0f;
+            if (dt > 1e-5f)
+            {
+                Vector3 d = pos - _lastViewPositions[slot];
+                d.y = 0f;
+                speed = d.magnitude / dt;
+                turnRate = Mathf.DeltaAngle(_lastViewYaws[slot], yaw) / dt;
+            }
+            _lastViewPositions[slot] = pos;
+            _lastViewYaws[slot] = yaw;
+
+            var input = new UnitRigInput
+            {
+                Speed = speed,
+                TurnRate = turnRate,
+                Fired = _firedThisFrame[slot],
+                Working = !unit.IsMoving
+                          && ((unit.Role == UnitRole.Harvester && unit.HarvestFieldId != 0 && !unit.IsReturningCargo)
+                              || (unit.Role == UnitRole.Builder && _buildingThisFrame[slot])
+                              || IsProducingForViewer(in unit)),
+            };
+            input.HasTarget = TryGetTargetViewPosition(in unit, out input.TargetPosition);
+            rig.Tick(in input, dt);
+        }
+
+        /// <summary>
+        /// World position of the unit's attack target, read from the target's
+        /// VIEW — a target without a bound view is not visible to the viewer,
+        /// and aiming at it would leak its position through the fog.
+        /// </summary>
+        private bool TryGetTargetViewPosition(in UnitState unit, out Vector3 position)
+        {
+            position = default;
+            EntityId target = unit.AttackTarget;
+            if (!target.IsValid) return false;
+            int targetSlot = target.Index;
+            if (targetSlot < 0 || targetSlot >= _viewInstances.Length) return false;
+            if (_boundIds[targetSlot] != target || _viewInstances[targetSlot] == null) return false;
+            position = _viewInstances[targetSlot].transform.position;
+            return true;
+        }
+
+        /// <summary>
+        /// Flags every builder assigned to a VISIBLE construction site, read
+        /// from the site side (the simulation keeps the assignment there), so
+        /// its arms can work while it stands at the site.
+        /// </summary>
+        private void MarkWorkingBuilders(EntityManager entities)
+        {
+            System.Array.Clear(_buildingThisFrame, 0, _buildingThisFrame.Length);
+            ConstructionSystem construction = _matchRunner.Construction;
+            if (construction == null) return;
+            for (int i = 0; i < _visibleScratch.Count; i++)
+            {
+                EntityId id = _visibleScratch[i];
+                if (!construction.IsActiveSite(id)) continue;
+                if (!construction.TryGetSite(UnitCommandStateView.ToRawEntityId(id), out _, out _, out uint builderRaw)) continue;
+                if (builderRaw == 0u) continue;
+                EntityId builder = UnitCommandStateView.ToEntityId(builderRaw);
+                if (builder.IsValid && builder.Index < _buildingThisFrame.Length) _buildingThisFrame[builder.Index] = true;
+            }
+        }
+
+        /// <summary>
+        /// A production building with a non-empty queue — for the viewer's
+        /// OWN buildings only: a busy glow on a foreign factory would leak its
+        /// production through the fog.
+        /// </summary>
+        private bool IsProducingForViewer(in UnitState unit)
+        {
+            if (!SimDefinitions.IsBuildingRole(unit.Role)) return false;
+            if (unit.PlayerId != _lastViewerTeam) return false;
+            var production = _matchRunner.Production;
+            if (production == null) return false;
+            return production.TryGetProducer(UnitCommandStateView.ToRawEntityId(unit.Id), out int entries, out _, out _)
+                   && entries > 0;
+        }
+
+        private static bool IsInfantryRole(UnitRole role)
+        {
+            return role == UnitRole.BasicInfantry || role == UnitRole.AntiArmorInfantry;
         }
 
         private void ApplyTint(int slot, byte playerId, int healthStep)

@@ -35,6 +35,9 @@ namespace Nova.Editor
 
         private const string UrpLitShader = "Universal Render Pipeline/Lit";
 
+        /// <summary>HDR gain on the _EM map: accents must read under the full desert sun.</summary>
+        private const float EmissionIntensity = 1.6f;
+
         [MenuItem("Tools/Project Nova/Build Art Prefabs From FBX")]
         public static void BuildMenu()
         {
@@ -123,12 +126,55 @@ namespace Nova.Editor
                 Debug.LogWarning($"[ArtAssetPrefabBuilder] no base-colour texture at '{texPath}'; material '{matPath}' stays untextured.");
             }
 
-            // The Tripo-sourced meshes ship base colour only. Until the _MSK
-            // mask of ArtAssetStandard.md section 5.1 is authored, keep the
-            // surface fully dielectric and mid-rough rather than inheriting
+            // _MSK (ArtAssetStandard.md section 5.1, written by
+            // tools/art/asset_pass.py): R metallic and A smoothness drive URP
+            // Lit's metallic map, G its occlusion map. Without one the surface
+            // stays fully dielectric and mid-rough rather than inheriting
             // URP's shiny default, which reads as wet plastic under the RTS sun.
-            material.SetFloat("_Metallic", 0f);
-            material.SetFloat("_Smoothness", 0.25f);
+            var mask = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_MSK.png");
+            if (mask != null)
+            {
+                material.SetTexture("_MetallicGlossMap", mask);
+                material.EnableKeyword("_METALLICSPECGLOSSMAP");
+                material.SetFloat("_Metallic", 1f);
+                material.SetFloat("_Smoothness", 1f);   // multiplies mask.a
+                material.SetTexture("_OcclusionMap", mask);
+                material.EnableKeyword("_OCCLUSIONMAP");
+                material.SetFloat("_OcclusionStrength", 1f);
+            }
+            else
+            {
+                material.SetTexture("_MetallicGlossMap", null);
+                material.DisableKeyword("_METALLICSPECGLOSSMAP");
+                material.SetTexture("_OcclusionMap", null);
+                material.DisableKeyword("_OCCLUSIONMAP");
+                material.SetFloat("_Metallic", 0f);
+                material.SetFloat("_Smoothness", 0.25f);
+            }
+
+            // _EM: the light strips and glow panels cut out by the art pass.
+            var emission = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_EM.png");
+            if (emission != null)
+            {
+                material.SetTexture("_EmissionMap", emission);
+                material.SetColor("_EmissionColor", Color.white * EmissionIntensity);
+                material.EnableKeyword("_EMISSION");
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            }
+            else
+            {
+                material.SetTexture("_EmissionMap", null);
+                material.SetColor("_EmissionColor", Color.black);
+                material.DisableKeyword("_EMISSION");
+            }
+
+            // Tripo meshes are ~1000 loose shells with real gaps between them.
+            // With back faces culled the desert floor shows through every
+            // gap as a bright crack; rendering both faces shows the dark
+            // inside instead, which reads as a panel line.
+            material.SetFloat("_Cull", (float)CullMode.Off);
+            material.doubleSidedGI = true;
+
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -157,18 +203,22 @@ namespace Nova.Editor
                 var levels = new List<LOD>();
                 var thresholds = new[] { Lod0ScreenHeight, Lod1ScreenHeight, 0.0f };
 
+                // A rigged mesh (tools/art/asset_pass.py) carries one renderer
+                // per animated part and LOD — Hull, Turret, Gun, Wheel_* ... —
+                // so a level collects EVERY renderer of its suffix, not the first.
                 for (int lod = 0; lod < 3; lod++)
                 {
-                    Transform child = FindChildWithSuffix(instance.transform, $"_LOD{lod}");
-                    if (child == null) continue;
+                    var renderers = new List<Renderer>();
+                    foreach (Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (!renderer.name.EndsWith($"_LOD{lod}", System.StringComparison.Ordinal)) continue;
+                        if (material != null) renderer.sharedMaterial = material;
+                        renderer.shadowCastingMode = lod == 2 ? ShadowCastingMode.Off : ShadowCastingMode.On;
+                        renderers.Add(renderer);
+                    }
+                    if (renderers.Count == 0) continue;
 
-                    var renderer = child.GetComponent<Renderer>();
-                    if (renderer == null) continue;
-
-                    if (material != null) renderer.sharedMaterial = material;
-                    renderer.shadowCastingMode = lod == 2 ? ShadowCastingMode.Off : ShadowCastingMode.On;
-
-                    levels.Add(new LOD(thresholds[lod], new[] { renderer }));
+                    levels.Add(new LOD(thresholds[lod], renderers.ToArray()));
                 }
 
                 if (levels.Count == 0)
@@ -194,16 +244,6 @@ namespace Nova.Editor
             {
                 Object.DestroyImmediate(instance);
             }
-        }
-
-        private static Transform FindChildWithSuffix(Transform root, string suffix)
-        {
-            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
-            {
-                if (t != root && t.name.EndsWith(suffix, System.StringComparison.Ordinal)) return t;
-            }
-
-            return null;
         }
     }
 }

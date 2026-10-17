@@ -73,6 +73,26 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Asset-Pass über alle 34 Tripo-Assets: bewegliche Teile, Animation und Optik (D-110).**
+  Ein rezeptgesteuerter Blender-Pass (`tools/art/asset_pass.py`,
+  `asset_recipes.json`, headless) trennt die Modelle in benannte, gepivotete Teile,
+  repariert Einzelfehler (schwebendes Doppelrohr der Allianz-Verteidigung, lose
+  Platte der Legion, 6-m-Splitter am Legion-Bauer, der die Einheit im Spiel
+  schrumpfen ließ), glättet die facettierten Normalen und hebt die viel zu dunklen
+  Texturen auf die D-072-Paletten (Allianz Stahlgrau mit Cyan-Akzenten, Legion
+  Rost); Aetherium-Kristalle und Warnlichter behalten ihre Farbe. Neu: Leuchttextur
+  `T_*_EM` und die `_MSK` nach Standard §5.1. In Unity bewegt `UnitRigAnimator` die
+  Teile rig-los aus dem Spielzustand: Türme schwenken aufs sichtbare Ziel, Rohre
+  stoßen beim Schuss zurück, Räder rollen, die Federung nickt und neigt sich,
+  Infanterie wippt im Schritt, Sammler- und Bauarme arbeiten, Radarschüsseln,
+  Raffinerie-Kristall und HQ-Antenne drehen sich, Gebäude atmen über ihre
+  Leuchtstreifen und pulsieren beim Produzieren. Art-Materialien rendern
+  doppelseitig, damit man durch die Lücken der Tripo-Schalen nicht mehr den Sand
+  sieht. Prüfwerkzeuge: `ArtPreviewCapture` (Unity-Fotobox im echten Renderer),
+  `asset_layout.py` (Raster-Ansichten für Rezepte). Protokoll und ehrliche Grenzen:
+  `docs/assets/AssetPass_2026-10-17.md` — Geometrie bleibt Tripo-Qualität,
+  Legion-Kraftwerk und -Forschungslabor sind als Panzer generiert, Infanterie hat
+  kein Skelett. Automatisiert und per Kamera geprüft, **nicht gespielt**
 - **RTS-Gefühl, Steuerung & Audio: Angriffsverfolgung, Kontext-Rechtsklick, dynamische Cursor, 3D-Welt und Sound-Cues (#51).**
   Schließt die offenen Bedien-, Audio- und Darstellungslücken vollständig ab, ohne in
   die deterministische Simulationslogik einzugreifen:
@@ -426,6 +446,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Einheiten schauen in ihre Fahrtrichtung.** Die Ansicht setzte den
+  mathematischen Sim-Kurs (0° = Osten, gegen den Uhrzeigersinn) direkt als
+  Unity-Gier (0° = Norden, im Uhrzeigersinn) ein und spiegelte jede Einheit an der
+  Nordost-Diagonale: Wer nach Osten fuhr, schaute nach Norden. Die Abbildung liegt
+  jetzt an einer Stelle (`ViewHeading`), abgesichert durch EditMode-Tests und einen
+  PlayMode-Nachweis in der laufenden Partie (sechs Richtungen, Gegenprobe mit der
+  alten Abbildung schlägt fehl). Stehende Einheiten ohne Turm drehen sich zum
+  sichtbaren Angriffsziel (D-110)
 - **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
   31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
   zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein

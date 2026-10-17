@@ -1,6 +1,6 @@
 # Art Asset Standard
 
-**Version:** 0.2.0 | **Status:** Entwurf – MS-1 Art-Strang verbindlich, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1 Art-Strang verbindlich, kein Gate-Nachweis | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -110,6 +110,7 @@ Zellzahl zurückgerechnet wird.
 | Textur BaseColor | `T_BLDG_<Faction>_<Role>_BC.png` bzw. `T_UNIT_<Faction>_<Role>_BC.png` | `T_UNIT_Alliance_Builder_BC.png` |
 | Textur Normal | `..._N.png` | `T_BLDG_Legion_Barracks_N.png` |
 | Textur Mask (Metallic/AO/Team/Smoothness, §5) | `..._MSK.png` | `T_UNIT_Alliance_LightTank_MSK.png` |
+| Textur Emission (Leuchtakzente, D-110) | `..._EM.png` | `T_BLDG_Alliance_Refinery_EM.png` |
 | Material | `M_BLDG_<Faction>_<Role>.mat` bzw. `M_UNIT_<Faction>_<Role>.mat` | `M_BLDG_Alliance_Refinery.mat` |
 | Prefab | `PF_BLDG_<Faction>_<Role>.prefab` bzw. `PF_UNIT_<Faction>_<Role>.prefab` | `PF_UNIT_Legion_BattleTank.prefab` |
 
@@ -118,6 +119,12 @@ Dateien. Sie folgen der Unity-`LODGroup`-Automatik-Konvention über
 Submesh-/Objektnamen mit Suffix `_LOD0` / `_LOD1` / `_LOD2`, z. B.
 `SM_UNIT_Alliance_LightTank_LOD0`, `..._LOD1`, `..._LOD2` als drei Objekte
 im selben FBX-Export. Der Root-Dateiname trägt kein LOD-Suffix.
+
+**Animierbare Assets (D-110)** tragen statt dreier flacher Objekte eine
+Knoten-Hierarchie (`Root` → `Body` → `Turret`/`Gun`/`Wheel_*`/`Arm_*`/`Spin_*`/`Scan_*`);
+jedes Teil liegt je LOD-Stufe als eigenes Objekt mit Suffix `_LOD0..2` darunter.
+Der Prefab-Bau sammelt alle Renderer einer Stufe in deren `LODGroup`-Eintrag.
+Vertrag und Werkzeuge: [AssetPass_2026-10-17.md](AssetPass_2026-10-17.md).
 
 **Verhältnis zur Daten-Ebene:** [../tech/NamingConvention.md](../tech/NamingConvention.md)
 §4 definiert bereits die Präfixe `UNIT_` und `BLDG_` für
@@ -356,3 +363,4 @@ möglich, aber im PR zu begründen.
 |---|---|---|---|
 | 0.1.0 | 2026-07-25 | Erstfassung: Ordnerstruktur, Dateinamenskonvention, LOD-Konvention, Import-Settings, Material-Standard und Team-Mask-Kanalbelegung spezifiziert | Technical Art |
 | 0.2.0 | 2026-07-25 | Team-Mask-Kanalbelegung (§5.1) von Vorschlag auf für MS-1 verbindlich gehoben, Alternativenabwägung als Begründung in den Fachabschnitt übernommen; Grid-Zellgröße 3,0 m als art-seitige Arbeitsannahme samt Footprint-Maßtabelle ergänzt (§1); Texel-Density bleibt Vorschlag; Hinweis auf ausstehenden `FolderStructure.md`-Nachtrag nach G0-B ergänzt | Technical Art |
+| 0.3.0 | 2026-10-17 | Emissionstextur `_EM` und Knoten-Hierarchie animierbarer Assets ergänzt (D-110) | Technical Art |

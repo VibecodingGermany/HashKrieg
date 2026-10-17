@@ -1,6 +1,6 @@
 # Animation System
 
-**Version:** 0.2.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.3.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
@@ -54,6 +54,27 @@ Fahrzeuge, Mechs ohne Humanoid-Rig, Gebäude und Lufteinheiten erhalten **kein S
 - **Gebäude:** Baufortschritt als Stufen-/Shader-Blend (Fundament → Gerüst → fertig); in MS-1 sind MG und Rocket der Verteidigungsplattform als austauschbare Turm-Sub-Meshes aktiv, Flak bleibt Post-MVP.
 - **Luft:** Banking/Pitch aus Steuerkurve der Luft-Steering-Schicht (D-034), Schwebetrudeln im Idle; kein Rig.
 - **Evolvierte-Gebäude (D-011):** Keim → Reifung über Wachstums-Shader (Vertex-Displacement/Blend-Shapes, Wachstumsgrad 0–1 aus Sim-Reifestufe) statt Konstruktions-Stufen; Regenerations-Visualisierung als Pulsieren statt Reparatur-Funken.
+
+### Umsetzungsstand (2026-10-17, D-110)
+
+Die rig-lose Sparte ist in einer ersten, schlanken Form gebaut — ohne
+`AnimationSetSO` und ohne Animations-LOD; beides bleibt Ziel dieses Dokuments.
+
+- **`UnitRigAnimator`** (`Nova.Gameplay.Match`) hängt an jeder Art-Ansicht und
+  bewegt die vom Blender-Pass benannten Knoten: `Body` (Federung, bei Infanterie
+  Schritt-Wippen), `Turret` (Gier zum sichtbaren Angriffsziel, gedeckelte Rate),
+  `Gun` (Rückstoß), `Wheel_*`, `Arm_*`, `Spin_*`, `Scan_*`; Gebäude pulsieren über
+  ihre Emission, schneller beim Produzieren. Knoten-Vertrag und Werkzeuge:
+  [../assets/AssetPass_2026-10-17.md](../assets/AssetPass_2026-10-17.md).
+- **Eingaben** kommen aus `UnitViewManager` und sind reine View-Daten: gemessene
+  Geschwindigkeit und Drehrate der Ansicht, Zielposition nur aus einer
+  gebundenen (also sichtbaren) Zielansicht, Schuss aus dem `Shot`-Ereignis des
+  `VisibleCombatFrameDiffer`, Arbeitszustand aus Ernte, Baustellen-Zuweisung und
+  eigener Produktionsschlange.
+- **Abweichung von diesem Entwurf:** Die Turmrate ist ein View-Wert, nicht aus
+  der Sim gespiegelt — die Sim kennt keinen Turm. Infanterie hat noch kein
+  Mecanim-Rig. Der Emissionspuls schreibt wie die Fraktionstönung über
+  `MaterialPropertyBlock`.
 
 ## Animations-LOD (3 Stufen, Pflicht)
 
@@ -147,3 +168,4 @@ Der `RenderSnapshot` wird vom View-Adapter aus dem serialisierbaren Sim-State (D
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Graphics Engineer |
 | 0.2.0 | 2026-07-24 | MS-1-Animationsumfang, synthetischen 500er-Lasttest, CPU-P95-Budget und Unity-Pin gemäß D-056/D-058/D-060/D-061 festgelegt | Lead Graphics Engineer |
 | 0.2.1 | 2026-07-24 | MG/Rocket-Module als MS-1-Pflicht klargestellt und nur Flak zurückgestellt | Lead Graphics Engineer |
+| 0.3.0 | 2026-10-17 | Umsetzungsstand der rig-losen Sparte (D-110): `UnitRigAnimator`, Knoten-Vertrag, View-Eingaben und Abweichungen vom Entwurf | Technical Art |

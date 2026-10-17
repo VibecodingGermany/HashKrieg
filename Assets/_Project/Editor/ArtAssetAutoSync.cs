@@ -196,7 +196,20 @@ namespace Nova.Editor
                 importer.importTangents = ModelImporterTangents.CalculateMikk; // Mikktspace
                 importer.weldVertices = true;
                 importer.importAnimation = false; // animated assets opt in per asset
+                // Rigged meshes (tools/art/asset_pass.py) arrive as a node
+                // hierarchy whose Z-up -> Y-up conversion sits on the single
+                // "Root" node. Unity would collapse that root into the model
+                // object and drop its rotation with it - the model then lies
+                // on its side. Keeping the hierarchy keeps the rotation.
+                // (bakeAxisConversion is NOT an option: it turns the older
+                // single-mesh FBX by 180 degrees, so they drive backwards.)
+                importer.preserveHierarchy = true;
+                importer.bakeAxisConversion = false;  // set explicitly: a stale .meta value survives otherwise
             }
+
+            // Bumped whenever the presets above change, so Unity re-imports
+            // the art with them instead of keeping stale import results.
+            public override uint GetVersion() => 4;
 
             // docs/assets/ArtAssetStandard.md §4.2 — texture import preset.
             private void OnPreprocessTexture()

@@ -287,4 +287,5 @@ def build_hierarchy(A, parts, tpivot, gpivot):
     bpy.ops.export_scene.gltf(filepath=glb_out, export_format='GLB', use_selection=True)
     print("EXPORTED", glb_out)
 
-main()
+if __name__ == "__main__":
+    main()
