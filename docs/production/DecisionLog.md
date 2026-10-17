@@ -3588,6 +3588,13 @@ Mitte sind ausdrücklich nicht Teil dieser Entscheidung.
 **Status:** Inhaberentscheidung vom 2026-10-17. Die Nummern D-110 bis D-113 sind
 vom Asset-Pass auf `feat/generals-look-and-feel` belegt.
 
+**Statusvermerk (2026-10-17, D-127-Entwurf, Refs #101):** Berichtigt durch
+D-127. Der seitlich versetzte Sammelpunkt lag außerhalb des Commit-Rings der
+Welle; geflankte Persönlichkeiten griffen deshalb stückweise vor der vollen
+Welle an. Die Konsequenz „zwischen rund 2.000 und 3.000 Ticks“ unten maß diesen
+Defekt mit: Das untere Ende stammte von Flanke +10. Nach D-127 liegt dieselbe
+Matrix bei 2.208 bis 2.871 Ticks. Der Text unten bleibt unverändert stehen.
+
 **Kontext:** Jede lokale Partie gegen die KI lief identisch ab. Am Code geprüft
 (`main` @ `85c912b`), stapeln sich drei Ursachen:
 
@@ -3774,6 +3781,102 @@ Gemessen auf `a6858d1` mit diesem Stand, headless (`dotnet test`):
 - **Die KI nutzt weiter genau ein Feld.** Die Härtung zwingt jeden KI-Sammler
   auf das KI-Feld. Ein KI-Ausbau auf mehrere Felder (D-114, Stufe B) braucht
   dafür eine eigene Regel.
+
+### D-127 | Entwurf | KI-Strang (der Commit-Ring wächst um den Flankenversatz des Sammelpunkts)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (Refs #101); verbindlich
+mit dem Merge. Berichtigt eine Konsequenz aus D-114 per Statusvermerk dort.
+
+**Kontext:** D-114 verschiebt den Sammelpunkt je Persönlichkeit um −10, 0 oder
++10 Felder quer zur Linie zum Gegner. `SkirmishAiSystem.IsCommittedToTheWave`
+unterscheidet „sammelt noch“ von „ist schon ausgerückt“ über einen Ring um das
+eigene HQ, und der maß weiter `StagingDistanceCells + StagingToleranceCells`
+= 16 Felder. Der versetzte Sammelpunkt liegt auf der kanonischen Karte bei
+(117,97) bzw. (97,117), Chebyshev 22 vom HQ (119,119), also außerhalb. Jede
+Einheit, die dort ankam, galt als ausgerückt. Gemessen headless auf
+`dafc7db` (kanonischer Seed, Ausgewogen, Layout 0, passiver Gegner):
+
+- Flanke +10: 0 `Hold`, 171 `Attack`-Entscheidungen vor der ersten vollen
+  Welle (Tick 1.540), der erste Angriff bei Tick 1.120, bis zu 11 Einheiten
+  vor der ersten Welle als ausgerückt gezählt.
+- Flanke −10: 0 `Hold`, 91 `Attack`-Entscheidungen, erster Angriff bei
+  Tick 1.100.
+- Flanke 0 (Kontrolle): 177 `Hold`, erster Angriff mit der Welle bei Tick 1.540.
+
+Die Armee lief also stückweise los, lange bevor die Welle stand. `DefendHome`
+nimmt nur nicht ausgerückte Einheiten, fand am versetzten Sammelpunkt also
+niemanden. `AiPersonality.Derive` wählt die Flanke gleichverteilt; für Slot 1
+sind 2.000 von 3.000 geprüften Seeds geflankt. Jede Verteidigungsregel aus #101
+hätte in diesen Partien nur halb gegriffen. Der kanonische Seed
+(`MatchBootstrap.CanonicalSeed`) leitet Flanke 0 ab und ist nicht betroffen.
+
+**Alternativen:**
+
+1. **Den Ring um den Flankenbetrag erweitern**, weiter ab dem HQ gemessen:
+   `StagingDistanceCells + |FlankOffsetCells| + StagingToleranceCells`. Eine
+   Zeile, keine neue Profilzahl, die neutrale Persönlichkeit behält ihren Ring
+   von 16. Die Grenze ist beweisbar dicht: Der Versatz ist je Achse höchstens
+   `|flank| · max(|dx|,|dy|) / span = |flank|`, das Klemmen ins Raster zieht
+   nur zum HQ hin. Nachteil: Ein geflankter Ring ist 26 Felder groß. Eine
+   Einheit, die mit einer Welle losläuft, gilt etwas länger als „sammelnd“.
+   Das ist dieselbe Spanne von vier Feldern hinter dem Sammelpunkt wie
+   ungeflankt.
+2. **Relativ zum Sammelpunkt messen** (ausgerückt = weiter als die Toleranz vom
+   Sammelpunkt). Unabhängig von jeder Geometrie, aber genau die Fassung, die
+   der Docstring von `IsCommittedToTheWave` als gescheitert dokumentiert: Die
+   Formationsverteilung streut eine Gruppe über mehr als vier Felder, die
+   Zählung blieb unter der Wellengröße, und die Armee pendelte 11.000 Ticks
+   zwischen Basis und Sammelpunkt. Ein großzügigerer Radius um den Sammelpunkt
+   wäre eine neue, ungemessene Zahl und würde zwischen HQ und Sammelpunkt
+   stehende Einheiten (frisch produziert, auf dem Weg) als ausgerückt zählen.
+3. **Die Flanke begrenzen**, etwa auf ±4, damit der Sammelpunkt im Ring von 16
+   bleibt. Ändert D-114 inhaltlich (Abwechslung im Basisbild), verschiebt alle
+   geflankten Partien und koppelt zwei unabhängige Zahlen über eine stille
+   Ungleichung, die beim nächsten Profilwechsel wieder reißt.
+4. **Den Ring je Partie aus dem tatsächlichen Sammelpunkt ableiten**
+   (Chebyshev-Abstand Sammelpunkt–HQ plus Toleranz). Für die heutige Formel
+   gleichwertig zu 1, aber eine zweite Herleitung derselben Geometrie, die bei
+   geklemmten Randfällen leicht kleiner ausfällt. Ohne messbaren Gewinn
+   gegenüber 1.
+
+**Entscheidung:** Alternative 1.
+
+- `IsCommittedToTheWave` misst
+  `StagingDistanceCells + |Personality.FlankOffsetCells| + StagingToleranceCells`
+  ab der HQ-Zelle. Der Docstring nennt den Grund und die Schranke.
+- `AiBehaviorId` steigt auf r11. Der Profil-Hash bleibt (`1E6E7AE3`), weil
+  keine Zahl dazukommt.
+- `CanonicalAiOutcomeTests` bleibt unverändert: Die neutrale Persönlichkeit hat
+  Flanke 0 und spielt r10 Tick für Tick (gemessen: Tick 2.726, Endzustand
+  `0x7AF32DBA56E393E2` vor und nach der Änderung).
+
+**Begründung:** Der Defekt liegt nicht in der Wellenlogik, sondern darin, dass
+D-114 den Ort des Sammelns verschoben hat, ohne den Ring mitzunehmen. Die
+kleinste Korrektur nimmt ihn mit. Die HQ-Messung bleibt, weil sie das
+dokumentierte Pendeln verhindert, und keine Persönlichkeit verliert ihre
+Abwechslung. Nach der Änderung: Flanke ±10 erzeugt 159 bzw. 166 `Hold` und kein
+`Attack` vor Tick 1.540; ausgerückt gezählt wird vor der ersten Welle niemand.
+
+**Konsequenzen:**
+
+- **Geflankte Partien entscheiden anders.** In der Matrix aus
+  `AiPersonalityTests.EveryOpening_FlankAndFaction_FinishesTheMatch` (vier
+  Eröffnungen, beide Fraktionen, Layout 5, passiver Gegner) entschied Flanke +10
+  vorher 165 bis 458 Ticks *früher* als Flanke 0. Das war der stückweise
+  Angriff, der gegen einen wehrlosen Gegner schneller ist. Jetzt liegt jede
+  Flanke 11 bis 159 Ticks hinter Flanke 0 (längerer Weg über den Sammelpunkt).
+  Die Spanne über alle 24 Partien wandert von 1.987–2.982 auf 2.208–2.871 Ticks.
+- **D-114 wird per Statusvermerk berichtigt**, nicht umgeschrieben: Die
+  Konsequenz „zwischen rund 2.000 und 3.000 Ticks“ maß den Defekt mit.
+- **Mehr Verteidiger.** Weil wartende Einheiten am versetzten Sammelpunkt nicht
+  mehr als ausgerückt gelten, nimmt `DefendHome` sie bei einem Angriff auf das
+  HQ wieder mit. Das ist die Vorbedingung für die Feld- und Harvester-Regel aus
+  #101 (Paket P-101b).
+- **Nicht gespielt.** Belegt ist das headless gegen einen passiven Gegner. Wie
+  sich die volle Welle am versetzten Sammelpunkt gegen einen Menschen spielt,
+  ist offen.
+- **Kein eigenes GitHub-Issue** für den Defekt ohne Freigabe; der PR trägt
+  „Refs #101“.
 
 ## Offene Punkte
 

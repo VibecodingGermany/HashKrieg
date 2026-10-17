@@ -787,6 +787,189 @@ namespace Nova.SimRunner.Tests
             Assert.That(seen, Is.True, "the subject was never judged");
         }
 
+        // ================================================================
+        // The flanked staging cell (r11, #101, D-127)
+        //
+        // D-114 shifts the staging cell sideways by up to ten cells. The ring
+        // that tells "still gathering" from "already out" was measured from
+        // the headquarters with the UNSHIFTED distance, so the shifted cell
+        // fell outside it: every unit that arrived there counted as committed,
+        // no unit was ever told to hold, and the army walked off piecemeal
+        // long before its wave was full — in two of three menu matches.
+        // ================================================================
+
+        /// <summary>
+        /// THE FLANKED STAGING CELL IS INSIDE THE RING. A unit that arrives
+        /// there is reported under <see cref="GoalKind.Hold"/>, and until the
+        /// first wave marches no unit counts as already out.
+        /// <para>
+        /// The first assertion is the precondition, not decoration: it proves
+        /// the scene puts the staging cell past the unflanked ring, which is
+        /// exactly the geometry of #101. Without it the test could pass on a
+        /// map where the flank happens not to matter.
+        /// </para>
+        /// </summary>
+        [TestCase(10)]
+        [TestCase(-10)]
+        public void FlankedStagingCellIsInsideTheRing_AndProducesHold(int flank)
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = FlankedHost(flank, observer, out int hqX, out int hqY);
+            uint firstWave = RunToFirstWave(host, observer);
+            Assert.That(firstWave, Is.Not.Zero, $"flank {flank}: the first wave never marched");
+
+            AiArmyGoal army = FirstEngagingArmy(observer);
+            int stagingDistance = Math.Max(Math.Abs(army.StagingCellX - hqX), Math.Abs(army.StagingCellY - hqY));
+            Assert.That(stagingDistance, Is.GreaterThan(shipped.StagingDistanceCells + shipped.StagingToleranceCells),
+                $"flank {flank}: the staging cell ({army.StagingCellX},{army.StagingCellY}) is inside the "
+                + "unflanked ring, so this scene does not reproduce #101");
+            Assert.That(stagingDistance, Is.LessThanOrEqualTo(shipped.StagingDistanceCells + Math.Abs(flank)),
+                $"flank {flank}: the flank moved the staging cell further than its own size");
+
+            int holds = 0;
+            for (int i = 0; i < observer.Army.Count; i++)
+            {
+                if (observer.Army[i].Tick >= firstWave || !observer.Army[i].Goal.Engages) continue;
+                Assert.That(observer.Army[i].Goal.Committed, Is.Zero,
+                    $"flank {flank}, tick {observer.Army[i].Tick}: {observer.Army[i].Goal.Committed} unit(s) "
+                    + "counted as already out before any wave marched — the flanked staging cell lies "
+                    + "outside the commit ring");
+            }
+            for (int i = 0; i < observer.Units.Count; i++)
+            {
+                if (observer.Units[i].Tick < firstWave && observer.Units[i].Goal.Goal == GoalKind.Hold) holds++;
+            }
+            Assert.That(holds, Is.GreaterThan(0),
+                $"flank {flank}: not one unit was told to hold at the staging cell before the first wave");
+        }
+
+        /// <summary>
+        /// NO ATTACK BEFORE THE WAVE IS READY. Before the first wave marches,
+        /// every unit gathers; the first <see cref="GoalKind.Attack"/> is the
+        /// wave itself. Flank 0 runs as the control: the unflanked cell was
+        /// always inside the ring and must stay that way.
+        /// </summary>
+        [TestCase(10)]
+        [TestCase(-10)]
+        [TestCase(0)]
+        public void NoAttackBeforeWaveReady_WhenFlanked(int flank)
+        {
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = FlankedHost(flank, observer, out _, out _);
+            uint firstWave = RunToFirstWave(host, observer);
+            Assert.That(firstWave, Is.Not.Zero, $"flank {flank}: the first wave never marched");
+
+            int attacksAtTheWave = 0;
+            for (int i = 0; i < observer.Units.Count; i++)
+            {
+                UnitEntry entry = observer.Units[i];
+                if (entry.Goal.Goal != GoalKind.Attack) continue;
+                Assert.That(entry.Tick, Is.GreaterThanOrEqualTo(firstWave),
+                    $"flank {flank}: unit {entry.Goal.EntityRaw} was sent to attack at tick {entry.Tick}, "
+                    + $"before the first wave was ready at tick {firstWave}");
+                if (entry.Tick == firstWave) attacksAtTheWave++;
+            }
+            Assert.That(attacksAtTheWave, Is.GreaterThan(0),
+                $"flank {flank}: the wave was reported ready at tick {firstWave} and nobody marched");
+        }
+
+        /// <summary>
+        /// THE GATHERERS AT A FLANKED STAGING CELL STILL DEFEND THE BASE.
+        /// This is what the ring is for beyond the wave: <c>DefendHome</c>
+        /// only takes units that are not committed, so a staging cell outside
+        /// the ring sent every waiting unit to the ENEMY when the own
+        /// headquarters came under attack.
+        /// </summary>
+        [TestCase(10)]
+        [TestCase(-10)]
+        public void FlankedGatherersStillBreakOffToDefendTheBase(int flank)
+        {
+            AiProfile shipped = AiProfiles.Ms1Canonical;
+            var observer = new RecordingObserver();
+            SkirmishAiTests.AiHost host = FlankedHost(flank, observer, out int hqX, out int hqY);
+
+            // Forward to the first unit standing at the staging cell, while
+            // the wave is still gathering.
+            int budget = SkirmishAiTests.EndToEndBudgetTicks;
+            bool holding = false;
+            while (budget-- > 0 && !holding)
+            {
+                host.Step();
+                for (int i = observer.Units.Count - 1; i >= 0 && !holding; i--)
+                {
+                    if (observer.Units[i].Goal.Goal == GoalKind.Hold) holding = true;
+                }
+                Assert.That(AnyWaveReady(observer), Is.False,
+                    $"flank {flank}: the wave marched before anybody held, so there is nothing to break off");
+            }
+            Assert.That(holding, Is.True, $"flank {flank}: no unit ever held at the staging cell");
+            Assert.That(CountCombatUnits(host, AiSlot), Is.GreaterThanOrEqualTo(shipped.AttackSquadThreshold),
+                $"flank {flank}: the army is under its squad threshold, so no goal is handed out at all");
+
+            SpawnEnemyInfantry(host, hqX + 2, hqY);
+            int before = observer.Units.Count;
+            RunToNextDecision(host);
+
+            int defenders = 0;
+            for (int i = before; i < observer.Units.Count; i++)
+            {
+                AiUnitGoal goal = observer.Units[i].Goal;
+                Assert.That(goal.Goal, Is.Not.EqualTo(GoalKind.Attack),
+                    $"flank {flank}: unit {goal.EntityRaw} marched on the enemy while its own base was "
+                    + "under attack and no wave had left");
+                if (goal.Goal == GoalKind.DefendHome) defenders++;
+            }
+            Assert.That(defenders, Is.GreaterThan(0),
+                $"flank {flank}: the headquarters is under attack and not one gatherer broke off");
+        }
+
+        /// <summary>The canonical match with a Balanced personality whose only deviation is the flank.</summary>
+        private static SkirmishAiTests.AiHost FlankedHost(
+            int flank, RecordingObserver observer, out int hqX, out int hqY)
+        {
+            AiPersonality personality = AiPersonality.Create(AiOpening.Balanced, flank, layoutVariant: 0);
+            SkirmishAiTests.AiHost host = SkirmishAiTests.BuildMatch(
+                SkirmishAiTests.Seed, goalObserver: observer, personality: personality);
+            Assert.That(TryHqCell(host, AiSlot, out hqX, out hqY), Is.True);
+            return host;
+        }
+
+        /// <summary>Steps until the army reports its first ready wave; returns that tick (0 = never).</summary>
+        private static uint RunToFirstWave(SkirmishAiTests.AiHost host, RecordingObserver observer)
+        {
+            int budget = SkirmishAiTests.EndToEndBudgetTicks;
+            while (budget-- > 0 && !host.Victory.IsDecided)
+            {
+                host.Step();
+                for (int i = observer.Army.Count - 1; i >= 0; i--)
+                {
+                    AiArmyGoal army = observer.Army[i].Goal;
+                    if (army.Engages && army.WaveReady) return observer.Army[i].Tick;
+                }
+            }
+            return 0;
+        }
+
+        private static bool AnyWaveReady(RecordingObserver observer)
+        {
+            for (int i = 0; i < observer.Army.Count; i++)
+            {
+                if (observer.Army[i].Goal.Engages && observer.Army[i].Goal.WaveReady) return true;
+            }
+            return false;
+        }
+
+        private static AiArmyGoal FirstEngagingArmy(RecordingObserver observer)
+        {
+            for (int i = 0; i < observer.Army.Count; i++)
+            {
+                if (observer.Army[i].Goal.Engages && observer.Army[i].Goal.StagingCellX >= 0) return observer.Army[i].Goal;
+            }
+            Assert.Fail("the army never engaged with a resolved staging cell");
+            return default;
+        }
+
         // ----------------------------------------------------------------
         // Deterministic read helpers (ascending entity index)
         // ----------------------------------------------------------------
