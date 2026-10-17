@@ -47,14 +47,20 @@ namespace Nova.SimRunner.Tests
         private const uint PinnedDecidedTick = 2726u;
 
         /// <summary>
-        /// End-state hash of the canonical AI match, last moved by: Sprint 16
-        /// package 16.9 / D-104 and D-107. The footprint placement rules and
-        /// corrected mirrored HQ geometry move the simulated match without
-        /// changing the AI implementation.
-        /// AiBehaviorId is r7.E34435F9.
-        /// Previous value: 0x28F2CC571BCE6B76 (Sprint 16.8).
+        /// End-state hash of the canonical AI match, last moved by #134
+        /// (D-121): a produced Harvester is born with a harvest order on the
+        /// nearest field to its Refinery. That is a production change under
+        /// the AI; the decided tick (2726) did not move. The same PR bumps the
+        /// AI to r10 (re-tasking harvesters ordered onto a foreign field), and
+        /// the hash was measured both ways on the same head: production change
+        /// alone and production change plus r10 both give this value — r10 is
+        /// not what moved it.
+        /// AiBehaviorId is r10.1E6E7AE3.
+        /// Previous value: 0x4A861D9FA2E57C6F (Sprint 16.9 / D-104 and D-107,
+        /// footprint placement rules and corrected mirrored HQ geometry).
+        /// Before that: 0x28F2CC571BCE6B76 (Sprint 16.8).
         /// </summary>
-        private const string PinnedEndState = "0x4A861D9FA2E57C6F";
+        private const string PinnedEndState = "0x7AF32DBA56E393E2";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()

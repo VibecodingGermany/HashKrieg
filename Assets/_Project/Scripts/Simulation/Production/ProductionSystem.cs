@@ -62,6 +62,17 @@ namespace Nova.Simulation.Production
     /// order to the rally cell (a direct <c>SetTarget</c> write, the same
     /// write class as the construction push-out's — no command record, no
     /// new command kind; movement then drives the walk).
+    /// A produced Harvester is additionally BORN HARVESTING (#134, D-121):
+    /// the same tick it spawns, its standing harvest order is set to
+    /// <see cref="EconomySystem.TryFindNearestField"/> measured from the
+    /// producer's footprint centre cell — the identical rule and anchor
+    /// the founding grant (#43) uses, integer Chebyshev distance, exhausted
+    /// fields skipped, ties to the lower registration index. Same write
+    /// class as the rally order (direct <c>HarvestFieldId</c> write, no
+    /// command record). It is a birth order only: nothing re-assigns it
+    /// later, so Stop and Harvest stay the player's. With no field holding
+    /// reserve the Harvester is born without an order and production
+    /// continues unchanged.
     /// When no free cell exists inside the search range or the entity store
     /// is full (MS-1 cap 1.024, mvp-v1.json capacity.entityStoreCap), the
     /// finished unit waits: progress stays clamped at the threshold and the
@@ -368,7 +379,8 @@ namespace Nova.Simulation.Production
         /// refund), then progresses every producer's first entry by the
         /// owner's exact Q16.16 speed multiplier and spawns finished units at
         /// the building's footprint with a standing move order to the rally
-        /// point — in strict ascending row order.
+        /// point (a Harvester also with its birth harvest order, #134) — in
+        /// strict ascending row order.
         /// </summary>
         public void ExecuteTick(Tick tick)
         {
@@ -427,6 +439,22 @@ namespace Nova.Simulation.Production
                     if (rallyCellX != cellX || rallyCellY != cellY)
                     {
                         _entityManager.GetUnitRef(spawned).SetTarget(new GridPos2D(rallyCellX, rallyCellY));
+                    }
+
+                    // #134 (D-121): a produced Harvester is born harvesting,
+                    // mirroring the founding grant (#43). Same field rule,
+                    // same anchor: the nearest field with reserve left to
+                    // the producer's footprint centre cell (ties to the lower
+                    // registration index). Without such a field it stays
+                    // unassigned; the rally order above is kept either way.
+                    if (def.Role == UnitRole.Harvester)
+                    {
+                        int centreX = Math.Max(0, SimFixed.WorldToGrid(building.Transform.PositionX));
+                        int centreY = Math.Max(0, SimFixed.WorldToGrid(building.Transform.PositionY));
+                        if (_economy.TryFindNearestField(centreX, centreY, out ushort fieldId))
+                        {
+                            _entityManager.GetUnitRef(spawned).HarvestFieldId = fieldId;
+                        }
                     }
 
                     entry.RemainingCount--;

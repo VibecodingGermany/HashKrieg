@@ -5,6 +5,7 @@ using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
 using Nova.Simulation.Economy;
+using Nova.Simulation.Pathfinding;
 using Nova.Simulation.Production;
 using Nova.Simulation.Snapshots;
 using Nova.Simulation.State;
@@ -15,7 +16,8 @@ namespace Nova.Simulation.Tests
     /// Canonical production suite (EditMode lane): QueueUnit cost and validation
     /// (producer assignment, T2 gating, queue capacity, count-scaled
     /// affordability), exact Q16.16 progress with the low-power halving,
-    /// deterministic rally-point spawning, CancelProduction refunds, the
+    /// deterministic rally-point spawning, the Harvester born with a harvest
+    /// order (#134, D-121), CancelProduction refunds, the
     /// entity-store-cap pause and the snapshot block 106 v1 contract. All
     /// values are documented Q-040 provisionals of SimDefinitions. MS-1 has
     /// no research tree: the retired ResearchTreeSystem scaffolding is
@@ -70,6 +72,41 @@ namespace Nova.Simulation.Tests
             public void Step(int ticks)
             {
                 for (int i = 0; i < ticks; i++) Kernel.StepTick();
+            }
+
+            /// <summary>
+            /// Places a completed HQ at (40,40) — power for the Refinery's 20
+            /// draw and the storage room a harvest needs — and a completed
+            /// Alliance Refinery at origin (20,20), and returns the Refinery's
+            /// raw wire id. Footprint (20,20)-(22,22), centre cell (21,21),
+            /// default rally (23,21), first spawn cell (19,19) (#134).
+            /// </summary>
+            public uint SpawnRefinery(byte slot)
+            {
+                Assert.That(Construction.PlaceCompletedBuilding(slot, 3, 40, 40).IsValid, Is.True, "HQ");
+                EntityId id = Construction.PlaceCompletedBuilding(slot, 4, 20, 20);
+                Assert.That(id.IsValid, Is.True, "Refinery");
+                return UnitCommandStateView.ToRawEntityId(id);
+            }
+
+            /// <summary>
+            /// Drains a reserve-1 field through a temporary harvester standing
+            /// on it, then removes that harvester again — the field stays
+            /// registered but exhausted. Needs the HQ's storage room
+            /// (<see cref="SpawnRefinery"/> first), or the gather is held.
+            /// </summary>
+            public void ExhaustField(ushort fieldId, int cellX, int cellY)
+            {
+                EntityId drain = Entities.SpawnUnit(
+                    0,
+                    new Transform2D(SimFixed.FromInt(cellX), SimFixed.FromInt(cellY)),
+                    SimFixed.FromInt(2),
+                    role: UnitRole.Harvester);
+                Entities.GetUnitRef(drain).HarvestFieldId = fieldId;
+                Step(1);
+                Assert.That(Economy.TryGetField(fieldId, out AetheriumField field) && field.IsExhausted, Is.True,
+                    $"field {fieldId} must be exhausted before the test proper");
+                Assert.That(Entities.DespawnUnit(drain), Is.True);
             }
         }
 
@@ -475,6 +512,129 @@ namespace Nova.Simulation.Tests
                 "Legion slot, Legion BasicInfantry is legal");
             Assert.That(f.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(1000L), "rejections charge nothing");
             Assert.That(f.Economy.GetPlayerEconomy(1).AetheriumCredits, Is.EqualTo(1000L));
+        }
+
+        // ------------------------------------------------------------------
+        // #134 (D-121): a produced Harvester is born harvesting
+        // ------------------------------------------------------------------
+
+        [Test]
+        public void ProducedHarvester_IsBornWithAnOrderOnTheNearestFieldWithReserve()
+        {
+            // Measured from the Refinery's footprint centre (21,21), the same
+            // anchor and rule as the founding grant (#43): field 1 is
+            // registered first but lies 39 cells away, field 2 at Chebyshev 6,
+            // field 3 at 9.
+            var f = new Fixture(configure: e =>
+            {
+                Assert.That(e.TryAddField(1, new GridPos2D(60, 60), 9000), Is.True);
+                Assert.That(e.TryAddField(2, new GridPos2D(21, 27), 9000), Is.True);
+                Assert.That(e.TryAddField(3, new GridPos2D(30, 21), 9000), Is.True);
+            });
+            uint refinery = f.SpawnRefinery(0);
+            Assert.That(f.Production.TryQueueUnit(0, refinery, 2, 1), Is.True, "Alliance Harvester (def 2, 700 AE)");
+
+            f.Step(249);
+            Assert.That(CountRole(f, UnitRole.Harvester), Is.EqualTo(0), "one tick short of 250");
+            f.Step(1);
+            Assert.That(CountRole(f, UnitRole.Harvester), Is.EqualTo(1), "spawned after exactly 250 full-power ticks");
+
+            ref readonly UnitState harvester = ref f.Entities.GetUnitRef(FindRole(f, UnitRole.Harvester));
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo((ushort)2),
+                "born with a standing harvest order on the nearest field with reserve — no Harvest command needed");
+            Assert.That(harvester.IsReturningCargo, Is.False);
+            Assert.That(harvester.IsMoving, Is.True, "the rally order is kept: the harvester still walks out first");
+            Assert.That(harvester.GoalGridPos.X, Is.EqualTo(23), "default rally two cells east of the centre cell");
+            Assert.That(harvester.GoalGridPos.Y, Is.EqualTo(21));
+        }
+
+        [Test]
+        public void ProducedHarvester_FieldTie_ResolvesToTheLowerRegistrationIndex()
+        {
+            // Both fields sit at Chebyshev 6 from the centre cell (21,21).
+            // Field 7 is registered FIRST: the tie goes to the registration
+            // index, not to the smaller id.
+            var f = new Fixture(configure: e =>
+            {
+                Assert.That(e.TryAddField(7, new GridPos2D(27, 21), 9000), Is.True);
+                Assert.That(e.TryAddField(4, new GridPos2D(21, 27), 9000), Is.True);
+            });
+            uint refinery = f.SpawnRefinery(0);
+            Assert.That(f.Production.TryQueueUnit(0, refinery, 2, 1), Is.True);
+
+            f.Step(250);
+
+            ref readonly UnitState harvester = ref f.Entities.GetUnitRef(FindRole(f, UnitRole.Harvester));
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo((ushort)7),
+                "a distance tie resolves to the lower registration index (EconomySystem.TryFindNearestField)");
+        }
+
+        [Test]
+        public void ProducedHarvester_SkipsAnExhaustedField()
+        {
+            // Field 1 is the nearest (Chebyshev 4) but exhausted; field 2
+            // (Chebyshev 9) still holds reserve and wins.
+            var f = new Fixture(configure: e =>
+            {
+                Assert.That(e.TryAddField(1, new GridPos2D(21, 25), 1), Is.True);
+                Assert.That(e.TryAddField(2, new GridPos2D(30, 30), 9000), Is.True);
+            });
+            uint refinery = f.SpawnRefinery(0);
+            f.ExhaustField(1, 21, 25);
+            Assert.That(f.Production.TryQueueUnit(0, refinery, 2, 1), Is.True);
+
+            f.Step(250);
+
+            ref readonly UnitState harvester = ref f.Entities.GetUnitRef(FindRole(f, UnitRole.Harvester));
+            Assert.That(harvester.HarvestFieldId, Is.EqualTo((ushort)2),
+                "an exhausted field is never handed out — its order would resolve on the first tick");
+        }
+
+        [Test]
+        public void ProducedHarvester_WithoutAFieldWithReserve_IsBornWithoutAnOrder_AndTheQueueRuns()
+        {
+            var f = new Fixture(startingCredits: 1500, configure: e =>
+            {
+                Assert.That(e.TryAddField(1, new GridPos2D(21, 25), 1), Is.True);
+            });
+            uint refinery = f.SpawnRefinery(0);
+            f.ExhaustField(1, 21, 25);
+            Assert.That(f.Production.TryQueueUnit(0, refinery, 2, 2), Is.True, "two Harvesters, 1.400 AE");
+
+            f.Step(500);
+
+            Assert.That(CountRole(f, UnitRole.Harvester), Is.EqualTo(2),
+                "a missing field never holds production up");
+            Assert.That(f.Production.TotalQueuedUnits, Is.EqualTo(0));
+            UnitState[] units = f.Entities.RawUnits;
+            for (int i = 0; i < f.Entities.Capacity; i++)
+            {
+                if (!units[i].IsActive || units[i].Role != UnitRole.Harvester) continue;
+                Assert.That(units[i].HarvestFieldId, Is.EqualTo((ushort)0),
+                    "only exhausted fields remain: the harvester is born without an order");
+                Assert.That(units[i].GoalGridPos.X, Is.EqualTo(23), "the rally order is issued all the same");
+                Assert.That(units[i].GoalGridPos.Y, Is.EqualTo(21));
+            }
+        }
+
+        [Test]
+        public void ProducedInfantry_GetsNoFieldOrder_AndKeepsItsRallyOrder()
+        {
+            var f = new Fixture(configure: e =>
+            {
+                Assert.That(e.TryAddField(1, new GridPos2D(11, 14), 9000), Is.True);
+            });
+            uint barracks = f.SpawnBarracks(0); // centre (11,11) -> default rally (13,11)
+            Assert.That(f.Production.TryQueueUnit(0, barracks, 12, 1), Is.True);
+
+            f.Step(100);
+
+            ref readonly UnitState infantry = ref f.Entities.GetUnitRef(FindRole(f, UnitRole.BasicInfantry));
+            Assert.That(infantry.HarvestFieldId, Is.EqualTo((ushort)0),
+                "the birth order is the Harvester's alone, even with a field three cells away");
+            Assert.That(infantry.IsMoving, Is.True);
+            Assert.That(infantry.GoalGridPos.X, Is.EqualTo(13));
+            Assert.That(infantry.GoalGridPos.Y, Is.EqualTo(11));
         }
 
         private static int CountRole(Fixture f, UnitRole role)

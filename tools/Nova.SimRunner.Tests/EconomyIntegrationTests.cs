@@ -7,6 +7,7 @@ using Nova.Simulation.Construction;
 using Nova.Simulation.Economy;
 using Nova.Simulation.Movement;
 using Nova.Simulation.Pathfinding;
+using Nova.Simulation.Production;
 using Nova.Simulation.Replays;
 using Nova.Simulation.State;
 using Nova.Simulation.Vision;
@@ -19,7 +20,8 @@ namespace Nova.SimRunner.Tests
     /// (economy registered BEFORE movement — SimulationCore.md section 2,
     /// phases 2/3 before 6), two-kernel determinism, hash sensitivity,
     /// snapshot continuation and replay playback with economy orders, plus
-    /// the low-power transition through a combat kill.
+    /// the low-power transition through a combat kill, and the produced
+    /// Harvester born harvesting (#134, D-121).
     /// Mirror of the EditMode lane EconomyIntegrationTests.
     /// </summary>
     [TestFixture]
@@ -78,6 +80,43 @@ namespace Nova.SimRunner.Tests
                 var ingress = new CommandIngress(session);
                 _ = new LocalLoopbackTransport(ingress);
                 kernel.BindCommands(new UnitCommandStateView(entities, pathfinding, economy), ingress);
+
+                kernel.Start();
+                return new EcoHost(kernel, entities, economy, construction, session, ingress);
+            }
+
+            /// <summary>
+            /// The same canonical host with construction and production wired
+            /// in (#134): economy, then construction and production (phases
+            /// 2/3 before 4/5 before 6), and a command view that resolves
+            /// QueueUnit — the wiring of
+            /// <c>ProductionConstructionIntegrationTests</c>.
+            /// </summary>
+            public static EcoHost CreateWithProduction(ulong seed, int capacity = 256, ushort width = 64, ushort height = 64)
+            {
+                var entities = new EntityManager(capacity);
+                var pathfinding = new PathfindingSystem(width, height);
+                var movement = new MovementSystem(entities, pathfinding);
+                var economy = new EconomySystem(entities);
+                var construction = new ConstructionSystem(entities, economy, pathfinding.CostField);
+                var production = new ProductionSystem(entities, economy, construction);
+                var fogOfWar = new FogOfWarSystem(entities, construction, economy, teamCount: 2, width, height);
+                var combat = new CombatSystem(entities, fogOfWar, economy, construction);
+
+                var kernel = new SimulationKernel(new SimRandom(seed));
+                kernel.RegisterSystem(economy);
+                kernel.RegisterSystem(construction);
+                kernel.RegisterSystem(production);
+                kernel.RegisterSystem(pathfinding);
+                kernel.RegisterSystem(movement);
+                kernel.RegisterSystem(fogOfWar);
+                kernel.RegisterSystem(combat);
+
+                var session = new MatchSession(localSlot: 0, activeSlots: new byte[] { 0, 1 }, inputDelayTicks: 1);
+                var ingress = new CommandIngress(session);
+                _ = new LocalLoopbackTransport(ingress);
+                kernel.BindCommands(
+                    new UnitCommandStateView(entities, pathfinding, economy, construction, production), ingress);
 
                 kernel.Start();
                 return new EcoHost(kernel, entities, economy, construction, session, ingress);
@@ -540,6 +579,112 @@ namespace Nova.SimRunner.Tests
                 Is.True, () => $"playback failed: {error} ({detail})");
             Assert.That(playback.Kernel.CalculateStateHash(), Is.EqualTo(endHash),
                 "playback re-executes the rejections to the identical results and end state hash");
+        }
+
+        // ------------------------------------------------------------------
+        // #134 (D-121): a produced Harvester is born harvesting
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Completed HQ (power and storage) at (40,40), completed Alliance
+        /// Refinery at origin (20,20) — footprint (20,20)-(22,22), centre
+        /// (21,21), default rally (23,21), in deposit reach of the footprint —
+        /// and one field at (24,22), in harvest reach of that rally cell. Then
+        /// one Harvester is queued through the sealed command path. Returns
+        /// the Refinery's raw id.
+        /// </summary>
+        private static uint SetUpRefineryAndQueueOneHarvester(EcoHost host)
+        {
+            Assert.That(host.Construction.PlaceCompletedBuilding(0, 3, 40, 40).IsValid, Is.True, "HQ");
+            EntityId refinery = host.Construction.PlaceCompletedBuilding(0, 4, 20, 20);
+            Assert.That(refinery.IsValid, Is.True, "Refinery");
+            Assert.That(host.Economy.TryAddField(1, new GridPos2D(24, 22), 9000), Is.True);
+            uint refineryRaw = UnitCommandStateView.ToRawEntityId(refinery);
+            Assert.That(
+                host.Ingress.TrySubmitIntent(CommandIntent.Create(new QueueUnitPayload(refineryRaw, 2, 1)), out _),
+                Is.EqualTo(CommandIngressResult.Accepted));
+            return refineryRaw;
+        }
+
+        private static bool TryFindHarvester(EcoHost host, out EntityId harvester)
+        {
+            UnitState[] units = host.Entities.RawUnits;
+            for (int i = 0; i < host.Entities.Capacity; i++)
+            {
+                if (units[i].IsActive && units[i].PlayerId == 0 && units[i].Role == UnitRole.Harvester)
+                {
+                    harvester = units[i].Id;
+                    return true;
+                }
+            }
+            harvester = EntityId.Invalid;
+            return false;
+        }
+
+        [Test]
+        public void ProducedHarvester_DeliversCredits_WithoutAnyHarvestCommand()
+        {
+            var host = EcoHost.CreateWithProduction(Seed);
+            SetUpRefineryAndQueueOneHarvester(host);
+
+            int recordsSealed = 0;
+            bool charged = false;
+            long credits = 0;
+            for (int tick = 0; tick < 1500; tick++)
+            {
+                recordsSealed += host.StepTick().Count;
+                credits = host.Economy.GetPlayerEconomy(0).AetheriumCredits;
+                if (credits == 300L) charged = true;
+                if (charged && credits > 300L) break;
+            }
+
+            Assert.That(charged, Is.True, "the QueueUnit charged the Harvester's 700 AE");
+            Assert.That(recordsSealed, Is.EqualTo(1),
+                "the QueueUnit is the only command of the whole run — no Harvest, no Move");
+            Assert.That(credits, Is.EqualTo(300L + 330L),
+                "1.000 - 700 for the Harvester, then one full Alliance cargo of 330 AE banked");
+            Assert.That(TryFindHarvester(host, out EntityId harvester), Is.True);
+            Assert.That(host.Entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)1),
+                "the birth order is retained through the auto-cycle");
+            Assert.That(host.Economy.TryGetField(1, out AetheriumField field), Is.True);
+            Assert.That(field.RemainingAE, Is.LessThanOrEqualTo(9000L - 330L));
+        }
+
+        [Test]
+        public void Stop_OnAProducedHarvester_ClearsTheBirthOrder_AndNothingReassignsIt()
+        {
+            var host = EcoHost.CreateWithProduction(Seed);
+            SetUpRefineryAndQueueOneHarvester(host);
+
+            EntityId harvester = EntityId.Invalid;
+            for (int tick = 0; tick < 400 && !harvester.IsValid; tick++)
+            {
+                host.StepTick();
+                TryFindHarvester(host, out harvester);
+            }
+            Assert.That(harvester.IsValid, Is.True, "the Refinery produced its Harvester");
+            Assert.That(host.Entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)1),
+                "born with the order");
+
+            uint raw = UnitCommandStateView.ToRawEntityId(harvester);
+            Assert.That(
+                host.Ingress.TrySubmitIntent(CommandIntent.Create(new StopPayload(new[] { raw })), out _),
+                Is.EqualTo(CommandIngressResult.Accepted));
+            host.StepTick();
+            host.StepTick();
+            Assert.That(host.Entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)0),
+                "Stop cancels the birth order like any other standing order");
+
+            long credits = host.Economy.GetPlayerEconomy(0).AetheriumCredits;
+            for (int tick = 0; tick < 600; tick++)
+            {
+                host.StepTick();
+                Assert.That(host.Entities.GetUnitRef(harvester).HarvestFieldId, Is.EqualTo((ushort)0),
+                    $"nothing re-assigns a stopped harvester (tick {host.Kernel.CurrentTick.Value}) — the order is a birth order only");
+            }
+            Assert.That(host.Entities.GetUnitRef(harvester).CargoAE, Is.EqualTo(0));
+            Assert.That(host.Economy.GetPlayerEconomy(0).AetheriumCredits, Is.EqualTo(credits),
+                "a stopped harvester earns nothing until the player orders it again");
         }
     }
 }

@@ -3662,6 +3662,119 @@ berührt.
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
 
+### D-121 | Entwurf | Wirtschaft (ein produzierter Sammler wird mit Ernteauftrag geboren)
+
+**Status:** Entwurf aus dem Issue-Lauf vom 2026-10-17 (#134); verbindlich mit
+dem Merge des PR.
+
+**Kontext:** Seit #43 bekommt der Gründungs-Sammler beim Fertigstellen der
+Raffinerie einen Ernteauftrag (`ConstructionSystem.GrantFoundingHarvester`):
+das nächste Feld mit Restbestand, gemessen ab dem Footprint-Zentrum der
+Raffinerie (`EconomySystem.TryFindNearestField`). Jeder weitere, in der
+Raffinerie produzierte Sammler bekam keinen. `ProductionSystem` setzte nur das
+Sammelpunkt-Ziel, `HarvestFieldId` blieb 0. Der Sammler stand am Sammelpunkt,
+bis der Spieler `H` drückte, ohne Hinweis und ohne Eskorte, weil die
+Client-Eskorte nur Sammler mit Feldauftrag begleitet. Die KI hatte das Problem
+nicht: Sie schickt untätige Sammler selbst aufs eigene Feld. Benachteiligt war
+nur der Mensch. Der Testbericht T-01 erwartet, dass ein Sammler sammelt, sobald
+Aetherium in seiner Reichweite liegt.
+
+Am Code nachgeprüft (`main` @ `a6858d1`) kam ein zweiter Befund dazu: Die KI
+wählt ihr Feld anders (nächstes Feld zum HQ, `TryGetOwnFieldCell`) als
+Produktion und Gründung (nächstes Feld zur Raffinerie). Wo beide Regeln
+auseinanderlaufen, führte die Sammel-Eskorte der KI den Sammler zum KI-Feld,
+sein Auftrag nannte aber das andere. Die Wirtschaft hält einen Auftrag außer
+Reichweite, statt ihn zu verwerfen. Der Sammler stand dann für den Rest der
+Partie mit eingefrorener Ladung. Über den Gründungs-Sammler war das schon auf
+`main` möglich.
+
+**Alternativen:**
+
+1. **Simulation: der Sammler wird mit Auftrag geboren.** `ProductionSystem`
+   setzt beim Spawn `HarvestFieldId` nach derselben Regel wie die Gründung.
+   Gilt gleich für Mensch, KI, Netzpartie und Replay, braucht keinen neuen
+   Befehl und kein neues Snapshot-Feld. Kosten: Das Simulationsverhalten ändert
+   sich, ein KI-Pin wandert, und ein neuer Build für alle Tester ist nötig.
+2. **Client-Weg: die Eskorte erteilt einmalig einen Harvest-Befehl.** Schon
+   gebaut im Commit `73f54b5` auf `feat/generals-look-and-feel`
+   (`_autoAssignedHarvesters` in `RtsDeviceInput.cs`). Ein lokaler Sammler ohne
+   Auftrag bekommt nach Ende seiner Bewegung einen normalen Harvest-Befehl, auf
+   das nächste Feld ab seiner eigenen Position (Gleitkomma, euklidisch). Keine
+   Simulationsänderung, aber: wirkt nur für den lokalen Menschen, die Merker
+   gehen bei Neustart oder Restore verloren, die Feldregel ist eine dritte neben
+   Gründung und KI, und es gibt keinen CI-Nachweis, weil Unity-Tests in keiner
+   CI laufen. Das Verhalten hinge am Client statt an der Simulation, im
+   Widerspruch zum Gründungsfall. Der CHANGELOG-Eintrag des Commits nennt die
+   Änderung nicht.
+3. **Gewollt lassen und den Hinweis nachliefern:** kein Automatismus, dafür
+   eine Anzeige „N Sammler ohne Auftrag (H)“ und eine Leerlauftaste. Erklärt
+   die Lücke, statt sie zu schließen, und der Mensch bleibt gegenüber der KI im
+   Nachteil.
+4. **Wie 1, aber die Feldwahl auf den Raffinerie-Umkreis begrenzen.** Ohne Feld
+   in der Nähe bliebe der Sammler untätig. Näher an der Formulierung von T-01,
+   aber eine zweite Regel neben der Gründung, und sie ist nicht gemessen.
+
+**Entscheidung:** Alternative 1.
+
+- `ProductionSystem.ExecuteTick` setzt einem produzierten Sammler im
+  Spawn-Tick `HarvestFieldId` auf `EconomySystem.TryFindNearestField`, ab der
+  Zentrumszelle des Erzeugers (Footprint-Zentrum der Raffinerie). Ganzzahlige
+  Chebyshev-Distanz, erschöpfte Felder übersprungen, Gleichstand zum
+  niedrigeren Registrierungsindex: dieselbe Regel und derselbe Anker wie die
+  Gründung (#43).
+- Ohne Feld mit Restbestand bleibt der Sammler unbeauftragt, und die
+  Produktion läuft unverändert weiter.
+- Der Sammelpunkt-Befehl bleibt. Der Sammler läuft zuerst zum Sammelpunkt.
+- Es ist ein Geburtsauftrag, **kein Nachsteuern**: Nichts vergibt später neu.
+  `Stop` löscht ihn wie jeden anderen Dauerbefehl, `H` setzt ein anderes Feld.
+  Beides bleibt beim Spieler.
+- **KI-Härtung im selben PR:** `SkirmishAiSystem` beauftragt jeden Sammler, der
+  nicht zurückfährt und nicht schon auf dem KI-Feld steht, nicht nur die ohne
+  Auftrag. `AiBehaviorId` steigt auf r10, der Profil-Hash bleibt.
+- **Kein RulesRevision-Bump.** Snapshot-Layout, Befehlsregister und
+  `RulesHash64` bleiben unberührt.
+
+**Begründung:** Die Erwartung ist durch T-01 belegt, die KI erfüllt sie schon,
+und der Gründungsfall ist der direkte Präzedenzfall. Die Feldregel existiert
+bereits deterministisch und öffentlich, es muss keine neue erfunden werden. Der
+Client-Weg löst das Problem nur für einen von zwei Spielern und nur so lange,
+wie der Client läuft. Die Härtung der KI gehört dazu, weil die Simulation ab
+jetzt mehr Sammler mit Auftrag erzeugt und der Hänger sonst häufiger greift.
+
+Gemessen auf `a6858d1` mit diesem Stand, headless (`dotnet test`):
+- Der Entscheidungstick der kanonischen KI-Partie bleibt 2726.
+- Der Endzustand wandert von `0x4A861D9FA2E57C6F` auf `0x7AF32DBA56E393E2`.
+- Die Produktionsänderung allein ergibt denselben Wert. r10 allein auf der
+  alten Produktion lässt den alten Wert stehen.
+- Der Pin wandert also durch die Simulation unter der KI, nicht durch r10.
+
+**Konsequenzen:**
+
+- **Pin im selben PR.** `CanonicalAiOutcomeTests` wird nach D-101 im selben PR
+  nachgezogen. D-108 und Sprint 21 R-3 verlangen für diesen Pin dagegen einen
+  zweiten PR und ein Merge-Fenster mit dem Einheitenstrang. Mit D-114 liegen
+  beide Stränge beim Inhaber. Der Widerspruch wird im PR genannt, nicht hier
+  aufgelöst.
+- **Determinismus-Drehbuch angepasst, Guard unberührt.**
+  `Determinism10000Scenario.cs` beauftragt jeden eigenen Sammler genau einmal,
+  statt „Sammler ohne Auftrag“ zu suchen. So bleibt `Harvest` im Befehlsstrom.
+  `Determinism10000Tests.cs` bleibt unverändert (Sprint 21 R-2).
+- **Neuer Build für alle Tester.** Ohne Fingerprint-Bewegung laufen alte und
+  neue Builds in Netzpartien gleich an und fallen erst beim ersten
+  produzierten Sammler als Relay-Desync auf (StateHash alle 50 Ticks). Alte
+  Relay-Aufzeichnungen scheitern am ersten Checkpoint danach. Mergen im
+  Merge-Fenster der übrigen simulationsändernden PRs.
+- **Ein Mechanismus, nicht zwei.** Wird diese Entscheidung angenommen, entfällt
+  der `_autoAssignedHarvesters`-Block aus `73f54b5` im Art-PR (P-51). Sonst
+  laufen zwei Feldregeln nebeneinander.
+- **Offen für den Inhaber:** ob die Feldwahl ab der Raffinerie oder ab dem
+  Sammelpunkt erfolgen soll, und ob eine Reichweitengrenze gelten soll
+  (Alternative 4). Nach Erschöpfung des Heimatfelds kann ein neuer Sammler
+  heute quer über die Karte geschickt werden, wie Gründung und KI auch.
+- **Die KI nutzt weiter genau ein Feld.** Die Härtung zwingt jeden KI-Sammler
+  auf das KI-Feld. Ein KI-Ausbau auf mehrere Felder (D-114, Stufe B) braucht
+  dafür eine eigene Regel.
+
 ## Offene Punkte
 
 - Alle Sprint-4-Review-Befunde (105, davon 9 kritisch): 7 entscheidungsbedürftige kritische Befunde sind durch D-043–D-052 entschieden.

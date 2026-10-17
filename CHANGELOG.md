@@ -258,6 +258,22 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Ein produzierter Sammler erntet von selbst (#134, D-121-Entwurf).** Bisher
+  bekam nur der Gründungs-Sammler einen Feldauftrag. Jeder weitere stand am
+  Sammelpunkt, bis jemand `H` drückte. Jetzt setzt `ProductionSystem` beim Spawn
+  das nächste Feld mit Restbestand ab dem Footprint-Zentrum der Raffinerie,
+  dieselbe Regel wie bei der Gründung. `Stop` und `H` bleiben beim Spieler,
+  nichts vergibt neu. Die KI beauftragt zusätzlich Sammler, deren Auftrag ein
+  fremdes Feld nennt; vorher konnten sie dauerhaft stehen bleiben. Deshalb
+  steigt `AiBehaviorId` auf `r10.1E6E7AE3`. Gemessen mit `dotnet test` auf dem
+  PR-Stand: Die kanonische KI-Partie entscheidet weiter bei Tick 2.726, der
+  Endzustand wandert von `0x4A861D9FA2E57C6F` auf `0x7AF32DBA56E393E2`. Das
+  verursacht die Produktionsänderung, r10 allein bewegt ihn nicht. Das
+  Journal `tools/Nova.AiLab/reports/behavior-log.md` existiert im Repository
+  nicht; die Messung steht deshalb hier und im PR. Das Drehbuch
+  `Determinism10000Scenario.cs` beauftragt jeden Sammler genau einmal, der
+  Guard-Test bleibt unberührt. Kein RulesRevision-Bump: Gemischte alte und
+  neue Builds fallen in Netzpartien erst als Relay-Desync auf
 - **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
   84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
   Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die
