@@ -862,7 +862,7 @@ namespace Nova.SimRunner.Tests
             return false;
         }
 
-        private static bool TryHqCell(SkirmishAiTests.AiHost host, byte slot, out int cellX, out int cellY)
+        internal static bool TryHqCell(SkirmishAiTests.AiHost host, byte slot, out int cellX, out int cellY)
         {
             UnitState[] units = host.Entities.RawUnits;
             for (int i = 0; i < units.Length; i++)

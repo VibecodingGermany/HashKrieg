@@ -923,14 +923,22 @@ namespace Nova.AI
         /// cell is the SAME for the whole match — a unit ordered there is not
         /// re-ordered on the next cadence.
         /// <para>
-        /// A personality with a flank offset shifts the cell sideways,
-        /// perpendicular to the line toward the enemy. The offset is a match
-        /// constant and the shift reads no live state, so the cell stays a
-        /// pure function of map and personality — the same every cadence.
-        /// Deliberately no footprint test: one would let a building placed
-        /// later flip the cell mid-match, and the unshifted cell never had one
-        /// either. That the shifted cells stay off the rock is pinned for the
-        /// canonical map by <c>AiPersonalityTests.FlankedStagingCells_AreInsideTheGridAndWalkable</c>.
+        /// A personality with a flank offset turns the cell sideways: shifted
+        /// perpendicular to the line toward the enemy, then scaled back so it
+        /// stays within <see cref="AiProfile.StagingDistanceCells"/> (Chebyshev)
+        /// of the HQ. That bound is what the wave rules stand on —
+        /// <see cref="IsCommittedToTheWave"/> measures its ring from the HQ, and
+        /// a gathering point outside the ring turns every unit walking there
+        /// into a lone attacker. The offset is a match constant and the turn
+        /// reads no live state, so the cell stays a pure function of map and
+        /// personality — the same every cadence. Deliberately no footprint
+        /// test: one would let a building placed later flip the cell
+        /// mid-match, and the unflanked cell never had one either. Both
+        /// properties are pinned for the canonical map by
+        /// <c>AiPersonalityTests.FlankedStagingCells_StayInsideTheRingAndWalkable</c>
+        /// (both slots, mirrored) and
+        /// <c>AiPersonalityTests.FlankedStagingCell_IsTheOneTheAiReports</c>
+        /// (slot 1, the production value).
         /// </para>
         /// <para>
         /// Integer division truncates, which is deterministic and identical on
@@ -960,8 +968,26 @@ namespace Nova.AI
             int flank = Personality.FlankOffsetCells;
             if (flank != 0)
             {
-                cellX = ClampToGrid(cellX + (-dy * flank / span));
-                cellY = ClampToGrid(cellY + (dx * flank / span));
+                // Shift perpendicular to the line, then scale the offset back
+                // onto the staging distance: the flank TURNS the cell around
+                // the HQ instead of pushing it outward. Without the second step
+                // a diagonal line moves the cell on both axes — on the
+                // Glutrinne to Chebyshev 22 from the HQ, outside the staging
+                // ring at 16 — and every unit walking there counted as
+                // committed and marched alone (review of PR #144, B1). The
+                // scale-back keeps the direction and leaves an offset that is
+                // already inside (an axis-aligned line) untouched. The HQ is
+                // inside the grid, so the clamp can only shorten the offset.
+                int offsetX = cellX - hqCellX + (-dy * flank / span);
+                int offsetY = cellY - hqCellY + (dx * flank / span);
+                int reach = Math.Max(Math.Abs(offsetX), Math.Abs(offsetY));
+                if (reach > distance)
+                {
+                    offsetX = offsetX * distance / reach;
+                    offsetY = offsetY * distance / reach;
+                }
+                cellX = ClampToGrid(hqCellX + offsetX);
+                cellY = ClampToGrid(hqCellY + offsetY);
             }
         }
 

@@ -6,6 +6,7 @@ using Nova.AI.Data;
 using Nova.Simulation;
 using Nova.Simulation.Construction;
 using Nova.Simulation.Definitions;
+using Nova.Simulation.Economy;
 using Nova.Simulation.State;
 
 namespace Nova.SimRunner.Tests
@@ -67,7 +68,8 @@ namespace Nova.SimRunner.Tests
                     case AiOpening.Turtle:
                         Assert.That(army, Is.InRange(13, 15));
                         Assert.That(retreat, Is.InRange(60, 70));
-                        Assert.That(10 + p.DefendHomeCellsDelta, Is.EqualTo(14));
+                        // Asks for 10 + 4; Apply caps it one short of the staging cell (12).
+                        Assert.That(p.Apply(AiProfiles.Ms1Canonical).DefendHomeCells, Is.EqualTo(11));
                         Assert.That(p.DefensePlatforms, Is.InRange(1, 2));
                         break;
                 }
@@ -241,30 +243,232 @@ namespace Nova.SimRunner.Tests
         // Flank cells on the real map
         // ----------------------------------------------------------------
 
-        [TestCase((byte)1, 118, 117, 7)]
-        [TestCase((byte)0, 4, 7, 117)]
-        public void FlankedStagingCells_AreInsideTheGridAndWalkable(byte slot, int hqOrigin, int ownField, int enemyField)
+        /// <summary>
+        /// Every flank on both seats keeps the gathering point inside the
+        /// staging ring, on the grid and off the rock.
+        /// <para>
+        /// THE RING IS THE POINT. <c>IsCommittedToTheWave</c> measures from the
+        /// HQ cell and calls everything beyond
+        /// <c>StagingDistanceCells + StagingToleranceCells</c> a unit of an
+        /// earlier wave. The first version of the flank pushed the cell
+        /// perpendicular to the diagonal of the Glutrinne, Chebyshev 22 from
+        /// the HQ — every unit on its way there turned "committed" and marched
+        /// alone (review of PR #144, B1).
+        /// </para>
+        /// <para>
+        /// The HQ and the enemy field are read off the built match the way the
+        /// AI reads them — the HQ cell is <c>GridCellOf</c> of its position, not
+        /// the footprint origin the previous version of this test used (B4).
+        /// </para>
+        /// </summary>
+        [TestCase((byte)1)]
+        [TestCase((byte)0)]
+        public void FlankedStagingCells_StayInsideTheRingAndWalkable(byte slot)
         {
-            _ = ownField;
-            const int distance = 12; // AiProfiles.Ms1Canonical.StagingDistanceCells
-            Assert.That(AiProfiles.Ms1Canonical.StagingDistanceCells, Is.EqualTo(distance));
-            foreach (int flank in new[] { -10, 10 })
+            AiProfile profile = AiProfiles.Ms1Canonical;
+            int distance = profile.StagingDistanceCells;
+            int ring = distance + profile.StagingToleranceCells;
+
+            SkirmishAiTests.AiHost host = SkirmishAiTests.BuildMatch(SkirmishAiTests.Seed);
+            Assert.That(SkirmishGoalTests.TryHqCell(host, slot, out int hqX, out int hqY), Is.True);
+            FarthestFieldCell(host, hqX, hqY, out int enemyX, out int enemyY);
+            MirrorStagingCell(hqX, hqY, enemyX, enemyY, distance, 0, out int centreX, out int centreY);
+
+            foreach (int flank in new[] { -10, 0, 10 })
             {
-                // Mirror of SkirmishAiSystem.GetStagingCell (flank branch); the enemy start area is the far field.
-                int dx = enemyField - hqOrigin;
-                int dy = enemyField - hqOrigin;
-                int span = Math.Max(Math.Abs(dx), Math.Abs(dy));
-                Assert.That(span, Is.GreaterThan(distance));
-                int cx = Clamp(hqOrigin + dx * distance / span);
-                int cy = Clamp(hqOrigin + dy * distance / span);
-                int fx = Clamp(cx + (-dy * flank / span));
-                int fy = Clamp(cy + (dx * flank / span));
-                Assert.That(fx, Is.InRange(0, ConstructionSystem.GridSize - 1), $"slot {slot} flank {flank}");
-                Assert.That(fy, Is.InRange(0, ConstructionSystem.GridSize - 1), $"slot {slot} flank {flank}");
-                Assert.That(CanonicalTerrainMirror.IsImpassable(fx, fy), Is.False,
-                    $"slot {slot} flank {flank}: cell ({fx},{fy}) is rock");
-                Assert.That(fx != cx || fy != cy, Is.True, "the flank must actually move the cell");
+                MirrorStagingCell(hqX, hqY, enemyX, enemyY, distance, flank, out int x, out int y);
+                string label = $"slot {slot} (HQ cell {hqX},{hqY}) flank {flank}: cell ({x},{y})";
+                int reach = Math.Max(Math.Abs(x - hqX), Math.Abs(y - hqY));
+                TestContext.Progress.WriteLine($"[personality] {label}, Chebyshev {reach} from the HQ");
+
+                Assert.That(reach + profile.StagingToleranceCells, Is.LessThanOrEqualTo(ring),
+                    label + " lies outside the staging ring");
+                Assert.That(x, Is.InRange(0, ConstructionSystem.GridSize - 1), label);
+                Assert.That(y, Is.InRange(0, ConstructionSystem.GridSize - 1), label);
+                Assert.That(CanonicalTerrainMirror.IsImpassable(x, y), Is.False, label + " is rock");
+                if (flank != 0)
+                    Assert.That(x != centreX || y != centreY, Is.True, label + ": the flank must actually move the cell");
             }
+        }
+
+        /// <summary>
+        /// The mirror above is only worth something while it computes what the
+        /// AI computes. The AI reports its staging cell to a goal observer, so
+        /// on the seat the harness can play (slot 1) the mirror is checked
+        /// against the production value instead of against itself.
+        /// </summary>
+        [TestCase(-10)]
+        [TestCase(0)]
+        [TestCase(10)]
+        public void FlankedStagingCell_IsTheOneTheAiReports(int flank)
+        {
+            var observer = new WaveObserver();
+            SkirmishAiTests.AiHost host = SkirmishAiTests.BuildMatch(
+                SkirmishAiTests.Seed, goalObserver: observer,
+                personality: AiPersonality.Create(AiOpening.Balanced, flank, layoutVariant: 0));
+            for (int i = 0; i < SkirmishAiTests.EndToEndBudgetTicks && observer.FirstStagingX < 0; i++) host.Step();
+            Assert.That(observer.FirstStagingX, Is.GreaterThanOrEqualTo(0), "the AI never resolved a staging cell");
+
+            Assert.That(SkirmishGoalTests.TryHqCell(host, AiSlot, out int hqX, out int hqY), Is.True);
+            FarthestFieldCell(host, hqX, hqY, out int enemyX, out int enemyY);
+            MirrorStagingCell(hqX, hqY, enemyX, enemyY, AiProfiles.Ms1Canonical.StagingDistanceCells, flank,
+                out int x, out int y);
+            Assert.That((observer.FirstStagingX, observer.FirstStagingY), Is.EqualTo((x, y)));
+        }
+
+        /// <summary>
+        /// The regression test for B1, on the behaviour rather than on the
+        /// geometry: until the first wave is ready, nobody is out with an
+        /// earlier wave — so nothing may be committed and nobody may be sent to
+        /// attack. With the gathering point outside the ring the review counted
+        /// 91 to 222 attack orders in that window; with flank 0 there were none.
+        /// </summary>
+        [Test]
+        public void FlankedWave_SendsNobodyBeforeTheFirstWaveIsReady()
+        {
+            foreach (FactionId faction in new[] { FactionId.Legion, FactionId.Alliance })
+            {
+                foreach (int flank in new[] { -10, 0, 10 })
+                {
+                    var observer = new WaveObserver();
+                    SkirmishAiTests.AiHost host = SkirmishAiTests.BuildMatch(
+                        SkirmishAiTests.Seed, goalObserver: observer, aiFaction: faction,
+                        personality: AiPersonality.Create(AiOpening.Balanced, flank, layoutVariant: 0));
+                    for (int i = 0; i < SkirmishAiTests.EndToEndBudgetTicks && observer.FirstWaveTick == 0
+                        && !host.Victory.IsDecided; i++)
+                    {
+                        host.Step();
+                    }
+
+                    string label = $"{faction} flank {flank}";
+                    TestContext.Progress.WriteLine($"[personality] {label}: staging ({observer.FirstStagingX}," +
+                        $"{observer.FirstStagingY}), {observer.GatheringDecisions} gathering decisions, " +
+                        $"first wave at tick {observer.FirstWaveTick}, committed early {observer.CommittedEarly}, " +
+                        $"attacks early {observer.AttacksEarly}");
+                    Assert.That(observer.FirstWaveTick, Is.Not.Zero, label + ": no wave was ever ready");
+                    Assert.That(observer.GatheringDecisions, Is.GreaterThan(0), label + ": the army never gathered");
+                    Assert.That(observer.CommittedEarly, Is.Zero, label + ": units counted as committed before any wave marched");
+                    Assert.That(observer.AttacksEarly, Is.Zero, label + ": attack orders before the first wave was ready");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Watches the window before the first wave: army decisions that act
+        /// while the wave is not ready, and every unit goal inside them.
+        /// </summary>
+        private sealed class WaveObserver : IAiGoalObserver
+        {
+            public int FirstStagingX = -1, FirstStagingY = -1;
+            public uint FirstWaveTick;
+            public int GatheringDecisions, CommittedEarly, AttacksEarly;
+            private bool _gathering;
+
+            public void OnArmyGoal(byte slot, uint tick, in AiArmyGoal army)
+            {
+                _gathering = false;
+                if (!army.Engages) return;
+                if (FirstStagingX < 0 && army.StagingCellX >= 0)
+                {
+                    FirstStagingX = army.StagingCellX;
+                    FirstStagingY = army.StagingCellY;
+                }
+                if (FirstWaveTick != 0) return;
+                if (army.WaveReady)
+                {
+                    FirstWaveTick = tick;
+                    return;
+                }
+                _gathering = true;
+                GatheringDecisions++;
+                CommittedEarly += army.Committed;
+            }
+
+            public void OnUnitGoal(byte slot, uint tick, in AiUnitGoal goal)
+            {
+                if (_gathering && goal.Goal == GoalKind.Attack) AttacksEarly++;
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // Turtle home radius
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// The Turtle widens the home guard, but not onto the gathering point:
+        /// a radius that reaches the staging cell turns a skirmish there into a
+        /// call home for the whole waiting wave (review of PR #144, B2; the
+        /// invariant is documented on <c>AiProfiles.Ms1Canonical</c>).
+        /// </summary>
+        [Test]
+        public void TurtleHomeRadius_StaysShortOfTheStagingCell()
+        {
+            var shipped = AiProfiles.Ms1Canonical;
+            var matchRunnerBase = new AiFactionProfile("Legion",
+                targetPowerMargin: 0, targetArmySize: 12, attackSquadThreshold: 6, targetHarvesterCount: 2).Profile;
+            foreach (AiProfile baseProfile in new[] { shipped, matchRunnerBase })
+            {
+                AiProfile turtle = AiPersonality.Create(AiOpening.Turtle, 0, 0).Apply(baseProfile);
+                Assert.That(turtle.DefendHomeCells, Is.LessThan(turtle.StagingDistanceCells));
+                Assert.That(turtle.DefendHomeCells, Is.GreaterThan(baseProfile.DefendHomeCells),
+                    "the Turtle still guards a wider home than the base profile");
+            }
+
+            // Only what the personality adds is capped: a base profile that set
+            // a wider radius itself — to measure it, say — keeps its own value.
+            AiProfile wide = new AiProfile(
+                "wide", shipped.DecisionTickInterval, shipped.PlacementSearchRadius, 0, 2,
+                shipped.HarvesterQueueBatch, 12, 6, shipped.InfantryQueueBatch,
+                shipped.TargetDamageWeight, shipped.TargetThreatWeight, shipped.TargetFinishWeight,
+                shipped.TargetDistanceWeight, shipped.WaveSize, shipped.StagingDistanceCells,
+                shipped.StagingToleranceCells, shipped.RetreatHealthPercent, shipped.RetreatDangerCells,
+                shipped.WaveStrengthPoints, defendHomeCells: 13);
+            Assert.That(AiPersonality.Create(AiOpening.Turtle, 0, 0).Apply(wide).DefendHomeCells, Is.EqualTo(13));
+        }
+
+        // ----------------------------------------------------------------
+        // Mirrors of the AI's static map knowledge
+        // ----------------------------------------------------------------
+
+        /// <summary>Mirror of <c>SkirmishAiSystem.GetEnemyStartAreaCell</c>: the registered field farthest from the HQ, lowest id on a tie.</summary>
+        private static void FarthestFieldCell(SkirmishAiTests.AiHost host, int hqX, int hqY, out int cellX, out int cellY)
+        {
+            cellX = ConstructionSystem.GridSize / 2;
+            cellY = ConstructionSystem.GridSize / 2;
+            long best = -1;
+            for (ushort id = 1; id <= EconomySystem.MaxFields; id++)
+            {
+                if (!host.Economy.TryGetField(id, out AetheriumField field)) continue;
+                long dx = field.GridPos.X - hqX;
+                long dy = field.GridPos.Y - hqY;
+                if (dx * dx + dy * dy <= best) continue;
+                best = dx * dx + dy * dy;
+                cellX = field.GridPos.X;
+                cellY = field.GridPos.Y;
+            }
+        }
+
+        /// <summary>Mirror of <c>SkirmishAiSystem.GetStagingCell</c>, flank branch included.</summary>
+        private static void MirrorStagingCell(
+            int hqX, int hqY, int enemyX, int enemyY, int distance, int flank, out int cellX, out int cellY)
+        {
+            int dx = enemyX - hqX;
+            int dy = enemyY - hqY;
+            int span = Math.Max(Math.Abs(dx), Math.Abs(dy));
+            Assert.That(span, Is.GreaterThan(distance), "the enemy field lies inside the staging distance");
+            cellX = Clamp(hqX + (dx * distance / span));
+            cellY = Clamp(hqY + (dy * distance / span));
+            if (flank == 0) return;
+            int offsetX = cellX - hqX + (-dy * flank / span);
+            int offsetY = cellY - hqY + (dx * flank / span);
+            int reach = Math.Max(Math.Abs(offsetX), Math.Abs(offsetY));
+            if (reach > distance)
+            {
+                offsetX = offsetX * distance / reach;
+                offsetY = offsetY * distance / reach;
+            }
+            cellX = Clamp(hqX + offsetX);
+            cellY = Clamp(hqY + offsetY);
         }
 
         private static int Clamp(int c) => Math.Max(0, Math.Min(ConstructionSystem.GridSize - 1, c));

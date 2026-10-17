@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.46.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.46.1 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3624,7 +3624,9 @@ das Fähigkeiten-Set des Computergegners je Partie neu.
     - **Ansturm**: Kaserne vor Raffinerie, kleinere Armee, die früher losschlägt;
     - **Ökonom**: dritter Sammler und größere Armee;
     - **Igel**: ein bis zwei Abwehrplattformen zwischen HQ und Sammelpunkt;
-  - einen seitlich versetzten Sammelpunkt (−10, 0 oder +10 Felder);
+  - einen zur Seite gedrehten Sammelpunkt (Flanke −10, 0 oder +10 Felder),
+    der im Abstand des mittigen Sammelpunkts vom HQ bleibt (siehe
+    Berichtigung);
   - eine von acht Suchrichtungen für Bauplätze;
   - kleine Streuungen der Profilwerte in festen Bändern.
 - Die neutrale Persönlichkeit (`default`) spielt exakt wie r8. Der gepinnte
@@ -3661,6 +3663,22 @@ berührt.
 - **Der kanonische Seed spielt nicht mehr neutral.** Er leitet einen
   Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
   nicht r8.
+
+**Berichtigung (2026-10-17):** Die Erstfassung nannte den Sammelpunkt
+„seitlich versetzt“, und so war er auch umgesetzt: zehn Felder senkrecht zur
+Linie zum Gegner. Auf der diagonalen Glutrinne verschob das den Punkt auf
+beiden Achsen, 22 Felder vom HQ statt 12, und damit aus dem Wellenring (16)
+hinaus. Jede Einheit auf dem Weg dorthin galt als Teil einer schon
+abmarschierten Welle und griff allein an. Welle, Stärkegate und
+Heimverteidigung liefen in zwei Dritteln aller Persönlichkeiten leer. Das
+unabhängige Review von PR #144 hat das gefunden und gemessen. Die Flanke
+**dreht** den Sammelpunkt jetzt um das HQ: verschoben wie bisher, dann auf
+den Sammelpunktabstand zurückskaliert. Im selben Zug endet der erweiterte
+Heimradius des Igels ein Feld vor dem Sammelpunkt (11 statt 14). Sonst ruft
+ein Gefecht dort die wartende Welle nach Hause, entgegen der Invariante am
+ausgelieferten Profil. Die neutrale Persönlichkeit und der kanonische
+Ausgang sind unberührt. `AiBehaviorId` steigt auf r10; eine eigene D-ID gibt
+es dafür nicht (Inhaberentscheidung vom 2026-10-17).
 
 ## Offene Punkte
 
@@ -3742,6 +3760,7 @@ berührt.
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.46.1 | 2026-10-17 | D-114 berichtigt: Die Sammelpunkt-Flanke dreht den Punkt um das HQ, statt ihn aus dem Wellenring (16) hinauszuschieben; der Igel-Heimradius endet ein Feld vor dem Sammelpunkt. Befunde B1 und B2 aus dem Review von PR #144; `AiBehaviorId` r10, keine neue D-ID | Dennis Westermann / Orchestrator |
 | 1.46.0 | 2026-10-17 | D-114 aufgenommen: Die Skirmish-KI bekommt je Partie eine Persönlichkeit als reine Funktion aus Match-Seed und Slot (Eröffnung, Sammelpunkt-Flanke, Bauplatz-Suchrichtung, Profilstreuung); das Hauptmenü zieht je lokaler Partie einen frischen Seed. Die Versionen 1.42.0 bis 1.45.0 und D-110 bis D-113 trägt der Asset-Pass auf `feat/generals-look-and-feel` | Dennis Westermann / Orchestrator |
 | 1.41.0 | 2026-08-18 | **D-108 in der Prämisse berichtigt und in der Sache neu gefasst.** Die Erstfassung behauptete, der Code lasse bereits jedes Gebäude als Bauanker gelten, und wollte das nur aussprechen — tatsächlich prüft `IsInsideBuildInfluence` seit D-104 auf HQ, Lager und Kraftwerk. Der ausführende Agent hat den Widerspruch beim Umsetzen von Paket 21.1 gefunden und angehalten. Der Inhaber hat daraufhin in Kenntnis der Lage neu entschieden: die Ankerliste wird bewusst geöffnet, **jedes eigene fertiggestellte Gebäude wird Anker**. Damit ist D-108 eine Verhaltensänderung (`RulesHash64`, Baselines, kanonischer KI-Pin), keine Festschreibung. `MinimumBuildingDistanceCells` bleibt bei 2 — die Messung aus 21.1 (15/23/23) weist die gemeldete Enge nicht als Abstandsproblem aus | Dennis Westermann / Orchestrator |
 | 1.40.0 | 2026-08-17 | D-108 und D-109 aufgenommen (Sprint 21, aus Testbericht T-01): Territorium wächst **kriechend an jedem eigenen Bauanker** — die bestehende Regel wird festgeschrieben statt geändert, und die gemeldete Enge wird an `MinimumBuildingDistanceCells` gemessen, bevor ein Wert fällt. Die Kartenmitte wird ein Gebiet mit schmalen Zufahrten, mit der verbindlichen Auflage, dass Begehbarkeit und Optik aus **einer** Struktur stammen — heute streut `GlutrinneBlockoutView` begehbare Deko-Felsen, während niemand ausser `ConstructionSystem` in das `CostField` schreibt | Dennis Westermann / Orchestrator |
