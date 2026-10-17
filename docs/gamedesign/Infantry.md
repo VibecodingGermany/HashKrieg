@@ -1,6 +1,6 @@
 # Infanterie – Einheiten-Design (24 Einheiten)
 
-**Version:** 0.5.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
+**Version:** 0.6.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 4
 
 ## Zweck
 
@@ -150,6 +150,87 @@ Designlinie: Alle Evolvierten-Infanterie **regeneriert** HP langsam außerhalb d
 
 Begründung der Asymmetrie: Allianz löst Konter über Reichweite/Qualität (höchste Einzelkosten), Legion über Zahl und Fläche (niedrigste Kosten, höchste Stückzahlen), Evolvierte über Nähe und Nachhaltigkeit (Regeneration kompensiert schwächere Fernkampfwerte). Die Anti-Luft-Abdeckung per Infanterie bleibt bei allen Fraktionen auf T2 beschränkt (einzige Ausnahme: der T3-Kristallmagier der Evolvierten als mobile Flugabwehr, D-026), damit das Flugfeld (D-008) als Anti-Luft-Quelle relevant bleibt.
 
+## Sanitäter (Planung, Refs #56)
+
+Dieser Abschnitt ist reine Planung. Er fügt keine Einheit hinzu, ändert keinen
+Code und keine Definition; der Betatest-Wunsch („Sanitäter zunächst nur in die
+Planung aufnehmen“) ist damit abgedeckt. Die Allianz-Zeile *Medic* und die
+Evolvierte-Zeile *Bio-Heiler* in den Tabellen oben bleiben die Rollenskizze des
+Vollspiels; hier steht, was dazu **noch zu klären** ist und wie es sich zu dem
+verhält, was MS-1 heute tut.
+
+**MS-1-Stand gegen Vollspielziel**
+
+| Aspekt | MS-1 (ausgeliefert) | Vollspielziel (Planung) |
+|---|---|---|
+| Heilung eigener Infanterie | Passive Reparaturzone an der Kaserne (#55, Commit `c1a5ebf`): kostenlos, heilt auch im Gefecht, ist aber auf Erholung zwischen Gefechten ausgelegt, für beide aktiven Fraktionen einschließlich der Legion | Zusätzlich aktive Heileinheit (Allianz *Medic*, Evolvierte *Bio-Heiler*) |
+| Reparatur von Gebäuden | Builder, kostenpflichtig (D-104) | unverändert, plus Repair-Drohnen (D-014) |
+| Reparatur von Fahrzeugen | nur die Fahrzeugfabrik-Zone | Reparaturfahrzeuge (siehe [Vehicles.md](./Vehicles.md)); keine Infanterie |
+| Evolvierte-Regeneration | nicht in MS-1 | Fraktionsmechanik gemäß D-011 |
+| Sanitäter-Einheit | keine; `UnitRole` und `SimDefinitions` kennen keine Heilrolle | offen, erst wenn der Einheitenbestand ohnehin angefasst wird |
+
+Die Konstanten der Zone stehen ausschließlich im Code
+(`ConstructionSystem.PassiveRepairRateHpPerTick`,
+`ConstructionSystem.PassiveRepairRadiusCells`, Tickrate `SimClock.TicksPerSecond`);
+dieses Dokument nennt keine Zahlen dazu (D-047, jeder Wert existiert genau einmal).
+Unter Low Power heilt die Zone nur noch auf geraden Ticks, also mit halber
+mittlerer Rate.
+
+**Abgrenzung zur passiven Reparaturzone (#55)**
+
+Beide heilen, dürfen sich aber nicht doppeln. Die Zone ist die Grundversorgung
+*zuhause*: ortsgebunden, kostenlos, langsam, zwischen den Gefechten. Ein
+Sanitäter wäre die Versorgung *im Feld*: mobil, an eine Produktionskette
+gebunden, schneller als die Zone, dafür mit Kosten und einem Platz unter dem
+Einheitendeckel des MVP-Manifests. Daraus folgt für die Planung:
+
+- Die Heilrate des Sanitäters muss deutlich über der Zonenrate liegen, sonst
+  ist er überflüssig. Der frühere Richtwert aus [ArmorSystem.md](./ArmorSystem.md)
+  (ca. 3 % Max-HP/s) liegt nach heutigem Code für MS-1-Infanterie (Max-HP aus `SimDefinitions`) **unter** der
+  kostenlosen Zone und ist deshalb nicht mehr tragfähig. Neue Rate: Platzhalter,
+  festzulegen im Balancing-Pass nach einer gespielten Runde.
+- Die Zone bleibt, was sie ist: Sie ersetzt keinen Sanitäter und wird durch ihn
+  nicht abgeschafft.
+- Wer das Feldprofil wählt (Kanalheilung auf ein Ziel, Flächenheilung oder
+  Sofortheilung mit Cooldown), ist offen.
+
+**Stapelregel (offen).** Vorbild ist die Zone: Dort gewinnt das erste passende
+Zonen-Gebäude, es gibt keine Addition. D-027.6 regelt dagegen nur „aktive
+Heilung stapelt nicht auf passive Regeneration“ der Evolvierten und ist hier
+nicht direkt übertragbar. Zu entscheiden: Stapelt Sanitäter-Heilung auf die
+Zone, stapeln mehrere Sanitäter, oder wirkt je Ziel nur die stärkste Quelle?
+Empfehlung für die Entscheidung: je Ziel und Tick nur eine Quelle, die
+stärkste; das hält die Heilung vorhersagbar und verhindert Sanitäter-Klumpen.
+
+**Umsetzungsform (offen).** D-056 schließt in MS-1 ein generisches
+Auren-, Status- und Kanalsystem aus. Ein Sanitäter wäre daher, solange dieses
+System fehlt, nur als fest verdrahtete Einzelregel denkbar (Zielwahl, Reichweite
+und Heilrate im System selbst, wie bei der Zone), nicht als Fähigkeit im
+Sinne der Tabellen oben. Reichweite: Platzhalter, in Zellen anzugeben (die
+Tabelle nennt 8 m als Skizze); Werte bei Umsetzung aus `SimDefinitions` ableiten.
+
+**Fraktionsfrage.** D-027.4 gilt: Die Legion bleibt bewusst ohne
+Infanterie-Heiler (Ausgleich über günstige Neuproduktion). Das widerspricht der
+MS-1-Zone nicht, denn die Zone ist keine Einheit; sie heilt die Legion mit, und
+ob diese Annäherung der Masse-Identität schadet, prüft die gespielte Runde.
+Das „Legion repariert eher“ aus dem Issue steckt in den Reparaturfahrzeugen
+(siehe [Vehicles.md](./Vehicles.md)), die keine Infanterie reparieren. Soll die
+Legion doch eine Heilmöglichkeit im Feld bekommen, braucht das eine neue
+Entscheidung, die D-027.4 ausdrücklich ersetzt. Allianz *Medic* und Evolvierte
+*Bio-Heiler* sind das ausgewiesene Vollspielziel.
+
+**Namensfrage.** Der Anzeigename der Einheit wird nicht hier festgelegt. Die
+Einheitennamen stehen insgesamt zur Überarbeitung an (#15, Namensdoktrin in
+[06_Narrative.md](../production/hashkrieg/06_Narrative.md)); ein Sanitäter soll
+dort mitgedacht werden, damit er nicht in dieselbe Falle läuft (doppelt
+vergebene oder nicht zur Fiktion passende Namen). Anzeigenamen fließen nicht in
+den Definitions-Hash ein, die Rolle (`UnitRole`) und ihre ID-Vergabe schon;
+eine neue Rolle bräuchte daher eine eigene ID-Planung.
+
+**Nicht Teil dieser Planung:** Umsetzung in der Simulation, Eintrag in
+`SimDefinitions.cs`, Art-Bestellung und Werte-Tuning. Die offene Frage steht
+als Q-048 in [OpenQuestions.md](../production/OpenQuestions.md).
+
 ## Offene Punkte
 
 - **Anti-Luft per Infanterie (Status: teilweise entschieden):** Die Evolvierte-Lücke ist durch D-026 geschlossen (Kristallmagier, Zielklasse `Both`). Offen bleibt die langfristige Frage, ob die dual-role Raketen-Infanterie von Allianz/Legion (Fahrzeug + Luft) eigenständig bleibt oder zugunsten von Flugfeld/Flak-Modulen (D-008) abgeschwächt wird – Beobachtung im Balancing-Pass v0.2, Entscheidung Game Director.
@@ -174,3 +255,4 @@ Bereinigt im Korrekturlauf Sprint 4: Alpha-Mutant-Doppelwerte (Kosten/HP/DPS/Fä
 | 0.3.0 | 2026-07-21 | Korrekturlauf Sprint 4 (D-043–D-052, Review-Findings): Alpha-Mutant-Werte/-Fähigkeiten durch Verweis auf Vehicles.md ersetzt (D-047-Grundsatzregel, keine Doppelpflege) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-24 | MS-1 auf Basis- und Panzerabwehrinfanterie von Allianz und Legion begrenzt; aktive Fähigkeiten gemäß D-056 deaktiviert | Lead Gameplay Designer |
 | 0.5.0 | 2026-07-26 | Lokale 6 × 4-Schadensmatrix nach D-074 aufgehoben und durch Verweis auf [./ArmorSystem.md](./ArmorSystem.md) ersetzt; „Kristall" als Schadensart gestrichen (in den ScopeLedger verschoben). Einheitentabellen, Rollen und Konter-Matrix unverändert | Agent (unter Inhaber-Delegation, D-074) |
+| 0.6.0 | 2026-10-17 | #56 (Planung): Abschnitt „Sanitäter“ ergänzt – MS-1-Stand gegen Vollspielziel, Abgrenzung zur passiven Reparaturzone (#55), Stapelregel, Umsetzungsform, Fraktionsfrage (D-027.4) und Namensfrage; Werte als Platzhalter, keine neue Einheit | Orchestrator |

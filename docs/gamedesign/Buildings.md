@@ -1,6 +1,6 @@
 # Gebäude – alle Fraktionen
 
-**Version:** 0.9.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.10.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -276,6 +276,8 @@ Module werden auf dem fertigen Podest installiert (nicht als separates Gebäude)
   30 % ohne Rundungsdrift oder zusätzliches Zustandsfeld. Fehlendes AE lehnt
   Abbuchung und Heilung atomar ab; pro Ziel wirkt nur der erste valide,
   erreichbare Auftrag in stabiler Reihenfolge.
+- **Passive Produktionszone (#55, Commit `c1a5ebf`):** Kaserne und Fahrzeugfabrik heilen beschädigte eigene Einheiten der von ihnen produzierbaren Rollen kostenlos in einer kleinen Zone um den Footprint. Rate, Radius und Low-Power-Verhalten stehen nur im Code (`ConstructionSystem.PassiveRepairRateHpPerTick`, `PassiveRepairRadiusCells`); Einordnung in [Economy.md](./Economy.md) (Reparatur- und Verkaufsregeln).
+- **Sanitäter:** keine Einheit in MS-1; Planung und Abgrenzung zur Zone in [Infantry.md](./Infantry.md), Abschnitt Sanitäter.
 - Repair-Drohnen und die Vollspiel-Zielrate von ungefähr 2 % TP/s sind nicht
   Teil des ausgelieferten MS-1.
 
@@ -329,3 +331,4 @@ Entschieden und entfernt im Korrekturlauf Sprint 4: HQ-Grundenergie (+30 führen
 | 0.8.0 | 2026-08-10 | D-104-MS-1-Override ergänzt: einheitliche 3×3-Footprints, footprintbasierte Einfluss-, Gelände-, Gebäude- und Feldabstände sowie kumulative 30-%-Reparaturkosten mit 10/5 TP pro Tick; nicht implementierte Vollspielziele klar abgegrenzt | Agent (unter Delegation) / Dennis Westermann |
 | 0.8.1 | 2026-08-10 | Paket 16.10 nachgezogen: der Bauknopf erklärt All-of-Voraussetzungen, AE, Energie und Baustellenlimit; Energie bleibt informativ und blockiert den Platzierungsmodus nicht | Codex / Dennis Westermann |
 | 0.9.0 | 2026-10-17 | #67/D-122 (Entwurf): Verteidigungsplattformen fallen bei Strommangel aus (Grundprinzip „Energiebilanz“ und Abschnitt Verteidigungsplattform berichtigt; Vollspielziel nur noch für Forschung und Superwaffen) | Agent (Issue-Lauf 2026-10-17, unter Delegation) |
+| 0.10.0 | 2026-10-17 | #56: Abschnitt 7 um zwei Verweiszeilen ergänzt (passive Produktionszone aus #55, Sanitäter-Planung); keine Zahlen dupliziert | Orchestrator |

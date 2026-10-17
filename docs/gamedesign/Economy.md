@@ -1,6 +1,6 @@
 # Wirtschaftssystem (Economy)
 
-**Version:** 0.7.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.8.0 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -112,6 +112,7 @@ nach ~4–6 min, Tier 3 nach ~12–15 min erreichbar – passend zur Ziel-Matchd
 |---|---|
 | Reparatur (Allianz/Legion, Gebäude) | **MS-1: kumulativ 30 %** der Baukosten für 0→100 % HP (D-104), anteilig über `S(h)`, ohne Rundungsdrift; Rate 10 HP/Tick, bei Low Power 5 HP/Tick |
 | Reparatur (Fahrzeuge) | Über Repair-Drohne (D-014) oder Werft-Funktion der Fahrzeugfabrik; bis zur Umsetzung gilt derselbe 30-%-Startwert aus D-104 |
+| Passive Produktionszone (MS-1, #55) | Kaserne und Fahrzeugfabrik heilen beschädigte eigene Einheiten der von ihnen produzierbaren Rollen in einer kleinen Zone um den Footprint: **0 AE**, kein Konto wird belastet, bei Low Power halbe mittlere Rate. Rate und Radius nur im Code (`ConstructionSystem.PassiveRepairRateHpPerTick`, `PassiveRepairRadiusCells`), keine Zahl hier (D-047) |
 | Evolvierte | Keine aktive Reparatur: Regeneration ~1 % HP/s kostenlos, doppelt so schnell auf/nahe **lebender** Aetherium-Felder (D-011; Einschränkung auf lebende Felder gemäß D-027); kein AE-Abzug – Ausgleich über langsamere Rate |
 | Verkauf | 50 % der investierten AE zurück (Basiswert, keine Reparatur-Rückerstattung); 5 s Abwickel-Phase, Gebäude in dieser Zeit verwundbar und funktionslos; Evolvierte "Rückbau" übernimmt dieselbe 50-%-Regel (Resorption) |
 
@@ -169,3 +170,4 @@ Leitplanke: Gesamt-AE-Fluss pro Spieler über ein typisches 25-min-Match ≈ 25.
 | 0.5.0 | 2026-08-10 | MS-1-Start auf 3.000 AE (D-077) nachgezogen und D-106 präzisiert: eine HQ-Basis je Konto, +2.000 je fertigem Lager, harte Einzahlungskappung sowie zustandsloser 25-%-Abbau des aktuellen Überhangs pro Sekunde | Codex / Dennis Westermann |
 | 0.6.0 | 2026-08-10 | D-104: Reparaturkosten für MS-1 auf den implementierten kumulativen Startwert von 30 % vereinheitlicht; ganzzahlige `S(h)`-Abrechnung und Low-Power-Rate präzisiert | Project Owner / Agent (unter Delegation) |
 | 0.7.0 | 2026-10-17 | #67/D-122 (Entwurf): MS-1-Stand der Low-Power-Regel ergänzt – Verteidigungsplattformen offline (Ziel verwerfen, Cooldown läuft weiter, ein Tick Latenz), Spielerfalle durch nicht reservierte Baustellen benannt | Agent (Issue-Lauf 2026-10-17, unter Delegation) |
+| 0.8.0 | 2026-10-17 | #56: Zeile zur kostenlosen passiven Produktionszone (#55) in die Reparatur- und Verkaufsregeln aufgenommen; nur Verweis auf Code-Konstanten | Orchestrator |

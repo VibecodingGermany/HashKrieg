@@ -258,6 +258,7 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Sanitäter in die Planung aufgenommen, passive Reparaturzone in den Designdokumenten nachgezogen (Refs #56).** Neuer Abschnitt „Sanitäter“ in `Infantry.md` (MS-1-Stand gegen Vollspielziel, Abgrenzung zur Zone aus #55, Stapelregel, Umsetzungsform, Fraktionsfrage nach D-027.4, Namensfrage ohne Vorgriff auf #15); `ArmorSystem.md`, `Economy.md` und `Buildings.md` berichtigt bzw. ergänzt, Q-048 gekürzt. Reine Dokumentation, keine neue Einheit, kein Code, keine Zahlen dupliziert.
 - **Verteidigungsplattformen fallen bei Strommangel aus (#67, D-122).** Ein
   Besitzer im Defizit (`PlayerEconomyState.IsLowPower`) verliert die Feuerkraft
   seiner Gebäuderollen: `CombatSystem` erfasst keine Ziele, feuert nicht und

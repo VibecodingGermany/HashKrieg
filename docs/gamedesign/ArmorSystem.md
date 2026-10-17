@@ -1,6 +1,6 @@
 # Panzerungssystem (Armor System)
 
-**Version:** 0.5.0 | **Status:** Entwurf – Matrix führend nach D-074, Reparaturwert nach D-104 | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
+**Version:** 0.6.0 | **Status:** Entwurf – Matrix führend nach D-074, Reparaturwert nach D-104 | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 16
 
 ## Zweck
 
@@ -90,13 +90,13 @@ Evolvierte-Einheiten und -Gebäude regenerieren statt repariert zu werden:
 
 ## Reparatur (Allianz & Legion)
 
-Allianz und Legion heilen nicht passiv; Reparatur ist aktive, kostenpflichtige Aktion:
+Allianz und Legion heilen nicht passiv und nicht am Einsatzort; Reparatur im Feld ist aktive, kostenpflichtige Aktion. **Ausnahme MS-1:** Kaserne und Fahrzeugfabrik reparieren beschädigte eigene Einheiten der Rollen, die sie produzieren können, passiv und kostenlos in einer kleinen Zone um ihren Footprint (#55, Commit `c1a5ebf`; Rate und Radius in `ConstructionSystem.PassiveRepairRateHpPerTick` und `PassiveRepairRadiusCells`, bei Low Power nur jeder zweite Tick). Die Zone gilt für beide aktiven Fraktionen, auch für die Legion:
 
 | Weg | Regel (Richtwerte v0.1) |
 |---|---|
-| Repair-Fahrzeug / Repair-Drohne (D-014) | Reparaturstrahl: ~3–5 % Max-HP/s auf ein Ziel, Reichweite Nahbereich, nur Fahrzeuge/Gebäude, keine Infanterie |
+| Repair-Fahrzeug / Repair-Drohne (D-014) | Reparaturstrahl: ~3–5 % Max-HP/s auf ein Ziel, Reichweite Nahbereich, nur Fahrzeuge/Gebäude, keine Infanterie. Vollspielziel, nicht MS-1; in MS-1 deckt die Fahrzeugfabrik-Zone Fahrzeuge ab |
 | Gebäudereparatur (Bau-Menü) | Repariert sich selbst auf Befehl: ~1 % Max-HP/s, Kosten ~0.5 AE pro HP (Richtwert, Feinjustage in Economy.md) |
-| Infanterie | Nicht reparierbar; Allianz: Medic-Einheit heilt Infanterie (separates Heil-Profil, analog 3 %/s); Legion: **keine Infanterie-Heilung** (D-027.4 – Masse-Identität, Ausgleich über günstige Neuproduktion: Ersatz statt Erhalt) |
+| Infanterie | Kein Repair-Strahl und keine Builder-Reparatur. **MS-1:** heilt nur die passive Kasernen-Zone (siehe oben), auch für die Legion. **Vollspielziel:** Allianz: Medic-Einheit heilt Infanterie im Feld (eigenes Heil-Profil, Rate offen und deutlich über der Zone anzusetzen, der frühere Richtwert 3 %/s liegt darunter; Planung in [Infantry.md](./Infantry.md), Abschnitt Sanitäter); Legion: **keine aktive Infanterie-Heilung** (D-027.4 – Masse-Identität, Ausgleich über günstige Neuproduktion: Ersatz statt Erhalt), die Zone ist keine Einheit |
 | Evolvierte | Keine Reparatur-Mechanik (D-011); Bio-Heiler heilt nur Infanterie |
 
 Kostenprinzip: Reparatur kostet in MS-1 kumulativ **30 % der Baukosten** für
@@ -130,3 +130,4 @@ als Q-047 nach der ersten gespielten Runde zu prüfen.
 | 0.3.0 | 2026-07-21 | Feinschliff Sprint 2 Runde 2 (D-031) | Lead Gameplay Designer |
 | 0.4.0 | 2026-07-26 | Autoritätsvermerk nach D-074 ergänzt: die 6 × 6-Matrix ist alleinige kanonische Quelle und in `Nova.Simulation.Combat.DamageMatrix` implementiert; Lokaltabellen in Infantry.md/Vehicles.md aufgehoben. **Keiner der 36 Werte geändert** | Agent (unter Inhaber-Delegation, D-074) |
 | 0.5.0 | 2026-08-09 | D-104: die widersprüchliche 50-%-Faustregel auf den implementierten kumulativen MS-1-Startwert von 30 % vereinheitlicht; Q-047 bleibt als Balancingfrage offen | Project Owner / Agent (unter Delegation) |
+| 0.6.0 | 2026-10-17 | #56: Reparaturabschnitt gegen die passive Produktionszone (#55) berichtigt – „nicht reparierbar“ und „keine Infanterie-Heilung der Legion“ gelten nur noch für aktive Heilung; Medic-Rate als überholt markiert, Verweis auf Infantry.md | Orchestrator |
