@@ -515,6 +515,14 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Animationskontinuität und Pool-Reset:** Radar-Schwenks springen nicht mehr
+  beim Rotorumlauf; Infanterie richtet ihren Idle-Blick bei Zielkontakt oder
+  Schuss neutral aus. Wiederverwendete Ansichten starten mit zurückgesetzten
+  Phasen/Timern und Basisemission bei erhaltener Fraktionstönung.
+  Transform- und Art-Prefab-Regressionstests ergänzt. Roadmap auf aktives Tier 2
+  und offene Beta-Vorbereitung ausgerichtet, veraltete Attack-Move-Lücken in
+  README/Runbook berichtigt und lokalen Art-Paket-Kandidaten dokumentiert;
+  aktuelle manuelle Spielabnahme und Veröffentlichung stehen aus.
 - **Der zweite Bauer baut (D-118).** Bisher konnte nur der Bauer mit dem
   kleinsten Index eine Baustelle fortschreiben, jeder weitere stand daneben,
   und beim Platzieren lief immer der erste los. Jetzt geht der ausgewählte Bauer

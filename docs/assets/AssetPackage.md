@@ -1,6 +1,6 @@
 # Art-Asset-Paket (ausserhalb des Repositories)
 
-**Version:** 1.1.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
+**Version:** 1.2.0 | **Status:** verbindlich | **Verantwortungsbereich:** Technical Art / Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -50,6 +50,8 @@ Herkunftsnachweis nach [Provenance.md](Provenance.md). Er gehört ins Repo, auch
 wenn das Asset selbst es nicht tut — inklusive der offenen Punkte darin.
 
 ## 3. Das Paket
+
+### Zuletzt dokumentierter geteilter Stand (August 2026)
 
 | | |
 |---|---|
@@ -101,6 +103,24 @@ ist. Nach jeder Paketaktualisierung wandern **beide** mit: Zip und README.
 Die `.meta`-Dateien sind Teil des Pakets und **müssen** es bleiben: Sie tragen
 die Unity-GUIDs. Ohne sie vergibt jeder Import neue GUIDs, und Material-,
 Prefab- und Registry-Referenzen brechen bei jedem Entwickler unterschiedlich.
+
+### Lokaler Kandidat vom 18. Oktober 2026 (noch nicht hochgeladen)
+
+| | |
+|---|---|
+| Datei | `Hashkrieg_Art_MS1_2026-10-18_0013.zip` |
+| Lokale Ablage | `output/art-package/` (Git-ignoriert), mit `README.txt` |
+| Größe | 290.517.620 Bytes (rund 277 MiB) |
+| Inhalt | 616 Dateien: 69× `.fbx`, 137× `.png`, 68× `.mat`, 34× `.prefab`, 308× `.meta` |
+| SHA-256 | `326e01aeb90d25edb0dd93d091ea80c70572ee5f9f053a413dcbaa6a8922d02a` |
+| Ausgangsstand | `3c8e6bf`, Arbeitsbaum beim Packen nicht sauber |
+
+CRC und vollständige `.meta`-Paare wurden geprüft. Alle 34 Prefabs enthalten
+Wracks; die vier neu aufgebauten Legion-Gebäude einschließlich Wrack-FBX sind
+enthalten. Externe GUID-Verweise ließen sich auf URP-Lit und `AssetVersion`
+auflösen. Das bestätigt die Paketstruktur, noch keinen Import in einen
+frischen Workspace oder die Darstellung im Match. Der geteilte Ordner wurde
+nicht aktualisiert; der Kandidat ist kein veröffentlichter Release.
 
 ## 4. Installieren
 
@@ -166,3 +186,4 @@ bricht sonst ab — ein Paket ohne GUIDs wäre schlimmer als gar keines (§3).
 |---|---|---|---|
 | 1.0.0 | 2026-08-06 | Erstfassung: Art-Assets als externes Paket statt im Repo; Ausschlussregeln, Paketinhalt, Installations- und Erweiterungsablauf | Producer / Technical Art |
 | 1.1.0 | 2026-08-08 | Paket auf den Nachschub-Stand gehoben (HQ und BattleTank ersetzt, Aetherium neu): neue Kennzahlen in §3, Paketname auf die Marke umgestellt; §5 auf das neue Build-Skript `tools/art/build_art_package.sh` umgestellt, das den Inhalt aus `.gitignore` ableitet; Freigabeweg und Link-Verzicht ausdrücklich festgehalten | Producer / Agent (Umsetzung) |
+| 1.2.0 | 2026-10-18 | Lokalen Art-Paket-Kandidaten mit Prüfsumme und Strukturprüfung ergänzt, klar getrennt vom zuletzt dokumentierten geteilten August-Stand; Upload und frischer Import offen | Codex |

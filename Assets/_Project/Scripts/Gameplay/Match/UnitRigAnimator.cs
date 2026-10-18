@@ -179,6 +179,7 @@ namespace Nova.Gameplay.Match
         private Renderer[] _glowRenderers = System.Array.Empty<Renderer>();
         private Color[] _glowBase = System.Array.Empty<Color>();
         private float _glowPhase;
+        private float _glowInitialPhase;
         private float _glowBusy;
 
         private float _size = 1f;
@@ -187,6 +188,7 @@ namespace Nova.Gameplay.Match
         private float _bobPhase;
         private float _wheelAngle;
         private float _spinAngle;
+        private float _scanPhase;
         private float _armPhase;
         private float _armBlend;
         private float _lastSpeed;
@@ -223,6 +225,10 @@ namespace Nova.Gameplay.Match
             EnsureBound();
             _turretYaw = 0f; _recoil = 0f; _bobPhase = 0f; _wheelAngle = 0f;
             _armShake = 0f;
+            _spinAngle = 0f; _scanPhase = 0f; _time = 0f;
+            _lookTarget = 0f; _lookTimer = 0f; _smokeTimer = 0f;
+            _glowPhase = _glowInitialPhase; _glowBusy = 0f;
+            ApplyGlow(1f, false);
             _armPhase = 0f; _armBlend = 0f; _lastSpeed = 0f; _pitch = 0f; _roll = 0f; _moveBlend = 0f;
             Restore(_body, _hasBody);
             Restore(_turret, _hasTurret);
@@ -314,10 +320,12 @@ namespace Nova.Gameplay.Match
                 s.T.localRotation = Quaternion.AngleAxis(_spinAngle + s.Phase, s.Up) * s.RestRot;
             }
 
+            // A sweep has its own full period; scaling a wrapped spin angle jumps at 360 degrees.
+            _scanPhase = Mathf.Repeat(_scanPhase + _spinRate * Mathf.Deg2Rad * 0.6f * dt, Mathf.PI * 2f);
             for (int i = 0; i < _scans.Count; i++)
             {
                 Node s = _scans[i];
-                float sweep = Mathf.Sin((_spinAngle + s.Phase) * Mathf.Deg2Rad * 0.6f) * 50f;
+                float sweep = Mathf.Sin(_scanPhase + s.Phase * Mathf.Deg2Rad * 0.6f) * 50f;
                 s.T.localRotation = Quaternion.AngleAxis(sweep, s.Up) * s.RestRot;
             }
 
@@ -428,15 +436,20 @@ namespace Nova.Gameplay.Match
             _glowBusy = Mathf.MoveTowards(_glowBusy, working ? 1f : 0f, dt * 1.5f);
             _glowPhase += dt * Mathf.Lerp(1.4f, 5.5f, _glowBusy);
             float k = 1f + Mathf.Sin(_glowPhase) * Mathf.Lerp(0.22f, 0.55f, _glowBusy) + 0.25f * _glowBusy;
+            ApplyGlow(k, true);
+        }
+
+        private void ApplyGlow(float intensity, bool visibleOnly)
+        {
             if (_glowBlock == null) _glowBlock = new MaterialPropertyBlock();
             for (int i = 0; i < _glowRenderers.Length; i++)
             {
                 Renderer r = _glowRenderers[i];
-                if (r == null || !r.isVisible) continue;
+                if (r == null || (visibleOnly && !r.isVisible)) continue;
                 // Read-modify-write keeps the faction tint UnitViewManager put
                 // into the same block.
                 r.GetPropertyBlock(_glowBlock);
-                _glowBlock.SetColor(EmissionColorId, _glowBase[i] * k);
+                _glowBlock.SetColor(EmissionColorId, _glowBase[i] * intensity);
                 r.SetPropertyBlock(_glowBlock);
             }
         }
@@ -499,7 +512,9 @@ namespace Nova.Gameplay.Match
                 // Standing: breathe, and now and then look around.
                 float rest = 1f - _moveBlend;
                 offset += _body.Up * (Mathf.Sin(_time * 1.6f) * 0.006f * _size * rest);
-                TickLook(dt, rest);
+                // Root heading already tracks combat aim; an idle glance must not turn the weapon away.
+                if (input.HasTarget || input.Fired) _lookYaw = 0f;
+                else TickLook(dt, rest);
             }
             else if (_infantryGait)
             {
@@ -706,7 +721,8 @@ namespace Nova.Gameplay.Match
             }
             _glowRenderers = glowing.ToArray();
             _glowBase = glowBase.ToArray();
-            _glowPhase = Random.value * 6.28f;
+            _glowInitialPhase = Random.value * 6.28f;
+            _glowPhase = _glowInitialPhase;
 
             Transform bed = FindLive(transform, BedNode);
             _hasBed = bed != null;
