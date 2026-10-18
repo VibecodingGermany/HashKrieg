@@ -48,8 +48,13 @@ namespace Nova.AI
     /// </para>
     /// <para>
     /// DECISION LOOP (fixed cadence <see cref="DecisionTickInterval"/> = 20
-    /// ticks = 2.0 s, ascending-index scans only, no PRNG): (1) build order —
-    /// Refinery first (no prerequisite since D-077), then the Power plant
+    /// ticks = 2.0 s, ascending-index scans only, no PRNG — the per-match
+    /// <see cref="Personality"/> is a pure function of match seed and slot,
+    /// fixed at construction like the profile, never drawn during play):
+    /// (1) build order —
+    /// Refinery first (no prerequisite since D-077; a Rush personality builds
+    /// the Barracks first and a Turtle one adds defence platforms at the
+    /// end), then the Power plant
     /// required by D-103, then Barracks, one site at a time; Power also
     /// preempts whenever the committed margin would drop below the profile
     /// reserve, the spot picked by a deterministic
@@ -157,6 +162,14 @@ namespace Nova.AI
         /// </summary>
         private readonly IAiGoalOverride _goalOverride;
 
+        /// <summary>
+        /// The per-match flavour (opening order, staging flank, placement scan
+        /// orientation; its number deltas are already folded into the profile
+        /// by <see cref="AiFactionProfile.WithPersonality"/>). Default is the
+        /// neutral personality, which plays exactly as r8 did.
+        /// </summary>
+        public AiPersonality Personality { get; }
+
         public string Name => $"SkirmishAi_{_profile.FactionName}_P{_aiPlayerId}";
         public byte AiPlayerId => _aiPlayerId;
 
@@ -176,6 +189,13 @@ namespace Nova.AI
         /// that were fixed before the first tick, which is what lets the run
         /// stay reproducible from its inputs.
         /// </para>
+        /// <para>
+        /// <paramref name="personality"/> is a third input of the same kind: fixed
+        /// before the first tick, read-only, derived by the caller from (match
+        /// seed, slot) via <see cref="AiPersonality.Derive"/>. The caller also
+        /// applies it to the profile; this argument carries the parts a number
+        /// cannot express. The neutral default reproduces r8 tick for tick.
+        /// </para>
         /// </summary>
         public SkirmishAiSystem(
             byte aiPlayerId,
@@ -188,8 +208,10 @@ namespace Nova.AI
             FogOfWarSystem fogOfWar,
             VictorySystem victory,
             IAiGoalObserver goalObserver = null,
-            IAiGoalOverride goalOverride = null)
+            IAiGoalOverride goalOverride = null,
+            AiPersonality personality = default)
         {
+            Personality = personality;
             _goalObserver = goalObserver;
             _goalOverride = goalOverride;
             _aiPlayerId = aiPlayerId;
@@ -240,6 +262,7 @@ namespace Nova.AI
             // One ascending-index scan of the entity store collecting every
             // fact the decisions below read (deterministic iteration order).
             uint hqRaw = 0, refineryRaw = 0, barracksRaw = 0;
+            int defensePlatforms = 0;
             int hqCellX = -1, hqCellY = -1, refineryCellX = -1, refineryCellY = -1;
             bool powerCompleted = false;
             int builders = 0, harvesters = 0, combatCount = 0;
@@ -294,6 +317,9 @@ namespace Nova.AI
                         case UnitRole.Power:
                             powerCompleted = true;
                             break;
+                        case UnitRole.DefensePlatform:
+                            defensePlatforms++;
+                            break;
                     }
                     continue;
                 }
@@ -334,9 +360,7 @@ namespace Nova.AI
             // go negative" with the demo profile's reserve of 0. ----
             if (sites.Count == 0)
             {
-                UnitRole next = refineryRaw == 0
-                    ? UnitRole.Refinery
-                    : (barracksRaw == 0 ? UnitRole.Barracks : UnitRole.Unit);
+                UnitRole next = NextBuildingToPlan(refineryRaw != 0, barracksRaw != 0, defensePlatforms);
                 if (next != UnitRole.Unit
                     && SimDefinitions.TryGetBuilding(faction, next, out SimBuildingDefinition nextDef))
                 {
@@ -870,11 +894,44 @@ namespace Nova.AI
         }
 
         /// <summary>
+        /// The next building of the opening order, or <see cref="UnitRole.Unit"/>
+        /// for "nothing more to build". Neutral/Balanced/Economy/Turtle:
+        /// Refinery, Barracks, then defence platforms up to
+        /// <see cref="AiPersonality.DefensePlatforms"/>; Rush swaps the first two.
+        /// The Power pre-emption in the caller applies to whatever this returns,
+        /// so a Rush AI (Barracks needs Power) builds Power, Barracks, Refinery.
+        /// </summary>
+        private UnitRole NextBuildingToPlan(bool hasRefinery, bool hasBarracks, int defensePlatforms)
+        {
+            if (Personality.Opening == AiOpening.Rush)
+            {
+                if (!hasBarracks) return UnitRole.Barracks;
+                if (!hasRefinery) return UnitRole.Refinery;
+            }
+            else
+            {
+                if (!hasRefinery) return UnitRole.Refinery;
+                if (!hasBarracks) return UnitRole.Barracks;
+            }
+            return defensePlatforms < Personality.DefensePlatforms ? UnitRole.DefensePlatform : UnitRole.Unit;
+        }
+
+        /// <summary>
         /// The staging cell: <see cref="AiProfile.StagingDistanceCells"/> cells
         /// from the own HQ along the straight line toward the enemy start area,
         /// clamped into the grid. Static map knowledge on both ends, so this
         /// cell is the SAME for the whole match — a unit ordered there is not
         /// re-ordered on the next cadence.
+        /// <para>
+        /// A personality with a flank offset shifts the cell sideways,
+        /// perpendicular to the line toward the enemy. The offset is a match
+        /// constant and the shift reads no live state, so the cell stays a
+        /// pure function of map and personality — the same every cadence.
+        /// Deliberately no footprint test: one would let a building placed
+        /// later flip the cell mid-match, and the unshifted cell never had one
+        /// either. That the shifted cells stay off the rock is pinned for the
+        /// canonical map by <c>AiPersonalityTests.FlankedStagingCells_AreInsideTheGridAndWalkable</c>.
+        /// </para>
         /// <para>
         /// Integer division truncates, which is deterministic and identical on
         /// both machines; that is the only property that matters here.
@@ -899,6 +956,13 @@ namespace Nova.AI
 
             cellX = ClampToGrid(hqCellX + (dx * distance / span));
             cellY = ClampToGrid(hqCellY + (dy * distance / span));
+
+            int flank = Personality.FlankOffsetCells;
+            if (flank != 0)
+            {
+                cellX = ClampToGrid(cellX + (-dy * flank / span));
+                cellY = ClampToGrid(cellY + (dx * flank / span));
+            }
         }
 
         /// <summary>
@@ -1587,7 +1651,24 @@ namespace Nova.AI
                 anchorX = fieldX;
                 anchorY = fieldY;
             }
-            if (TryFindPlacementSpot(def.DefinitionId, anchorX, anchorY, out int spotX, out int spotY))
+            int spotX, spotY;
+            bool found = false;
+            if (role == UnitRole.DefensePlatform)
+            {
+                // A platform guards the approach, not the economy: search around
+                // the midpoint between the HQ and the staging cell first, and
+                // fall back to the field anchor when that stretch is built up.
+                GetStagingCell(hqCellX, hqCellY, out int stageX, out int stageY);
+                found = TryFindPlacementSpot(def.DefinitionId, (hqCellX + stageX) / 2, (hqCellY + stageY) / 2,
+                    out spotX, out spotY);
+            }
+            else
+            {
+                spotX = 0;
+                spotY = 0;
+            }
+            if (!found) found = TryFindPlacementSpot(def.DefinitionId, anchorX, anchorY, out spotX, out spotY);
+            if (found)
             {
                 Submit(new PlaceBuildingPayload(def.DefinitionId, (ushort)spotX, (ushort)spotY));
             }
@@ -1595,8 +1676,9 @@ namespace Nova.AI
 
         /// <summary>
         /// Deterministic placement search: expanding Chebyshev rings 1..<see cref="PlacementSearchRadius"/>
-        /// around the anchor cell, ascending (y, x) inside each ring, and the
-        /// first origin that passes <see cref="ConstructionSystem.ValidatePlacement"/>
+        /// around the anchor cell, inside each ring in the orientation of
+        /// <see cref="AiPersonality.LayoutVariant"/> (variant 0: ascending
+        /// (y, x), the order before r9), and the first origin that passes <see cref="ConstructionSystem.ValidatePlacement"/>
         /// — the identical state-dependent rules the command executor applies
         /// at the target tick — wins. Ring 1 first means the Refinery lands
         /// beside the field (harvest AND deposit reach in one cell).
@@ -1604,12 +1686,25 @@ namespace Nova.AI
         private bool TryFindPlacementSpot(ushort buildingDefId, int anchorX, int anchorY, out int spotX, out int spotY)
         {
             int f = SimDefinitions.BuildingFootprintCells;
+            // Orientation of the in-ring scan: bit0 x descending, bit1 y descending,
+            // bit2 x is the outer loop. Ring order (d ascending) is untouched.
+            int layout = Personality.LayoutVariant;
+            bool xDesc = (layout & 1) != 0, yDesc = (layout & 2) != 0, xOuter = (layout & 4) != 0;
             for (int d = 1; d <= PlacementSearchRadius; d++)
             {
-                for (int y = anchorY - d - (f - 1); y <= anchorY + d; y++)
+                int xLo = anchorX - d - (f - 1), xHi = anchorX + d;
+                int yLo = anchorY - d - (f - 1), yHi = anchorY + d;
+                int xCount = xHi - xLo + 1, yCount = yHi - yLo + 1;
+                int outerCount = xOuter ? xCount : yCount;
+                int innerCount = xOuter ? yCount : xCount;
+                for (int o = 0; o < outerCount; o++)
                 {
-                    for (int x = anchorX - d - (f - 1); x <= anchorX + d; x++)
+                    for (int n = 0; n < innerCount; n++)
                     {
+                        int xi = xOuter ? o : n;
+                        int yi = xOuter ? n : o;
+                        int x = xDesc ? xHi - xi : xLo + xi;
+                        int y = yDesc ? yHi - yi : yLo + yi;
                         if (ChebyshevToFootprint(anchorX, anchorY, x, y) != d) continue;
                         if (_construction.ValidatePlacement(_aiPlayerId, buildingDefId, x, y)
                             == CommandResultCode.Applied)

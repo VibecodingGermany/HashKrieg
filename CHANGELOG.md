@@ -172,6 +172,27 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   (Siegesfanfare vs. Niederlage-Explosion in `MatchFrameHud`).
   **(5) In-Game-HUD:** `HudChrome`, `BuildMenuHud`, `CommandCardHud` und `ResourceBarHud` mit taktischen
   Sci-Fi-Buttons, Rollen-Badges (`[HQ]`, `[RAF]`, `[NRG]` usw.), Hotkey-Pills und Fraktionsauswahl im Hauptmenü.
+- **Die KI spielt nicht mehr jede Partie gleich (D-114, Stufe A).** Bisher lief
+  jede lokale Partie identisch: Die KI würfelt bewusst nie, und das Menü
+  startete immer mit demselben Seed. Jetzt zieht „Neues Spiel“ und „Neue Runde“
+  je Partie einen frischen Seed.
+  - Aus Seed und Slot leitet die KI eine **Persönlichkeit** ab, als reine
+    Funktion ohne Zustand und ohne Zufallszüge während der Partie.
+  - **Eröffnung:** ausgewogen; Ansturm (Kaserne vor Raffinerie, kleinere und
+    frühere Welle); Ökonom (dritter Sammler, größere Armee); Igel (ein bis zwei
+    Abwehrplattformen Richtung Front).
+  - **Sammelpunkt:** um zehn Felder zur Seite versetzt oder mittig.
+  - **Bauplätze:** eine von acht Suchrichtungen, damit die Basis jedes Mal
+    anders aussieht.
+  - **Profilwerte:** kleine Streuung in festen Bändern.
+  - Das Debug-HUD (F3) und das Startlog zeigen Persönlichkeit und Seed;
+    `NOVA_MATCH_SEED=<hex>` stellt eine gemeldete Partie nach.
+  - Die neutrale Persönlichkeit spielt exakt wie bisher. Der gepinnte Ausgang
+    der kanonischen KI-Partie bleibt stehen, `AiBehaviorId` steigt auf r9.
+    Netzpartien sind unberührt.
+  - **Bewusst klein:** Solange die KI nur Infanterie und drei Gebäude kennt,
+    variieren Bauordnung, Basisbild, Sammelpunkt und Angriffszeitpunkt, mehr
+    nicht. Panzer, Konter-Bau und Tech folgen als Stufe B.
 - **Fahrzeugfabrik und Kaserne reparieren jetzt passiv, was sie bauen können (#55).**
   Der Wunsch stammt aus dem Betatest vom 09.08.2026 und wurde am 31.08.2026
   erneut vermisst: beschädigte Panzerung war bis hierher faktisch dauerhaft —

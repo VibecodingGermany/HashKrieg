@@ -1,6 +1,6 @@
 # Decision Log
 
-**Version:** 1.50.0 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
+**Version:** 1.50.1 | **Status:** aktiv (laufend) | **Verantwortungsbereich:** Game Director / Lead Technical Director / Project Owner | **Sprint:** 21
 
 ## Zweck
 
@@ -3745,6 +3745,85 @@ einem Kollisionsradius von einem halben Feld weniger überlappen.
 sitzen weiter auf fester Höhe über dem Boden; das passt jetzt besser, ist aber
 nicht an die Modellhöhe gekoppelt.
 
+### D-114 | verbindlich | KI-Strang (eine Persönlichkeit je Partie statt Zufallszügen im Spiel)
+
+**Status:** Inhaberentscheidung vom 2026-10-17. Die Nummern D-110 bis D-113 sind
+vom Asset-Pass auf `feat/generals-look-and-feel` belegt.
+
+**Kontext:** Jede lokale Partie gegen die KI lief identisch ab. Am Code geprüft
+(`main` @ `85c912b`), stapeln sich drei Ursachen:
+
+1. Die Skirmish-KI ist bewusst zustandslos und ohne Zufall. Jede Entscheidung
+   ist eine reine Funktion aus Tick und committed Zustand.
+2. Die lokale Partie startet immer mit `MatchBootstrap.CanonicalSeed`.
+3. Das Repertoire ist klein: eine Bauordnung, nur Basisinfanterie, drei von
+   neun Gebäuderollen.
+
+Der KI-Strang ist seit Arns letzter Aktivität (2026-08-21) unbesetzt; der
+Inhaber übernimmt ihn. Als Vorbild dient C&C Generals: der offene EA-Quellcode
+(GPL-3), aus dem nur Konzepte übernommen werden, kein Code. Generals wählt unter
+gleich priorisierten Teams per Spielzufall aus dem Simulations-Seed und zieht
+das Fähigkeiten-Set des Computergegners je Partie neu.
+
+**Alternativen:**
+
+1. Die KI zieht während der Partie aus dem Simulations-PRNG (`SimRandom`). Das
+   greift in den Zufallsstrom aller Systeme ein. Außerdem hinge jede
+   KI-Entscheidung vom Ziehzeitpunkt ab, und Save/Restore bräuchte KI-Zustand.
+2. Die KI bekommt einen eigenen PRNG-Zustand im Sidecar
+   ([AIArchitecture.md](../tech/AIArchitecture.md) §4). Das braucht einen
+   Snapshot-Block und damit eine eigene Grundsatzentscheidung. Für Abwechslung
+   *zwischen* Partien ist das nicht nötig.
+3. Eine **Persönlichkeit als reine Funktion aus Match-Seed und KI-Slot**, beim
+   Aufbau festgelegt, dazu ein frischer Seed je lokaler Partie aus dem Menü.
+
+**Entscheidung:** Alternative 3.
+
+- `AiPersonality.Derive(seed, slot)` hasht einen Domänen-Tag, den Seed und den
+  Slot (XxHash64). Daraus wählt die Funktion:
+  - eine von vier Eröffnungen:
+    - **Ausgewogen** (heutiges Verhalten mit leichter Streuung);
+    - **Ansturm**: Kaserne vor Raffinerie, kleinere Armee, die früher losschlägt;
+    - **Ökonom**: dritter Sammler und größere Armee;
+    - **Igel**: ein bis zwei Abwehrplattformen zwischen HQ und Sammelpunkt;
+  - einen seitlich versetzten Sammelpunkt (−10, 0 oder +10 Felder);
+  - eine von acht Suchrichtungen für Bauplätze;
+  - kleine Streuungen der Profilwerte in festen Bändern.
+- Die neutrale Persönlichkeit (`default`) spielt exakt wie r8. Der gepinnte
+  Ausgang der kanonischen KI-Partie bewegt sich nicht.
+- Eine Persönlichkeit schaltet keine Regel ein, die das Grundprofil
+  abgeschaltet hat.
+- `MatchBootstrap.FreshSeedPerLocalMatch` ist standardmäßig aus, damit Tests und
+  Harnesses beim kanonischen Seed bleiben. Das Hauptmenü schaltet es ein, und
+  „Neue Runde“ zieht dann ebenfalls neu.
+- `NOVA_MATCH_SEED` pinnt den Seed, um eine gemeldete Partie nachzustellen.
+- Netzpartien sind unberührt; ihr Seed kommt vom Relay.
+- Debug-HUD (F3) und Startlog zeigen Persönlichkeit und Seed.
+- `AiBehaviorId` steigt auf r9. Der Profil-Hash bleibt, weil sich
+  `Ms1Canonical` nicht ändert.
+
+**Begründung:** Für Abwechslung zwischen Partien braucht es keine Zufallszüge
+während der Partie. Als reine Funktion bleibt die KI zustandslos und
+Save/Restore-identisch, und der Seed allein reproduziert den Gegner.
+Snapshot-Format, Determinismus-Baselines und Match-Fingerprint werden nicht
+berührt.
+
+**Konsequenzen:**
+
+- **Die Vielfalt ist bewusst klein.** Mit Infanterie und drei Gebäuderollen
+  variieren nur Bauordnung, Basisbild, Sammelpunkt und Angriffszeitpunkt.
+  Headless gegen einen passiven Gegner entscheiden die Eröffnungen die Partie
+  zwischen rund 2.000 und 3.000 Ticks; kanonisch sind es 2.726.
+- **Stufe B ist der eigentliche Hebel:** Fahrzeugfabrik, Panzer, Konter-Bau
+  nach sichtbarer Gegnerzusammensetzung, Labor und Tier 2. Sie kommt in eigenen
+  PRs.
+- **Stufe C bleibt eine eigene Entscheidung:** Lernen innerhalb der Partie
+  (Generals: Teampriorität steigt nach Erfolg und sinkt nach Misserfolg)
+  braucht KI-Gedächtnis im Spielstand.
+- **Der kanonische Seed spielt nicht mehr neutral.** Er leitet einen
+  Ansturm-Gegner ab. Wer ohne Menü startet (AutoStart, Harness), spielt diesen,
+  nicht r8.
+
 ### D-115 | verbindlich | Asset-Pass 2026-10-17 (Wracks bleiben liegen, Umgebungsbewegung)
 
 **Status:** Im Auftrag des Inhabers vom 2026-10-17 („zu jedem Asset eine
@@ -4025,10 +4104,12 @@ Generatorsplitter hält. Altstand liegt unter
 
 | Version | Datum | Änderung | Autor |
 |---|---|---|---|
+| 1.50.1 | 2026-10-18 | D-114 und dessen Verlauf aus main mit D-110–D-119 zusammengeführt; Entscheidungsinhalte unverändert | Codex |
 | 1.50.0 | 2026-10-17 | D-118 und D-119 aufgenommen: jeder Bauer kann bauen (Übergabe der Baustelle an den eigenen Bauer in Reichweite, ersetzt die Nur-kleinster-Index-Regel aus D-085); Legion-Kraftwerk, -Fabrik, -Labor und -Kaserne prozedural nach Konzeptbild statt generiert, Hunyuan3D wegen fehlender EU-Lizenz verworfen | Dennis Westermann / Orchestrator |
 | 1.49.0 | 2026-10-17 | D-117 aufgenommen: Befehlsleiste im Stil von Zero Hour in UI Toolkit; Angriffsbewegung, Patrouille, Bewachen, Verteilen und Formationen als Client-Aufträge über Move/Stop/AttackTarget statt neuer CommandKinds | Dennis Westermann / Orchestrator |
 | 1.48.0 | 2026-10-17 | D-116 aufgenommen: oktile Wegkosten (Ganzzahlfehler 14/10 → 1 behoben), Abstand je Einheitentyp, größenabhängige Gruppenplätze, Platzmachen, pfadgeführter Kurs; Regel-Revision V4, kanonischer KI-Pin bewegt | Dennis Westermann / Orchestrator |
 | 1.47.0 | 2026-10-17 | D-115 aufgenommen: Wrack-Variante je Asset im Prefab, Wracks bleiben liegen (Obergrenzen 60/20, Neubau räumt), Umgebungsbewegung über geteilte Partikelsysteme. Version 1.46.0 trägt D-114 (KI-Strang, PR #144) | Dennis Westermann / Orchestrator |
+| 1.46.0 | 2026-10-17 | D-114 aufgenommen: Die Skirmish-KI bekommt je Partie eine Persönlichkeit als reine Funktion aus Match-Seed und Slot (Eröffnung, Sammelpunkt-Flanke, Bauplatz-Suchrichtung, Profilstreuung); das Hauptmenü zieht je lokaler Partie einen frischen Seed. Die Versionen 1.42.0 bis 1.45.0 und D-110 bis D-113 trägt der Asset-Pass auf `feat/generals-look-and-feel` | Dennis Westermann / Orchestrator |
 | 1.45.0 | 2026-10-17 | D-113 aufgenommen: Größenverhältnis der Art über eine Regel je Klasse (`ArtViewScale`) statt der Graybox-Tabelle; Fahrzeuge 0,22 Felder je Meter, Mindesthöhen für Infanterie und Bauer, Abwehrtürme auf Panzerhöhe | Dennis Westermann / Orchestrator |
 | 1.44.0 | 2026-10-17 | D-112 aufgenommen: Abwehrtürme optisch auf rund doppelte Soldatenhöhe verkleinert (Sockel füllt den 3×3-Footprint), Footprint-Verkleinerung als Regeländerung offen gelassen | Dennis Westermann / Orchestrator |
 | 1.43.0 | 2026-10-17 | D-111 aufgenommen: Bloom als Grundstack des Pipeline-Assets (fehlende `postProcessData` ergänzt, Kamera-Post-Processing an, Emission mit `RealtimeEmissive`), Sonne auf `Euler(50°, 35°)` von der Kameraseite statt Gegenlicht | Dennis Westermann / Orchestrator |

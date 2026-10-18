@@ -156,8 +156,22 @@ namespace Nova.AI.Data
         /// 15-point margin covered the Barracks' 10-point draw and therefore
         /// retried an illegal placement forever once the all-of gate shipped.
         /// </para>
+        /// <para>
+        /// r9 is the per-match personality (<see cref="AiPersonality"/>): an
+        /// opening order (Balanced, or Rush with the Barracks first, Economy,
+        /// Turtle with defence platforms toward the front), a flank offset of
+        /// the staging cell, an orientation of the placement scan and banded
+        /// number deltas on army size, squad threshold, harvesters, retreat and
+        /// home guard. It is derived purely from (match seed, slot) and fixed
+        /// at construction, so the AI stays stateless. The NEUTRAL personality
+        /// (<c>default</c>) reproduces r8 tick for tick, which is what the
+        /// canonical outcome pin proves; <see cref="ProfileHash"/> is unchanged
+        /// because <see cref="AiProfiles.Ms1Canonical"/> is. A match that
+        /// plays a non-neutral personality is still "r9" — the personality
+        /// is printed next to this identifier, not folded into it.
+        /// </para>
         /// </summary>
-        public const int Revision = 8;
+        public const int Revision = 9;
 
         /// <summary>
         /// Hash over every value of the shipped profile. Domain-separated like
