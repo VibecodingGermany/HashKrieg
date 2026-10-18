@@ -281,14 +281,18 @@ namespace Nova.Simulation.Tests
         [Test]
         public void Rotation_FollowsMovementDirection_ViaSimTrigAtan2()
         {
-            // The heading is SimTrig.Atan2 of the normalized steering vector:
-            // a pure diagonal move faces exactly 45 degrees (8192 angle units).
+            // The heading is SimTrig.Atan2 of the PATH direction, turned at
+            // most 30 degrees (5461 angle units) per tick (D-116): a pure
+            // diagonal move from heading 0 reaches exactly 45 degrees (8192)
+            // on the second tick.
             var host = TestHost.Create(Seed);
             EntityId unit = host.Entities.SpawnUnit(0, new Transform2D(SimFixed.FromFloat(10.5f), SimFixed.FromFloat(10.5f)), SimFixed.FromInt(5));
             host.Entities.GetUnitRef(unit).SetTarget(new GridPos2D(20, 20));
 
             host.StepTick();
+            Assert.AreEqual(5461, host.Entities.GetUnitRef(unit).Transform.Rotation.RawValue, "one tick turns at most 30 degrees");
 
+            host.StepTick();
             Assert.AreEqual(8192, host.Entities.GetUnitRef(unit).Transform.Rotation.RawValue);
         }
 

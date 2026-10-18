@@ -27,6 +27,20 @@ namespace Nova.Gameplay.Match
         /// <summary>Legion base tone of the D-072 palette (#7A3524).</summary>
         public static readonly Color LegionBase = ParseHex("#7A3524");
 
+        /// <summary>
+        /// High-albedo tint for textured 3D Alliance prefabs: keeps the
+        /// authored BaseColor map bright and legible while adding a subtle
+        /// cool steel-blue grade.
+        /// </summary>
+        public static readonly Color AlliancePrefabTint = new Color(0.94f, 0.97f, 1.00f, 1f);
+
+        /// <summary>
+        /// High-albedo tint for textured 3D Legion prefabs: keeps the
+        /// authored BaseColor map bright and legible while adding a subtle
+        /// warm industrial-amber grade instead of crushing green/blue channels.
+        /// </summary>
+        public static readonly Color LegionPrefabTint = new Color(1.00f, 0.93f, 0.87f, 1f);
+
         private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
         private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
 
@@ -38,6 +52,15 @@ namespace Nova.Gameplay.Match
         public static Color BaseColor(FactionId faction)
         {
             return faction == FactionId.Legion ? LegionBase : AllianceBase;
+        }
+
+        /// <summary>
+        /// High-albedo tint for a 3D prefab view whose material already carries
+        /// a faction-authored BaseColor texture.
+        /// </summary>
+        public static Color PrefabBaseColor(FactionId faction)
+        {
+            return faction == FactionId.Legion ? LegionPrefabTint : AlliancePrefabTint;
         }
 
         /// <summary>

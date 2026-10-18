@@ -49,5 +49,20 @@ namespace Nova.Gameplay.Tests
             Assert.That(block.GetColor("_Color"), Is.EqualTo(tint),
                 "built-in RP reads _Color");
         }
+
+        [Test]
+        public void PrefabBaseColor_PreservesHighAlbedoAndDistinguishesFactions()
+        {
+            Color alliance = FactionTint.PrefabBaseColor(FactionId.Alliance);
+            Color legion = FactionTint.PrefabBaseColor(FactionId.Legion);
+
+            Assert.That(alliance, Is.Not.EqualTo(legion));
+            Assert.That(alliance.r, Is.GreaterThan(0.85f), "3D prefab tint must not crush red channel");
+            Assert.That(alliance.g, Is.GreaterThan(0.85f), "3D prefab tint must not crush green channel");
+            Assert.That(alliance.b, Is.GreaterThan(0.85f), "3D prefab tint must not crush blue channel");
+            Assert.That(legion.r, Is.GreaterThan(0.85f), "3D prefab tint must not crush red channel");
+            Assert.That(legion.g, Is.GreaterThan(0.85f), "3D prefab tint must not crush green channel");
+            Assert.That(legion.b, Is.GreaterThan(0.85f), "3D prefab tint must not crush blue channel");
+        }
     }
 }

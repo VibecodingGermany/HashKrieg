@@ -1,6 +1,6 @@
 # Demo-Runbook – erste spielbare Runde (Glutrinne-Graybox)
 
-**Version:** 0.6.1 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
+**Version:** 0.6.2 | **Status:** Entwurf – Graybox-Spur, kein Gate-Nachweis | **Verantwortungsbereich:** Producer / Technical Writer | **Sprint:** 16
 
 ## Zweck
 
@@ -94,7 +94,7 @@ Gate-Status steht ausschließlich in [MVPRecoveryPlan.md](MVPRecoveryPlan.md).
 | LMB Klick / Drag | Auswahl einzeln / Box |
 | RMB | Bewegen |
 | S | Stopp |
-| A | Angriff auf Gegner unter dem Cursor (sonst schlichtes Move — **keine** Zielerfassung bei Ankunft) |
+| A | Angriff auf Gegner unter dem Cursor; auf Boden Angriffsbewegung mit Gegnererfassung unterwegs |
 | H | Nächstes freies Aetherium-Feld abernten |
 | R | Ladung abliefern |
 | P | Pause / Fortsetzen |
@@ -160,8 +160,9 @@ steht davor und dauert so lange, wie man ihn zeigen will.
   snapshot-serialisiert.
 - **Zielerfassung bleibt schlicht:** Bewaffnete Einheiten und fertige
   Verteidigungsplattformen erfassen Ziele automatisch und erwidern Feuer. Ein
-  A-Befehl ohne Gegner unter dem Cursor bleibt jedoch ein schlichtes Move;
-  Attack-Move und Zielerfassung bei der Ankunft sind nicht implementiert.
+  Befehl „Angriffsbewegung“ ist implementiert: kampffähige Truppen bekämpfen
+  sichtbare Gegner unterwegs und setzen danach den Marsch fort. Der vollständige
+  aktuelle Spielablauf mit Art-Assets bleibt manuell abzunehmen.
 - `Stop` löscht Bewegung und das aktuelle Angriffsziel. Die automatische
   Zielerfassung darf im nächsten Combat-Tick erneut ein Ziel setzen; ein echtes
   Halte-Feuer ist weiterhin nicht implementiert. Angriffe auf eigene Einheiten
@@ -280,3 +281,4 @@ der Editor in der Konsole, wenn das Schreiben fehlschlägt.
 | 0.5.0 | 2026-08-06 | Bedienbares HUD (D-084): §2 um Bauleiste/Ghost-Platzierung, Command Card, Minimap, sichtbaren Nebel und Selektionsmarker ergänzt; §3 um MMB-Drag-Rotation, Space-Reset und die tastaturfreien Wege über Bauleiste/Command Card erweitert | Agent |
 | 0.6.0 | 2026-08-10 | D-102/Sprint 16.7 nachgezogen: fünf endliche Aetheriumfelder samt Markerpositionen und Reserven ersetzen die alte Zwei-Feld-Beschreibung; Angriffswege bleiben G4-Scope | Codex / Dennis Westermann |
 | 0.6.1 | 2026-08-10 | D-097/Paket 16.10 nachgezogen: Stop löscht das aktuelle Angriffsziel; automatische Neuerfassung im Folgetick und das weiterhin fehlende Halte-Feuer ehrlich abgegrenzt; die benachbarte überholte Behauptung fehlender Auto-Zielerfassung auf den aktuellen Combat-Stand korrigiert | Codex / Dennis Westermann |
+| 0.6.2 | 2026-10-18 | Veraltete Aussage zu fehlendem Attack-Move durch den implementierten Befehlsablauf ersetzt; aktuelle manuelle Abnahme bleibt offen | Codex |

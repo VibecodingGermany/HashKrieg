@@ -85,6 +85,42 @@ namespace Nova.Simulation.Movement
         /// </summary>
         private static readonly SimFixed MinSteeringLengthSquared = SimFixed.FromRaw(7);
 
+        /// <summary>
+        /// Heading turn limit per tick (30 degrees, 5461 of 65536 angle units;
+        /// D-116): an 8-way flow snap turns over two ticks, a reversal over
+        /// six, instead of flipping in one.
+        /// </summary>
+        private const int MaxTurnUnitsPerTick = 5461;
+
+        /// <summary>
+        /// Below this squared length (0.1 cells) the path vector near the goal
+        /// is too short to define a heading; the unit keeps the one it has.
+        /// </summary>
+        private static readonly SimFixed MinHeadingLengthSquared = SimFixed.FromRaw(SimFixed.OneRaw / 100);
+
+        /// <summary>
+        /// Neighbour query half-width in cells: spacing radii reach 0.78
+        /// (<see cref="MovementSpacing.MaxRadius"/>), so a pair can touch at
+        /// 1.56 cells — beyond the old 3x3 window.
+        /// </summary>
+        private const int QueryCells = 2;
+
+        /// <summary>How far ahead of a mover a standing friend starts to make way (on top of both radii).</summary>
+        private static readonly SimFixed YieldLookAhead = SimFixed.FromRaw(SimFixed.OneRaw * 6 / 5);
+
+        /// <summary>Lateral clearance a yielding unit opens beyond both radii (0.15 cells).</summary>
+        private static readonly SimFixed YieldMargin = SimFixed.FromRaw((SimFixed.OneRaw * 15 + 50) / 100);
+
+        /// <summary>Share of the missing clearance a yielding unit steps per tick (0.6).</summary>
+        private static readonly SimFixed YieldGain = SimFixed.FromRaw((SimFixed.OneRaw * 3) / 5);
+
+        /// <summary>
+        /// Weight of a yielding friend's separation on the mover (0.25): the
+        /// mover keeps its line and the group parts around it, instead of both
+        /// pushing each other off course.
+        /// </summary>
+        private static readonly SimFixed YielderSeparationWeight = SimFixed.FromRaw(SimFixed.OneRaw / 4);
+
         private readonly EntityManager _entityManager;
         private readonly PathfindingSystem _pathfindingSystem;
 
@@ -193,16 +229,20 @@ namespace Nova.Simulation.Movement
                     }
                 }
 
-                // O(1) Local 3x3 Spatial Grid Neighborhood Separation —
+                // O(1) local 5x5 spatial-grid neighbourhood separation —
                 // computed for moving and standing units alike, so an
                 // arrived unit still makes room (and can be pushed).
+                // Contact distance uses the per-role spacing radius (D-116).
                 SimFixed sepDx = SimFixed.Zero;
                 SimFixed sepDy = SimFixed.Zero;
+                SimFixed yieldDx = SimFixed.Zero;
+                SimFixed yieldDy = SimFixed.Zero;
+                SimFixed myRadius = MovementSpacing.RadiusOf(in unit);
 
-                int minGx = Math.Max(0, gridX - 1);
-                int maxGx = Math.Min(_gridWidth - 1, gridX + 1);
-                int minGy = Math.Max(0, gridY - 1);
-                int maxGy = Math.Min(_gridHeight - 1, gridY + 1);
+                int minGx = Math.Max(0, gridX - QueryCells);
+                int maxGx = Math.Min(_gridWidth - 1, gridX + QueryCells);
+                int minGy = Math.Max(0, gridY - QueryCells);
+                int maxGy = Math.Min(_gridHeight - 1, gridY + QueryCells);
 
                 for (int gy = minGy; gy <= maxGy; gy++)
                 {
@@ -215,7 +255,23 @@ namespace Nova.Simulation.Movement
                             {
                                 ref readonly UnitState other = ref units[otherIndex];
                                 SimFixed distSq = unit.Transform.DistanceToSquared(in other.Transform);
-                                SimFixed minDist = unit.Radius + other.Radius;
+                                SimFixed otherRadius = MovementSpacing.RadiusOf(in other);
+                                SimFixed minDist = myRadius + otherRadius;
+
+                                // A standing friend no bigger than me makes
+                                // way (below); while I drive, its push on me
+                                // is weak, so I keep my line through the group.
+                                SimFixed weight = SimFixed.One;
+                                if (moving && !other.IsMoving && other.MoveSpeed > SimFixed.Zero
+                                    && other.PlayerId == unit.PlayerId && otherRadius <= myRadius)
+                                {
+                                    weight = YielderSeparationWeight;
+                                }
+                                if (!moving)
+                                {
+                                    AccumulateYield(in unit, myRadius, in other, otherRadius, otherIndex > i,
+                                        ref yieldDx, ref yieldDy);
+                                }
 
                                 if (distSq == SimFixed.Zero)
                                 {
@@ -225,12 +281,12 @@ namespace Nova.Simulation.Movement
                                     // index — the higher index yields in +x.
                                     // Deterministic across hosts (indices are
                                     // canonical state).
-                                    sepDx += otherIndex > i ? -minDist : minDist;
+                                    sepDx += (otherIndex > i ? -minDist : minDist) * weight;
                                 }
                                 else if (distSq < minDist * minDist)
                                 {
                                     SimFixed dist = SimTrig.Sqrt(distSq);
-                                    SimFixed pushFactor = (minDist - dist) / dist;
+                                    SimFixed pushFactor = (minDist - dist) / dist * weight;
                                     sepDx += (curX - other.Transform.PositionX) * pushFactor;
                                     sepDy += (curY - other.Transform.PositionY) * pushFactor;
                                 }
@@ -260,7 +316,14 @@ namespace Nova.Simulation.Movement
                         SimFixed step = unit.MoveSpeed / TicksPerSecond;
                         SimFixed nextX = curX + finalDx * step;
                         SimFixed nextY = curY + finalDy * step;
-                        SimAngle rotation = SimTrig.Atan2(finalDy, finalDx);
+                        // Heading follows the PATH, not path plus separation:
+                        // in a crowd the summed push could flip a unit by up
+                        // to 180 degrees per tick. Turn-rate limited (D-116).
+                        SimAngle rotation = unit.Transform.Rotation;
+                        if (moveDx * moveDx + moveDy * moveDy > MinHeadingLengthSquared)
+                        {
+                            rotation = TurnToward(rotation, SimTrig.Atan2(moveDy, moveDx));
+                        }
 
                         // Never step into an impassable cell (a building
                         // footprint, once construction feeds the cost field):
@@ -287,8 +350,8 @@ namespace Nova.Simulation.Movement
                     // raw overlap vector, damped, capped and dead-zoned. The
                     // push approaches zero as the overlap closes, so arrived
                     // units unstack without vibrating; rotation is untouched.
-                    SimFixed pushDx = sepDx * StandingSeparationWeight;
-                    SimFixed pushDy = sepDy * StandingSeparationWeight;
+                    SimFixed pushDx = sepDx * StandingSeparationWeight + yieldDx;
+                    SimFixed pushDy = sepDy * StandingSeparationWeight + yieldDy;
 
                     SimFixed lenSq = pushDx * pushDx + pushDy * pushDy;
                     if (lenSq > MinSteeringLengthSquared)
@@ -309,6 +372,54 @@ namespace Nova.Simulation.Movement
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Make way (D-116): a standing unit that sits in the corridor ahead of
+        /// a moving friend at least its own size steps sideways, away from the
+        /// mover's line, by a share of the clearance still missing. The mover's
+        /// heading is its path direction, so the corridor points where it is
+        /// going. A unit dead on the line steps to a side fixed by entity
+        /// order, so two hosts always part the same way.
+        /// </summary>
+        private static void AccumulateYield(in UnitState me, SimFixed myRadius, in UnitState mover, SimFixed moverRadius,
+                                            bool moverIsHigherIndex, ref SimFixed yieldDx, ref SimFixed yieldDy)
+        {
+            if (!mover.IsMoving || mover.MoveSpeed <= SimFixed.Zero) return;
+            if (mover.PlayerId != me.PlayerId) return;
+            if (moverRadius < myRadius) return;
+
+            SimFixed dirX = SimTrig.Cos(mover.Transform.Rotation);
+            SimFixed dirY = SimTrig.Sin(mover.Transform.Rotation);
+            SimFixed relX = me.Transform.PositionX - mover.Transform.PositionX;
+            SimFixed relY = me.Transform.PositionY - mover.Transform.PositionY;
+
+            SimFixed along = relX * dirX + relY * dirY;
+            SimFixed reach = moverRadius + myRadius + YieldLookAhead;
+            if (along <= SimFixed.Zero || along >= reach) return;
+
+            SimFixed lateral = relX * -dirY + relY * dirX;   // signed distance off the line
+            SimFixed clearance = moverRadius + myRadius + YieldMargin;
+            SimFixed absLateral = lateral < SimFixed.Zero ? -lateral : lateral;
+            if (absLateral >= clearance) return;
+
+            SimFixed side = lateral > SimFixed.Zero ? SimFixed.One
+                : lateral < SimFixed.Zero ? -SimFixed.One
+                : (moverIsHigherIndex ? SimFixed.One : -SimFixed.One);
+            // Closer ahead of the mover means more urgent.
+            SimFixed urgency = SimFixed.One - along / reach;
+            SimFixed step = (clearance - absLateral) * YieldGain * urgency * side;
+            yieldDx += -dirY * step;
+            yieldDy += dirX * step;
+        }
+
+        /// <summary>Turns <paramref name="from"/> toward <paramref name="to"/> by at most <see cref="MaxTurnUnitsPerTick"/>.</summary>
+        private static SimAngle TurnToward(SimAngle from, SimAngle to)
+        {
+            int delta = (short)unchecked((ushort)(to.RawValue - from.RawValue));
+            if (delta > MaxTurnUnitsPerTick) delta = MaxTurnUnitsPerTick;
+            else if (delta < -MaxTurnUnitsPerTick) delta = -MaxTurnUnitsPerTick;
+            return SimAngle.FromRaw(unchecked((ushort)(from.RawValue + delta)));
         }
 
         /// <summary>True when the world position lies inside the map on a walkable cell.</summary>

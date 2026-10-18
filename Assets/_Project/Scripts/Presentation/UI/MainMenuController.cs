@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
+using Nova.Simulation.State;
 
 namespace Nova.Presentation.UI
 {
@@ -126,6 +127,9 @@ namespace Nova.Presentation.UI
         private Button _networkCancel;
         private Label _networkStatus;
         private UnitViewManager _views;
+        private FactionId _skirmishFaction = FactionId.Alliance;
+        private Button _allianceFactionButton;
+        private Button _legionFactionButton;
 
         /// <summary>Deduplicated width x height modes, biggest first; index-parallel to the resolution dropdown.</summary>
         private readonly List<Vector2Int> _resolutions = new List<Vector2Int>(16);
@@ -342,6 +346,7 @@ namespace Nova.Presentation.UI
 
         private void BuildMainButtons(VisualElement parent)
         {
+            BuildSkirmishFactionRow(parent);
             parent.Add(MakeButton("Neues Spiel", StartMatch));
             parent.Add(MakeButton("Netzpartie", () => ShowLobbyPanel(true)));
 
@@ -366,6 +371,86 @@ namespace Nova.Presentation.UI
 
             parent.Add(MakeButton("Einstellungen", () => ShowSettings(true)));
             parent.Add(MakeButton("Beenden", Quit));
+        }
+
+        private void BuildSkirmishFactionRow(VisualElement parent)
+        {
+            var row = new VisualElement { name = "skirmish-faction-row" };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.width = _buttonWidth;
+            row.style.marginBottom = 8f;
+
+            var label = new Label("Fraktion:")
+            {
+                name = "skirmish-faction-label",
+                pickingMode = PickingMode.Ignore,
+            };
+            ApplyFont(label, _bodyFont);
+            label.style.fontSize = 18;
+            label.style.color = _bodyColor;
+            label.style.marginRight = 10f;
+            row.Add(label);
+
+            _allianceFactionButton = MakeFactionChip("Allianz", "skirmish-faction-alliance", () => SetSkirmishFaction(FactionId.Alliance));
+            _allianceFactionButton.style.marginRight = 6f;
+            row.Add(_allianceFactionButton);
+
+            _legionFactionButton = MakeFactionChip("Legion", "skirmish-faction-legion", () => SetSkirmishFaction(FactionId.Legion));
+            row.Add(_legionFactionButton);
+
+            parent.Add(row);
+            RefreshSkirmishFactionChips();
+        }
+
+        private Button MakeFactionChip(string text, string elementName, Action onClick)
+        {
+            var chip = new Button(onClick)
+            {
+                name = elementName,
+                text = text,
+            };
+            ApplyFont(chip, _titleFont);
+            chip.style.flexGrow = 1f;
+            chip.style.height = 38f;
+            chip.style.fontSize = 19;
+            chip.style.letterSpacing = 1.5f;
+            chip.style.unityTextAlign = TextAnchor.MiddleCenter;
+            chip.style.marginLeft = 0f;
+            chip.style.marginTop = 0f;
+            chip.style.marginBottom = 0f;
+            return chip;
+        }
+
+        private void SetSkirmishFaction(FactionId faction)
+        {
+            _skirmishFaction = faction == FactionId.Legion ? FactionId.Legion : FactionId.Alliance;
+            AudioServiceLocator.Play2D(SoundEventId.UI_Click);
+            RefreshSkirmishFactionChips();
+        }
+
+        private void RefreshSkirmishFactionChips()
+        {
+            bool allianceSelected = _skirmishFaction != FactionId.Legion;
+            if (_allianceFactionButton != null)
+            {
+                _allianceFactionButton.style.backgroundColor = allianceSelected
+                    ? new Color(0.14f, 0.25f, 0.34f, 0.95f)
+                    : _buttonFill;
+                _allianceFactionButton.style.color = allianceSelected ? _titleColor : _disabledTextColor;
+                SetBorder(_allianceFactionButton, allianceSelected ? 2f : 1f,
+                    allianceSelected ? _accentColor : _panelEdge, 3f);
+            }
+            if (_legionFactionButton != null)
+            {
+                Color legionAccent = new Color(0.92f, 0.42f, 0.24f, 1f);
+                _legionFactionButton.style.backgroundColor = !allianceSelected
+                    ? new Color(0.32f, 0.14f, 0.10f, 0.95f)
+                    : _buttonFill;
+                _legionFactionButton.style.color = !allianceSelected ? _titleColor : _disabledTextColor;
+                SetBorder(_legionFactionButton, !allianceSelected ? 2f : 1f,
+                    !allianceSelected ? legionAccent : _panelEdge, 3f);
+            }
         }
 
         private void BuildNetworkJoin(VisualElement parent)
@@ -711,6 +796,7 @@ namespace Nova.Presentation.UI
             }
 
             IsMenuVisible = false;
+            _bootstrap.LocalSkirmishFaction = _skirmishFaction;
             // Order matters: match first, rig second. RtsCameraController
             // resets the minimap channel in its OnEnable, and that reset
             // belongs to the fresh match rather than to the empty scene.
@@ -720,6 +806,7 @@ namespace Nova.Presentation.UI
             _bootstrap.FreshSeedPerLocalMatch = true;
             if (_bootstrap.IsMatchReady)
             {
+                _views?.ResetViews();
                 _bootstrap.RestartMatch();
             }
             else

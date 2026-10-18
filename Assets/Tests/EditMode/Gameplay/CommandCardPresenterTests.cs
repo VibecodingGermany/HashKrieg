@@ -359,6 +359,145 @@ namespace Nova.Gameplay.Tests
         }
 
         // ----------------------------------------------------------------
+        // Unit command bar: per-unit-type presence and harvester readout (D-117)
+        // ----------------------------------------------------------------
+
+        [Test]
+        public void GetBarCommands_Harvester_HidesCombatOrdersAndFormations()
+        {
+            var presenter = new CommandCardPresenter();
+
+            BarCommand bar = presenter.GetBarCommands(FactionId.Alliance, new[] { UnitRole.Harvester, UnitRole.Harvester });
+
+            Assert.IsTrue(bar.HasFlag(BarCommand.Move));
+            Assert.IsTrue(bar.HasFlag(BarCommand.Stop));
+            Assert.IsTrue(bar.HasFlag(BarCommand.Harvest));
+            Assert.IsTrue(bar.HasFlag(BarCommand.ReturnCargo));
+            foreach (BarCommand hidden in new[]
+            {
+                BarCommand.AttackMove, BarCommand.Guard, BarCommand.Patrol,
+                BarCommand.AttackTarget, BarCommand.Scatter, BarCommand.Formations, BarCommand.Repair,
+            })
+            {
+                Assert.IsFalse(bar.HasFlag(hidden), $"{hidden} must be hidden for harvesters");
+            }
+        }
+
+        [Test]
+        public void GetBarCommands_Builder_OffersRepairButNoCombatOrders()
+        {
+            var presenter = new CommandCardPresenter();
+
+            BarCommand bar = presenter.GetBarCommands(FactionId.Legion, new[] { UnitRole.Builder });
+
+            Assert.IsTrue(bar.HasFlag(BarCommand.Repair));
+            Assert.IsFalse(bar.HasFlag(BarCommand.Patrol));
+            Assert.IsFalse(bar.HasFlag(BarCommand.Formations));
+            Assert.IsFalse(bar.HasFlag(BarCommand.Harvest));
+        }
+
+        [Test]
+        public void GetBarCommands_ArmedUnits_OfferCombatOrdersAndFormationsButNoRoleActions()
+        {
+            var presenter = new CommandCardPresenter();
+
+            BarCommand bar = presenter.GetBarCommands(FactionId.Alliance, new[] { UnitRole.LightTank, UnitRole.BasicInfantry });
+
+            foreach (BarCommand shown in new[]
+            {
+                BarCommand.Move, BarCommand.Stop, BarCommand.AttackMove, BarCommand.Guard, BarCommand.Patrol,
+                BarCommand.AttackTarget, BarCommand.Scatter, BarCommand.Formations,
+            })
+            {
+                Assert.IsTrue(bar.HasFlag(shown), $"{shown} must be shown for armed units");
+            }
+            Assert.IsFalse(bar.HasFlag(BarCommand.Harvest));
+            Assert.IsFalse(bar.HasFlag(BarCommand.ReturnCargo));
+            Assert.IsFalse(bar.HasFlag(BarCommand.Repair));
+        }
+
+        [Test]
+        public void GetBarCommands_MixedSelection_CombatGroupIsUnionRoleActionsAreIntersection()
+        {
+            var presenter = new CommandCardPresenter();
+
+            BarCommand bar = presenter.GetBarCommands(FactionId.Alliance, new[] { UnitRole.Harvester, UnitRole.LightTank });
+
+            Assert.IsTrue(bar.HasFlag(BarCommand.Guard), "one armed unit is enough for the combat group");
+            Assert.IsTrue(bar.HasFlag(BarCommand.Formations));
+            Assert.IsFalse(bar.HasFlag(BarCommand.Harvest), "Harvest would be a lie over the tank");
+            Assert.IsFalse(bar.HasFlag(BarCommand.ReturnCargo));
+        }
+
+        [Test]
+        public void GetBarCommands_NoMobileRole_ReturnsNone()
+        {
+            var presenter = new CommandCardPresenter();
+
+            Assert.AreEqual(BarCommand.None, presenter.GetBarCommands(FactionId.Alliance, new[] { UnitRole.HQ }));
+            Assert.AreEqual(BarCommand.None, presenter.GetBarCommands(FactionId.Alliance, new UnitRole[0]));
+        }
+
+        [Test]
+        public void IsArmedRole_FollowsTheDefinitionRow()
+        {
+            Assert.IsTrue(CommandCardPresenter.IsArmedRole(FactionId.Alliance, UnitRole.LightTank));
+            Assert.IsFalse(CommandCardPresenter.IsArmedRole(FactionId.Alliance, UnitRole.Harvester));
+            Assert.IsFalse(CommandCardPresenter.IsArmedRole(FactionId.Alliance, UnitRole.Builder));
+            Assert.IsFalse(CommandCardPresenter.IsArmedRole(FactionId.Alliance, UnitRole.HQ));
+        }
+
+        [Test]
+        public void GetHarvesterStatus_DerivesFromOrdersAndMovement()
+        {
+            var u = new UnitState();
+            Assert.AreEqual(HarvesterStatus.Idle, CommandCardPresenter.GetHarvesterStatus(in u));
+
+            u.HarvestFieldId = 3;
+            u.IsMoving = true;
+            Assert.AreEqual(HarvesterStatus.DrivingToField, CommandCardPresenter.GetHarvesterStatus(in u));
+            u.IsMoving = false;
+            Assert.AreEqual(HarvesterStatus.Harvesting, CommandCardPresenter.GetHarvesterStatus(in u));
+
+            u.IsReturningCargo = true;
+            u.IsMoving = true;
+            Assert.AreEqual(HarvesterStatus.DrivingToRefinery, CommandCardPresenter.GetHarvesterStatus(in u));
+            u.IsMoving = false;
+            Assert.AreEqual(HarvesterStatus.WaitingAtRefinery, CommandCardPresenter.GetHarvesterStatus(in u));
+
+            Assert.AreEqual("Fährt zum Feld", CommandCardPresenter.FormatHarvesterStatus(HarvesterStatus.DrivingToField));
+            Assert.AreEqual("Sammelt", CommandCardPresenter.FormatHarvesterStatus(HarvesterStatus.Harvesting));
+            Assert.AreEqual("Fährt zur Raffinerie", CommandCardPresenter.FormatHarvesterStatus(HarvesterStatus.DrivingToRefinery));
+            Assert.AreEqual("Wartet an der Raffinerie", CommandCardPresenter.FormatHarvesterStatus(HarvesterStatus.WaitingAtRefinery));
+            Assert.AreEqual("Untätig", CommandCardPresenter.FormatHarvesterStatus(HarvesterStatus.Idle));
+        }
+
+        [Test]
+        public void SummarizeHarvesters_SumsCargoCapacityAndStatus_SkippingOtherRoles()
+        {
+            var entities = new EntityManager(8);
+            EntityId a = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(1), SimFixed.FromInt(1)), SimFixed.FromInt(3), role: UnitRole.Harvester);
+            EntityId b = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(2), SimFixed.FromInt(2)), SimFixed.FromInt(3), role: UnitRole.Harvester);
+            EntityId tank = entities.SpawnUnit(0, new Transform2D(SimFixed.FromInt(3), SimFixed.FromInt(3)), SimFixed.FromInt(3), role: UnitRole.LightTank);
+            entities.GetUnitRef(a).CargoAE = 210;
+            entities.GetUnitRef(a).HarvestFieldId = 1;
+            entities.GetUnitRef(b).CargoAE = 100;
+            int cap = SimDefinitions.HarvesterCargoCapacityAE(FactionId.Legion);
+            var presenter = new CommandCardPresenter();
+
+            HarvesterSummary sum = presenter.SummarizeHarvesters(FactionId.Legion, new[] { a, b, tank }, entities);
+
+            Assert.AreEqual(2, sum.Count);
+            Assert.AreEqual(310, sum.CargoAE);
+            Assert.AreEqual(2 * cap, sum.CapacityAE);
+            Assert.AreEqual(1, sum.Harvesting);
+            Assert.AreEqual(1, sum.Idle);
+            Assert.AreEqual(310f / (2 * cap), sum.Fill, 1e-5f);
+            Assert.AreEqual($"Ladung 310 / {2 * cap}", CommandCardPresenter.FormatCargo(sum.CargoAE, sum.CapacityAE));
+            Assert.AreEqual("1× Sammelt · 1× Untätig", CommandCardPresenter.FormatHarvesterStatusLine(in sum));
+        }
+
+        // ----------------------------------------------------------------
         // Display names (canonical GDD name tables)
         // ----------------------------------------------------------------
 

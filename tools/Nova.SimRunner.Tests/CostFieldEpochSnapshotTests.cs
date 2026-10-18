@@ -107,10 +107,11 @@ namespace Nova.SimRunner.Tests
             Assert.That(system.FlowFieldCacheCount, Is.EqualTo(1));
 
             // (15,10) sits directly west of the would-be wall (x=16,
-            // y=10..13) on the destination row. Open terrain: the first
-            // strictly-lowest neighbour in iteration order is NorthEast.
+            // y=10..13) on the destination row. Open terrain with octile
+            // costs (D-116): straight east. (Before D-116 a diagonal cost the
+            // same as a straight step and this read NorthEast.)
             Assert.That(system.GetField(oldDestination).GetDirection(15, 10),
-                Is.EqualTo(Direction2D.NorthEast), "open-terrain baseline direction");
+                Is.EqualTo(Direction2D.East), "open-terrain baseline direction");
 
             TestHost.ApplyTerrain(system.CostField);
 

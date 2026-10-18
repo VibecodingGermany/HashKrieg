@@ -65,6 +65,7 @@ namespace Nova.Presentation.UI
         private VictorySystem _panelVictory;
         private string _panelNetworkReason;
         private int _panelStalledSlot;
+        private bool _resultAudioPlayed;
 
         /// <summary>
         /// True while one of this component's modal panels (result or
@@ -108,6 +109,11 @@ namespace Nova.Presentation.UI
             _panelStalledSlot = isMatchReady && _runner.IsRelayMatch && _runner.RelayCommandsAllowed
                 ? _bootstrap.NetworkStalledOnSlot
                 : -1;
+
+            if (_panelVictory == null || !_panelVictory.IsDecided)
+            {
+                _resultAudioPlayed = false;
+            }
 
             return (_panelVictory != null && _panelVictory.IsDecided)
                 || !string.IsNullOrEmpty(_panelNetworkReason)
@@ -157,6 +163,19 @@ namespace Nova.Presentation.UI
         {
             byte localSlot = _runner.Session != null ? _runner.Session.LocalSlot : (byte)0;
 
+            if (!_resultAudioPlayed)
+            {
+                _resultAudioPlayed = true;
+                if (victory.Outcome == MatchOutcome.VictoryElimination && victory.WinnerSlot == localSlot)
+                {
+                    AudioServiceLocator.Play2D(SoundEventId.PRD_UnitReady);
+                }
+                else
+                {
+                    AudioServiceLocator.Play2D(SoundEventId.DTH_Building);
+                }
+            }
+
             string headline;
             switch (victory.Outcome)
             {
@@ -204,6 +223,7 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void RestartRound()
         {
+            _resultAudioPlayed = false;
             _bootstrap.RestartMatch();
             if (_views != null) _views.ResetViews();
             MinimapCameraLink.RequestStartFocusReset();
@@ -211,6 +231,7 @@ namespace Nova.Presentation.UI
 
         private void ReturnToMenu()
         {
+            _resultAudioPlayed = false;
             if (_menu != null)
             {
                 _menu.ReturnToMenu();

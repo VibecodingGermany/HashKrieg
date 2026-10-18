@@ -33,6 +33,52 @@ namespace Nova.Gameplay
     }
 
     /// <summary>
+    /// The buttons of the unit command bar (D-117, UI Toolkit). Finer than
+    /// <see cref="CommandButtonType"/>: the bar HIDES buttons that make no
+    /// sense for the selection instead of greying them, so it needs its own
+    /// presence vocabulary (<see cref="CommandCardPresenter.GetBarCommands"/>).
+    /// </summary>
+    [Flags]
+    public enum BarCommand
+    {
+        None = 0,
+        Move = 1 << 0,
+        Stop = 1 << 1,
+        AttackMove = 1 << 2,
+        Guard = 1 << 3,
+        Patrol = 1 << 4,
+        AttackTarget = 1 << 5,
+        Scatter = 1 << 6,
+        Formations = 1 << 7,
+        Harvest = 1 << 8,
+        ReturnCargo = 1 << 9,
+        Repair = 1 << 10,
+    }
+
+    /// <summary>What one harvester is doing right now, derived from its unit state only.</summary>
+    public enum HarvesterStatus
+    {
+        Idle = 0,
+        DrivingToField = 1,
+        Harvesting = 2,
+        DrivingToRefinery = 3,
+        WaitingAtRefinery = 4,
+    }
+
+    /// <summary>Summed cargo and status counts of the harvesters in a selection.</summary>
+    public struct HarvesterSummary
+    {
+        public int Count;
+        public int CargoAE;
+        public int CapacityAE;
+        /// <summary>Harvesters per <see cref="HarvesterStatus"/> (index = enum value).</summary>
+        public int Idle, DrivingToField, Harvesting, DrivingToRefinery, WaitingAtRefinery;
+
+        /// <summary>Fill 0..1 (0 when there is no capacity).</summary>
+        public float Fill => CapacityAE > 0 ? Math.Min(1f, Math.Max(0f, (float)CargoAE / CapacityAE)) : 0f;
+    }
+
+    /// <summary>
     /// One row of the selection breakdown (21.5, #88): all selected entities
     /// sharing one role, with their count and summed HP. The group order
     /// follows the FIRST OCCURRENCE in the selection — the selection order
@@ -210,6 +256,141 @@ namespace Nova.Gameplay
                 hasMobileRole = true;
             }
             return hasMobileRole ? shared : CommandButtonType.None;
+        }
+
+        /// <summary>True when the role's definition row carries AttackDamage &gt; 0 (a role without a row counts as unarmed).</summary>
+        public static bool IsArmedRole(FactionId faction, UnitRole role)
+        {
+            if (SimDefinitions.IsBuildingRole(role)) return false;
+            return SimDefinitions.TryGetUnit(faction, role, out SimUnitDefinition definition)
+                && definition.AttackDamage > 0;
+        }
+
+        /// <summary>
+        /// The buttons the unit command bar shows for a selection (D-117);
+        /// the bar hides everything else. Building roles are bystanders.
+        /// <para>
+        /// MIXED-SELECTION CHOICE (C&amp;C Generals style): the COMBAT group
+        /// (AttackMove, Guard, Patrol, AttackTarget, Scatter, Formations) is the
+        /// UNION — one armed unit in the group is enough to show it, and the
+        /// order then affects only the armed units while unarmed ones in the
+        /// selection keep doing their job (the hotkey methods filter the same
+        /// way). Move/Stop and the role actions (Harvest, ReturnCargo, Repair)
+        /// stay the INTERSECTION of <see cref="GetSharedUnitCommands"/>: a
+        /// Harvest button over a tank group would be a lie.
+        /// </para>
+        /// </summary>
+        public BarCommand GetBarCommands(FactionId faction, ReadOnlySpan<UnitRole> roles)
+        {
+            CommandButtonType shared = GetSharedUnitCommands(faction, roles);
+            BarCommand bar = BarCommand.None;
+            if (shared.HasFlag(CommandButtonType.Move)) bar |= BarCommand.Move;
+            if (shared.HasFlag(CommandButtonType.Stop)) bar |= BarCommand.Stop;
+            if (shared.HasFlag(CommandButtonType.Harvest)) bar |= BarCommand.Harvest;
+            if (shared.HasFlag(CommandButtonType.ReturnCargo)) bar |= BarCommand.ReturnCargo;
+            if (shared.HasFlag(CommandButtonType.Repair)) bar |= BarCommand.Repair;
+
+            for (int i = 0; i < roles.Length; i++)
+            {
+                if (!IsArmedRole(faction, roles[i])) continue;
+                bar |= BarCommand.AttackMove | BarCommand.Guard | BarCommand.Patrol
+                    | BarCommand.AttackTarget | BarCommand.Scatter | BarCommand.Formations;
+                break;
+            }
+            return bar;
+        }
+
+        /// <summary>
+        /// A harvester's current activity. Return trip wins over the harvest
+        /// order; a unit that is not moving at its field is collecting, one that
+        /// is not moving with a return order is queueing at the refinery.
+        /// </summary>
+        public static HarvesterStatus GetHarvesterStatus(in UnitState unit)
+        {
+            if (unit.IsReturningCargo)
+            {
+                return unit.IsMoving ? HarvesterStatus.DrivingToRefinery : HarvesterStatus.WaitingAtRefinery;
+            }
+            if (unit.HarvestFieldId != 0)
+            {
+                return unit.IsMoving ? HarvesterStatus.DrivingToField : HarvesterStatus.Harvesting;
+            }
+            return HarvesterStatus.Idle;
+        }
+
+        /// <summary>German status text of a harvester state.</summary>
+        public static string FormatHarvesterStatus(HarvesterStatus status)
+        {
+            switch (status)
+            {
+                case HarvesterStatus.DrivingToField: return "Fährt zum Feld";
+                case HarvesterStatus.Harvesting: return "Sammelt";
+                case HarvesterStatus.DrivingToRefinery: return "Fährt zur Raffinerie";
+                case HarvesterStatus.WaitingAtRefinery: return "Wartet an der Raffinerie";
+                default: return "Untätig";
+            }
+        }
+
+        /// <summary>Status line for a harvester group: the single status, or "2 Sammelt · 1 Untätig" when they differ.</summary>
+        public static string FormatHarvesterStatusLine(in HarvesterSummary s)
+        {
+            int kinds = 0;
+            HarvesterStatus only = HarvesterStatus.Idle;
+            if (s.Idle > 0) { kinds++; only = HarvesterStatus.Idle; }
+            if (s.DrivingToField > 0) { kinds++; only = HarvesterStatus.DrivingToField; }
+            if (s.Harvesting > 0) { kinds++; only = HarvesterStatus.Harvesting; }
+            if (s.DrivingToRefinery > 0) { kinds++; only = HarvesterStatus.DrivingToRefinery; }
+            if (s.WaitingAtRefinery > 0) { kinds++; only = HarvesterStatus.WaitingAtRefinery; }
+            if (kinds <= 1) return FormatHarvesterStatus(only);
+
+            var sb = new StringBuilder(64);
+            AppendStatusCount(sb, s.DrivingToField, HarvesterStatus.DrivingToField);
+            AppendStatusCount(sb, s.Harvesting, HarvesterStatus.Harvesting);
+            AppendStatusCount(sb, s.DrivingToRefinery, HarvesterStatus.DrivingToRefinery);
+            AppendStatusCount(sb, s.WaitingAtRefinery, HarvesterStatus.WaitingAtRefinery);
+            AppendStatusCount(sb, s.Idle, HarvesterStatus.Idle);
+            return sb.ToString();
+        }
+
+        private static void AppendStatusCount(StringBuilder sb, int count, HarvesterStatus status)
+        {
+            if (count <= 0) return;
+            if (sb.Length > 0) sb.Append(" · ");
+            sb.Append(count).Append("× ").Append(FormatHarvesterStatus(status));
+        }
+
+        /// <summary>"Ladung 210 / 300" (the group's summed cargo and capacity).</summary>
+        public static string FormatCargo(int cargoAE, int capacityAE)
+        {
+            return $"Ladung {cargoAE} / {capacityAE}";
+        }
+
+        /// <summary>
+        /// Sums cargo, capacity and status over every Harvester in the selection
+        /// (stale handles and other roles are skipped). Capacity is
+        /// <see cref="SimDefinitions.HarvesterCargoCapacityAE"/> per unit.
+        /// </summary>
+        public HarvesterSummary SummarizeHarvesters(FactionId faction, ReadOnlySpan<EntityId> selection, EntityManager entities)
+        {
+            var summary = new HarvesterSummary();
+            if (entities == null) return summary;
+            int capacity = SimDefinitions.HarvesterCargoCapacityAE(faction);
+            for (int i = 0; i < selection.Length; i++)
+            {
+                if (!entities.TryGetUnit(selection[i], out UnitState unit) || unit.Role != UnitRole.Harvester) continue;
+                summary.Count++;
+                summary.CargoAE += unit.CargoAE;
+                summary.CapacityAE += capacity;
+                switch (GetHarvesterStatus(in unit))
+                {
+                    case HarvesterStatus.DrivingToField: summary.DrivingToField++; break;
+                    case HarvesterStatus.Harvesting: summary.Harvesting++; break;
+                    case HarvesterStatus.DrivingToRefinery: summary.DrivingToRefinery++; break;
+                    case HarvesterStatus.WaitingAtRefinery: summary.WaitingAtRefinery++; break;
+                    default: summary.Idle++; break;
+                }
+            }
+            return summary;
         }
 
         /// <summary>

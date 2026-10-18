@@ -1,37 +1,41 @@
 {
   "assetId": "legion.building.VehicleFactory",
-  "originType": "ai-generated",
-  "sourceName": "Tripo AI (Tripo3D)",
+  "originType": "procedural",
+  "sourceName": "Blender 5.2 prozedural (build_factory.py, Sitzung 2026-10-17)",
   "sourceUrl": "",
   "licenseId": "",
   "licenseUrl": "",
-  "retrievedAt": "2026-08-05",
-  "sourceFileHash": "6591b8306822b1d2e0ce24621a96cc3f7044b9907bb2c7b8ce072c432a98b599",
+  "retrievedAt": "2026-10-17",
+  "sourceFileHash": "fa9ab51eee0a4d0da4cb1d4b20468c8286483e877859878a743bcc9f80809a2d",
   "attributionRequired": null,
   "attributionText": "",
   "redistributionAllowed": null,
-  "modifications": "GLB -> FBX ueber Blender 5.2.0 LTS headless: auf Zielmass skaliert (12.0 m, fit=footprint), Origin auf Bodenmittelpunkt, Yaw-Korrektur -90 Grad auf Forward +Z, LOD0/LOD1/LOD2 per Decimate auf die Budgets aus docs/tech/AssetBudget.md §1, BaseColor-Textur entpackt und auf Standard-Groesse skaliert (ArtAssetStandard.md §4.2). Keine geometrische Neuerstellung.",
+  "modifications": "Textur: Konzeptbild (img/v2test/legion_building_VehicleFactory_b.png, gpt-image-1 ueber generate_v2.py mit Stilplatte) per Box-Projektion auf die Form gelegt und in Cycles auf Smart-UV gebacken, Basisfarbe per Gamma auf mittlere Luminanz 0,12 gehoben; danach glb_to_unity_fbx.py --keep-slivers und asset_pass.py. Ersetzt das als Panzer generierte bzw. zerfallene Tripo-Modell (Altstand unter unity_ready/_replaced_2026-10-17).",
   "derivedFrom": "",
   "verifiedBy": "",
   "verifiedAt": "",
-  "aiProvider": "Tripo AI",
-  "aiModel": "Tripo3D",
+  "aiProvider": "",
+  "aiModel": "",
   "aiModelVersion": "",
-  "promptText": "rusty tank robot 3d model",
-  "inputImages": [],
-  "generatedAt": "2026-08-05",
+  "promptText": "",
+  "inputImages": [
+    "img/v2test/legion_building_VehicleFactory_b.png"
+  ],
+  "generatedAt": "2026-10-17",
   "providerTermsUrl": "",
   "providerTermsRetrievedAt": "",
   "commercialUseGranted": null,
   "outputOwnership": "",
-  "_sourceFileName": "rusty+tank+robot+3d+model.glb",
+  "_sourceFileName": "proc_factory.glb",
   "_providerEvidence": "Provider aus dem GLB selbst belegt: die eingebettete Textur traegt den Namen 'tripo_image_<uuid>_0'. promptText ist aus dem Download-Dateinamen rekonstruiert, nicht vom Anbieter bestaetigt.",
   "_TODO": [
-    "sourceUrl: Generierungs-URL/Job-ID bei Tripo nachtragen",
-    "providerTermsUrl + providerTermsRetrievedAt: Tripo-Nutzungsbedingungen abrufen und datieren",
-    "commercialUseGranted: aus den Tripo-Bedingungen des genutzten Tarifs belegen",
-    "outputOwnership: woertliches Zitat der Rechteklausel eintragen",
-    "aiModelVersion: konkrete Tripo-Modellversion eintragen",
-    "verifiedBy + verifiedAt: Vier-Augen-Verifikation durchfuehren und eintragen"
-  ]
+    "verifiedBy + verifiedAt eintragen"
+  ],
+  "_vorgaenger": {
+    "sourceName": "Tripo AI (Tripo3D)",
+    "aiProvider": "Tripo AI",
+    "_sourceFileName": "rusty+tank+robot+3d+model.glb",
+    "sourceFileHash": "6591b8306822b1d2e0ce24621a96cc3f7044b9907bb2c7b8ce072c432a98b599"
+  },
+  "_hinweis": "Eine Hunyuan3D-2.1-Form wurde verworfen: die Tencent-Hunyuan-Community-Lizenz gilt nicht in der EU."
 }

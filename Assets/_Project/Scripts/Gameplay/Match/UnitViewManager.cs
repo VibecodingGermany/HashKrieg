@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Nova.Core;
 using Nova.Data;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.CombatFeedback;
 using Nova.Simulation.CommandsV1;
 using Nova.Simulation.Combat;
@@ -77,19 +78,19 @@ namespace Nova.Gameplay.Match
         private const float PrefabGroundOffset = 0f;
 
         /// <summary>
-        /// Uniform scale factor that shrinks a prefab's horizontal extent to
-        /// its simulation footprint when the measured bounds come out larger
-        /// than the footprint. Art is authored at the ArtAssetStandard.md
-        /// convention (1 grid cell = 3 m) while the simulation world runs 1
-        /// cell = 1 world unit, so the raw PF_* meshes are ~3x too large and
-        /// would overlap (GB-005 finding). Normalizing here — at the view
-        /// boundary, from the mesh's own bounds — keeps every future drop-in
-        /// model swappable without touching prefabs or game logic. Art that
-        /// arrives SMALLER than its footprint keeps its authored scale
-        /// (factor 1): upscaling a detailed miniature reads worse than a
-        /// slightly small model, and the authored look is preserved.
+        /// Uniform scale factor per source prefab, measured once in
+        /// <see cref="NormalizePrefabScale"/>. Art is authored at the
+        /// ArtAssetStandard.md convention (1 grid cell = 3 m) while the
+        /// simulation world runs 1 cell = 1 world unit, so the raw PF_* meshes
+        /// are ~3x too large and would overlap (GB-005 finding). Normalizing
+        /// here — at the view boundary, from the mesh's own bounds — keeps
+        /// every future drop-in model swappable without touching prefabs or
+        /// game logic.
         /// </summary>
         private readonly Dictionary<GameObject, float> _prefabScaleFactors = new Dictionary<GameObject, float>();
+
+        /// <summary>Scaled horizontal extent (max of width, depth) per source prefab, measured with the factor.</summary>
+        private readonly Dictionary<GameObject, float> _prefabFootprints = new Dictionary<GameObject, float>();
 
         [Header("References")]
         [SerializeField] private MatchRunner _matchRunner;
@@ -131,6 +132,19 @@ namespace Nova.Gameplay.Match
         private int[] _lastSeenFrame;
         private bool[] _tracked;
 
+        // Rig animation (UnitRigAnimator): one per prefab view, plus the last
+        // rendered position/yaw so speed and turn rate are measured on the
+        // VIEW — the smoothed motion the player sees, not the 10-Hz sim steps.
+        private UnitRigAnimator[] _viewRigs;
+        private float[] _viewFootprints;
+        private Vector3[] _lastViewPositions;
+        /// <summary>Cargo of each bound harvester view on its previous frame: the unload edge (>0 to 0) starts the dump animation.</summary>
+        private int[] _lastCargoAE;
+        private float[] _lastViewYaws;
+        private bool[] _firedThisFrame;
+        private bool[] _buildingThisFrame;
+        private byte _lastViewerTeam;
+
         // Compact list of slots that currently own a view, so the per-frame
         // sweep is O(visible) instead of O(entity capacity).
         private readonly List<int> _activeIndices = new List<int>(256);
@@ -150,6 +164,7 @@ namespace Nova.Gameplay.Match
         private readonly List<DeathViewHold> _deathHolds = new List<DeathViewHold>(16);
         private readonly Dictionary<Material, Material> _transparentMaterialCache = new Dictionary<Material, Material>();
         private MaterialPropertyBlock _propertyBlock;
+        private float _lastBaseUnderAttackTime = -20f;
         // Scratch for the all-renderers tint upload (no per-call allocation).
         private readonly List<Renderer> _tintScratch = new List<Renderer>(8);
         // Shared runtime material for graybox primitives: Unity's primitive
@@ -180,6 +195,11 @@ namespace Nova.Gameplay.Match
 
         /// <summary>Views currently held outside the slot table for the 0.8-second death presentation.</summary>
         public int ActiveDeathHoldCount => _deathHolds.Count;
+
+        /// <summary>Destroyed art views currently lying on the field (D-115).</summary>
+        public int WreckCount => _wrecks != null ? _wrecks.Count : 0;
+
+        private ViewWrecks _wrecks;
 
         /// <summary>
         /// Team slot whose committed Fog-of-War view drives the rendered set.
@@ -231,6 +251,22 @@ namespace Nova.Gameplay.Match
         /// is what keeps world picking Fog-of-War legal
         /// (docs/tech/CameraSystem.md section 1).
         /// </summary>
+        /// <summary>
+        /// Horizontal size of an entity's view in world units (the larger of
+        /// width and depth at its authored orientation), for markers that
+        /// should hug the model rather than a fixed graybox size.
+        /// </summary>
+        public bool TryGetViewFootprint(EntityId id, out float size)
+        {
+            size = 0f;
+            if (_viewInstances == null || !id.IsValid) return false;
+            int slot = id.Index;
+            if (slot < 0 || slot >= _viewInstances.Length) return false;
+            if (_boundIds[slot] != id || _viewInstances[slot] == null) return false;
+            size = _viewFootprints[slot];
+            return size > 0f;
+        }
+
         public bool TryGetEntityId(GameObject viewObject, out EntityId id)
         {
             id = EntityId.Invalid;
@@ -253,6 +289,7 @@ namespace Nova.Gameplay.Match
         private void LateUpdate()
         {
             AdvanceDeathHolds(Time.deltaTime);
+            _wrecks?.Advance(Time.deltaTime);
             if (_matchRunner == null || !_matchRunner.IsRunning) return;
 
             EntityManager entities = _matchRunner.Entities;
@@ -273,6 +310,7 @@ namespace Nova.Gameplay.Match
             EnsureBuffers();
 
             byte viewerTeam = ResolveViewerTeam(fog);
+            _lastViewerTeam = viewerTeam;
             _frameStamp++;
 
             // 1) The committed team view is the ONLY source of renderable
@@ -332,8 +370,32 @@ namespace Nova.Gameplay.Match
                 {
                     BeginDeathHold(feedback.TargetId);
                 }
+
+                if ((feedback.Kind == CombatFeedbackKind.Hit || feedback.Kind == CombatFeedbackKind.Death)
+                    && SimDefinitions.IsBuildingRole(feedback.TargetRole))
+                {
+                    if (entities.TryGetUnit(feedback.TargetId, out UnitState targetBuilding)
+                        && targetBuilding.PlayerId == viewerTeam)
+                    {
+                        if (Time.time >= _lastBaseUnderAttackTime + 20f)
+                        {
+                            _lastBaseUnderAttackTime = Time.time;
+                            AudioServiceLocator.Play2D(SoundEventId.UI_Deny);
+                        }
+                    }
+                }
             }
             _combatEffects?.Present(_combatEvents);
+
+            MarkWorkingBuilders(entities);
+            System.Array.Clear(_firedThisFrame, 0, _firedThisFrame.Length);
+            for (int i = 0; i < _combatEvents.Count; i++)
+            {
+                CombatFeedbackEvent feedback = _combatEvents[i];
+                if (feedback.Kind != CombatFeedbackKind.Shot) continue;
+                int sourceSlot = feedback.SourceId.Index;
+                if (sourceSlot >= 0 && sourceSlot < _firedThisFrame.Length) _firedThisFrame[sourceSlot] = true;
+            }
 
             float blend = 1f - Mathf.Exp(-Mathf.Max(0f, _interpolationSpeed) * Time.deltaTime);
             for (int i = 0; i < _visibleScratch.Count; i++)
@@ -351,8 +413,13 @@ namespace Nova.Gameplay.Match
                 // what promotes the view from the site pad to the finished
                 // building look.
                 bool spawned = false;
-                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != EffectiveViewRole(in unit))
+                UnitRole newEffectiveRole = EffectiveViewRole(in unit);
+                if (_viewInstances[slot] == null || _boundIds[slot] != id || _viewRoles[slot] != newEffectiveRole)
                 {
+                    if (_boundIds[slot] == id && _viewRoles[slot] == UnitRole.Unit && SimDefinitions.IsBuildingRole(newEffectiveRole) && unit.PlayerId == viewerTeam)
+                    {
+                        AudioServiceLocator.Play2D(SoundEventId.PRD_UnitReady);
+                    }
                     ReleaseView(slot);
                     AcquireView(slot, in unit);
                     spawned = true;
@@ -371,6 +438,7 @@ namespace Nova.Gameplay.Match
 
                 _lastSeenFrame[slot] = _frameStamp;
                 ApplyTransform(slot, in unit, spawned ? 1f : blend);
+                AnimateRig(slot, in unit, spawned);
             }
 
             // 2) Everything not visible now is either already detached into a
@@ -444,6 +512,13 @@ namespace Nova.Gameplay.Match
             _viewHealthSteps = new int[capacity];
             _lastSeenFrame = new int[capacity];
             _tracked = new bool[capacity];
+            _viewRigs = new UnitRigAnimator[capacity];
+            _viewFootprints = new float[capacity];
+            _lastViewPositions = new Vector3[capacity];
+            _lastCargoAE = new int[capacity];
+            _lastViewYaws = new float[capacity];
+            _firedThisFrame = new bool[capacity];
+            _buildingThisFrame = new bool[capacity];
 
             for (int i = 0; i < capacity; i++)
             {
@@ -491,6 +566,14 @@ namespace Nova.Gameplay.Match
             float groundOffset;
             GameObject sourcePrefab = ResolveViewPrefab(in unit);
 
+            // A building (or its site) going up clears the wrecks on its
+            // footprint, so a ruin never pokes through a fresh wall.
+            if (_wrecks != null && SimDefinitions.IsBuildingRole(unit.Role))
+            {
+                _wrecks.ClearArea(new Vector3(unit.Transform.PositionX.ToFloat(), 0f, unit.Transform.PositionY.ToFloat()),
+                    SimDefinitions.BuildingFootprintCells * 0.85f);
+            }
+
             if (sourcePrefab != null)
             {
                 shapeKey = PrefabShapeKey;
@@ -511,7 +594,12 @@ namespace Nova.Gameplay.Match
             }
             else
             {
-                GetRoleShape(EffectiveViewRole(in unit), out PrimitiveType primitive, out Vector3 scale);
+                UnitRole effectiveRole = EffectiveViewRole(in unit);
+                GetRoleShape(effectiveRole, out PrimitiveType primitive, out Vector3 scale);
+                if (effectiveRole == UnitRole.Unit && SimDefinitions.IsBuildingRole(unit.Role))
+                {
+                    scale = new Vector3(2.60f, 0.28f, 2.60f);
+                }
                 shapeKey = (int)primitive;
                 groundOffset = GroundOffset(primitive, scale);
 
@@ -554,6 +642,21 @@ namespace Nova.Gameplay.Match
             _viewOwners[slot] = -1;       // forces a tint on this frame
             _viewHealthSteps[slot] = -1;  // ... including the health bucket of the recycled instance
             _viewObjectToSlot[instance] = slot;
+
+            // Art prefabs get the rig animation; graybox primitives stay still.
+            UnitRigAnimator rig = null;
+            if (sourcePrefab != null)
+            {
+                rig = instance.GetComponent<UnitRigAnimator>();
+                if (rig == null) rig = instance.AddComponent<UnitRigAnimator>();
+                rig.InfantryGait = IsInfantryRole(unit.Role);
+                rig.EmissivePulse = SimDefinitions.IsBuildingRole(unit.Role);
+                rig.ResetPose();
+            }
+            _viewRigs[slot] = rig;
+            _viewFootprints[slot] = sourcePrefab != null && _prefabFootprints.TryGetValue(sourcePrefab, out float footprint)
+                ? footprint
+                : Mathf.Max(instance.transform.localScale.x, instance.transform.localScale.z);
 
             if (!_tracked[slot])
             {
@@ -606,56 +709,32 @@ namespace Nova.Gameplay.Match
         }
 
         /// <summary>
-        /// Measures the freshly instantiated prefab view and caches the
-        /// uniform scale factor that brings its horizontal extent down to the
-        /// simulation footprint of its role (see the field remarks on
-        /// <see cref="_prefabScaleFactors"/>). The instance must be unscaled
-        /// (fresh <c>Instantiate</c>) and parented under this transform —
-        /// world bounds and the local scale applied afterwards share the same
-        /// parent, so the ratio stays exact. Meshes without renderers, or art
-        /// already smaller than its footprint, keep factor 1.
+        /// Measures the freshly instantiated prefab view once per source
+        /// prefab and caches the uniform scale <see cref="ArtViewScale"/>
+        /// prescribes for its role.
         /// </summary>
         private float NormalizePrefabScale(GameObject sourcePrefab, GameObject instance, in UnitState unit)
         {
             float factor = 1f;
-
-            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length > 0)
+            Transform wreck = ViewWrecks.FindWreck(instance);
+            bool any = false;
+            Bounds bounds = default;
+            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
             {
-                Bounds bounds = renderers[0].bounds;
-                for (int i = 1; i < renderers.Length; i++)
-                {
-                    bounds.Encapsulate(renderers[i].bounds);
-                }
-
-                float target = TargetViewSize(EffectiveViewRole(in unit));
-                float current = Mathf.Max(bounds.size.x, bounds.size.z);
-                if (current > target && current > 1e-4f)
-                {
-                    factor = target / current;
-                }
+                // The inactive wreck child may sprawl wider (rubble); the live
+                // model alone decides the scale.
+                if (wreck != null && r.transform.IsChildOf(wreck)) continue;
+                if (!any) { bounds = r.bounds; any = true; }
+                else bounds.Encapsulate(r.bounds);
+            }
+            if (any)
+            {
+                factor = ArtViewScale.Factor(EffectiveViewRole(in unit), bounds.size);
+                _prefabFootprints[sourcePrefab] = Mathf.Max(bounds.size.x, bounds.size.z) * factor;
             }
 
             _prefabScaleFactors[sourcePrefab] = factor;
             return factor;
-        }
-
-        /// <summary>
-        /// Horizontal world size a view of this role should occupy. Buildings
-        /// fill their 3x3-cell footprint (<see cref="SimDefinitions.BuildingFootprintCells"/>,
-        /// 1 cell = 1 world unit); units reuse the graybox shape table's
-        /// larger horizontal extent so art and primitive fallback read at the
-        /// same size for the same role.
-        /// </summary>
-        private static float TargetViewSize(UnitRole role)
-        {
-            if (SimDefinitions.IsBuildingRole(role))
-            {
-                return SimDefinitions.BuildingFootprintCells;
-            }
-
-            GetRoleShape(role, out _, out Vector3 primitiveScale);
-            return Mathf.Max(primitiveScale.x, primitiveScale.z);
         }
 
         /// <summary>
@@ -677,6 +756,11 @@ namespace Nova.Gameplay.Match
             }
 
             _viewObjectToSlot.Remove(instance);
+            if (_viewRigs[slot] != null)
+            {
+                _viewRigs[slot].ResetPose();
+                _viewRigs[slot] = null;
+            }
             int shapeKey = _viewShapeKeys[slot];
             GameObject sourcePrefab = _viewSourcePrefabs[slot];
             ReturnInstanceToPool(instance, shapeKey, sourcePrefab);
@@ -704,6 +788,31 @@ namespace Nova.Gameplay.Match
 
             GameObject instance = _viewInstances[slot];
             _viewObjectToSlot.Remove(instance);
+
+            // Art with a wreck child stays on the field as a wreck (D-115);
+            // graybox primitives and art without one keep the fade-out.
+            Transform wreck = _viewSourcePrefabs[slot] != null ? ViewWrecks.FindWreck(instance) : null;
+            if (wreck != null)
+            {
+                Collider[] wreckColliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
+                var wreckColliderStates = new bool[wreckColliders.Length];
+                for (int i = 0; i < wreckColliders.Length; i++)
+                {
+                    wreckColliderStates[i] = wreckColliders[i] != null && wreckColliders[i].enabled;
+                    if (wreckColliders[i] != null) wreckColliders[i].enabled = false;
+                }
+                if (_wrecks == null) _wrecks = new ViewWrecks(ReturnInstanceToPool);
+                _wrecks.Begin(instance, wreck, _viewShapeKeys[slot], _viewSourcePrefabs[slot],
+                    SimDefinitions.IsBuildingRole(_viewRoles[slot]), wreckColliders, wreckColliderStates);
+                _viewRigs[slot] = null;
+                _viewInstances[slot] = null;
+                _viewRenderers[slot] = null;
+                _boundIds[slot] = EntityId.Invalid;
+                _viewSourcePrefabs[slot] = null;
+                _viewOwners[slot] = -1;
+                _viewHealthSteps[slot] = -1;
+                return true;
+            }
 
             Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(includeInactive: true);
             Collider[] colliders = instance.GetComponentsInChildren<Collider>(includeInactive: true);
@@ -751,7 +860,9 @@ namespace Nova.Gameplay.Match
                 SimDefinitions.IsBuildingRole(_viewRoles[slot])));
 
             // Detach only. The active-slot sweep owns _tracked/_activeIndices
-            // and removes this slot later in the same LateUpdate.
+            // and removes this slot later in the same LateUpdate. The corpse
+            // keeps its last rig pose; the pool resets it on reuse.
+            _viewRigs[slot] = null;
             _viewInstances[slot] = null;
             _viewRenderers[slot] = null;
             _boundIds[slot] = EntityId.Invalid;
@@ -811,6 +922,7 @@ namespace Nova.Gameplay.Match
 
         private void CompleteAllDeathHolds()
         {
+            _wrecks?.CompleteAll();
             for (int i = _deathHolds.Count - 1; i >= 0; i--)
             {
                 CompleteDeathHoldAt(i);
@@ -903,6 +1015,7 @@ namespace Nova.Gameplay.Match
             _combatDiffer.Reset(_viewInstances != null ? _viewInstances.Length : 0);
             _combatSamples.Clear();
             _combatEvents.Clear();
+            _lastBaseUnderAttackTime = -20f;
             CompleteAllDeathHolds();
             _combatEffects?.ResetEffects();
         }
@@ -925,12 +1038,26 @@ namespace Nova.Gameplay.Match
             // receive position writes only.
             bool isBuilding = SimDefinitions.IsBuildingRole(_viewRoles[slot]);
 
+            Quaternion targetRot = ViewHeading.Rotation(unit.Transform.Rotation);
+            if (!isBuilding && !unit.IsMoving && TryGetTargetViewPosition(in unit, out Vector3 aim))
+            {
+                // A standing unit without a turret turns its whole body onto
+                // the target; a turreted one keeps the hull and lets the rig
+                // swing the turret. View-only: the sim heading is untouched.
+                UnitRigAnimator rig = _viewRigs[slot];
+                if (rig == null || !rig.HasTurret)
+                {
+                    float yaw = ViewHeading.YawToward(viewTransform.position, aim, targetRot.eulerAngles.y);
+                    targetRot = Quaternion.Euler(0f, yaw, 0f);
+                }
+            }
+
             if (blend >= 1f)
             {
                 viewTransform.position = targetPos;
                 if (!isBuilding)
                 {
-                    viewTransform.rotation = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
+                    viewTransform.rotation = targetRot;
                 }
                 return;
             }
@@ -940,9 +1067,150 @@ namespace Nova.Gameplay.Match
             viewTransform.position = Vector3.Lerp(viewTransform.position, targetPos, blend);
             if (!isBuilding)
             {
-                Quaternion targetRot = Quaternion.Euler(0f, unit.Transform.Rotation.ToDegrees().ToFloat(), 0f);
                 viewTransform.rotation = Quaternion.Slerp(viewTransform.rotation, targetRot, blend);
             }
+        }
+
+        /// <summary>
+        /// Feeds the rig animation of a prefab view with this frame's view
+        /// motion, the visible attack target and the shot flag.
+        /// </summary>
+        private void AnimateRig(int slot, in UnitState unit, bool spawned)
+        {
+            UnitRigAnimator rig = _viewRigs[slot];
+            Transform t = _viewInstances[slot].transform;
+            Vector3 pos = t.position;
+            float yaw = t.eulerAngles.y;
+            // A (re)bound view starts from the unit's current load, so a harvester
+            // entering view empty or full never counts as having just unloaded.
+            if (rig == null || spawned)
+            {
+                _lastViewPositions[slot] = pos;
+                _lastViewYaws[slot] = yaw;
+                _lastCargoAE[slot] = unit.CargoAE;
+                return;
+            }
+
+            float dt = Time.deltaTime;
+            float speed = 0f, turnRate = 0f;
+            if (dt > 1e-5f)
+            {
+                Vector3 d = pos - _lastViewPositions[slot];
+                d.y = 0f;
+                speed = d.magnitude / dt;
+                turnRate = Mathf.DeltaAngle(_lastViewYaws[slot], yaw) / dt;
+            }
+            _lastViewPositions[slot] = pos;
+            _lastViewYaws[slot] = yaw;
+
+            var input = new UnitRigInput
+            {
+                Speed = speed,
+                TurnRate = turnRate,
+                Fired = _firedThisFrame[slot],
+                Working = !unit.IsMoving
+                          && ((unit.Role == UnitRole.Harvester && unit.HarvestFieldId != 0 && !unit.IsReturningCargo)
+                              || (unit.Role == UnitRole.Builder && _buildingThisFrame[slot])
+                              || IsProducingForViewer(in unit)),
+            };
+            input.HasTarget = TryGetTargetViewPosition(in unit, out input.TargetPosition);
+            if (unit.Role == UnitRole.Harvester)
+            {
+                int capacity = HarvesterCapacityAE(in unit);
+                int previous = _lastCargoAE[slot];
+                input.CargoFill = Mathf.Clamp01(unit.CargoAE / (float)capacity);
+                if (previous > 0 && unit.CargoAE <= 0)
+                {
+                    input.Dump = true;
+                    input.DumpFromFill = Mathf.Clamp01(previous / (float)capacity);
+                }
+                _lastCargoAE[slot] = unit.CargoAE;
+            }
+            rig.Tick(in input, dt);
+        }
+
+        /// <summary>Cargo capacity of this harvester's faction; the global ceiling when the faction cannot be resolved.</summary>
+        private int HarvesterCapacityAE(in UnitState unit)
+        {
+            EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
+            if (economy != null && unit.PlayerId < EconomySystem.MaxPlayers)
+            {
+                return Mathf.Max(1, SimDefinitions.HarvesterCargoCapacityAE(economy.GetSlotFaction(unit.PlayerId)));
+            }
+            return SimDefinitions.MaxHarvesterCargoCapacityAE;
+        }
+
+        /// <summary>
+        /// World position of the unit's attack target, read from the target's
+        /// VIEW — a target without a bound view is not visible to the viewer,
+        /// and aiming at it would leak its position through the fog.
+        /// </summary>
+        private bool TryGetTargetViewPosition(in UnitState unit, out Vector3 position)
+        {
+            position = default;
+            EntityId target = unit.AttackTarget;
+            if (!target.IsValid) return false;
+            int targetSlot = target.Index;
+            if (targetSlot < 0 || targetSlot >= _viewInstances.Length) return false;
+            if (_boundIds[targetSlot] != target || _viewInstances[targetSlot] == null) return false;
+            position = _viewInstances[targetSlot].transform.position;
+            return true;
+        }
+
+        /// <summary>
+        /// Flags every builder assigned to a VISIBLE construction site, read
+        /// from the site side (the simulation keeps the assignment there), so
+        /// its arms can work while it stands at the site.
+        /// </summary>
+        private void MarkWorkingBuilders(EntityManager entities)
+        {
+            System.Array.Clear(_buildingThisFrame, 0, _buildingThisFrame.Length);
+            ConstructionSystem construction = _matchRunner.Construction;
+            if (construction == null) return;
+            for (int i = 0; i < _visibleScratch.Count; i++)
+            {
+                EntityId id = _visibleScratch[i];
+                if (!construction.IsActiveSite(id)) continue;
+                if (!construction.TryGetSite(UnitCommandStateView.ToRawEntityId(id), out _, out _, out uint builderRaw)) continue;
+                if (builderRaw == 0u) continue;
+                EntityId builder = UnitCommandStateView.ToEntityId(builderRaw);
+                if (!builder.IsValid || builder.Index >= _buildingThisFrame.Length
+                    || !entities.TryGetUnit(builder, out UnitState builderUnit)
+                    || builderUnit.Role != UnitRole.Builder
+                    || !entities.TryGetUnit(id, out UnitState siteUnit)
+                    || builderUnit.PlayerId != siteUnit.PlayerId) continue;
+
+                // Site entities sit at the footprint centre, as in the site HUD.
+                // Assignment survives a move away; only an in-reach builder actually works.
+                int half = SimDefinitions.BuildingFootprintCells / 2;
+                int originX = SimFixed.WorldToGrid(siteUnit.Transform.PositionX) - half;
+                int originY = SimFixed.WorldToGrid(siteUnit.Transform.PositionY) - half;
+                int builderX = Math.Max(0, SimFixed.WorldToGrid(builderUnit.Transform.PositionX));
+                int builderY = Math.Max(0, SimFixed.WorldToGrid(builderUnit.Transform.PositionY));
+                if (ConstructionSiteStatus.IsInReachOfFootprint(
+                    builderX, builderY, originX, originY, SimDefinitions.BuildingFootprintCells))
+                    _buildingThisFrame[builder.Index] = true;
+            }
+        }
+
+        /// <summary>
+        /// A production building with a non-empty queue — for the viewer's
+        /// OWN buildings only: a busy glow on a foreign factory would leak its
+        /// production through the fog.
+        /// </summary>
+        private bool IsProducingForViewer(in UnitState unit)
+        {
+            if (!SimDefinitions.IsBuildingRole(unit.Role)) return false;
+            if (unit.PlayerId != _lastViewerTeam) return false;
+            var production = _matchRunner.Production;
+            if (production == null) return false;
+            return production.TryGetProducer(UnitCommandStateView.ToRawEntityId(unit.Id), out int entries, out _, out _)
+                   && entries > 0;
+        }
+
+        private static bool IsInfantryRole(UnitRole role)
+        {
+            return role == UnitRole.BasicInfantry || role == UnitRole.AntiArmorInfantry;
         }
 
         private void ApplyTint(int slot, byte playerId, int healthStep)
@@ -950,7 +1218,8 @@ namespace Nova.Gameplay.Match
             GameObject instance = _viewInstances[slot];
             if (instance == null) return;
 
-            Color color = TintFor(playerId, healthStep);
+            bool isPrefab = _viewShapeKeys[slot] == PrefabShapeKey;
+            Color color = TintFor(playerId, healthStep, isPrefab);
             _propertyBlock.Clear();
             // Built-in RP reads _Color, URP/HDRP read _BaseColor. Setting both
             // keeps the graybox tinted through the pipeline migration instead
@@ -974,20 +1243,19 @@ namespace Nova.Gameplay.Match
 
         /// <summary>
         /// Owner colour, darkened toward <see cref="_damagedColor"/> by the
-        /// health bucket. A full-health unit returns the owner colour
-        /// unchanged, so undamaged views look exactly as they did before the
-        /// readout existed; <see cref="_healthTintFloor"/> keeps a share of the
-        /// owner hue at the brink so colour never stops answering "whose is
-        /// it?".
+        /// health bucket. Textured 3D prefabs use <see cref="FactionTint.PrefabBaseColor"/>
+        /// so their authored BaseColor maps are not crushed by dark primitive tints.
         /// </summary>
-        private Color TintFor(byte playerId, int healthStep)
+        private Color TintFor(byte playerId, int healthStep, bool isPrefab)
         {
-            Color owner = ColorForOwner(playerId);
+            Color owner = ColorForOwner(playerId, isPrefab);
             if (healthStep >= HealthTintSteps) return owner;
 
             float fraction = (float)healthStep / HealthTintSteps;
-            float blend = Mathf.Lerp(Mathf.Clamp01(_healthTintFloor), 1f, fraction);
-            return Color.Lerp(_damagedColor, owner, blend);
+            float floor = isPrefab ? Mathf.Max(0.42f, Mathf.Clamp01(_healthTintFloor)) : Mathf.Clamp01(_healthTintFloor);
+            float blend = Mathf.Lerp(floor, 1f, fraction);
+            Color damagedTarget = isPrefab ? new Color(0.62f, 0.22f, 0.18f, 1f) : _damagedColor;
+            return Color.Lerp(damagedTarget, owner, blend);
         }
 
         /// <summary>
@@ -1015,14 +1283,15 @@ namespace Nova.Gameplay.Match
         /// (no economy wired, slot outside the declared range) fall back to
         /// <see cref="_unknownPlayerColor"/> instead of throwing.
         /// </summary>
-        private Color ColorForOwner(byte playerId)
+        private Color ColorForOwner(byte playerId, bool isPrefab)
         {
             EconomySystem economy = _matchRunner != null ? _matchRunner.Economy : null;
             if (economy != null && playerId < EconomySystem.MaxPlayers)
             {
-                return FactionTint.BaseColor(economy.GetSlotFaction(playerId));
+                FactionId faction = economy.GetSlotFaction(playerId);
+                return isPrefab ? FactionTint.PrefabBaseColor(faction) : FactionTint.BaseColor(faction);
             }
-            return _unknownPlayerColor;
+            return isPrefab ? Color.white : _unknownPlayerColor;
         }
 
         /// <summary>

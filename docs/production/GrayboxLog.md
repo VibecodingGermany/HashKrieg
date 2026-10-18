@@ -1,6 +1,6 @@
 # Graybox-Log
 
-**Version:** 0.5.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
+**Version:** 0.6.0 | **Status:** Entwurf – append-only Sitzungsprotokoll (trägt D-067, noch nicht ratifiziert) | **Verantwortungsbereich:** Orchestrator / Technical Writer | **Sprint:** 7
 
 ## Zweck
 
@@ -649,6 +649,50 @@ Zweitsystem.
 - Erster **menschlicher** Play-Durchlauf steht weiter aus (Runbook §4 ist auf
   GB-005 aktualisiert).
 
+## Sitzung GB-006 – 2026-10-18 – Buildstart und Animations-Teilprüfung
+
+**Ausgangsstand:** `3c8e6bf` mit den anschließend als `24bb14e` gesicherten
+Animationskorrekturen; lokaler macOS-Build `3c8e6bf-dirty`, Unity 6000.5.4f1.
+Der Build wurde auf Inhaberwunsch vor dem Commit erstellt und gestartet.
+Das später integrierte KI-Update aus `main` (`6f36b7e`) gehört nicht zu dieser
+laufenden Spielinstanz.
+
+### Beobachtet
+
+- Der macOS-Player wurde erfolgreich gebaut (663.446.516 Bytes laut Unity)
+  und gestartet. In der laufenden Partie waren Art-HQ, Builder, Baustelle,
+  später fertige Raffinerie, Sammler sowie Ressourcen- und Befehlsanzeigen
+  sichtbar. Der Build-Stempel war lesbar.
+- Der Agent beobachtete die bereits bediente Partie, ohne eigene Spielbefehle
+  einzuspeisen. Standbilder belegen die Darstellung, keine durchgehende
+  Animationsqualität oder vollständige Spielerfahrung.
+- Weitere Abfragen der nativen Spielansicht scheiterten zweimal am Timeout.
+  Deshalb keine behauptete vollständige visuelle Spielabnahme, kein Sieg-/
+  Niederlagen-Durchlauf und kein Meilenstein-Nachweis.
+
+### Nachfolgende technische Prüfung
+
+- Branch samt Animationskorrekturen veröffentlicht als
+  [Draft-PR #154](https://github.com/VibecodingGermany/HashKrieg/pull/154).
+  Konflikte mit D-114 auf `main` unter Erhalt von Fraktionswahl und Seed-Auswahl
+  aufgelöst; unabhängiges Read-only-Review ohne Befund. Danach 785
+  Simulationstests und 729 Unity-EditMode-Tests erfolgreich.
+- Der nächste Animationsbefund wurde in einer laufenden Testszene reproduziert:
+  Ein entfernter, gestoppter Builder schwenkte trotz pausierter Baustelle seine
+  Arme bis 14°. Eine reine Baustellenzuweisung darf deshalb nicht als aktives
+  Arbeiten angezeigt werden. Die View-Korrektur nutzt die vorhandene
+  Footprint-Reichweitenhilfe; Simulationsregeln bleiben unverändert.
+  Gegenprobe: alter Code reproduziert den Fehler, korrigierter Code besteht
+  den Test; alle sieben gezielten PlayMode-Tests sind anschließend grün.
+
+### Offen
+
+Eine vollständige Partie mit dem integrierten Stand, beide Fraktionen,
+längere Gefechte und eine menschliche Beurteilung von Gang, Rückstoß und
+Arbeitsübergängen bleiben ausstehend. Der laufende Build wird nicht nachträglich
+als Build eines späteren Commits bezeichnet. Aktuelle Reihenfolge:
+[Roadmap](Roadmap.md), Tier-2-Abnahme: [Governance](../../GOVERNANCE.md).
+
 ## Offene Punkte
 
 - D-067 und D-068 sind Entwürfe. Ohne Ratifizierung existiert der
@@ -688,3 +732,4 @@ Zweitsystem.
 | 0.4.0 | 2026-08-05 | Sitzung GB-004 (Demo-Beweis, Harvester-Footprint-Fix, URP-Verdrahtung, 34 Tripo-Assets integriert) angehängt – Kopfzeile war ohne Tabellenzeile geblieben, hier nachgezogen | Technical Writer |
 | 0.5.0 | 2026-08-06 | Sitzung GB-005 (spielbarer Core-Loop nach D-077) angehängt – Befund Overlay/Maßstab, Sieg bei HQ-Verlust, KI-Slot aktiv, Verifikation 420/425/2 grün, `-quit`-Fallstrick erneut protokolliert | Agent |
 | 0.4.0 | 2026-08-05 | Sitzung GB-004 (Wirtschaftsfix nach D-068-Regeln, volle Tastenbelegung, URP-Zuordnung, Tripo-Asset-Integration 34/34, PlayMode-Sichtbeweis mit Screenshots) angehängt – einschließlich getrennter Hash-Zuordnung und fünf offenen Befunden | Technical Writer |
+| 0.6.0 | 2026-10-18 | GB-006 ergänzt: gestarteter macOS-Testbuild, ehrliche visuelle Teilprüfung, Integration mit main und reproduzierter Builder-Animationsbefund | Codex |

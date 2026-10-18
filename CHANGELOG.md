@@ -18,6 +18,13 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
 > erzeugt; MS-0 und MS-1 bleiben offen.
 
 ### Entschieden
+- **D-118: Jeder Bauer kann bauen.** Steht der an eine Baustelle gebundene Bauer
+  nicht in Reichweite, übernimmt der eigene Bauer mit dem kleinsten Index, der dort
+  steht. Ersetzt die Nur-kleinster-Index-Regel aus D-085; mit einem Bauer
+  byte-identisch, Fingerprints und KI-Pin bleiben
+- **D-119: Legion-Kraftwerk, -Fabrik, -Labor und -Kaserne prozedural.** Neu
+  modelliert nach neuen Konzeptbildern statt neu generiert; Hunyuan3D wurde
+  erprobt und verworfen, weil dessen Lizenz in der EU nicht gilt
 - **D-108 berichtigt und neu gefasst: jedes eigene Gebäude wird Bauanker.** Die
   Erstfassung vom 2026-08-17 behauptete, der Code lasse *jedes* Gebäude als Anker
   gelten, und wollte diesen Zustand nur aussprechen. Das war falsch:
@@ -73,6 +80,98 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   spielerisch abgenommen und kein Meilenstein-Nachweis
 
 ### Hinzugefügt
+- **Sammler zeigen ihre Ladung und kippen sie ab.** Auf der Mulde des
+  Legion-Lasters bzw. dem Rücken des Allianz-Roboters wächst mit dem Füllstand
+  eine Erzladung mit leuchtenden Aetherium-Kristallen. An der Raffinerie kippt die
+  Mulde nach hinten (Roboter: lehnt sich zurück), die Ladung rutscht unter
+  leuchtendem Staub heraus, danach fährt der Sammler weiter; der eigene Sammler
+  wartet dafür kurz an der Raffinerie. Beim Sammeln vibriert der Motor. Die
+  Legion-Mulde ist ein eigenes Teil (`Bed`), `ArtPreviewCapture -captureDump`
+  zeigt die Kipp-Phase. Per Kamera im Spielrenderer geprüft, **nicht gespielt**
+- **Befehlsleiste je Einheitentyp.** Unpassende Befehle werden ausgeblendet statt
+  ausgegraut: Sammler und Bauer haben keine Patrouille, Wache, Angriffsbewegung,
+  Verteilen oder Formationen. Sammler zeigen stattdessen einen Ladungsbalken
+  („Ladung 210 / 300“) und ihren Zustand (fährt zum Feld, sammelt, fährt zur
+  Raffinerie …), bei Mehrfachauswahl summiert. W/K/J/M wirken nur noch auf die
+  kampffähigen Einheiten der Auswahl
+- **Befehlsleiste im Stil von Command & Conquer: Zero Hour, mit Gruppenbefehlen und
+  Formationen (D-117).** Ausgewählte Einheiten bekommen unten rechts eine Leiste in UI
+  Toolkit: Typ-Chips (Klick wählt nur diesen Typ), ein Raster aus quadratischen
+  Knöpfen mit gezeichneten Icons, Tastenkürzel und Tooltip. Neu: **Angriffsbewegung**
+  (A auf freien Boden), **Patrouille** (K), **Bewachen** (W), **Verteilen** (J) und fünf
+  **Formationen** — Locker, Linie, Kolonne, Keil, Block (M wechselt) —, die bei jedem
+  Gruppenbefehl gelten. Alles läuft als Client-Auftrag über die vorhandenen Befehle
+  Move, Stop und AttackTarget, das Befehlsregister bleibt unverändert. Die alte Karte
+  zeigt nur noch Gebäude. Per Kamera im laufenden Spiel geprüft, **nicht gespielt**
+- **Zerstörte Einheiten und Gebäude bleiben als Wrack liegen (D-115).** Zu jedem
+  der 34 Assets erzeugt der Blender-Pass eine Wrack-Variante (verdrehter Turm,
+  hängendes Rohr, liegender Soldat, eingestürzte Ruine mit Trümmern, verkohlte
+  Textur), die im selben Prefab liegt. Beim Tod wird das Modell kurz schwarz,
+  wechselt aufs Wrack und qualmt; ältere Wracks versinken erst ab 60 Einheiten-
+  bzw. 20 Gebäudewracks, ein Neubau räumt seine Fläche. Dazu Umgebungsbewegung:
+  Staubfahnen hinter Fahrzeugen, Schornsteinrauch der Legion, suchende Türme im
+  Leerlauf, atmende und sich umschauende Infanterie, Motorvibration. Neuer
+  PlayMode-Test lässt acht Einheiten im Kampf sterben und prüft die Wracks
+- **Infanterie geht.** Die vier Infanteristen haben in Blender abgetrennte Ober-
+  und Unterschenkel (`Leg_*`/`Shin_*`); `UnitRigAnimator` fährt daraus einen
+  Zwei-Gelenk-Gang mit Hüftsenkung, damit die Füße am Boden bleiben, und einen
+  Rückstoß des Oberkörpers beim Schuss. Die Kadenz folgt der Geschwindigkeit,
+  gedeckelt auf 3,2 Schritte/s, weil die verkleinerten Soldaten sonst zappeln.
+  Starre Glieder, kein Skelett; per Kamera im laufenden Spiel geprüft, **nicht
+  gespielt**
+- **Glow und Licht von der Kameraseite (D-111).** Leuchtakzente der Art blühen
+  jetzt über URP-Bloom: Das Projekt renderte bisher ganz ohne Post-Processing,
+  weil dem Renderer die `postProcessData` fehlte; dazu kamen ein Bloom-Profil als
+  Grundstack des Pipeline-Assets, Post-Processing an der Hauptkamera und
+  Emission, die die URP-Validierung nicht mehr wegstreicht. Die Sonne steht
+  jetzt hoch und von der Kameraseite — vorher lag jede sichtbare Fassade im
+  Gegenlicht, was die Allianz-Basis düster machte. Das Allianz-Radar ist auf
+  Gebäudehöhe gestaucht. Neuer PlayMode-Showcase (`ArtShowcaseTests`) fotografiert
+  beide Basen vollständig in Spielgröße aus 18/30/42 m. Per Kamera geprüft,
+  **nicht gespielt**
+- **Asset-Pass über alle 34 Tripo-Assets: bewegliche Teile, Animation und Optik (D-110).**
+  Ein rezeptgesteuerter Blender-Pass (`tools/art/asset_pass.py`,
+  `asset_recipes.json`, headless) trennt die Modelle in benannte, gepivotete Teile,
+  repariert Einzelfehler (schwebendes Doppelrohr der Allianz-Verteidigung, lose
+  Platte der Legion, 6-m-Splitter am Legion-Bauer, der die Einheit im Spiel
+  schrumpfen ließ), glättet die facettierten Normalen und hebt die viel zu dunklen
+  Texturen auf die D-072-Paletten (Allianz Stahlgrau mit Cyan-Akzenten, Legion
+  Rost); Aetherium-Kristalle und Warnlichter behalten ihre Farbe. Neu: Leuchttextur
+  `T_*_EM` und die `_MSK` nach Standard §5.1. In Unity bewegt `UnitRigAnimator` die
+  Teile rig-los aus dem Spielzustand: Türme schwenken aufs sichtbare Ziel, Rohre
+  stoßen beim Schuss zurück, Räder rollen, die Federung nickt und neigt sich,
+  Infanterie wippt im Schritt, Sammler- und Bauarme arbeiten, Radarschüsseln,
+  Raffinerie-Kristall und HQ-Antenne drehen sich, Gebäude atmen über ihre
+  Leuchtstreifen und pulsieren beim Produzieren. Art-Materialien rendern
+  doppelseitig, damit man durch die Lücken der Tripo-Schalen nicht mehr den Sand
+  sieht. Prüfwerkzeuge: `ArtPreviewCapture` (Unity-Fotobox im echten Renderer),
+  `asset_layout.py` (Raster-Ansichten für Rezepte). Protokoll und ehrliche Grenzen:
+  `docs/assets/AssetPass_2026-10-17.md` — Geometrie bleibt Tripo-Qualität,
+  Legion-Kraftwerk und -Forschungslabor sind als Panzer generiert, Infanterie hat
+  kein Skelett. Automatisiert und per Kamera geprüft, **nicht gespielt**
+- **RTS-Gefühl, Steuerung & Audio: Angriffsverfolgung, Kontext-Rechtsklick, dynamische Cursor, 3D-Welt und Sound-Cues (#51).**
+  Schließt die offenen Bedien-, Audio- und Darstellungslücken vollständig ab, ohne in
+  die deterministische Simulationslogik einzugreifen:
+  **(1) Kampf & Steuerung:** Kontextsensitiver Rechtsklick (`DispatchContextRightClick` in `RtsDeviceInput`):
+  Rechtsklick auf sichtbare Feinde löst gezielten Angriff mit Zwei-Intent-Annäherung (`MoveTo` in Waffenreichweite + `Attack`)
+  und Verfolgungsschleife (`UpdateAttackPursuit`) aus; Rechtsklick auf Aetherium-Vorkommen mit Sammlern schickt sie
+  zur Ernte (`ResolveHarvestAt`); Rechtsklick auf beschädigte eigene Gebäude mit Baupionieren repariert;
+  Rechtsklick auf freien Boden bewegt Einheiten oder setzt Sammelpunkte für Produktionsgebäude.
+  Feinde im Fog of War sind nicht blind anklickbar.
+  **(2) Visuelles Feedback & Cursors:** Prozedural generierte taktische 32x32-Hardware-Cursor (`RtsCursorController`)
+  mit dynamischem Hover-Switch (`Default`, `Move`, `Attack`, `Harvest`, `Repair`);
+  farbcodierte, animierte Boden-Klick-Pings (`SelectionMarkerView.SpawnClickFeedback` in Grün, Rot, Cyan, Gelb, Orange);
+  sichtbare Zielringe unter anvisierten Feinden; aufgewertete Lebensbalken (`HealthBarHud`) mit 1px Kontrastrahmen,
+  Glanzkante, breiteren Abmessungen (36px Einheiten / 54px Gebäude) und Sofortanzeige bei Einheiten-Hover.
+  **(3) 3D-Darstellung:** Volle Farberhaltung für texturierte 3D-Modelle (`FactionTint.PrefabBaseColor`);
+  Aetherium-Felder als facettierte, schimmernde 3D-Kristallcluster auf Erzbett (`GlutrinneBlockoutView`);
+  mitwachsende 3D-Gerüstkonstruktion für Baustellen und Hologramm-Vorschau beim Platzieren.
+  **(4) In-Game-Audio & Alarmtöne:** Akustische Signale für fertiggestellte Bauwerke (`PRD_UnitReady`),
+  Basis-unter-Beschuss-Warnung (`UI_Deny` mit 20s Abklingzeit bei Treffern auf eigene Gebäude),
+  Stromausfall-Alarm (`UI_Deny` bei Übergang in Defizit in `ResourceBarHud`), sowie Rundenabschluss-Audio
+  (Siegesfanfare vs. Niederlage-Explosion in `MatchFrameHud`).
+  **(5) In-Game-HUD:** `HudChrome`, `BuildMenuHud`, `CommandCardHud` und `ResourceBarHud` mit taktischen
+  Sci-Fi-Buttons, Rollen-Badges (`[HQ]`, `[RAF]`, `[NRG]` usw.), Hotkey-Pills und Fraktionsauswahl im Hauptmenü.
 - **Die KI spielt nicht mehr jede Partie gleich (D-114, Stufe A).** Bisher lief
   jede lokale Partie identisch: Die KI würfelt bewusst nie, und das Menü
   startete immer mit demselben Seed. Jetzt zieht „Neues Spiel“ und „Neue Runde“
@@ -258,6 +357,19 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   sie belegt keine Verbesserung.
 
 ### Geändert
+- **Stimmiges Größenverhältnis (D-113).** Einheiten wurden bisher auf die Größe
+  ihres Graybox-Primitivs gezwungen: ein Kampfpanzer war doppelt so hoch wie ein
+  Soldat und fast so breit wie eine Kaserne, ein Sammler kleiner als ein leichter
+  Panzer. Jetzt gilt eine Regel je Klasse (`ArtViewScale`): Gebäude füllen ihren
+  Footprint, alle Fahrzeuge teilen einen metrischen Faktor, sodass ihre
+  Proportionen erhalten bleiben, Infanterie und Bauer bekommen eine lesbare
+  Mindesthöhe. Der Auswahlring folgt der Modellgröße. Abwehrtürme stehen jetzt
+  auf Panzerhöhe. Neue Größen-Aufstellung in `ArtPreviewCapture`
+- **Abwehrtürme in menschlichem Maßstab (D-112).** Jedes Gebäude wird auf seinen
+  3×3-Footprint skaliert, ein schlanker Turm maß dadurch vier Soldatenhöhen. Die
+  Türme stehen jetzt auf einem flachen Betonsockel, der den Footprint füllt, und
+  sind selbst rund doppelt so hoch wie ein Soldat. Der Footprint bleibt 3×3; ihn
+  zu verkleinern wäre eine Regeländerung und ist offen
 - **Die lebende Dokumentation heißt jetzt Hashkrieg (#14, Stufe 3).** 54 Dateien,
   84 Stellen — die Marke in der Prosa unter `docs/**` und in den Wurzeldateien.
   Zwei Regeln haben den Umfang bestimmt. Erstens **E-3: nur die Marke.** Die
@@ -424,6 +536,49 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Builder-Arme folgen dem tatsächlichen Baubereich:** Eine Baustellenzuweisung
+  allein löst keine Arbeitsanimation mehr aus. Nur ein lebender eigener Builder
+  in Reichweite des Baustellen-Footprints arbeitet sichtbar; nach Wegfahren und
+  Stop bleiben seine Arme ruhig, während der Bau pausiert. PlayMode-Regression
+  prüft echte Baustelle, Befehle, Baufortschritt und Armbewegung gemeinsam.
+- **Animationskontinuität und Pool-Reset:** Radar-Schwenks springen nicht mehr
+  beim Rotorumlauf; Infanterie richtet ihren Idle-Blick bei Zielkontakt oder
+  Schuss neutral aus. Wiederverwendete Ansichten starten mit zurückgesetzten
+  Phasen/Timern und Basisemission bei erhaltener Fraktionstönung.
+  Transform- und Art-Prefab-Regressionstests ergänzt. Roadmap auf aktives Tier 2
+  und offene Beta-Vorbereitung ausgerichtet, veraltete Attack-Move-Lücken in
+  README/Runbook berichtigt und lokalen Art-Paket-Kandidaten dokumentiert;
+  aktuelle manuelle Spielabnahme und Veröffentlichung stehen aus.
+- **Der zweite Bauer baut (D-118).** Bisher konnte nur der Bauer mit dem
+  kleinsten Index eine Baustelle fortschreiben, jeder weitere stand daneben,
+  und beim Platzieren lief immer der erste los. Jetzt geht der ausgewählte Bauer
+  zur Baustelle und baut, ein Rechtsklick mit Bauern auf die eigene Baustelle
+  schickt sie dorthin. Die Meldung aus #135 war damals als Bauzonen-Radius
+  fehldiagnostiziert worden
+- **Legion-Gebäude sind wieder Gebäude (D-119).** Fahrzeugfabrik, Kraftwerk und
+  Forschungslabor waren als Panzer generiert, die Kaserne zerfiel in zwei Hälften
+  mit schwebendem Wachturm. Neu: Wellblech-Montagehalle mit Rolltor und Kran,
+  Generatorblock mit Doppelschornstein (zwei Rauchfahnen), verschweißter
+  Containerstapel mit Antennen und Schüssel, Wellblechhütten mit Planenvordach und
+  Wachturm (`tools/art/procedural/`). Die Art liegt wie bisher nur lokal; das
+  Asset-Paket muss neu gebaut werden
+- **Einheiten fahren gerade, machen Platz und drehen sich nicht mehr weg (D-116).**
+  Die Wegfindung rechnete Diagonalschritte durch einen Ganzzahlfehler
+  (`14 / 10` = 1) so teuer wie gerade — Einheiten fuhren Treppen statt Geraden. Jetzt
+  oktil 10/14. Der Kurs folgt dem Pfad statt der Abstoßung (höchstens 30° je Tick),
+  Einheiten halten Abstand je Typ (Infanterie dicht, Panzer weit), große Fahrzeuge
+  bekommen Gruppenplätze mit freiem Rand, und stehende eigene Einheiten weichen
+  einer gleich großen oder größeren fahrenden Einheit seitlich aus. Gemessen:
+  fahrende Einheiten schauen in 100 % der Frames in Fahrtrichtung, ein Panzer fährt
+  ohne Abweichung durch neun Soldaten. Regel-Revision V4, KI-Pin 2726 → 2721
+- **Einheiten schauen in ihre Fahrtrichtung.** Die Ansicht setzte den
+  mathematischen Sim-Kurs (0° = Osten, gegen den Uhrzeigersinn) direkt als
+  Unity-Gier (0° = Norden, im Uhrzeigersinn) ein und spiegelte jede Einheit an der
+  Nordost-Diagonale: Wer nach Osten fuhr, schaute nach Norden. Die Abbildung liegt
+  jetzt an einer Stelle (`ViewHeading`), abgesichert durch EditMode-Tests und einen
+  PlayMode-Nachweis in der laufenden Partie (sechs Richtungen, Gegenprobe mit der
+  alten Abbildung schlägt fehl). Stehende Einheiten ohne Turm drehen sich zum
+  sichtbaren Angriffsziel (D-110)
 - **Die Bauverweigerung nennt jetzt den Grund (#135).** Aus der Proberunde vom
   31.08.2026 kamen zwei Beschwerden, die sich als **dieselbe** erwiesen: „Der
   zweite Atlas kann keine Gebäude bauen" und „Ich konnte in der Kartenmitte kein

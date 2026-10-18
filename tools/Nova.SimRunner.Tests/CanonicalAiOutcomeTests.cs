@@ -43,18 +43,19 @@ namespace Nova.SimRunner.Tests
     [TestFixture]
     public sealed class CanonicalAiOutcomeTests
     {
-        /// <summary>Decided tick of the canonical AI match, last moved by: Sprint 16.9 / D-104 and D-107 placement geometry. Previous value: 2705 (Sprint 16.8).</summary>
-        private const uint PinnedDecidedTick = 2726u;
+        /// <summary>Decided tick of the canonical AI match, last moved by: D-116 movement feel (octile flow costs, per-role spacing, make-way, turn-limited heading). Previous value: 2726 (Sprint 16.9 / D-104, D-107).</summary>
+        private const uint PinnedDecidedTick = 2721u;
 
         /// <summary>
-        /// End-state hash of the canonical AI match, last moved by: Sprint 16
-        /// package 16.9 / D-104 and D-107. The footprint placement rules and
-        /// corrected mirrored HQ geometry move the simulated match without
-        /// changing the AI implementation.
-        /// AiBehaviorId is r7.E34435F9.
-        /// Previous value: 0x28F2CC571BCE6B76 (Sprint 16.8).
+        /// End-state hash of the canonical AI match, last moved by: D-116. The
+        /// flow field now prices a diagonal step at 14 against 10 (it was 1
+        /// against 1 through integer truncation), units space by role,
+        /// friends make way and headings follow the path — the simulated match
+        /// moves without changing the AI implementation.
+        /// AiBehaviorId is r8.1E6E7AE3.
+        /// Previous value: 0x4A861D9FA2E57C6F (Sprint 16.9 / D-104, D-107).
         /// </summary>
-        private const string PinnedEndState = "0x4A861D9FA2E57C6F";
+        private const string PinnedEndState = "0x6E15320BCC3F3EE4";
 
         [Test]
         public void CanonicalAiMatch_DecidesOnThePinnedTick_WithThePinnedEndState()

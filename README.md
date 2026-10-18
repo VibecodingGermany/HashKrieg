@@ -1,6 +1,6 @@
 # Hashkrieg
 
-**Dokumentversion:** 0.23.0 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-08-10
+**Dokumentversion:** 0.23.1 | **Status:** unveröffentlichter Entwicklungsstand, spielbar | **Verantwortungsbereich:** Executive Producer / Technical Writer | **Stand:** 2026-10-18
 
 > Ein Echtzeitstrategiespiel in der Tradition von **Command &amp; Conquer** — Basisbau,
 > Ernte, Armee, Karte kontrollieren. Gebaut mit Unity und C#, offen entwickelt.
@@ -148,8 +148,9 @@ automatisierte Laufzeitevidenz, keine behauptete manuelle Spielabnahme.
 Ehrlich und ohne Beschönigung. Der Loop läuft — aber ein Spiel ist mehr als ein
 funktionierender Loop:
 
-- **Kein Attack-Move.** Truppen feuern zwar von selbst, halten unterwegs aber
-  nicht an, um zu kämpfen.
+- **Attack-Move ist implementiert; die aktuelle Spielabnahme bleibt offen.**
+  Der Befehl „Angriffsbewegung“ lässt kampffähige Truppen unterwegs kämpfen
+  und anschließend den Marsch fortsetzen.
 - **Netzwerkabnahme und Betrieb stehen aus.** Der Zwei-Spieler-Pfad ist
   verdrahtet und headless nachgewiesen; zwei Unity-Fenster, LAN, Linux/systemd,
   VPS und der Live-Workflow sind noch nicht vollständig ausgeführt.
@@ -280,8 +281,8 @@ Runde*.
 
 **Läuft noch nicht:**
 
-- **Kein Attack-Move.** Truppen feuern von selbst, halten unterwegs aber nicht
-  zum Kämpfen an.
+- **Aktuelle Attack-Move-Spielabnahme offen.** Angriffsbewegung ist umgesetzt;
+  der vollständige Durchlauf mit dem aktuellen Art-Stand bleibt zu prüfen.
 - **Netzwerk und Gefechtsdichte sind noch nicht vollständig manuell
   abgenommen.** A8 Stufen 2–4 sowie die 60-Einheiten-Sicht-/Gegenhörprüfung
   bleiben offen.
@@ -453,8 +454,8 @@ Zur Bewertung, in dieser Reihenfolge:
    SFX-Regler, Klangbalance und Kamera-Listener gegenhören und ansehen.
 3. **Strang C manuell abnehmen** — Blocker-, Energie- und Stop-Feedback im
    laufenden Spiel lesen und bedienen; die Implementierung ist abgeschlossen.
-4. **Attack-Move** — Truppen sollen unterwegs Gegner bekämpfen, ohne jeden
-   Kontakt einzeln befohlen zu bekommen.
+4. **Attack-Move im Match prüfen** — die implementierte Angriffsbewegung
+   einschließlich Kampfunterbrechung und Weiterlaufen auf aktuellem Stand abnehmen.
 5. **KI-Ausbau** — der Gegner spielt, aber weiterhin schlicht; die neuen
    Wirtschaftsregeln müssen später auch in sein strategisches Verhalten einfließen.
 
@@ -487,3 +488,4 @@ Projekt ein Publikum hat.
 | 0.15.0 | 2026-07-26 | Neu gegliedert und bebildert: Hashkrieg-Richtung nach vorn gezogen, die offene Wirtschaftsentscheidung als eigener Abschnitt sichtbar gemacht, Mitmach-Abschnitt mit Einstiegspunkten ergänzt, Projektstatus um Graybox und Fraktionsidentität aktualisiert, Lizenzlage präzisiert | Technical Writer |
 | 0.17.0 | 2026-08-07 | **Kernloop geschlossen:** erste vollständige Runde gespielt. Sprint „Gefecht und Rundenrahmen" (D-086, D-087) als fünfte Zeile in den Werdegang aufgenommen; Projektstatus von „fast geschlossen" auf „geschlossen" gezogen und der Kopf sagt jetzt in der ersten Zeile, dass das Spiel spielbar ist; „Was noch fehlt" komplett ersetzt (die vier alten Punkte sind erledigt) durch Einheiten-Stapelung, Wegfindung durch Gebäude, fehlendes Attack-Move und stumme Gefechte; Steuerung um Kontrollgruppen und additive Auswahl ergänzt; Nächste Schritte auf Sprint 11 umgestellt; Sprint-Feld im Kopf entfernt, weil die Sprint-7-Zählung seit der Hashkrieg-Reihe nicht mehr trägt | Technical Writer |
 | 0.16.0 | 2026-08-06 | Auf den Stand nach vier Sprints gezogen (D-077, D-083, D-084, D-085): Projektstatus nennt jetzt die spielende KI, Menü, bedienbares HUD und funktionierendes Bauen; §4 korrigiert den Start (Menü statt Direktstart), führt die vollständige Steuerung und ersetzt die überholte „was die Graybox nicht kann"-Liste durch den echten offenen Rest; §5 dokumentiert die 34 3D-Assets und die Drop-in-Pipeline statt „es existiert kein 3D-Asset"; Mitmach-Tabelle und Nächste Schritte auf den laufenden Sprintplan umgestellt | Technical Writer |
+| 0.23.1 | 2026-10-18 | Veraltete Attack-Move-Lücken korrigiert: implementierte Angriffsbewegung von der offenen aktuellen Spielabnahme getrennt | Codex |

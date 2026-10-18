@@ -35,6 +35,17 @@ namespace Nova.Editor
 
         private const string UrpLitShader = "Universal Render Pipeline/Lit";
 
+        /// <summary>
+        /// Name of the inactive child that carries the destroyed state
+        /// (SM_*_Wreck.fbx, D-115); ViewWrecks swaps to it on death.
+        /// </summary>
+        public const string WreckNode = Nova.Gameplay.Match.ViewWrecks.WreckNode;
+
+        private const string WreckSuffix = "_Wreck";
+
+        /// <summary>HDR gain on the _EM map: accents must read under the full desert sun.</summary>
+        private const float EmissionIntensity = 2.0f;
+
         [MenuItem("Tools/Project Nova/Build Art Prefabs From FBX")]
         public static void BuildMenu()
         {
@@ -63,6 +74,8 @@ namespace Nova.Editor
                     string fbxPath = AssetDatabase.GUIDToAssetPath(guid);
                     string stem = Path.GetFileNameWithoutExtension(fbxPath);
                     if (!stem.StartsWith("SM_", System.StringComparison.Ordinal)) continue;
+                    // Wreck meshes ride inside their parent's prefab, never alone.
+                    if (stem.EndsWith(WreckSuffix, System.StringComparison.Ordinal)) continue;
 
                     // SM_UNIT_Alliance_LightTank -> PF_UNIT_Alliance_LightTank
                     string suffix = stem.Substring("SM_".Length);
@@ -123,12 +136,59 @@ namespace Nova.Editor
                 Debug.LogWarning($"[ArtAssetPrefabBuilder] no base-colour texture at '{texPath}'; material '{matPath}' stays untextured.");
             }
 
-            // The Tripo-sourced meshes ship base colour only. Until the _MSK
-            // mask of ArtAssetStandard.md section 5.1 is authored, keep the
-            // surface fully dielectric and mid-rough rather than inheriting
+            // _MSK (ArtAssetStandard.md section 5.1, written by
+            // tools/art/asset_pass.py): R metallic and A smoothness drive URP
+            // Lit's metallic map, G its occlusion map. Without one the surface
+            // stays fully dielectric and mid-rough rather than inheriting
             // URP's shiny default, which reads as wet plastic under the RTS sun.
-            material.SetFloat("_Metallic", 0f);
-            material.SetFloat("_Smoothness", 0.25f);
+            var mask = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_MSK.png");
+            if (mask != null)
+            {
+                material.SetTexture("_MetallicGlossMap", mask);
+                material.EnableKeyword("_METALLICSPECGLOSSMAP");
+                material.SetFloat("_Metallic", 1f);
+                material.SetFloat("_Smoothness", 1f);   // multiplies mask.a
+                material.SetTexture("_OcclusionMap", mask);
+                material.EnableKeyword("_OCCLUSIONMAP");
+                material.SetFloat("_OcclusionStrength", 1f);
+            }
+            else
+            {
+                material.SetTexture("_MetallicGlossMap", null);
+                material.DisableKeyword("_METALLICSPECGLOSSMAP");
+                material.SetTexture("_OcclusionMap", null);
+                material.DisableKeyword("_OCCLUSIONMAP");
+                material.SetFloat("_Metallic", 0f);
+                material.SetFloat("_Smoothness", 0.25f);
+            }
+
+            // _EM: the light strips and glow panels cut out by the art pass.
+            var emission = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_EM.png");
+            if (emission != null)
+            {
+                material.SetTexture("_EmissionMap", emission);
+                material.SetColor("_EmissionColor", Color.white * EmissionIntensity);
+                material.EnableKeyword("_EMISSION");
+                // URP's material validation keeps _EMISSION only while the GI
+                // flags say "emissive" (BaseShaderGUI.SetMaterialKeywords);
+                // with None it silently strips the keyword on the next import.
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+            else
+            {
+                material.SetTexture("_EmissionMap", null);
+                material.SetColor("_EmissionColor", Color.black);
+                material.DisableKeyword("_EMISSION");
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+
+            // Tripo meshes are ~1000 loose shells with real gaps between them.
+            // With back faces culled the desert floor shows through every
+            // gap as a bright crack; rendering both faces shows the dark
+            // inside instead, which reads as a panel line.
+            material.SetFloat("_Cull", (float)CullMode.Off);
+            material.doubleSidedGI = true;
+
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -157,18 +217,22 @@ namespace Nova.Editor
                 var levels = new List<LOD>();
                 var thresholds = new[] { Lod0ScreenHeight, Lod1ScreenHeight, 0.0f };
 
+                // A rigged mesh (tools/art/asset_pass.py) carries one renderer
+                // per animated part and LOD — Hull, Turret, Gun, Wheel_* ... —
+                // so a level collects EVERY renderer of its suffix, not the first.
                 for (int lod = 0; lod < 3; lod++)
                 {
-                    Transform child = FindChildWithSuffix(instance.transform, $"_LOD{lod}");
-                    if (child == null) continue;
+                    var renderers = new List<Renderer>();
+                    foreach (Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (!renderer.name.EndsWith($"_LOD{lod}", System.StringComparison.Ordinal)) continue;
+                        if (material != null) renderer.sharedMaterial = material;
+                        renderer.shadowCastingMode = lod == 2 ? ShadowCastingMode.Off : ShadowCastingMode.On;
+                        renderers.Add(renderer);
+                    }
+                    if (renderers.Count == 0) continue;
 
-                    var renderer = child.GetComponent<Renderer>();
-                    if (renderer == null) continue;
-
-                    if (material != null) renderer.sharedMaterial = material;
-                    renderer.shadowCastingMode = lod == 2 ? ShadowCastingMode.Off : ShadowCastingMode.On;
-
-                    levels.Add(new LOD(thresholds[lod], new[] { renderer }));
+                    levels.Add(new LOD(thresholds[lod], renderers.ToArray()));
                 }
 
                 if (levels.Count == 0)
@@ -187,6 +251,8 @@ namespace Nova.Editor
                 group.SetLODs(levels.ToArray());
                 group.RecalculateBounds();
 
+                AttachWreck(instance, fbxPath, dir, prefabName);
+
                 PrefabUtility.SaveAsPrefabAsset(instance, $"{dir}/{prefabName}.prefab");
                 return true;
             }
@@ -195,15 +261,46 @@ namespace Nova.Editor
                 Object.DestroyImmediate(instance);
             }
         }
-
-        private static Transform FindChildWithSuffix(Transform root, string suffix)
+        /// <summary>
+        /// Adds the sibling <c>SM_*_Wreck.fbx</c> as an inactive child named
+        /// <see cref="WreckNode"/> with its own charred material
+        /// (<c>M_*_Wreck</c> on <c>T_*_Wreck_BC</c>). The wreck is not part of
+        /// the LODGroup: it is a single mesh, shown alone once the live model
+        /// is switched off. No wreck file — no child, the view keeps the
+        /// fade-out death.
+        /// </summary>
+        private static void AttachWreck(GameObject instance, string fbxPath, string dir, string prefabName)
         {
-            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
-            {
-                if (t != root && t.name.EndsWith(suffix, System.StringComparison.Ordinal)) return t;
-            }
+            string wreckPath = fbxPath.Substring(0, fbxPath.Length - ".fbx".Length) + WreckSuffix + ".fbx";
+            var wreckModel = AssetDatabase.LoadAssetAtPath<GameObject>(wreckPath);
+            if (wreckModel == null) return;
 
-            return null;
+            string suffix = prefabName.Substring("PF_".Length) + WreckSuffix;
+            string matPath = $"{dir}/M_{suffix}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (material == null)
+            {
+                material = new Material(Shader.Find(UrpLitShader));
+                AssetDatabase.CreateAsset(material, matPath);
+            }
+            var baseMap = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/T_{suffix}_BC.png");
+            material.SetTexture("_BaseMap", baseMap);
+            material.SetFloat("_Metallic", 0.1f);
+            material.SetFloat("_Smoothness", 0.12f);
+            material.SetFloat("_Cull", (float)CullMode.Off);
+            material.doubleSidedGI = true;
+            EditorUtility.SetDirty(material);
+
+            var wreck = (GameObject)PrefabUtility.InstantiatePrefab(wreckModel);
+            PrefabUtility.UnpackPrefabInstance(wreck, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            wreck.name = WreckNode;
+            wreck.transform.SetParent(instance.transform, false);
+            foreach (Renderer r in wreck.GetComponentsInChildren<Renderer>(true))
+            {
+                r.sharedMaterial = material;
+                r.shadowCastingMode = ShadowCastingMode.On;
+            }
+            wreck.SetActive(false);
         }
     }
 }

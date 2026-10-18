@@ -1,0 +1,1215 @@
+{
+  "_doc": "Rezepte fuer tools/art/asset_pass.py. Koordinaten normiert auf die LOD0-Bounding-Box: x links->rechts, y vorne->hinten (vorne = Unity +Z), z unten->oben. Felder siehe Docstring von asset_pass.py. Geometrie-AO/Kanten (ao_strength, edge_highlight) sind standardmaessig aus: auf Tripo-Mehrschalen-Meshes backen sie ganze Flaechen schwarz.",
+  "_defaults": {
+    "smooth_angle": 38,
+    "texture": {
+      "enabled": true,
+      "bake_samples": 48,
+      "ao_strength": 0.0,
+      "ao_distance": 0.08,
+      "edge_radius": 0.006,
+      "edge_highlight": 0.0,
+      "metallic": 0.25,
+      "smoothness": 0.3,
+      "accent_by_faction": {
+        "Alliance": {
+          "hue": [
+            165,
+            215
+          ],
+          "sat": 0.45,
+          "val": 0.45,
+          "glow_sat": 0.6,
+          "glow_val": 0.6
+        },
+        "Legion": {
+          "hue": [
+            10,
+            45
+          ],
+          "sat": 0.6,
+          "val": 0.75
+        }
+      },
+      "palette_mix_by_faction": {
+        "Alliance": 0.55,
+        "Legion": 0.45
+      },
+      "target_mean": 0.34,
+      "max_gain": 4.0,
+      "white_point": 1.25,
+      "saturation_by_faction": {
+        "Alliance": 0.6,
+        "Legion": 0.85
+      },
+      "hue_band_by_faction": {
+        "Alliance": [
+          150,
+          230
+        ],
+        "Legion": [
+          0,
+          50
+        ]
+      }
+    }
+  },
+  "BLDG_Alliance_Barracks": {
+    "path": "Buildings/Alliance/Barracks",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_DefensePlatform": {
+    "move_boxes": [
+      {
+        "box": [
+          0.3,
+          0.65,
+          0,
+          0.2,
+          0.7,
+          1.0
+        ],
+        "offset": [
+          0,
+          0.42,
+          0
+        ]
+      }
+    ],
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.62,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret",
+        "box": [
+          0.35,
+          0.55,
+          0.4,
+          0.64,
+          0.76,
+          0.97
+        ]
+      }
+    ],
+    "path": "Buildings/Alliance/DefensePlatform",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    },
+    "pad": {
+      "height_ratio": 0.55,
+      "tone": [
+        0.34,
+        0.5
+      ]
+    }
+  },
+  "BLDG_Alliance_HQ": {
+    "path": "Buildings/Alliance/HQ",
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Spin_Spire",
+        "kind": "spin",
+        "box": [
+          0.4,
+          0.6,
+          0.4,
+          0.62,
+          0.82,
+          1.0
+        ],
+        "pivot": [
+          0.5,
+          0.51,
+          0.82
+        ]
+      }
+    ],
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_Power": {
+    "path": "Buildings/Alliance/Power",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_Radar": {
+    "parts": [
+      {
+        "name": "Spin_Dish",
+        "kind": "spin",
+        "box": [
+          0,
+          1,
+          0,
+          1,
+          0.84,
+          1
+        ],
+        "pivot": [
+          0.5,
+          0.52,
+          0.84
+        ]
+      }
+    ],
+    "path": "Buildings/Alliance/Radar",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    },
+    "squash": {
+      "below": 0.84,
+      "factor": 0.45
+    }
+  },
+  "BLDG_Alliance_Refinery": {
+    "path": "Buildings/Alliance/Refinery",
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Spin_Crystal",
+        "kind": "spin",
+        "box": [
+          0.35,
+          0.55,
+          0.55,
+          0.8,
+          0.89,
+          1.0
+        ],
+        "pivot": [
+          0.45,
+          0.67,
+          0.88
+        ],
+        "islands": 0.6
+      }
+    ],
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_ResearchLab": {
+    "path": "Buildings/Alliance/ResearchLab",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_Storage": {
+    "path": "Buildings/Alliance/Storage",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Alliance_VehicleFactory": {
+    "path": "Buildings/Alliance/VehicleFactory",
+    "faction": "Alliance",
+    "texture": {
+      "target_mean": 0.42,
+      "palette_mix_by_faction": {
+        "Alliance": 0.65,
+        "Legion": 0.45
+      }
+    }
+  },
+  "BLDG_Legion_Barracks": {
+    "path": "Buildings/Legion/Barracks",
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
+  },
+  "BLDG_Legion_DefensePlatform": {
+    "drop_boxes": [
+      [
+        0.3,
+        0.58,
+        0.1,
+        0.28,
+        0,
+        0.05
+      ]
+    ],
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.42,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret"
+      }
+    ],
+    "path": "Buildings/Legion/DefensePlatform",
+    "faction": "Legion",
+    "pad": {
+      "height_ratio": 0.55,
+      "tone": [
+        0.34,
+        0.5
+      ]
+    }
+  },
+  "BLDG_Legion_HQ": {
+    "path": "Buildings/Legion/HQ",
+    "faction": "Legion",
+    "emitters": [
+      {
+        "name": "Smoke_Chimney",
+        "pos": [
+          0.25,
+          0.62,
+          0.86
+        ]
+      }
+    ]
+  },
+  "BLDG_Legion_Power": {
+    "path": "Buildings/Legion/Power",
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0,
+    "emitters": [
+      {"name": "Smoke_ChimneyL", "pos": [0.27, 0.59, 1.0]},
+      {"name": "Smoke_ChimneyR", "pos": [0.47, 0.59, 1.0]}
+    ]
+  },
+  "BLDG_Legion_Radar": {
+    "parts": [
+      {
+        "name": "Scan_Dish",
+        "kind": "spin",
+        "box": [
+          0,
+          0.36,
+          0,
+          0.45,
+          0.6,
+          1.0
+        ],
+        "pivot": [
+          0.2,
+          0.3,
+          0.62
+        ]
+      }
+    ],
+    "path": "Buildings/Legion/Radar",
+    "faction": "Legion"
+  },
+  "BLDG_Legion_Refinery": {
+    "path": "Buildings/Legion/Refinery",
+    "faction": "Legion",
+    "emitters": [
+      {
+        "name": "Smoke_Chimney",
+        "pos": [
+          0.62,
+          0.35,
+          1.0
+        ]
+      }
+    ]
+  },
+  "BLDG_Legion_ResearchLab": {
+    "path": "Buildings/Legion/ResearchLab",
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
+  },
+  "BLDG_Legion_Storage": {
+    "path": "Buildings/Legion/Storage",
+    "faction": "Legion"
+  },
+  "BLDG_Legion_VehicleFactory": {
+    "path": "Buildings/Legion/VehicleFactory",
+    "faction": "Legion",
+    "drop_needles": false,
+    "smooth_angle": 0
+  },
+  "UNIT_Alliance_AntiArmorInfantry": {
+    "path": "Units/Alliance/AntiArmorInfantry",
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.2,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.37,
+          0.68,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          [
+            0.5,
+            0.86,
+            0,
+            1,
+            0,
+            0.47
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.68,
+          0.68,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.2,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.37,
+          0.68,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          [
+            0.5,
+            0.86,
+            0,
+            1,
+            0,
+            0.25
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.68,
+          0.68,
+          0.25
+        ]
+      }
+    ]
+  },
+  "UNIT_Alliance_Artillery": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.57,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret",
+        "box": [
+          0.38,
+          0.62,
+          0.0,
+          0.58,
+          0.72,
+          1.0
+        ]
+      }
+    ],
+    "path": "Units/Alliance/Artillery",
+    "faction": "Alliance"
+  },
+  "UNIT_Alliance_BasicInfantry": {
+    "path": "Units/Alliance/BasicInfantry",
+    "faction": "Alliance",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.32,
+          0.72,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          0.5,
+          1,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.71,
+          0.72,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.32,
+          0.72,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          0.5,
+          1,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.71,
+          0.72,
+          0.25
+        ]
+      }
+    ]
+  },
+  "UNIT_Alliance_BattleTank": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 4.109
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret"
+      }
+    ],
+    "path": "Units/Alliance/BattleTank",
+    "faction": "Alliance"
+  },
+  "UNIT_Alliance_Builder": {
+    "parts": [
+      {
+        "name": "Arm_L",
+        "kind": "arm",
+        "box": [
+          [
+            0,
+            0.18,
+            0,
+            1,
+            0.2,
+            0.62
+          ],
+          [
+            0,
+            0.3,
+            0,
+            1,
+            0.6,
+            0.8
+          ]
+        ],
+        "pivot": [
+          0.27,
+          0.5,
+          0.7
+        ]
+      },
+      {
+        "name": "Arm_R",
+        "kind": "arm",
+        "box": [
+          [
+            0.82,
+            1,
+            0,
+            1,
+            0.2,
+            0.62
+          ],
+          [
+            0.7,
+            1,
+            0,
+            1,
+            0.6,
+            0.8
+          ]
+        ],
+        "pivot": [
+          0.73,
+          0.5,
+          0.7
+        ]
+      }
+    ],
+    "path": "Units/Alliance/Builder",
+    "faction": "Alliance"
+  },
+  "UNIT_Alliance_Harvester": {
+    "parts": [
+      {
+        "name": "Arm_R",
+        "kind": "arm",
+        "box": [
+          0.74,
+          1.0,
+          0.42,
+          0.9,
+          0.45,
+          1.0
+        ],
+        "pivot": [
+          0.82,
+          0.6,
+          0.92
+        ]
+      }
+    ],
+    "emitters": [
+      {
+        "name": "Cargo_Anchor",
+        "pos": [0.4, 0.83, 0.69]
+      }
+    ],
+    "path": "Units/Alliance/Harvester",
+    "faction": "Alliance"
+  },
+  "UNIT_Alliance_LightTank": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.49,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret"
+      }
+    ],
+    "path": "Units/Alliance/LightTank",
+    "faction": "Alliance"
+  },
+  "UNIT_Alliance_ScoutVehicle": {
+    "parts": [
+      {
+        "name": "Wheel_FL",
+        "kind": "wheel",
+        "axle": [
+          0.205,
+          0.205
+        ],
+        "r": 0.21,
+        "x": [
+          0,
+          0.16
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_FR",
+        "kind": "wheel",
+        "axle": [
+          0.205,
+          0.205
+        ],
+        "r": 0.21,
+        "x": [
+          0.84,
+          1
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_RL",
+        "kind": "wheel",
+        "axle": [
+          0.805,
+          0.205
+        ],
+        "r": 0.21,
+        "x": [
+          0,
+          0.16
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_RR",
+        "kind": "wheel",
+        "axle": [
+          0.805,
+          0.205
+        ],
+        "r": 0.21,
+        "x": [
+          0.84,
+          1
+        ],
+        "islands": 0.7
+      }
+    ],
+    "path": "Units/Alliance/ScoutVehicle",
+    "faction": "Alliance"
+  },
+  "UNIT_Legion_AntiArmorInfantry": {
+    "path": "Units/Legion/AntiArmorInfantry",
+    "faction": "Legion",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.45
+        ],
+        "pivot": [
+          0.33,
+          0.55,
+          0.45
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          0.5,
+          0.8,
+          0,
+          1,
+          0,
+          0.45
+        ],
+        "pivot": [
+          0.66,
+          0.55,
+          0.45
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.33,
+          0.55,
+          0.25
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          0.5,
+          0.8,
+          0,
+          1,
+          0,
+          0.25
+        ],
+        "pivot": [
+          0.66,
+          0.55,
+          0.25
+        ]
+      }
+    ]
+  },
+  "UNIT_Legion_Artillery": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.5,
+        "ring_z_norm": true,
+        "box": [
+          0.2,
+          0.8,
+          0,
+          1,
+          0,
+          1
+        ]
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret",
+        "box": [
+          0.25,
+          0.75,
+          0.0,
+          0.5,
+          0.74,
+          1.0
+        ]
+      }
+    ],
+    "path": "Units/Legion/Artillery",
+    "faction": "Legion"
+  },
+  "UNIT_Legion_BasicInfantry": {
+    "path": "Units/Legion/BasicInfantry",
+    "faction": "Legion",
+    "parts": [
+      {
+        "name": "Leg_L",
+        "kind": "limb",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.47
+        ],
+        "pivot": [
+          0.33,
+          0.5,
+          0.47
+        ]
+      },
+      {
+        "name": "Leg_R",
+        "kind": "limb",
+        "box": [
+          [
+            0.5,
+            0.83,
+            0,
+            1,
+            0,
+            0.47
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.67,
+          0.5,
+          0.47
+        ]
+      },
+      {
+        "name": "Shin_L",
+        "kind": "limb",
+        "from": "Leg_L",
+        "parent": "Leg_L",
+        "box": [
+          0.18,
+          0.5,
+          0,
+          1,
+          0,
+          0.27
+        ],
+        "pivot": [
+          0.33,
+          0.5,
+          0.27
+        ]
+      },
+      {
+        "name": "Shin_R",
+        "kind": "limb",
+        "from": "Leg_R",
+        "parent": "Leg_R",
+        "box": [
+          [
+            0.5,
+            0.83,
+            0,
+            1,
+            0,
+            0.27
+          ],
+          [
+            0.5,
+            1,
+            0,
+            1,
+            0,
+            0.2
+          ]
+        ],
+        "pivot": [
+          0.67,
+          0.5,
+          0.27
+        ]
+      }
+    ]
+  },
+  "UNIT_Legion_BattleTank": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 3.9375
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret"
+      }
+    ],
+    "path": "Units/Legion/BattleTank",
+    "faction": "Legion"
+  },
+  "UNIT_Legion_Builder": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.23,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Arm_Boom",
+        "kind": "arm",
+        "from": "Turret",
+        "parent": "Turret",
+        "box": [
+          [
+            0.6,
+            0.85,
+            0,
+            0.2,
+            0.4,
+            0.8
+          ],
+          [
+            0.6,
+            0.85,
+            0.17,
+            0.62,
+            0.62,
+            1.0
+          ],
+          [
+            0.6,
+            0.85,
+            0.62,
+            0.82,
+            0.42,
+            1.0
+          ]
+        ],
+        "pivot": [
+          0.7,
+          0.74,
+          0.47
+        ]
+      }
+    ],
+    "path": "Units/Legion/Builder",
+    "faction": "Legion"
+  },
+  "UNIT_Legion_Harvester": {
+    "drop_boxes": [
+      [0.07, 0.93, 0.62, 0.96, 0.46, 1],
+      [0, 1, 0.62, 1, 0.74, 1]
+    ],
+    "parts": [
+      {
+        "name": "Wheel_FL",
+        "kind": "wheel",
+        "axle": [
+          0.36,
+          0.14
+        ],
+        "r": 0.145,
+        "x": [
+          0,
+          0.14
+        ],
+        "islands": 0.55
+      },
+      {
+        "name": "Wheel_FR",
+        "kind": "wheel",
+        "axle": [
+          0.36,
+          0.14
+        ],
+        "r": 0.145,
+        "x": [
+          0.86,
+          1
+        ],
+        "islands": 0.55
+      },
+      {
+        "name": "Wheel_RL",
+        "kind": "wheel",
+        "axle": [
+          0.79,
+          0.14
+        ],
+        "r": 0.145,
+        "x": [
+          0,
+          0.14
+        ],
+        "islands": 0.4
+      },
+      {
+        "name": "Wheel_RR",
+        "kind": "wheel",
+        "axle": [
+          0.79,
+          0.14
+        ],
+        "r": 0.145,
+        "x": [
+          0.86,
+          1
+        ],
+        "islands": 0.4
+      },
+      {
+        "name": "Bed",
+        "kind": "bed",
+        "box": [
+          [0, 1, 0.62, 1, 0.43, 1],
+          [0.1, 0.9, 0.62, 1, 0.37, 0.43]
+        ],
+        "pivot": [0.5, 0.99, 0.45]
+      }
+    ],
+    "path": "Units/Legion/Harvester",
+    "faction": "Legion"
+  },
+  "UNIT_Legion_LightTank": {
+    "parts": [
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.655,
+        "ring_z_norm": true
+      },
+      {
+        "name": "Gun",
+        "kind": "gun",
+        "from": "Turret",
+        "parent": "Turret"
+      }
+    ],
+    "path": "Units/Legion/LightTank",
+    "faction": "Legion"
+  },
+  "UNIT_Legion_ScoutVehicle": {
+    "parts": [
+      {
+        "name": "Wheel_FL",
+        "kind": "wheel",
+        "axle": [
+          0.15,
+          0.215
+        ],
+        "r": 0.215,
+        "x": [
+          0,
+          0.2
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_FR",
+        "kind": "wheel",
+        "axle": [
+          0.15,
+          0.215
+        ],
+        "r": 0.215,
+        "x": [
+          0.8,
+          1
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_RL",
+        "kind": "wheel",
+        "axle": [
+          0.8,
+          0.25
+        ],
+        "r": 0.25,
+        "x": [
+          0,
+          0.2
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Wheel_RR",
+        "kind": "wheel",
+        "axle": [
+          0.8,
+          0.25
+        ],
+        "r": 0.25,
+        "x": [
+          0.8,
+          1
+        ],
+        "islands": 0.7
+      },
+      {
+        "name": "Turret",
+        "kind": "turret",
+        "ring_z": 0.845,
+        "ring_z_norm": true,
+        "box": [
+          0.15,
+          0.7,
+          0.45,
+          0.88,
+          0.84,
+          1.0
+        ]
+      }
+    ],
+    "path": "Units/Legion/ScoutVehicle",
+    "faction": "Legion"
+  }
+}

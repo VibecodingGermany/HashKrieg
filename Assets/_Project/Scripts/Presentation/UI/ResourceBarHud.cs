@@ -1,5 +1,6 @@
 using UnityEngine;
 using Nova.Gameplay;
+using Nova.Gameplay.Audio;
 using Nova.Gameplay.Match;
 using Nova.Simulation.Economy;
 
@@ -92,6 +93,7 @@ namespace Nova.Presentation.UI
         // CapacityFor re-sweeps the entity store on every call.
         private ResourceBarModel _model;
         private int _modelFrame = -1;
+        private bool _wasLowPower;
 
         private void Awake()
         {
@@ -132,6 +134,14 @@ namespace Nova.Presentation.UI
                 economy.CapacityFor(slot),
                 playerEconomy.PowerProvided,
                 playerEconomy.PowerRequired);
+
+            bool nowLowPower = _model.IsLowPower;
+            if (nowLowPower && !_wasLowPower)
+            {
+                AudioServiceLocator.Play2D(SoundEventId.UI_Deny);
+            }
+            _wasLowPower = nowLowPower;
+
             return _model;
         }
 
@@ -143,8 +153,8 @@ namespace Nova.Presentation.UI
         /// </summary>
         private void DrawBar(in ResourceBarModel model, float scale)
         {
-            _aetheriumContent.text = model.AetheriumText;
-            _powerContent.text = ResourceBarPresenter.SegmentSeparator + model.PowerText;
+            _aetheriumContent.text = "◆ " + model.AetheriumText;
+            _powerContent.text = ResourceBarPresenter.SegmentSeparator + "⚡ " + model.PowerText;
             GUIStyle powerStyle = model.IsLowPower ? _alertValueStyle : _valueStyle;
             _warningContent.text = model.WarningText != null
                 ? ResourceBarPresenter.SegmentSeparator + model.WarningText
@@ -158,6 +168,13 @@ namespace Nova.Presentation.UI
             Rect zone = ToRect(ResourceBarPresenter.TopRightZone(
                 HudLayout.GuiWidth(scale), _topOffset, contentWidth, _barHeight, _margin));
             GUI.Box(zone, GUIContent.none, HudChrome.PanelStyle);
+
+            Color prev = GUI.color;
+            GUI.color = model.IsCritical
+                ? _criticalColor
+                : new Color(0.22f, 0.86f, 0.94f, 0.90f);
+            GUI.DrawTexture(new Rect(zone.x + 2f, zone.y + 3f, 3f, zone.height - 6f), HudChrome.Pixel);
+            GUI.color = prev;
 
             float x = zone.x + ContentInset;
             GUI.Label(new Rect(x, zone.y, aetheriumWidth, zone.height), _aetheriumContent, _valueStyle);
@@ -183,9 +200,11 @@ namespace Nova.Presentation.UI
                 _valueStyle = new GUIStyle(GUI.skin.label)
                 {
                     fontSize = _fontSize,
+                    fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleLeft,
                     wordWrap = false,
                     padding = new RectOffset(0, 0, 0, 0),
+                    normal = { textColor = new Color(0.78f, 0.96f, 1.00f, 1f) }
                 };
             }
             if (_alertValueStyle == null)

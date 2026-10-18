@@ -101,11 +101,15 @@ namespace Nova.SimRunner.Tests
             ulong revisionTwo = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV2);
             ulong current = MatchFingerprint.ComputeCurrentRulesHash64();
 
-            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV3));
-            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV3)));
-            Assert.That(current, Is.EqualTo(0xD1B683837D12FCEFUL), "revision 3 canonical stream is frozen");
-            Assert.That(current, Is.Not.EqualTo(revisionTwo),
+            Assert.That(MatchFingerprint.CurrentRulesRevision, Is.EqualTo(MatchFingerprint.RulesRevisionV4));
+            Assert.That(current, Is.EqualTo(MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV4)));
+            ulong revisionThree = MatchFingerprint.ComputeRulesHash64(MatchFingerprint.RulesRevisionV3);
+            Assert.That(revisionThree, Is.EqualTo(0xD1B683837D12FCEFUL), "revision 3 canonical stream is frozen");
+            Assert.That(revisionThree, Is.Not.EqualTo(revisionTwo),
                 "D-104 placement and repair behavior must not share revision 2's rules identity");
+            Assert.That(current, Is.Not.EqualTo(revisionThree),
+                "D-116 movement must not share revision 3's rules identity");
+            Assert.That(current, Is.EqualTo(0x7E2E3E8C4CF1591EUL), "revision 4 canonical stream is frozen");
         }
 
         [Test]

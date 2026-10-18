@@ -1,6 +1,6 @@
 # Core Gameplay – Spielgefühl, Kamera, Steuerung, UI
 
-**Version:** 0.2.0 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
+**Version:** 0.2.1 | **Status:** Entwurf (Korrekturlauf Sprint 2) | **Verantwortungsbereich:** Lead Gameplay Designer | **Sprint:** 2
 
 ## Zweck
 
@@ -34,7 +34,7 @@ Feel-Bausteine (abstimmungsrelevant für Art/Audio):
 |---|---|---|
 | Befehlsmarker | 0,5 s Einblendung, fraktionsneutrale Form, Teamfarbe | Sofort-Feedback ohne Visuellen Lärm |
 | Auswahl-Voice | 1 kurze Zeile pro Einheitentyp, Cooldown 3 s | C&C-Nostalgie (H1), kein Voice-Spam |
-| Zerstörungs-Feedback | Wrack bleibt 20–30 s liegen (D-012), danach Fade | Schlachtfeld liest sich als "Geschichte" des Gefechts |
+| Zerstörungs-Feedback | Wrack bleibt liegen (D-115; ältere versinken erst ab 60 Einheiten- bzw. 20 Gebäudewracks, Neubau räumt die Fläche) | Schlachtfeld liest sich als "Geschichte" des Gefechts |
 | Treffer-Feedback | Zahleneinblendungen **aus**; Gesundheitsbalken + Trefferblitz | Zahlenflut widerspricht Lesbarkeitsprinzip |
 | Spielgeschwindigkeit | 1,0 fest im Skirmish; Pause nur im Solo | SP-first (D-007), keine Speed-Debatten |
 
@@ -162,3 +162,4 @@ Zwei Profile: **Standard** (alle Elemente) und **Kompakt** (Minimap und Befehlsl
 |---|---|---|---|
 | 0.1.0 | 2026-07-21 | Erstfassung | Lead Gameplay Designer |
 | 0.2.0 | 2026-07-21 | Korrekturlauf Sprint 2 (D-020–D-030): Kamera-Rotation erst ab Beta (D-029), kein Ingame-Voice-Chat (D-029), D-025-Referenz (Alpha-FFA lokal/Online ab Beta), Aggressions-Modi für Verteidigungsplattformen festgelegt, Streuen mit Playtest-Vorbehalt bestätigt, Links repariert (Units.md → Infantry/Vehicles/Aircraft) | Lead Gameplay Designer |
+| 0.2.1 | 2026-10-17 | Zerstörungs-Feedback: Wracks bleiben liegen statt 20–30 s (D-115) | Technical Art |

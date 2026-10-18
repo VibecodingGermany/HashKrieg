@@ -116,6 +116,8 @@ namespace Nova.Presentation.UI
 
         private readonly StringBuilder _builder = new StringBuilder(64);
         private GUIStyle _buttonStyle;
+        private GUIStyle _badgeStyle;
+        private GUIStyle _hotkeyBadgeStyle;
         private GUIStyle _statusStyle;
         private GUIStyle _powerStatusStyle;
         private bool _hintDismissed;
@@ -143,6 +145,9 @@ namespace Nova.Presentation.UI
         /// so the permanent HUD elements can never overlap.
         /// </summary>
         public float OccupiedHeight => StatusLineHeight + StatusLineGap + _buttonHeight + _barMargin;
+
+        /// <summary>IMGUI scale of the bar; OccupiedHeight times this is screen pixels.</summary>
+        public float UiScale => Mathf.Max(1f, _uiScale);
 
         /// <summary>
         /// Screen-space hit test used by RtsDeviceInput: a pointer over the
@@ -364,7 +369,55 @@ namespace Nova.Presentation.UI
                     _input.EnterPlacementMode(def.DefinitionId);
                 }
                 GUI.enabled = wasEnabled;
+
+                DrawButtonAccents(rect, role, def.DefinitionId, available);
             }
+        }
+
+        private void DrawButtonAccents(Rect rect, UnitRole role, ushort defId, bool available)
+        {
+            Color prev = GUI.color;
+            bool armed = _input != null && _input.PlacementModeActive && _input.PlacementDefId == defId;
+            Color accent = armed
+                ? new Color(0.32f, 0.96f, 0.72f, 1f)
+                : HudChrome.RoleAccentColor(role);
+            if (!available)
+            {
+                accent = new Color(accent.r * 0.45f, accent.g * 0.45f, accent.b * 0.45f, 0.55f);
+            }
+
+            // Top category accent bar inside the button frame.
+            GUI.color = accent;
+            GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, 3f), HudChrome.Pixel);
+
+            // Role badge pill in top-left corner.
+            Rect badgeRect = new Rect(rect.x + 5f, rect.y + 6f, 28f, 13f);
+            GUI.color = new Color(accent.r * 0.25f, accent.g * 0.25f, accent.b * 0.25f, available ? 0.88f : 0.45f);
+            GUI.DrawTexture(badgeRect, HudChrome.Pixel);
+            GUI.color = available ? accent : new Color(0.65f, 0.70f, 0.76f, 0.55f);
+            GUI.Label(badgeRect, HudChrome.BuildingBadgeCode(role), _badgeStyle);
+
+            // Hotkey pill in top-right corner.
+            string hotkey = HotkeyHint(role);
+            if (hotkey.Length > 0)
+            {
+                float hkWidth = Mathf.Min(42f, Mathf.Max(16f, hotkey.Length * 6.5f + 6f));
+                Rect hkRect = new Rect(rect.xMax - hkWidth - 5f, rect.y + 6f, hkWidth, 13f);
+                GUI.color = new Color(0.03f, 0.05f, 0.08f, available ? 0.82f : 0.45f);
+                GUI.DrawTexture(hkRect, HudChrome.Pixel);
+                GUI.color = available
+                    ? new Color(0.95f, 0.86f, 0.52f, 0.95f)
+                    : new Color(0.55f, 0.58f, 0.62f, 0.50f);
+                GUI.Label(hkRect, hotkey, _hotkeyBadgeStyle);
+            }
+
+            if (armed)
+            {
+                GUI.color = new Color(0.32f, 0.96f, 0.72f, 0.85f);
+                GUI.DrawTexture(new Rect(rect.x + 2f, rect.yMax - 4f, rect.width - 4f, 2f), HudChrome.Pixel);
+            }
+
+            GUI.color = prev;
         }
 
         private static bool PrerequisiteMet(
@@ -642,7 +695,37 @@ namespace Nova.Presentation.UI
         {
             if (_buttonStyle == null)
             {
-                _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 11, wordWrap = false };
+                _buttonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = 11,
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = false,
+                    alignment = TextAnchor.LowerCenter,
+                    padding = new RectOffset(6, 6, 18, 5)
+                };
+                HudChrome.ApplyButtonChrome(_buttonStyle);
+            }
+            if (_badgeStyle == null)
+            {
+                _badgeStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 8,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = false,
+                    padding = new RectOffset(0, 0, 0, 0)
+                };
+            }
+            if (_hotkeyBadgeStyle == null)
+            {
+                _hotkeyBadgeStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 8,
+                    fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    wordWrap = false,
+                    padding = new RectOffset(0, 0, 0, 0)
+                };
             }
             if (_statusStyle == null)
             {
@@ -651,7 +734,8 @@ namespace Nova.Presentation.UI
                     fontSize = 9,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleRight,
-                    wordWrap = false
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.86f, 0.92f, 0.98f, 1f) }
                 };
             }
             if (_powerStatusStyle == null)
@@ -661,7 +745,8 @@ namespace Nova.Presentation.UI
                     fontSize = 10,
                     fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleLeft,
-                    wordWrap = false
+                    wordWrap = false,
+                    normal = { textColor = new Color(0.98f, 0.82f, 0.35f, 1f) }
                 };
             }
         }

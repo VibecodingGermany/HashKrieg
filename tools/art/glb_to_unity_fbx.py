@@ -59,6 +59,9 @@ def parse_args(argv):
     p.add_argument("--budgets", type=int, nargs=3, required=True,
                    help="Dreiecksbudget LOD0 LOD1 LOD2 aus docs/tech/AssetBudget.md Abschnitt 1")
     p.add_argument("--report", default="")
+    p.add_argument("--keep-slivers", action="store_true",
+                   help="Splitterfilter aus: fuer modellierte (nicht generierte) Quellen, deren "
+                        "duenne Teile (Leitern, Antennen) an UV-Naehten wie Splitter aussehen")
     return p.parse_args(argv)
 
 
@@ -318,7 +321,7 @@ def main():
     obj = join_meshes(meshes)
     source_tris = triangle_count(obj)
 
-    obj, slivers_removed = remove_slivers(obj)
+    obj, slivers_removed = (obj, 0) if args.keep_slivers else remove_slivers(obj)
     factor = scale_to_target(obj, args.fit, args.size)
     apply_yaw(obj, args.yaw)
     origin_to_ground_center(obj)

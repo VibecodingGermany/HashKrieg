@@ -123,8 +123,16 @@ namespace Nova.Simulation.Replays
         /// </summary>
         public const ushort RulesRevisionV3 = 3;
 
+        /// <summary>
+        /// D-116 movement feel layered onto revision 3: per-role spacing radii,
+        /// size-aware group-move slots, make-way steering and a path-following,
+        /// turn-limited heading. Snapshot bytes are unchanged, the trajectories
+        /// are not — old/new peers must not meet.
+        /// </summary>
+        public const ushort RulesRevisionV4 = 4;
+
         /// <summary>The rules revision emitted by current hosts.</summary>
-        public const ushort CurrentRulesRevision = RulesRevisionV3;
+        public const ushort CurrentRulesRevision = RulesRevisionV4;
 
         /// <summary>Parser bound for one identifier string; checked before allocation.</summary>
         public const int MaxIdentifierBytes = 64;
@@ -274,7 +282,8 @@ namespace Nova.Simulation.Replays
         {
             if (rulesRevision != RulesRevisionV1
                 && rulesRevision != RulesRevisionV2
-                && rulesRevision != RulesRevisionV3)
+                && rulesRevision != RulesRevisionV3
+                && rulesRevision != RulesRevisionV4)
             {
                 throw new ArgumentOutOfRangeException(nameof(rulesRevision), rulesRevision, "Unknown rules revision.");
             }
@@ -283,7 +292,8 @@ namespace Nova.Simulation.Replays
             hash.WriteFieldTag((uint)MatchContentStub.Rules);
             hash.WriteUInt32(rulesRevision == RulesRevisionV1
                 ? 5u
-                : rulesRevision == RulesRevisionV2 ? 7u : 14u); // ordered rule fields below
+                : rulesRevision == RulesRevisionV2 ? 7u
+                : rulesRevision == RulesRevisionV3 ? 14u : 16u); // ordered rule fields below
             hash.WriteFieldTag(1);
             hash.WriteUInt16(rulesRevision);
             hash.WriteFieldTag(2);
@@ -317,6 +327,13 @@ namespace Nova.Simulation.Replays
                 hash.WriteInt32(ConstructionSystem.RefineryMaximumFieldDistanceCells);
                 hash.WriteFieldTag(14);
                 hash.WriteInt32(ConstructionSystem.MinimumNonRefineryFieldDistanceCells);
+            }
+            if (rulesRevision >= RulesRevisionV4)
+            {
+                hash.WriteFieldTag(15);
+                hash.WriteInt32(Movement.MovementSpacing.MaxRadius.RawValue);
+                hash.WriteFieldTag(16);
+                hash.WriteInt32(Movement.MovementSpacing.LargeRadius.RawValue);
             }
             return hash.Digest();
         }
