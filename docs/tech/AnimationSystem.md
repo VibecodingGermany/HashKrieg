@@ -1,6 +1,6 @@
 # Animation System
 
-**Version:** 0.3.1 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
+**Version:** 0.3.2 | **Status:** Entwurf – MS-1-Override verbindlich | **Verantwortungsbereich:** Lead Graphics Engineer | **Sprint:** 3
 
 ## Zweck
 
@@ -86,6 +86,13 @@ Die rig-lose Sparte ist in einer ersten, schlanken Form gebaut — ohne
   EditMode-Regressionstests prüfen Transform-Verläufe und vorhandene Radar-/
   Infanterie-Prefabs. Die visuelle Qualität im vollständigen Match bleibt separat
   abzunehmen; diese Korrekturen ersetzen weder Rigging noch Animations-LOD.
+
+- **Builder-Arbeit:** Eine Baustellenzuweisung zählt nur bei einem lebenden
+  Builder desselben Besitzers in Reichweite des tatsächlichen Footprints als
+  Arbeitszustand. Die View nutzt dieselbe bereits vorhandene Reichweitenhilfe
+  wie das Baustellen-HUD; eine pausierte Baustelle animiert den entfernten,
+  stehenden Builder nicht weiter. Ein PlayMode-Test verbindet Baufortschritt,
+  Bewegung/Stop über den Befehlsweg und die Armtransforms des Art-Prefabs.
 
 ## Animations-LOD (3 Stufen, Pflicht)
 
@@ -181,3 +188,4 @@ Der `RenderSnapshot` wird vom View-Adapter aus dem serialisierbaren Sim-State (D
 | 0.2.1 | 2026-07-24 | MG/Rocket-Module als MS-1-Pflicht klargestellt und nur Flak zurückgestellt | Lead Graphics Engineer |
 | 0.3.0 | 2026-10-17 | Umsetzungsstand der rig-losen Sparte (D-110): `UnitRigAnimator`, Knoten-Vertrag, View-Eingaben und Abweichungen vom Entwurf | Technical Art |
 | 0.3.1 | 2026-10-18 | Kontinuierlicher Radar-Schwenk, Gefechtsausrichtung der Infanterie und vollständiger Pool-Reset beschrieben; visuelle Match-Abnahme bleibt offen | Codex |
+| 0.3.2 | 2026-10-18 | Builder-Arbeit an tatsächliche Baustellenreichweite gebunden; PlayMode-Nachweis für Bauen und pausierte Fernzuweisung beschrieben | Codex |

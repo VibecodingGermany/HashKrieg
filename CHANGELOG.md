@@ -536,6 +536,11 @@ die Versionierung folgt (in der aktuellen Doku-Phase) dem Dokumentationsstand de
   bei 2 AE/Tick, bis eine gespielte Balance-Kalibrierung belastbare Werte gibt
 
 ### Behoben
+- **Builder-Arme folgen dem tatsächlichen Baubereich:** Eine Baustellenzuweisung
+  allein löst keine Arbeitsanimation mehr aus. Nur ein lebender eigener Builder
+  in Reichweite des Baustellen-Footprints arbeitet sichtbar; nach Wegfahren und
+  Stop bleiben seine Arme ruhig, während der Bau pausiert. PlayMode-Regression
+  prüft echte Baustelle, Befehle, Baufortschritt und Armbewegung gemeinsam.
 - **Animationskontinuität und Pool-Reset:** Radar-Schwenks springen nicht mehr
   beim Rotorumlauf; Infanterie richtet ihren Idle-Blick bei Zielkontakt oder
   Schuss neutral aus. Wiederverwendete Ansichten starten mit zurückgesetzten

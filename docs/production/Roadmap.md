@@ -1,6 +1,6 @@
 # Produktions-Roadmap
 
-**Version:** 2.4.0 | **Status:** messwertbasiertes Rebaseline – ohne Kalenderzusage | **Verantwortungsbereich:** Producer / Executive Producer | **Sprint:** 7
+**Version:** 2.4.1 | **Status:** messwertbasiertes Rebaseline – ohne Kalenderzusage | **Verantwortungsbereich:** Producer / Executive Producer | **Sprint:** 7
 
 ## Zweck
 
@@ -65,10 +65,10 @@ eine zurückgestellte Spielabnahme gemäß D-105 ist kein Meilenstein-Nachweis.
 
 | Priorität | Nächster überprüfbarer Schritt | Ehrlicher Stand |
 |---|---|---|
-| 1 | Animationskorrekturen an Radar, Infanterie und wiederverwendeten Ansichten prüfen; Bewegung, Zielen und Ernten aus Spielkamera ansehen | Transform-Animation ist vorhanden; vollständige visuelle Match-Abnahme offen |
+| 1 | Animationskorrekturen an Radar, Infanterie und wiederverwendeten Ansichten prüfen; Bewegung, Zielen und Ernten aus Spielkamera ansehen | Radar-/Ziel-/Pool-Korrekturen und Builder-Reichweite automatisiert geprüft; visuelle Teilprüfung in [GB-006](GrayboxLog.md), vollständige Match-Abnahme offen |
 | 2 | Eine vollständige Partie mit dem aktuellen Art-Stand von Aufbau bis Ergebnis spielen; Befehle einschließlich Attack-Move, Bau/Ernte und Gefechtsfeedback prüfen | Frühere Spielnachweise nehmen den aktuellen Stand nicht automatisch ab |
 | 3 | Aktuellen Art-Bestand als separates Paket samt Metadaten und Prüfsumme bereitstellen und Import prüfen | Art liegt außerhalb Git; lokaler Kandidat dokumentiert in [AssetPackage.md](../assets/AssetPackage.md), Upload und frischer Import offen |
-| 4 | Änderungen über PR, unabhängiges Review und grüne Pflicht-CI integrieren | Letzte Commits auf dem Arbeitsbranch gepusht; noch kein PR, lokale Folgekorrekturen nicht veröffentlicht |
+| 4 | Änderungen über PR, unabhängiges Review und grüne Pflicht-CI integrieren | [Draft-PR #154](https://github.com/VibecodingGermany/HashKrieg/pull/154) offen, mit main abgeglichen; CI auf `6f36b7e` grün, vollständige Spielabnahme weiter offen |
 | 5 | Bestehende Abnahmelücken zu Netzwerk und Gefechtsdichte abarbeiten | Zwei Unity-Fenster, LAN/VPS/Betrieb gemäß [Netzwerk-Abnahme A8](hashkrieg/12_Sprint_Zu_Zweit.md) sowie die [60-Einheiten-Sicht-/Gegenhörprüfung](hashkrieg/12B_Sprint_Sichtbares_Gefecht.md) bleiben offen |
 
 ## 5. Produktfragen
@@ -103,3 +103,4 @@ implementierten Zwei-Spieler-Pfads; dessen offene Abnahme steht in §4.
 | 2.2.0 | 2026-07-24 | D-064: Durchsatzbasis auf subject-unabhängig autorisierte Schema-1.3-Evidence nach zweistufigem G0-A-Bootstrap begrenzt | Producer / Executive Producer |
 | 2.3.0 | 2026-07-25 | D-066: Durchsatzbasis auf abgeschlossene zweiphasige Receipt-Autorisierung nach G0-A1/G0-A2 begrenzt | Producer / Executive Producer |
 | 2.4.0 | 2026-10-18 | Receipt-Sequenz gemäß D-076/D-091 als schlafend gekennzeichnet; aktuelle Beta-Vorbereitung mit offenen Integrations-, Art- und Spielabnahmen ergänzt | Codex |
+| 2.4.1 | 2026-10-18 | PR- und Integrationsstand sowie Animationsprüfung und visuelle Teilprüfung GB-006 nachgeführt | Codex |

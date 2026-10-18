@@ -1174,7 +1174,22 @@ namespace Nova.Gameplay.Match
                 if (!construction.TryGetSite(UnitCommandStateView.ToRawEntityId(id), out _, out _, out uint builderRaw)) continue;
                 if (builderRaw == 0u) continue;
                 EntityId builder = UnitCommandStateView.ToEntityId(builderRaw);
-                if (builder.IsValid && builder.Index < _buildingThisFrame.Length) _buildingThisFrame[builder.Index] = true;
+                if (!builder.IsValid || builder.Index >= _buildingThisFrame.Length
+                    || !entities.TryGetUnit(builder, out UnitState builderUnit)
+                    || builderUnit.Role != UnitRole.Builder
+                    || !entities.TryGetUnit(id, out UnitState siteUnit)
+                    || builderUnit.PlayerId != siteUnit.PlayerId) continue;
+
+                // Site entities sit at the footprint centre, as in the site HUD.
+                // Assignment survives a move away; only an in-reach builder actually works.
+                int half = SimDefinitions.BuildingFootprintCells / 2;
+                int originX = SimFixed.WorldToGrid(siteUnit.Transform.PositionX) - half;
+                int originY = SimFixed.WorldToGrid(siteUnit.Transform.PositionY) - half;
+                int builderX = Math.Max(0, SimFixed.WorldToGrid(builderUnit.Transform.PositionX));
+                int builderY = Math.Max(0, SimFixed.WorldToGrid(builderUnit.Transform.PositionY));
+                if (ConstructionSiteStatus.IsInReachOfFootprint(
+                    builderX, builderY, originX, originY, SimDefinitions.BuildingFootprintCells))
+                    _buildingThisFrame[builder.Index] = true;
             }
         }
 
